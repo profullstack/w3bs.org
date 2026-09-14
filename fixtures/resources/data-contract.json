@@ -1,0 +1,58 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/w3bs/data-contract@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Agree on the shape",
+  "description": "Draft a data contract with examples, validation rules, and compatibility notes.",
+  "publisher": {
+    "namespace": "w3bs",
+    "name": "W3BS reference examples",
+    "keyId": "w3bs-examples-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-09-14T00:00:00.000Z",
+  "provenance": {
+    "source": "https://w3bs.org/docs/founding-prd.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Fw3bs%2Fdata-contract%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "Draft a JSON data contract for: {{topic}}\n\nSpecify required and optional fields, types, constraints, versioning, null semantics and error cases. Include one valid and one invalid example. Separate proposed conventions from established standards. Highlight unresolved consumer requirements and avoid provider-specific assumptions.",
+    "inputs": {
+      "topic": {
+        "description": "The resource and intended consumers.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": ["model-independent"],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-examples-1",
+    "digest": "sha256:13319e1cf0372b9750bc8db1fb36a50e5f69c3e5aa9d223aec35a4d48783026f",
+    "signature": "RP4SSUNs7DiWxsV6wmiC95uD8O2yyvPbyFVcaDpvdaGs1up8FPerR6cc6B8xxKe31Pvz90cKaINBzTZ9MzL4Bw"
+  }
+}

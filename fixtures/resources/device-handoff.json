@@ -1,0 +1,58 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/w3bs/device-handoff@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "A careful handoff",
+  "description": "Prepare a device action proposal with limits, consent, and revocation made explicit.",
+  "publisher": {
+    "namespace": "w3bs",
+    "name": "W3BS reference examples",
+    "keyId": "w3bs-examples-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-09-14T00:00:00.000Z",
+  "provenance": {
+    "source": "https://w3bs.org/docs/founding-prd.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Fw3bs%2Fdevice-handoff%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "Prepare a handoff proposal for: {{topic}}\n\nList the device identity, intended action, required capabilities, owner approval, time limits, stop condition, failure behavior and revocation path. Mark missing information as unresolved. This is a proposal, not permission to actuate a device. Do not issue commands, bypass interlocks or infer human consent.",
+    "inputs": {
+      "topic": {
+        "description": "The proposed device action and environment.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": ["model-independent"],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-examples-1",
+    "digest": "sha256:529eb01088365497a6af8ff8acf624c8b58d337f99d23d4746678745386a2bac",
+    "signature": "ZDHXQTFS4EgUz-HH4oxo4sUPbTOVvjYy4ccnz0tni1zkdZSq9e2RfHMRabnFCqrdbGYyW3PUMKngUu7gfS-DAg"
+  }
+}

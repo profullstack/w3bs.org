@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "policy": "Pinned reference-example publisher key. This authenticates artifact provenance, not instruction authority, real-world identity or standards approval.",
+  "keys": [
+    {
+      "id": "w3bs-examples-1",
+      "namespace": "w3bs",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEApUtCLhkRs70WwiPeUkAuc0QOK77gW+nYghmYr9qsZTY=\n-----END PUBLIC KEY-----\n",
+      "revoked": false
+    }
+  ]
+}

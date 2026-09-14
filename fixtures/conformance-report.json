@@ -1,0 +1,102 @@
+{
+  "status": "passed",
+  "testedAt": "2026-09-14T18:11:16.415Z",
+  "implementationVersion": "0.1.0",
+  "sourceFingerprint": "05135f148e24f47f458afe99be87690460c0f32888299fed6a16b6e6486efbbe",
+  "nodeVersion": "v24.18.1",
+  "environment": "isolated loopback registry, not production",
+  "resource": "w3bs://prompt/w3bs/research@1",
+  "canonicalUri": "w3bs://prompt/w3bs/research@1.0.0",
+  "digest": "sha256:0decdf31a8d96b05b8f0708f0215e6cd8fbe5fde04fdd1950c4e2c431ae7c92d",
+  "surfaces": [
+    {
+      "name": "api",
+      "status": "passed",
+      "checks": [
+        "identity",
+        "version",
+        "full manifest",
+        "permissions",
+        "provenance",
+        "signature",
+        "revocation",
+        "effective authority"
+      ]
+    },
+    {
+      "name": "cli",
+      "status": "passed",
+      "checks": [
+        "identity",
+        "version",
+        "full manifest",
+        "permissions",
+        "provenance",
+        "signature",
+        "revocation",
+        "effective authority"
+      ]
+    },
+    {
+      "name": "web",
+      "status": "passed",
+      "checks": [
+        "identity",
+        "version",
+        "full manifest",
+        "permissions",
+        "provenance",
+        "signature",
+        "revocation",
+        "effective authority"
+      ]
+    },
+    {
+      "name": "mcpHttp",
+      "status": "passed",
+      "checks": [
+        "identity",
+        "version",
+        "full manifest",
+        "permissions",
+        "provenance",
+        "signature",
+        "revocation",
+        "effective authority"
+      ]
+    },
+    {
+      "name": "mcpStdio",
+      "status": "passed",
+      "checks": [
+        "identity",
+        "version",
+        "full manifest",
+        "permissions",
+        "provenance",
+        "signature",
+        "revocation",
+        "effective authority"
+      ]
+    },
+    {
+      "name": "native",
+      "status": "passed",
+      "checks": [
+        "identity",
+        "version",
+        "full manifest",
+        "permissions",
+        "provenance",
+        "signature",
+        "revocation",
+        "effective authority"
+      ]
+    }
+  ],
+  "limitations": [
+    "One reference stack with an independently implemented native verifier; no claim of independent organizational implementations.",
+    "Web envelope conformance is supplemented by Playwright browser tests.",
+    "No production availability or Recommendation status is implied."
+  ]
+}

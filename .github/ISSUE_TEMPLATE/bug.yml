@@ -1,0 +1,15 @@
+name: Bug report
+description: Report a reproducible reference implementation defect.
+body:
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps, expected behavior and observed behavior
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Revision, Node version and operating system
+    validations:
+      required: true

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "w3bs://prompt/w3bs/research@1.0.0",
+    "category": "Research"
+  },
+  {
+    "id": "w3bs://prompt/w3bs/code-review@1.0.0",
+    "category": "Engineering"
+  },
+  {
+    "id": "w3bs://prompt/w3bs/plain-language@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/w3bs/meeting-notes@1.0.0",
+    "category": "Collaboration"
+  },
+  {
+    "id": "w3bs://prompt/w3bs/accessibility@1.0.0",
+    "category": "Design"
+  },
+  {
+    "id": "w3bs://prompt/w3bs/data-contract@1.0.0",
+    "category": "Engineering"
+  },
+  {
+    "id": "w3bs://prompt/w3bs/threat-review@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/w3bs/release-notes@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/w3bs/source-check@1.0.0",
+    "category": "Research"
+  },
+  {
+    "id": "w3bs://prompt/w3bs/device-handoff@1.0.0",
+    "category": "Devices"
+  }
+]

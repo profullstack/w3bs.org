@@ -1,0 +1,22 @@
+name: Implementation or conformance report
+description: Share a compatible implementation or a disagreement between surfaces.
+body:
+  - type: input
+    id: implementation
+    attributes:
+      label: Implementation name, version and source
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Resource, tested surfaces and reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Expected and observed manifests or verification states
+      description: Include test reports. Remove credentials and private data.
+    validations:
+      required: true

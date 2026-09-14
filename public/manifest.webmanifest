@@ -1,0 +1,12 @@
+{
+  "id": "/",
+  "name": "W3BS — The Open Web",
+  "short_name": "W3BS",
+  "description": "Inspect the open Web for humans, agents and devices.",
+  "start_url": "/mission",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f4ed",
+  "theme_color": "#f6f4ed",
+  "icons": [{ "src": "/assets/mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

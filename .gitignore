@@ -1,0 +1,9 @@
+node_modules/
+.local/
+.env
+*.sqlite*
+playwright-report/
+test-results/
+artifacts/
+*.pem
+!fixtures/public-key.pem

@@ -1,0 +1,32 @@
+name: Standards proposal
+description: Propose a concrete interoperability improvement.
+title: '[Proposal] '
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and affected participants
+    validations:
+      required: true
+  - type: textarea
+    id: prior-art
+    attributes:
+      label: Existing standards and alternatives
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Proposed contract and trust boundaries
+    validations:
+      required: true
+  - type: textarea
+    id: conformance
+    attributes:
+      label: Testable interoperability example
+    validations:
+      required: true
+  - type: textarea
+    id: interests
+    attributes:
+      label: Relevant affiliations or conflicts

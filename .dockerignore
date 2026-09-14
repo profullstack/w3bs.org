@@ -1,0 +1,9 @@
+*
+!package.json
+!package-lock.json
+!src/**
+!native/**
+!public/**
+!fixtures/**
+!docs/**
+!Dockerfile
