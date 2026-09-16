@@ -63,7 +63,7 @@ export function authorize(token, expected = process.env.W3BS_PUBLISH_TOKEN) {
   if (actual.length !== target.length || !timingSafeEqual(actual, target))
     throw new W3bsError('UNAUTHORIZED', 'A valid registry publisher token is required.', 401);
 }
-export function dispatch(store, operation, args, { token, publishToken } = {}) {
+export async function dispatch(store, operation, args, { token, publishToken } = {}) {
   const definition = operations[operation];
   if (!definition) throw new W3bsError('UNKNOWN_OPERATION', 'Unknown W3BS operation.', 404);
   const parsed = definition.schema.safeParse(args);
@@ -74,10 +74,10 @@ export function dispatch(store, operation, args, { token, publishToken } = {}) {
     );
   if (definition.write) authorize(token, publishToken);
   const input = parsed.data;
-  if (operation === 'search') return { resources: store.search(input.query, input.type) };
+  if (operation === 'search') return { resources: await store.search(input.query, input.type) };
   if (operation === 'publish') return store.publish(input.manifest);
   if (operation === 'revoke') return store.revoke(input.uri, input.reason);
-  const result = store.inspect(input.uri);
+  const result = await store.inspect(input.uri);
   if (operation === 'verify')
     return { canonicalUri: result.canonicalUri, verification: result.verification };
   if (operation === 'run') {

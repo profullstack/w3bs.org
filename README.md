@@ -24,7 +24,7 @@ W3BS_API=http://localhost:3000 node native/client.mjs w3bs://prompt/w3bs/researc
 
 - Three implemented protocol drafts and five initial proposals, governance and contribution process.
 - Strict URI and manifest validation, RFC 8785 canonicalization, Ed25519 signatures and namespace-bound pinned public keys.
-- Persistent SQLite registry with ten signed prompt examples, immutable publication and resource revocation.
+- Persistent registry with ten signed prompt examples, immutable publication and resource revocation. PostgreSQL in production (`DATABASE_URL`), SQLite for local development and tests.
 - Shared search, resolve, inspect, verify, publish, run, revoke and conformance operations over CLI, HTTP and MCP, including stdio and Streamable HTTP.
 - Responsive web inspector, prompt search, manifest downloads, explicit template-rendering consent and a PWA offline state.
 - An experimental native URI handler with an independent parser and signature verifier.
@@ -46,9 +46,9 @@ Conformance compares the actual API, CLI process, HTML inspection envelope, HTTP
 
 ## Configuration and operation
 
-See `.env.example`, `docs/developers.md` and `docs/deployment.md`. Production requires a persistent `/data` volume, an explicit public origin and host allowlist. Administrative writes are disabled without a publisher token. Example private signing material stays in ignored `.local/keys` and is not required by the server.
+See `.env.example`, `docs/developers.md` and `docs/deployment.md`. Production requires a PostgreSQL `DATABASE_URL`, an explicit public origin and host allowlist. Administrative writes are disabled without a publisher token. Example private signing material stays in ignored `.local/keys` and is not required by the server.
 
-The Docker image runs one Node service as a non-root user. Use a single replica with SQLite. Source, governance proposals, issue templates and conformance fixtures are intended for public release.
+The Docker image runs one Node service as a non-root user against the self-hosted PostgreSQL service in the same Railway project. Source, governance proposals, issue templates and conformance fixtures are intended for public release.
 
 ## Layout
 

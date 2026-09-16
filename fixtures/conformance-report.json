@@ -1,8 +1,8 @@
 {
   "status": "passed",
-  "testedAt": "2026-09-14T18:11:16.415Z",
+  "testedAt": "2026-09-16T17:31:35.889Z",
   "implementationVersion": "0.1.0",
-  "sourceFingerprint": "05135f148e24f47f458afe99be87690460c0f32888299fed6a16b6e6486efbbe",
+  "sourceFingerprint": "5ef70588c02e655abee500bd3de87b75f3085e914fd02d2705143818d96558c7",
   "nodeVersion": "v24.18.1",
   "environment": "isolated loopback registry, not production",
   "resource": "w3bs://prompt/w3bs/research@1",
