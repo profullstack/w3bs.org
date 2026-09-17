@@ -21,7 +21,7 @@ test(
 );
 test('HTTP rejects hostile origins, arbitrary hosts, invalid bodies and unauthenticated writes', async () => {
   const instance = await startServer({
-    store: openStore({ path: ':memory:' }),
+    store: await openStore({ path: ':memory:' }),
     port: 0,
     publicOrigin: 'http://localhost:3000',
     publishToken: 'a'.repeat(32),
@@ -157,7 +157,7 @@ test('a new publisher can publish, render, revoke and inspect through HTTP', asy
   const manifest = signManifest(fixture, privateKey),
     token = 'b'.repeat(32);
   const instance = await startServer({
-    store: openStore({ path: ':memory:', trustStore: trust, seed: false }),
+    store: await openStore({ path: ':memory:', trustStore: trust, seed: false }),
     port: 0,
     publishToken: token,
   });
@@ -188,8 +188,8 @@ test('a new publisher can publish, render, revoke and inspect through HTTP', asy
   }
 });
 test('independent clients reject a valid signed artifact returned for the wrong URI', async () => {
-  const store = openStore({ path: ':memory:' }),
-    wrong = store.inspect('w3bs://prompt/w3bs/code-review@1');
+  const store = await openStore({ path: ':memory:' }),
+    wrong = await store.inspect('w3bs://prompt/w3bs/code-review@1');
   wrong.requestedUri = 'w3bs://prompt/w3bs/research@1';
   const server = createServer((_req, res) => {
     res.setHeader('Content-Type', 'application/json');
@@ -205,6 +205,6 @@ test('independent clients reject a valid signed artifact returned for the wrong 
   } finally {
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
-    store.close();
+    await store.close();
   }
 });

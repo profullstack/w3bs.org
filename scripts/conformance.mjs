@@ -25,7 +25,7 @@ function sourceFingerprint() {
 }
 export async function conformance() {
   const instance = await startServer({
-    store: openStore({ path: ':memory:' }),
+    store: await openStore({ path: ':memory:' }),
     port: 0,
     host: '127.0.0.1',
   });
