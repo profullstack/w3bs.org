@@ -32,7 +32,7 @@ test(
       writeFileSync(trustPath, JSON.stringify(trust));
       const token = 'c'.repeat(32);
       instance = await startServer({
-        store: openStore({ path: ':memory:', trustStore: trust }),
+        store: await openStore({ path: ':memory:', trustStore: trust }),
         port: 0,
         publishToken: token,
       });

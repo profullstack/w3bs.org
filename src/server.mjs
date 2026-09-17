@@ -12,11 +12,12 @@ import { createMcp } from './mcp.mjs';
 import { renderPage } from './site.mjs';
 
 export function createApp({
-  store = openStore(),
+  store,
   publishToken = process.env.W3BS_PUBLISH_TOKEN,
   publicOrigin = process.env.PUBLIC_ORIGIN || 'http://localhost:3000',
   allowedHosts = (process.env.ALLOWED_HOSTS || 'localhost,127.0.0.1').split(','),
 } = {}) {
+  if (!store) throw new Error('createApp requires an opened store; use startServer or openStore.');
   const app = express();
   const origin = new URL(publicOrigin).origin;
   const hosts = new Set(allowedHosts.map((host) => host.trim().toLowerCase()));
@@ -55,8 +56,13 @@ export function createApp({
   const token = (req) => /^Bearer (.+)$/.exec(req.headers.authorization || '')?.[1];
   const invoke = (req, name, args) =>
     dispatch(store, name, args, { token: token(req), publishToken });
-  app.get('/healthz', (_req, res) =>
-    res.json({ status: 'ok', version: '0.1.0', resources: store.search().length }),
+  app.get('/healthz', async (_req, res) =>
+    res.json({
+      status: 'ok',
+      version: '0.1.0',
+      storage: store.dialect,
+      resources: (await store.search()).length,
+    }),
   );
   app.get('/.well-known/w3bs.json', (_req, res) =>
     res.json({
@@ -108,13 +114,15 @@ export function createApp({
       );
     res.type('json').send(readFileSync(path, 'utf8'));
   });
-  app.get('/api/manifest', (req, res) => res.json(store.inspect(req.query.uri).manifest));
+  app.get('/api/manifest', async (req, res) =>
+    res.json((await store.inspect(req.query.uri)).manifest),
+  );
   for (const name of Object.keys(operations)) {
-    app.post(`/api/${name}`, (req, res) => res.json(invoke(req, name, req.body)));
+    app.post(`/api/${name}`, async (req, res) => res.json(await invoke(req, name, req.body)));
     if (['search', 'resolve', 'inspect', 'verify', 'conformance'].includes(name)) {
-      app.get(`/api/${name}`, (req, res) =>
+      app.get(`/api/${name}`, async (req, res) =>
         res.json(
-          invoke(
+          await invoke(
             req,
             name,
             name === 'search'
@@ -177,11 +185,13 @@ export function createApp({
     if (!existsSync(path)) throw new W3bsError('NOT_FOUND', 'Document not found.', 404);
     res.type('text/markdown').send(readFileSync(path, 'utf8'));
   });
-  app.get(/.*/, (req, res, next) => {
+  app.get(/.*/, async (req, res, next) => {
     try {
       res
         .type('html')
-        .send(renderPage({ path: req.path, host: req.hostname, query: req.query, store, origin }));
+        .send(
+          await renderPage({ path: req.path, host: req.hostname, query: req.query, store, origin }),
+        );
     } catch (error) {
       next(error);
     }
@@ -208,16 +218,14 @@ export function createApp({
             ? 'NOT_FOUND'
             : 'INTERNAL_ERROR');
     if (status === 500) process.stderr.write(`W3BS ${req.method} ${req.path}: ${error.message}\n`);
-    res
-      .status(status)
-      .json({
-        error: { code, message: status === 500 ? 'Internal server error.' : error.message },
-      });
+    res.status(status).json({
+      error: { code, message: status === 500 ? 'Internal server error.' : error.message },
+    });
   });
   return { app, store };
 }
 export async function startServer(options = {}) {
-  const { app, store } = createApp(options);
+  const { app, store } = createApp({ ...options, store: options.store ?? (await openStore()) });
   const server = createServer({ requestTimeout: 30000, headersTimeout: 10000 }, app);
   await new Promise((resolve, reject) => {
     server.once('error', reject);
@@ -233,7 +241,7 @@ export async function startServer(options = {}) {
     close: async () => {
       server.closeAllConnections();
       await new Promise((resolve) => server.close(resolve));
-      store.close();
+      await store.close();
     },
   };
 }

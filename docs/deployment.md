@@ -10,18 +10,18 @@ The service is deployment-ready source. Production launch requires publishing th
 | `PORT`               | Supplied by the host                                                                                                     |
 | `PUBLIC_ORIGIN`      | `https://w3bs.org`                                                                                                       |
 | `ALLOWED_HOSTS`      | `w3bs.org,www.w3bs.org,specs.w3bs.org,browse.w3bs.org,prompt.w3bs.org` plus the exact generated preview hostname if used |
-| `W3BS_DATA_DIR`      | `/data` on a persistent volume                                                                                           |
-| `RAILWAY_RUN_UID`    | `0` for Railway's root-owned volume; the bootstrap drops to uid/gid 1000 before starting HTTP                            |
+| `DATABASE_URL`       | PostgreSQL connection string. On Railway, `${{Postgres.DATABASE_URL}}` from the self-hosted Postgres service            |
+| `W3BS_DATA_DIR`      | Only used without `DATABASE_URL`: SQLite directory for local development                                                 |
 | `W3BS_PUBLISH_TOKEN` | Random administrative secret, at least 32 characters; absent means read-only                                             |
 | `W3BS_TRUST_FILE`    | Optional path to a mounted operator-managed trust file; otherwise bundled example public keys                            |
 
-Never deploy `.local/keys` or upload publisher private keys. The container needs public keys and pre-signed examples only. Store any administrative token in the provider's secret manager. Back up the SQLite database and trust configuration. Use one replica; horizontal replication requires replacing the local SQLite adapter.
+Never deploy `.local/keys` or upload publisher private keys. The container needs public keys and pre-signed examples only. Store any administrative token in the provider's secret manager. Back up the PostgreSQL database and trust configuration. The schema is created on first start; the ten bundled examples are seeded once and never re-inserted.
 
 ## Railway
 
-Create a service from the reviewed repository or local Docker context. The repository includes `Dockerfile` and `railway.json`. Attach a persistent volume at `/data`, provide the settings above and deploy. Health is `/healthz`.
+The production project is `w3bs` in the Profullstack workspace: a self-hosted PostgreSQL service (Railway's `postgres-ssl` image, one replica, its own volume) and the `w3bs` web service built from this repository's `Dockerfile` on every push to `main`. `railway.json` sets the health check to `/healthz`, which reports `"storage": "postgres"` when the database is in use.
 
-The health endpoint accepts Railway's `healthcheck.railway.app` hostname; that exception does not permit access to other routes. Railway volumes mount as root, so the container bootstrap initializes only the data directory and registry database files, then drops privileges before importing the server. It also works when launched directly as the image's default `node` user with an already writable volume. Provider references: https://docs.railway.com/deployments/healthchecks and https://docs.railway.com/volumes
+The health endpoint accepts Railway's `healthcheck.railway.app` hostname; that exception does not permit access to other routes. No application volume is needed. If a database URL carries `sslmode=require` (Railway's public proxy uses a self-signed certificate), the connection uses TLS without certificate verification; the internal URL has no `sslmode` and runs in plain TCP inside the private network. Provider references: https://docs.railway.com/deployments/healthchecks and https://docs.railway.com/guides/postgresql
 
 Add `w3bs.org`, `specs.w3bs.org`, `browse.w3bs.org` and `prompt.w3bs.org` as custom service domains. Read each exact DNS target and verification record from the hosting provider; do not guess them. Update the registrar records, replacing the parking records only for those requested website names. Wait for domain validation and certificate issuance.
 
