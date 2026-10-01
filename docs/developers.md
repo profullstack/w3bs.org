@@ -1,14 +1,14 @@
 # Build once. Meet every surface.
 
-The reference stack implements an experimental W3BS profile with a signed registry, resolver, web inspector, CLI, HTTP API, MCP server and independently implemented native verifier. Node.js 24 or later is required.
+The reference stack implements an experimental W3BS profile with a signed registry, resolver, web inspector, CLI, HTTP API, MCP server and independently implemented native verifier. The server runs on Bun 1.4 (pinned by `packageManager` in package.json); the CLI and native client also run on Node.js 24 or later.
 
 ## Start locally
 
 From the repository directory:
 
 ```sh
-npm ci
-npm start
+bun install
+bun run start
 ```
 
 Open http://localhost:3000 and set `W3BS_API=http://localhost:3000` in your shell. Ten signed resources seed the persistent SQLite registry on first start. The private example signing key is not required to run or deploy it.
@@ -91,10 +91,10 @@ The second command explicitly registers `w3bs://` for your Linux user. Opening s
 ## Conformance
 
 ```sh
-npm test
-npm run conformance
-npx playwright install chromium
-npm run test:browser
+bun run test
+bun run conformance
+bunx playwright install chromium
+bun run test:browser
 ```
 
 The suite starts an isolated registry and checks real CLI and native subprocesses, HTTP, both MCP transports and the web inspector. It includes signature tampering, namespace mismatch, immutable versions, persistent revocation and consent boundaries. Browser tests exercise navigation, prompt search, resource rendering, mobile layouts and offline behavior.

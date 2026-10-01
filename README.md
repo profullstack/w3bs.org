@@ -6,11 +6,11 @@ W3BS is a founding open standards initiative. This repository contains community
 
 ## Run
 
-Node.js 24+:
+Bun 1.4 (the version is pinned by `packageManager` in package.json; the CLI and native client also run on Node.js 24+):
 
 ```sh
-npm ci
-npm start
+bun install
+bun run start
 ```
 
 Open http://localhost:3000. The mission, specifications, prompt registry and resolver are available at `/mission`, `/specs`, `/prompts` and `/browse`. The same deployment can serve the four W3BS domains. Nothing in this README claims production DNS or deployment is complete.
@@ -35,11 +35,11 @@ W3BS_API=http://localhost:3000 node native/client.mjs w3bs://prompt/w3bs/researc
 ## Validate
 
 ```sh
-npm run check
-npm test
-npm run conformance
-npx playwright install chromium
-npm run test:browser
+bun run check
+bun run test
+bun run conformance
+bunx playwright install chromium
+bun run test:browser
 ```
 
 Conformance compares the actual API, CLI process, HTML inspection envelope, HTTP MCP, stdio MCP and independent native client. The browser suite checks the page loaded in Chromium, mobile overflow, forms and offline behavior. A passing reference suite is not a W3BS Recommendation or evidence of independent organizational adoption.

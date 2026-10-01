@@ -6,7 +6,7 @@ export default defineConfig({
   reporter: 'list',
   use: { baseURL: 'http://127.0.0.1:3417', trace: 'retain-on-failure' },
   webServer: {
-    command: 'node src/server.mjs',
+    command: 'bun src/server.mjs',
     url: 'http://127.0.0.1:3417/healthz',
     reuseExistingServer: false,
     env: {

@@ -2,26 +2,24 @@
   "name": "w3bs",
   "version": "0.1.0",
   "private": true,
-  "description": "W3BS community draft reference stack — the open Web for humans, agents and devices",
+  "description": "W3BS community draft reference stack \u2014 the open Web for humans, agents and devices",
   "type": "module",
   "license": "MIT",
-  "engines": {
-    "node": ">=24"
-  },
+  "packageManager": "bun@1.4.0",
   "bin": {
     "w3bs": "src/cli.mjs",
     "w3bs-open": "native/client.mjs"
   },
   "scripts": {
-    "start": "node src/server.mjs",
-    "dev": "node --watch src/server.mjs",
-    "test": "node --test test/*.test.mjs",
+    "start": "bun src/server.mjs",
+    "dev": "bun --watch src/server.mjs",
+    "test": "bun test test/*.test.mjs",
     "test:browser": "playwright test",
-    "check": "node scripts/check.mjs",
-    "seed:sign": "node scripts/sign-examples.mjs",
-    "mcp": "node src/mcp-stdio.mjs",
-    "conformance": "node scripts/conformance.mjs",
-    "build": "node scripts/check.mjs"
+    "check": "bun scripts/check.mjs",
+    "seed:sign": "bun scripts/sign-examples.mjs",
+    "mcp": "bun src/mcp-stdio.mjs",
+    "conformance": "bun scripts/conformance.mjs",
+    "build": "bun scripts/check.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
