@@ -4,7 +4,7 @@ Bring a concrete interoperability problem, an implementation report or a reprodu
 
 For a standards proposal, state the problem, affected actors and surfaces, existing standards considered, proposed wire contract, trust boundaries, migration implications and a testable acceptance example. Use the proposal issue template. Identify whether you are proposing text, implementing a draft or reporting interoperability.
 
-For code, run `npm run check`, `npm test` and the relevant browser checks before submitting. Describe the observable behavior and validation. Preserve signed fixture versions; new content requires a new version. Never commit private keys, tokens or `.local`.
+For code, run `bun run check`, `bun run test` and the relevant browser checks before submitting. Describe the observable behavior and validation. Preserve signed fixture versions; new content requires a new version. Never commit private keys, tokens or `.local`.
 
 Submit commits with a Developer Certificate of Origin sign-off (`git commit -s`) only when you can attest to https://developercertificate.org/. Contributions use this repository's MIT license. This is not an adopted standards patent policy; that policy requires open review before Recommendation status.
 
