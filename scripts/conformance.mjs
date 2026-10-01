@@ -20,7 +20,7 @@ function sourceFingerprint() {
       hash.update(readFileSync(resolve(ROOT, directory, filename)));
     }
   }
-  hash.update(readFileSync(resolve(ROOT, 'package-lock.json')));
+  hash.update(readFileSync(resolve(ROOT, 'bun.lock')));
   return hash.digest('hex');
 }
 export async function conformance() {
