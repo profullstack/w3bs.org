@@ -1,6 +1,6 @@
 # W3BS
 
-**The Open Web for Humans, Agents & Devices.**
+**Like Nostr but for everything**
 
 W3BS is a founding open standards initiative. This repository contains community drafts and an executable reference stack based on the supplied version 2.0 PRD, preserved in `docs/founding-prd.md`.
 
