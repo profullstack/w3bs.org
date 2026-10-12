@@ -64,6 +64,7 @@ const specs = [
 ];
 function header(active) {
   return `<a class="skip" href="#main">Skip to content</a><header class="header"><a class="wordmark" href="/mission" aria-label="W3BS home"><img src="/assets/mark.svg" alt="" width="28" height="28">w3bs<span class="wordmark-dot">.</span></a><nav aria-label="Main navigation">${[
+    ['/packages', 'Packages'],
     ['/specs', 'Standards'],
     ['/browse', 'Browse'],
     ['/prompts', 'Prompts'],
@@ -125,6 +126,30 @@ function resourceDetail(result) {
       '',
     )}<label class="consent"><input type="checkbox" id="run-consent" required> I authorize rendering this template with the inputs above.</label><button class="button dark" type="submit" ${!v.valid ? 'disabled' : ''}>Render instructions <span aria-hidden="true">→</span></button><p id="run-status" role="status" aria-live="polite"></p><pre class="instructions" id="run-output" hidden></pre></form></section><details class="inspector-panel"><summary>Canonical manifest</summary><pre class="json-source">${e(JSON.stringify(m, null, 2))}</pre></details></div><aside><section class="inspector-panel metadata"><h3>Resource details</h3><dl><dt>Version</dt><dd>${e(m.version)}</dd><dt>Publisher</dt><dd>${e(m.publisher.name)}</dd><dt>License</dt><dd>${e(m.license)}</dd><dt>Created</dt><dd>${e(m.createdAt.slice(0, 10))}</dd><dt>Runtime</dt><dd>${e(m.content.runtime)}</dd><dt>Permissions</dt><dd>${m.permissions.length ? e(m.permissions.join(', ')) : 'None requested'}</dd><dt>Dependencies</dt><dd>${m.dependencies.length ? e(m.dependencies.join(', ')) : 'None'}</dd><dt>Declared class</dt><dd>${e(m.trust.classification)}</dd><dt>Effective authority</dt><dd>${e(v.authority)}</dd></dl></section><section class="inspector-panel metadata"><h3>Verification</h3><dl><dt>Signature</dt><dd>${v.signatureValid ? 'Valid Ed25519 signature' : 'Not verified'}</dd><dt>Publisher key</dt><dd>${v.publisherTrusted ? 'Pinned by registry operator' : 'Untrusted'}</dd><dt>Revocation</dt><dd>${v.revoked ? 'Revoked' : 'Not revoked'}</dd><dt>Key ID</dt><dd>${e(v.keyId)}</dd><dt>Digest</dt><dd class="digest">${e(v.digest)}</dd></dl><a class="text-link" href="/api/manifest?uri=${encodeURIComponent(m.id)}">Download manifest ↗</a><a class="text-link" href="/api/conformance?uri=${encodeURIComponent(m.id)}">View fixture checks ↗</a></section><section class="inspector-panel"><h3>Provenance</h3><a class="break" href="${e(m.provenance.source)}">${e(m.provenance.source)}</a><p>${m.provenance.derivedFrom.length ? `Derived from ${e(m.provenance.derivedFrom.join(', '))}` : 'Original reference example.'}</p></section></aside></div></section>`;
 }
+const INSTALL = 'curl -fsSL https://w3bs.org/install.sh | sh';
+async function packagesPage(store, query) {
+  const filter = query.show === 'agentic' ? { agentic: true } : query.show === 'ours' ? { publisher: 'profullstack' } : {};
+  const items = await store.packages(String(query.q || ''), filter);
+  const all = await store.packages('');
+  const tab = (show, label, count) =>
+    `<a class="pill ${(query.show || '') === show ? 'green' : ''}" href="/packages${show ? `?show=${show}` : ''}">${e(label)} · ${count}</a>`;
+  const copy = (text) => `<button class="small-button" type="button" data-copy="${e(text)}">Copy</button>`;
+  return `<section class="page-head"><div class="eyebrow">W3BS PACKAGE MANAGER</div><h1>Install from anywhere.<br><em>Update everything</em> at once.</h1><p>One command line for the tools you install from their own websites. Every listed tool installs with its publisher's <code>curl | sh</code>, and <code>w3bs update</code> keeps all of them current.</p></section>
+  <section class="section resource-feature"><div><div class="eyebrow">GET STARTED</div><h2>One line.<br>Then one command.</h2><p>The installer downloads the prebuilt <code>w3bs</code> binary for your machine (Linux or macOS, x86_64 or arm64), checks it, and lets it install itself from the signed W3BS repository. No Node, Python or Rust needed.</p><a class="text-link" href="/docs/package-manager.md">Read the guide <span aria-hidden="true">→</span></a></div><div class="terminal"><div class="terminal-tabs"><span class="terminal-title">install w3bs</span></div><pre><code>${e(INSTALL)}</code></pre><div class="terminal-result">${copy(INSTALL)}<span class="terminal-label">THEN</span><code>w3bs install claude-code</code><code>w3bs list</code><code>w3bs update</code></div></div></section>
+  <section class="section"><div class="section-heading"><div><div class="eyebrow">THE CATALOG</div><h2>${all.length} tools,<br>one update command.</h2></div><p>Agentic coding tools, MCP servers and the CLIs around them. Search, copy the publisher's own installer, or let <code>w3bs install</code> run it and track it for you.</p></div>
+  <form class="search-bar" action="/packages" role="search"><label class="sr-only" for="package-search">Search packages</label><input id="package-search" name="q" type="search" value="${e(query.q || '')}" placeholder="Search by name, vendor or command…">${query.show ? `<input type="hidden" name="show" value="${e(query.show)}">` : ''}<button class="button dark" type="submit">Search <span aria-hidden="true">→</span></button></form>
+  <div class="catalog-heading"><span>${tab('', 'All', all.length)} ${tab('agentic', 'Agentic', all.filter((x) => x.agentic).length)} ${tab('ours', 'Profullstack', all.filter((x) => x.publisher === 'profullstack').length)}</span><span>${items.length} shown · curl installers only</span></div>
+  <div class="prompt-grid">${
+    items
+      .map(
+        (item) =>
+          `<article class="prompt-card" id="${e(item.id)}"><div class="prompt-top">${pill(item.agentic ? 'Agentic' : 'CLI', item.agentic ? 'green' : '')}<span class="verified-small">${e(item.vendor || '')}</span></div><h2>${e(item.name)}</h2><p>${e(item.description)}</p><code>${e(item.install)}</code><div class="prompt-bottom"><span>${copy(item.install)} <code>w3bs install ${e(item.id)}</code></span>${item.homepage ? `<a href="${e(item.homepage)}" rel="noopener">Site ↗</a>` : ''}</div></article>`,
+      )
+      .join('') || '<div class="empty"><h2>No matching tools.</h2><p><a href="/packages">See every package</a>.</p></div>'
+  }</div>
+  <aside class="callout"><strong>The listing rule: a curl installer, or you're not listed.</strong><p>Every tool here installs with one <code>curl … | sh</code> from its publisher. The script may use npm or pip inside, but <code>w3bs</code> only ever runs that installer. W3BS records what it ran, re-runs it on <code>w3bs update</code>, and is honest that it cannot roll back or verify a publisher's script. Publishers who want signed releases, pins and rollback can host a W3BS repository with <code>w3bs-publish</code>.</p><a href="/docs/package-manager.md#publishers">List your tool →</a></aside></section>
+  <section class="section"><div class="section-heading"><div><div class="eyebrow">HOW IT WORKS</div><h2>Your inventory.<br>Their release hosting.</h2></div><p>Publishers keep their domains, hosting and signing keys. You keep one inventory, one update command, pins, rollback and removal.</p></div><div class="principle-grid"><article><span class="card-index">01 / INSTALL</span><h3>From the website or by name.</h3><p>A publisher's <code>curl | sh</code> and <code>w3bs install</code> run the same engine and write the same receipt.</p></article><article><span class="card-index">02 / VERIFY</span><h3>Signed by the publisher.</h3><p>Native packages come from TUF-signed repositories: every artifact's length and SHA-256 is checked before anything is activated.</p></article><article><span class="card-index">03 / MAINTAIN</span><h3>Update all. Undo one.</h3><p><code>w3bs update</code> respects pins and major versions; <code>w3bs rollback</code> restores the previous files. Machine output with <code>--json</code>.</p></article></div></section>`;
+}
 function specIndex() {
   return `<section class="page-head"><div class="eyebrow">THE INITIAL STANDARDS SET</div><h1>Common ground.<br><em>Open questions.</em></h1><p>Eight specifications for a full-surface Web. Start with the implemented protocol drafts, then help shape what comes next.</p></section><div class="draft-note">Founding stage · All specifications are proposals or community drafts. No W3BS Recommendations have been issued.</div><div class="spec-list">${specs.map(([id, title, description, status], index) => `<a class="spec-row" href="/specs/${id}"><span class="spec-number">${String(index + 1).padStart(2, '0')}</span><div><span class="eyebrow">${id}</span><h2>${title}</h2><p>${description}</p></div>${pill(status)}<span class="row-arrow" aria-hidden="true">↗</span></a>`).join('')}</div><aside class="callout"><strong>Implementation is part of the standard.</strong><p>A Recommendation requires a conformance suite and multiple independent implementations. The reference stack is an experiment that makes these drafts testable.</p><a href="/developers#conformance">Run the conformance suite →</a></aside>`;
 }
@@ -154,6 +179,9 @@ export async function renderPage({ path, host, query, store, origin }) {
   } else if (path === '/browse') {
     title = 'Resource Browser';
     content = await browse(store, query);
+  } else if (path === '/packages') {
+    title = 'W3BS Package Manager';
+    content = await packagesPage(store, query);
   } else if (path === '/specs') {
     title = 'Open Standards';
     content = specIndex();

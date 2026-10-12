@@ -14,11 +14,13 @@ const SCHEMA = {
     CREATE TABLE IF NOT EXISTS resources (id TEXT PRIMARY KEY, base TEXT NOT NULL, version TEXT NOT NULL, manifest TEXT NOT NULL, published_at TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS resources_base ON resources(base);
     CREATE TABLE IF NOT EXISTS revocations (id TEXT PRIMARY KEY REFERENCES resources(id), reason TEXT NOT NULL, revoked_at TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS audit (sequence INTEGER PRIMARY KEY AUTOINCREMENT, operation TEXT NOT NULL, resource_id TEXT NOT NULL, at TEXT NOT NULL);`,
+    CREATE TABLE IF NOT EXISTS audit (sequence INTEGER PRIMARY KEY AUTOINCREMENT, operation TEXT NOT NULL, resource_id TEXT NOT NULL, at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, agentic INTEGER NOT NULL, publisher TEXT NOT NULL, entry TEXT NOT NULL, updated_at TEXT NOT NULL);`,
   postgres: `CREATE TABLE IF NOT EXISTS resources (id TEXT PRIMARY KEY, base TEXT NOT NULL, version TEXT NOT NULL, manifest TEXT NOT NULL, published_at TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS resources_base ON resources(base);
     CREATE TABLE IF NOT EXISTS revocations (id TEXT PRIMARY KEY REFERENCES resources(id), reason TEXT NOT NULL, revoked_at TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS audit (sequence BIGSERIAL PRIMARY KEY, operation TEXT NOT NULL, resource_id TEXT NOT NULL, at TEXT NOT NULL);`,
+    CREATE TABLE IF NOT EXISTS audit (sequence BIGSERIAL PRIMARY KEY, operation TEXT NOT NULL, resource_id TEXT NOT NULL, at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, agentic INTEGER NOT NULL, publisher TEXT NOT NULL, entry TEXT NOT NULL, updated_at TEXT NOT NULL);`,
 };
 
 async function openSqlite(path) {
@@ -219,6 +221,56 @@ export async function openStore({
     });
     return inspect(canonicalUri);
   }
+  // The package catalog: every tool listed here installs with its publisher's own
+  // `curl | sh` installer (the listing rule), mirrored from catalog/catalog.json and
+  // signed into the official W3BS repository at /repo.
+  async function syncPackages() {
+    const path = resolve(ROOT, 'catalog/catalog.json');
+    let rows = [];
+    try {
+      rows = JSON.parse(readFileSync(path, 'utf8'));
+    } catch {
+      return 0;
+    }
+    const now = new Date().toISOString();
+    await db.transaction(async (tx) => {
+      const ids = rows.map((row) => row.id);
+      for (const row of rows) {
+        if (!/^curl\s.*https:\/\/\S+.*\|\s*(sh|bash)\s*$/.test(row.install || ''))
+          throw new Error(`catalog entry ${row.id} has no curl | sh installer`);
+        await tx.run(
+          'INSERT INTO packages(id, name, kind, agentic, publisher, entry, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET name = excluded.name, kind = excluded.kind, agentic = excluded.agentic, publisher = excluded.publisher, entry = excluded.entry, updated_at = excluded.updated_at',
+          [row.id, row.name, 'curl', row.agentic ? 1 : 0, row.publisher || 'third-party', JSON.stringify(row), now],
+        );
+      }
+      for (const { id } of await tx.all('SELECT id FROM packages'))
+        if (!ids.includes(id)) await tx.run('DELETE FROM packages WHERE id = ?', [id]);
+    });
+    return rows.length;
+  }
+  async function packages(query = '', { agentic, publisher } = {}) {
+    if (typeof query !== 'string' || query.length > 200)
+      throw new W3bsError('INVALID_QUERY', 'Search is limited to 200 characters.');
+    const q = query.toLowerCase();
+    return (await db.all('SELECT entry FROM packages ORDER BY id'))
+      .map((row) => JSON.parse(row.entry))
+      .filter(
+        (item) =>
+          (agentic === undefined || Boolean(item.agentic) === agentic) &&
+          (!publisher || item.publisher === publisher) &&
+          `${item.id} ${item.name} ${item.vendor || ''} ${item.description} ${(item.commands || []).join(' ')}`
+            .toLowerCase()
+            .includes(q),
+      )
+      .map(({ evidence, ...item }) => ({ ...item, w3bs: `w3bs install ${item.id}` }));
+  }
+  async function packageById(id) {
+    const row = await db.get('SELECT entry FROM packages WHERE id = ?', [id]);
+    if (!row) throw new W3bsError('NOT_FOUND', `No package ${id} in the catalog.`, 404);
+    const { evidence, ...item } = JSON.parse(row.entry);
+    return { ...item, w3bs: `w3bs install ${item.id}` };
+  }
+  await syncPackages();
   if (seed) {
     for (const filename of readdirSync(resolve(ROOT, 'fixtures/resources'))
       .filter((name) => name.endsWith('.json'))
@@ -235,6 +287,9 @@ export async function openStore({
     publish,
     search,
     revoke,
+    packages,
+    package: packageById,
+    syncPackages,
     trust,
     dialect: db.dialect,
     close: () => db.close(),

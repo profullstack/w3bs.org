@@ -17,6 +17,8 @@ COPY --chown=bun:bun native ./native
 COPY --chown=bun:bun public ./public
 COPY --chown=bun:bun fixtures ./fixtures
 COPY --chown=bun:bun docs ./docs
+COPY --chown=bun:bun catalog ./catalog
+COPY --chown=bun:bun registry ./registry
 # Production storage is PostgreSQL (DATABASE_URL). Without it the store falls
 # back to SQLite in W3BS_DATA_DIR, so keep that directory writable by uid 1000.
 RUN mkdir -p /data && chown bun:bun /data
