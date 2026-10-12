@@ -303,6 +303,9 @@ pub struct CatalogIndex {
 pub struct CatalogEntry {
     pub id: PackageId,
     pub name: String,
+    /// Human display name, e.g. "Claude Code" for `anthropic.com/claude-code`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
