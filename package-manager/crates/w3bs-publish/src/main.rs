@@ -141,6 +141,12 @@ async fn main() -> Result<()> {
                     let install = parse_curl_command(cmd).with_context(|| format!("{}: not a curl | sh command: {cmd}", v["id"]))?;
                     let mut e = v.clone();
                     e["install"] = serde_json::to_value(install)?;
+                    // Seed rows carry a display name; OpenPkg `name` is the id's name.
+                    let id_name = v["id"].as_str().and_then(|i| i.split_once('/')).map(|(_, n)| n.to_owned()).unwrap_or_default();
+                    if e["name"].as_str() != Some(id_name.as_str()) {
+                        e["title"] = e["name"].clone();
+                        e["name"] = id_name.into();
+                    }
                     entries.push(serde_json::from_value::<CatalogEntry>(e)?);
                 } else {
                     entries.push(serde_json::from_value::<CatalogEntry>(v)?);

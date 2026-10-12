@@ -28,8 +28,11 @@ jobs:
       - name: Installer is POSIX sh and does nothing when truncated
         run: |
           sh -n bootstrap/install.sh
-          for n in 100 400 1200 2400 4000; do head -c $n bootstrap/install.sh | env -i HOME=/nonexistent sh; done
-          ! ls /nonexistent 2>/dev/null
+          # A cut-off download must not run anything: main() is only called on the last line.
+          for n in 100 400 1200 2400 4000 6000; do
+            head -c $n bootstrap/install.sh | env -i HOME="$RUNNER_TEMP/h$n" PATH=/usr/bin:/bin sh >/dev/null 2>&1 || true
+            test ! -e "$RUNNER_TEMP/h$n"
+          done
       - name: Catalog entries all have curl installers
         run: |
           cargo run -q --bin w3bs-publish -- init "$RUNNER_TEMP/cat" >/dev/null
