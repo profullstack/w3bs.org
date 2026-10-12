@@ -47,7 +47,8 @@ impl W3bsTransport {
             if attempt.previous().len() >= MAX_REDIRECTS {
                 attempt.error("too many redirects")
             } else if !url_allowed(attempt.url(), dev) || attempt.url().scheme() == "file" {
-                attempt.error(format!("refusing redirect to {}", attempt.url()))
+                let msg = format!("refusing redirect to {}", attempt.url());
+                attempt.error(msg)
             } else {
                 attempt.follow()
             }

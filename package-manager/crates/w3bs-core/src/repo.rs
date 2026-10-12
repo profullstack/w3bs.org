@@ -82,6 +82,7 @@ pub async fn fetch_initial_root(base: &Url, dev: bool) -> Result<Vec<u8>> {
 }
 
 pub struct LoadedRepo {
+    pub dev: bool,
     pub alias: String,
     pub repo_key: String,
     pub fingerprint: String,
@@ -114,7 +115,7 @@ pub async fn load(layout: &Layout, alias: &str, base_url: &str, key: &str) -> Re
         .load()
         .await
         .map_err(|e| classify_tough(alias, e))?;
-    Ok(LoadedRepo { alias: alias.to_owned(), repo_key: key.to_owned(), fingerprint: fingerprint(&initial), repo })
+    Ok(LoadedRepo { dev: layout.dev_transport, alias: alias.to_owned(), repo_key: key.to_owned(), fingerprint: fingerprint(&initial), repo })
 }
 
 fn classify_tough(alias: &str, e: tough::error::Error) -> Error {
@@ -171,7 +172,7 @@ impl LoadedRepo {
             return Ok(CatalogIndex { schema_version: w3bs_schema::manifest::SCHEMA_VERSION.into(), entries: vec![] });
         }
         let b = self.read_target(CATALOG_INDEX_TARGET, MAX_DOCUMENT).await?;
-        CatalogIndex::parse(&b).map_err(|e| Error::package("INVALID_CATALOG", format!("repository `{}`: {e}", self.alias)))
+        CatalogIndex::parse_with(&b, self.dev).map_err(|e| Error::package("INVALID_CATALOG", format!("repository `{}`: {e}", self.alias)))
     }
 
     /// The repository's package index; an absent target means no native packages.

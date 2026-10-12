@@ -3,8 +3,11 @@
 
 mod activate;
 mod lifecycle;
-mod maint;
+pub(crate) mod maint;
 mod repos;
+pub mod repos_api {
+    pub use super::repos::RepoAdd;
+}
 
 pub use lifecycle::{InstallRequest, UpdateRequest};
 
