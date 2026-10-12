@@ -157,7 +157,7 @@ impl Engine {
             }
             for e in catalog.entries.into_iter().filter(|e| r.matches(&e.id)) {
                 // A native package wins over a catalog entry for the same identity in one repository.
-                if !found.iter().any(|(rr, x)| rr.alias == repo.alias && x.id() == e.id) {
+                if !found.iter().any(|(rr, x)| rr.alias == repo.alias && *x.id() == e.id) {
                     found.push((repo.clone(), Resolved::Script(e)));
                 }
             }
@@ -285,6 +285,11 @@ impl Engine {
         if let Some(c) = &req.channel {
             w3bs_schema::manifest::validate_channel(c).map_err(|e| Error::usage("INVALID_CHANNEL", e))?;
         }
+        // Validate every argument before touching state.
+        let refs = parse_refs(&req.packages)?;
+        if refs.len() > 1 && req.version.is_some() {
+            return Err(Error::usage("VERSION_NEEDS_ONE_PACKAGE", "--version selects a release of exactly one package"));
+        }
         if self.opts.dry_run { self.begin_read()? } else { self.begin_mutation()? }
         let txn = txn_id();
         res.transaction_id = Some(txn.clone());
@@ -298,12 +303,11 @@ impl Engine {
                 Err(e) => res.packages.push(failure(&url, None, &e, Status::Failed)),
             }
         }
-        let refs = parse_refs(&req.packages)?;
-        if refs.len() > 1 && req.version.is_some() {
-            return Err(Error::usage("VERSION_NEEDS_ONE_PACKAGE", "--version selects a release of exactly one package"));
-        }
         for r in &refs {
             match self.plan_install(r, &req).await {
+                // Two spellings of one identity (`atlas`, `tools.example/atlas`) plan once.
+                Ok(Ok(c)) if changes.iter().any(|x| x.id() == c.id()) => {}
+                Ok(Err(o)) if res.packages.iter().any(|x| x.id == o.id) => {}
                 Ok(Ok(c)) => changes.push(c),
                 Ok(Err(o)) => res.packages.push(o),
                 Err(e) if matches!(e.kind, Kind::Usage | Kind::Approval | Kind::Preflight) => return Err(e),
@@ -820,6 +824,10 @@ impl Engine {
 
     pub async fn update(&mut self, req: UpdateRequest) -> Result<OperationResult> {
         let mut res = OperationResult::new("update");
+        parse_refs(&req.packages)?;
+        if req.all && !req.packages.is_empty() {
+            return Err(Error::usage("ALL_WITH_PACKAGES", "--all cannot be combined with package names"));
+        }
         if self.opts.dry_run { self.begin_read()? } else { self.begin_mutation()? }
         let txn = txn_id();
         res.transaction_id = Some(txn.clone());
@@ -993,6 +1001,7 @@ impl Engine {
         if !all && raw.is_empty() {
             return Err(Error::usage("MISSING_PACKAGE", "remove needs package names, or --all to remove every managed application"));
         }
+        parse_refs(raw)?;
         if self.opts.dry_run { self.begin_read()? } else { self.begin_mutation()? }
         let mut targets: Vec<Installed> = vec![];
         if all {

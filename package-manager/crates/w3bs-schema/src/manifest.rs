@@ -342,10 +342,15 @@ impl CurlInstall {
 
 impl CatalogIndex {
     pub fn parse(bytes: &[u8]) -> Result<Self, SchemaError> {
+        Self::parse_with(bytes, false)
+    }
+
+    /// `allow_file` admits `file://` installer URLs; only for development transport.
+    pub fn parse_with(bytes: &[u8], allow_file: bool) -> Result<Self, SchemaError> {
         let c: CatalogIndex = serde_json::from_slice(bytes)?;
         check_schema_version(&c.schema_version)?;
         for e in &c.entries {
-            e.validate()?;
+            e.validate_with(allow_file)?;
         }
         Ok(c)
     }
@@ -353,10 +358,15 @@ impl CatalogIndex {
 
 impl CatalogEntry {
     pub fn validate(&self) -> Result<(), SchemaError> {
+        self.validate_with(false)
+    }
+
+    pub fn validate_with(&self, allow_file: bool) -> Result<(), SchemaError> {
         if self.name != self.id.name() {
             return Err(SchemaError::Invalid(format!("catalog name `{}` does not match id `{}`", self.name, self.id)));
         }
-        if !self.install.url.starts_with("https://") || self.install.url.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        let scheme_ok = self.install.url.starts_with("https://") || (allow_file && self.install.url.starts_with("file://"));
+        if !scheme_ok || self.install.url.chars().any(|c| c.is_whitespace() || c.is_control()) {
             return Err(SchemaError::Invalid(format!("installer for `{}` must be a plain https:// URL", self.id)));
         }
         if !matches!(self.install.shell.as_str(), "sh" | "bash") {

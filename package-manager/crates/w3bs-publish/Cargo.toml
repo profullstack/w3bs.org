@@ -1,0 +1,29 @@
+[package]
+name = "w3bs-publish"
+description = "Publisher tooling for W3BS / OpenPkg repositories: keys, manifests, signed TUF metadata, curl installer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "w3bs-publish"
+path = "src/main.rs"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+w3bs-schema.workspace = true
+anyhow.workspace = true
+aws-lc-rs.workspace = true
+clap.workspace = true
+hex.workspace = true
+jiff.workspace = true
+semver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+tough.workspace = true
+walkdir = "2"

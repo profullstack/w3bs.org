@@ -29,5 +29,6 @@ tough.workspace = true
 url.workspace = true
 libc = "0.2"
 
+
 [dev-dependencies]
-w3bs-publish = { path = "../w3bs-publish" }
+tempfile.workspace = true

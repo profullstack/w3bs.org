@@ -1,0 +1,29 @@
+[package]
+name = "w3bs-cli"
+description = "W3BS Package Manager: install from any participating website or with `w3bs install`, manage every package, update all with one command"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[[bin]]
+name = "w3bs"
+path = "src/main.rs"
+
+[dependencies]
+w3bs-core.workspace = true
+w3bs-schema.workspace = true
+clap.workspace = true
+semver.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+w3bs-publish = { path = "../w3bs-publish" }
+tempfile.workspace = true
+flate2.workspace = true
+tar.workspace = true
+sha2.workspace = true
+hex.workspace = true
+fs4.workspace = true
