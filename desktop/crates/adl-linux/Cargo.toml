@@ -14,6 +14,7 @@ adl-broker.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 png.workspace = true
+libc.workspace = true
 zbus = { version = "5.19", optional = true }
 
 [features]

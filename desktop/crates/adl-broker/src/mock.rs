@@ -30,6 +30,7 @@ struct State {
     focus_steal_after: Option<(usize, String)>,
     begin_error: Option<String>,
     interlock: Option<String>,
+    untypeable: String,
 }
 
 pub struct MockDesktop {
@@ -120,6 +121,11 @@ impl MockDesktop {
     }
     pub fn set_interlock(&self, why: Option<&str>) {
         self.lock().interlock = why.map(Into::into);
+    }
+    /// Characters the "compositor" cannot type; `preflight` refuses text containing them, the
+    /// way the GNOME backend refuses characters missing from the active layout.
+    pub fn set_untypeable(&self, chars: &str) {
+        self.lock().untypeable = chars.into();
     }
     pub fn open_stream(&self) {
         self.lock().streams += 1;
@@ -265,6 +271,17 @@ impl Adapter for MockDesktop {
                 self.focus(&w);
             } else {
                 s.focus_steal_after = Some((n - 1, w));
+            }
+        }
+        Ok(())
+    }
+
+    fn preflight(&self, action: &Action) -> Result<()> {
+        let s = self.lock();
+        if let Action::Type { text } = action {
+            let bad: String = text.chars().filter(|c| s.untypeable.contains(*c)).collect();
+            if !bad.is_empty() {
+                return Err(AdlError::unsupported(format!("cannot type {bad}; nothing was typed")));
             }
         }
         Ok(())
