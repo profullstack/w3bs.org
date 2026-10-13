@@ -28,5 +28,11 @@ adl-linux.workspace = true
 ksni = { version = "0.3.6", default-features = false, features = ["blocking", "async-io"] }
 zbus = "5.19"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+adl-macos.workspace = true
+objc2 = "=0.6.5"
+objc2-foundation = "=0.3.2"
+objc2-app-kit = "=0.3.2"
+
 [dev-dependencies]
 tempfile.workspace = true

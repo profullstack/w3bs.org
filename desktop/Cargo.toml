@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/adl-schema", "crates/adl-broker", "crates/adl-linux", "crates/w3bs-desktop"]
+members = ["crates/adl-schema", "crates/adl-broker", "crates/adl-linux", "crates/adl-macos", "crates/w3bs-desktop"]
 
 [workspace.package]
 version = "0.1.0"
@@ -14,6 +14,7 @@ rust-version = "1.88"
 adl-schema = { path = "crates/adl-schema" }
 adl-broker = { path = "crates/adl-broker" }
 adl-linux = { path = "crates/adl-linux" }
+adl-macos = { path = "crates/adl-macos" }
 base64 = "0.22"
 clap = { version = "4.6", features = ["derive", "wrap_help", "env"] }
 getrandom = "0.3"
