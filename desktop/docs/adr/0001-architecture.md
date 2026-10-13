@@ -52,4 +52,17 @@ Status: accepted, 2026-10-13
   when its owner is the gnome-shell process. The extension never injects input; it is also the
   GNOME native control, so unloading it disables access. Without it, targeted input on GNOME is
   refused rather than guessed.
+- Windows (added 2026-10-13, `adl-windows`): desktop logical coordinates are **virtual-screen
+  physical pixels**. The broker is per-monitor DPI aware (v2), so every Win32 call speaks physical
+  pixels; Windows has no single DIP plane across monitors with different scale factors, so DIPs
+  could not serve as one space. Displays report `scale = 1.0` (captures map 1:1) and state their
+  DPI in the name. Absolute pointer motion uses `MOUSEEVENTF_VIRTUALDESK` with
+  `ceil(offset * 65536 / len)` and confirms the landing pixel. The named-pipe transport uses
+  overlapped I/O because synchronous pipe handles serialize reads and writes per handle, which
+  would stall event delivery behind a pending read. The emergency stop is `Win+Alt+Esc`
+  (mirrors Super+Alt+Escape; fallback Ctrl+Alt+Shift+F12) registered by the adapter with
+  `RegisterHotKey`; the tray only names it. Physical mouse takeover uses a low-level mouse hook
+  that reads only the injected flag; there is no keyboard hook. Session events come from a hidden
+  top-level window (message-only windows get no broadcasts). UIPI silently drops input to
+  higher-integrity windows, so such targets are refused before sending.
 - Same-user hostile processes are out of scope, as the PRD states.
