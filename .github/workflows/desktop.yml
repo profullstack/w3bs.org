@@ -29,3 +29,24 @@ jobs:
         with:
           name: w3bs-desktop-linux-x86_64-unsigned
           path: desktop/target/release/w3bs-desktop
+  # The portable crates and the CLI on real macOS and Windows runners (mock adapter; the native
+  # backends add their own end-to-end jobs).
+  portable:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+      - run: cargo test --locked -p adl-schema -p adl-broker -p w3bs-desktop
+      - run: cargo clippy --locked -p adl-schema -p adl-broker -p w3bs-desktop --all-targets -- -D warnings

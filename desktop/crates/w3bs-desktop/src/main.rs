@@ -2,17 +2,22 @@
 
 mod client;
 mod control;
+#[cfg(target_os = "linux")]
 mod gnome_ext;
 mod mcp;
 mod paths;
 mod peer;
+mod platform;
 mod server;
+#[cfg(target_os = "linux")]
 mod shortcut;
+mod transport;
+#[cfg(target_os = "linux")]
 mod tray;
 
 use adl_broker::audit::Audit;
 use adl_broker::store::AgentStore;
-use adl_broker::{Adapter, Broker, Config};
+use adl_broker::{Broker, Config};
 use adl_schema::*;
 use base64::Engine as _;
 use clap::{Args, Parser, Subcommand, ValueEnum};
@@ -49,47 +54,10 @@ enum AdapterKind {
     Vela,
     /// XDG RemoteDesktop/ScreenCast/Screenshot portals (KDE Plasma, GNOME); windows come from KWin or the GNOME Shell extension
     Portal,
+    /// Windows (UI Automation + SendInput) or macOS (Accessibility + CGEvent) native backend
+    Native,
     /// Deterministic fake desktop for tests and demos
     Mock,
-}
-
-fn make_adapter(kind: AdapterKind) -> Result<Arc<dyn Adapter>> {
-    use adl_linux::gnome::{self, ShellBus, ShellObserver, WithGnome};
-    use adl_linux::kwin::{KWinObserver, KWinScripts, WithKWin};
-    use adl_linux::{portal::PortalAdapter, vela::VelaAdapter};
-    let vela = || VelaAdapter::default_socket().map(VelaAdapter::new).ok_or_else(|| AdlError::new(ErrorCode::Blocked, "Vela command socket not found (needs XDG_RUNTIME_DIR and WAYLAND_DISPLAY)"));
-    // The portal backend gets its window list, focus and stacking from KWin on Plasma and from
-    // the W3BS Shell extension on GNOME.
-    let portal = || -> Arc<dyn Adapter> {
-        let p = PortalAdapter::new(paths::config_dir().join("portal-restore-token"));
-        if KWinObserver::detect() {
-            return match KWinScripts::connect() {
-                Ok(src) => Arc::new(WithKWin::new(p, KWinObserver::new(Box::new(src)))),
-                Err(e) => {
-                    eprintln!("w3bs-desktop: KWin window observer unavailable ({}); targeted input will be refused", e.message);
-                    Arc::new(p.with_windows_note(format!("the KWin window observer is unavailable ({}); targeted input is refused", e.message)))
-                }
-            };
-        }
-        if gnome::detect() {
-            return match ShellBus::connect() {
-                Ok(src) => Arc::new(WithGnome::new(p, ShellObserver::new(Box::new(src)))),
-                Err(e) => {
-                    eprintln!("w3bs-desktop: no GNOME Shell window data ({}); targeted input will be refused", e.message);
-                    Arc::new(p.with_windows_note(format!("GNOME Shell window data is unavailable: {}; targeted input is refused until then (restart the daemon after installing)", e.message)))
-                }
-            };
-        }
-        Arc::new(p)
-    };
-    Ok(match kind {
-        AdapterKind::Mock => Arc::new(adl_broker::mock::MockDesktop::new()),
-        AdapterKind::Vela => Arc::new(vela()?),
-        AdapterKind::Portal => portal(),
-        AdapterKind::Auto if VelaAdapter::detect() => Arc::new(vela()?),
-        AdapterKind::Auto if PortalAdapter::detect() => portal(),
-        AdapterKind::Auto => return Err(AdlError::new(ErrorCode::Blocked, "no supported desktop session found (need a Wayland/X11 session with D-Bus, or Vela); use --adapter mock for a demo")),
-    })
 }
 
 #[derive(Args, Clone)]
@@ -480,11 +448,21 @@ fn preset_policy(p: Preset, apps: Vec<String>, approve_for: Vec<String>, hours: 
 }
 
 fn save_token(name: &str, token: &str) -> std::io::Result<PathBuf> {
-    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
     let path = paths::token_file(name);
     let dir = path.parent().unwrap();
-    std::fs::DirBuilder::new().recursive(true).mode(0o700).create(dir)?;
-    let mut f = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(&path)?;
+    let mut db = std::fs::DirBuilder::new();
+    db.recursive(true);
+    let mut oo = std::fs::OpenOptions::new();
+    oo.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+        db.mode(0o700);
+        oo.mode(0o600);
+    }
+    // Windows: %LOCALAPPDATA% is already private to the user.
+    db.create(dir)?;
+    let mut f = oo.open(&path)?;
     f.write_all(token.as_bytes())?;
     Ok(path)
 }
@@ -518,7 +496,7 @@ fn main() {
     let j = cli.json;
     let r: Result<Value> = (|| match cli.cmd {
         Cmd::Daemon { adapter, no_native_control, retention_days } => {
-            let adapter = make_adapter(adapter)?;
+            let adapter = platform::make_adapter(adapter)?;
             let store = AgentStore::open(paths::config_dir().join("agents.json"))?;
             let audit = Audit::open(paths::state_dir().join("audit"), retention_days);
             let cfg = Config { require_native_control: !no_native_control, ..Config::default() };
@@ -527,7 +505,7 @@ fn main() {
             Ok(Value::Null)
         }
         Cmd::Tray => {
-            tray::run().map_err(|e| AdlError::new(ErrorCode::Blocked, e.to_string()))?;
+            platform::run_tray().map_err(|e| AdlError::new(ErrorCode::Blocked, e.to_string()))?;
             Ok(Value::Null)
         }
         Cmd::Control => {
@@ -676,8 +654,13 @@ fn main() {
             Ok(Value::Null)
         }
         Cmd::Setup { client: SetupClient::GnomeExtension, .. } => {
-            let v = gnome_ext::install()?;
-            Ok(if j { v } else { json!(v["message"].as_str().unwrap_or_default()) })
+            #[cfg(target_os = "linux")]
+            {
+                let v = gnome_ext::install()?;
+                Ok(if j { v } else { json!(v["message"].as_str().unwrap_or_default()) })
+            }
+            #[cfg(not(target_os = "linux"))]
+            Err(AdlError::unsupported("the GNOME Shell extension is Linux-only"))
         }
         Cmd::Setup { client, agent } => {
             let name = agent.unwrap_or_else(|| "claude-code".into());

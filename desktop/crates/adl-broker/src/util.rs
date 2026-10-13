@@ -20,3 +20,16 @@ pub fn sha256_hex(data: &[u8]) -> String {
 pub fn ct_eq(a: &[u8], b: &[u8]) -> bool {
     a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
+
+/// Open options for a file only the user may read (0600 on Unix; Windows relies on the private
+/// per-user directory it lives in).
+pub fn private_file() -> std::fs::OpenOptions {
+    #[allow(unused_mut)]
+    let mut o = std::fs::OpenOptions::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        o.mode(0o600);
+    }
+    o
+}
