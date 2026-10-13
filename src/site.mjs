@@ -241,22 +241,22 @@ const desktopSteps = [
   ],
   [
     'Connect it to your agent',
-    'w3bs-desktop setup claude-code --agent claude-code',
-    'Prints the line to run, such as <code>claude mcp add w3bs-desktop -- w3bs-desktop mcp serve --stdio --agent claude-code</code>. Use <code>setup opencode</code> or <code>setup codex</code> for those clients. It is a local stdio MCP server; nothing goes through the cloud.',
+    'w3bs-desktop setup claude-code --agent claude-code --http',
+    'Prints the line to run: <code>claude mcp add --transport http w3bs-desktop http://127.0.0.1:7801/mcp --header "Authorization: Bearer …"</code>. That connects to the MCP endpoint the running broker serves on 127.0.0.1:7801, so nothing extra starts per session. It answers only on loopback, only with your agent token, and refuses browser requests. Leave off <code>--http</code> to get the stdio form instead (Claude Code starts <code>w3bs-desktop mcp serve --stdio</code> itself). Use <code>setup opencode</code> or <code>setup codex</code> for those clients. Nothing goes through the cloud.',
   ],
   [
     'Turn it on',
-    'Tray or panel: Enable agent access',
-    'Only you can do this, from the tray icon, the GNOME panel, the macOS menu bar, or <code>w3bs-desktop control</code> in a terminal (type <code>enable</code>). The first time, the system asks for permission: allow Remote Control on KDE; on GNOME pick your screen and switch on Allow Remote Interaction; on macOS allow <code>w3bs-desktop</code> under Privacy &amp; Security in Accessibility and Screen Recording (<code>w3bs-desktop doctor --prompt</code> opens the prompts). Windows needs no extra permission.',
+    'w3bs-desktop control',
+    'Only you can do this, from the tray icon, the GNOME panel, the macOS menu bar, or <code>w3bs-desktop control</code> in a terminal (type <code>enable</code>). The first time, the system asks for permission: allow Remote Control on KDE; on GNOME pick your screen and switch on Allow Remote Interaction; on macOS allow <code>w3bs-desktop</code> under Privacy &amp; Security in Accessibility and Screen Recording (<code>w3bs-desktop doctor --prompt</code> opens the prompts). Windows needs no extra permission.<br>In the control, type <code>enable</code> and press Enter. Or skip the terminal and click Enable agent access in the tray, the GNOME panel or the macOS menu bar.',
   ],
   [
     'Ask your agent to work',
-    'Open the text editor and write a short note',
+    'claude "open the text editor and write a short note"',
     'The agent checks the status, starts a task, looks at the windows and screen, then clicks and types into the window it named. Requests that need approval appear in the tray or panel menu with Approve and Deny.',
   ],
   [
     'Turn it off',
-    'Tray or panel: Disable agent access',
+    'w3bs-desktop disable',
     'Or press the emergency shortcut: Super+Alt+Escape on Linux (KDE shows Meta+Alt+Esc), Win+Alt+Esc on Windows, Control+Option+Command+Escape on macOS. You can also run <code>w3bs-desktop disable</code> or lock the screen. Everything stops at once, held keys are released, and nothing turns back on by itself.',
   ],
 ];
@@ -273,7 +273,8 @@ w3bs-desktop layout|windows list|inspect --window ID      --agent NAME
 w3bs-desktop screen capture --display ID --output shot.png --agent NAME
 w3bs-desktop mouse move|click|drag|scroll ...              --agent NAME
 w3bs-desktop keyboard type --stdin|press|shortcut ...      --agent NAME
-w3bs-desktop mcp serve --stdio --agent NAME`;
+w3bs-desktop mcp serve --stdio --agent NAME
+w3bs-desktop daemon --mcp-http 127.0.0.1:7801   # broker + MCP over HTTP (installers do this)`;
 const desktopUninstall = `# Linux
 systemctl --user disable --now w3bs-desktop
 rm ~/.local/bin/w3bs-desktop ~/.config/systemd/user/w3bs-desktop.service \\
@@ -295,7 +296,7 @@ ${e(DESKTOP_INSTALL)}
 # Windows (PowerShell)
 ${e(DESKTOP_INSTALL_WIN)}</code></pre><div class="terminal-result"><button class="small-button" type="button" data-copy="${e(DESKTOP_INSTALL)}">Copy macOS/Linux</button><button class="small-button" type="button" data-copy="${e(DESKTOP_INSTALL_WIN)}">Copy Windows</button><span class="terminal-label">AGENT ACCESS AFTER INSTALL</span><code>Disabled</code><span class="terminal-muted">You turn it on from the tray, panel or menu bar.</span></div></div></section>
   <section class="section" id="steps" aria-labelledby="steps-title"><div class="section-heading"><div><div class="eyebrow">HOW TO USE IT</div><h2 id="steps-title">Six steps.</h2></div><p>Commands are shown as <code>w3bs-desktop</code>; with the <a class="inline-link" href="/packages">w3bs CLI</a> installed, <code>w3bs desktop</code> works the same.</p></div><ol class="desktop-steps">${desktopSteps
-    .map(([title, cmd, text]) => `<li><h3>${title}</h3><div class="identity-line"><code>${e(cmd)}</code>${cmd.includes(' ') && !cmd.includes(':') && !cmd.startsWith('Open') ? `<button class="small-button" type="button" data-copy="${e(cmd)}">Copy</button>` : ''}</div><p>${text}</p></li>`)
+    .map(([title, cmd, text]) => `<li><h3>${title}</h3><div class="identity-line"><code>${e(cmd)}</code><button class="small-button" type="button" data-copy="${e(cmd)}">Copy</button></div><p>${text}</p></li>`)
     .join('')}</ol><aside class="callout"><strong>Screenshots on Linux.</strong><p>Desktops ask before an app may take screenshots. Allow it in your privacy settings, or run <code>flatpak permission-set screenshot screenshot "" yes</code>. Without it, screenshot requests are refused instead of popping up a dialog in the middle of agent work.</p></aside></section>
   <section class="section desktop-demo" aria-labelledby="demo-title"><div class="section-heading"><div><div class="eyebrow">THE NATIVE CONTROL</div><h2 id="demo-title">One switch.<br>Always in reach.</h2></div><p>Access starts Disabled after install, login, restart or a crash. Enabling needs a human. Disabling works at any time and stops everything the layer mediates. Try the menu below. It is a simulation.</p></div>${demo}</section>
   <section class="section"><div class="section-heading"><div><div class="eyebrow">WHAT IT DOES</div><h2>Real input.<br>Real limits.</h2></div><p>Agents need an observe, act, observe loop. They also need a human who can see what is happening and stop it.</p></div><div class="principle-grid"><article><span class="card-index">01 / MOUSE AND KEYBOARD</span><h3>The core, not an add-on.</h3><p>OS-level pointer and keyboard input: move, click, drag, scroll, hover, type, shortcuts and explicit key and button holds. Every coordinate names its space, and stale screenshots are rejected.</p></article><article><span class="card-index">02 / YOUR AGENTS</span><h3>The tools you already use.</h3><p>Claude Code, OpenCode and Codex connect through a local stdio MCP server. The same capability model backs the CLI and the local API. No cloud service sits in the middle.</p></article><article><span class="card-index">03 / YOUR SWITCH</span><h3>Stop means stop.</h3><p>Disable closes the authorization gate first, revokes the input lease, cancels queued work, closes capture streams and releases any keys the layer is holding.</p></article></div></section>

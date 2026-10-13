@@ -11,7 +11,7 @@ use std::io::{BufRead, Write};
 
 const PROTOCOL: &str = "2025-11-25";
 
-struct Session {
+pub(crate) struct Session {
     client: Client,
     task: Option<String>,
 }
@@ -151,22 +151,20 @@ fn tool_result(name: &str, r: Result<Value, AdlError>) -> Value {
     }
 }
 
-pub fn serve_stdio(token: String) -> Result<(), AdlError> {
-    let mut client = Client::connect(&paths::agent_socket())?;
-    client.call("hello", json!({"token": token, "client": "mcp"}))?;
-    let mut s = Session { client, task: None };
-    let stdin = std::io::stdin();
-    let mut out = std::io::stdout().lock();
-    for line in stdin.lock().lines() {
-        let Ok(line) = line else { break };
-        if line.trim().is_empty() {
-            continue;
-        }
-        let Ok(msg) = serde_json::from_str::<Value>(&line) else {
-            writeln!(out, "{}", json!({"jsonrpc": "2.0", "id": null, "error": {"code": -32700, "message": "parse error"}})).ok();
-            continue;
-        };
-        let Some(id) = msg.get("id").cloned() else { continue }; // notifications need no reply
+impl Session {
+    /// Connect to the broker's agent endpoint and authenticate. `hello` carries the client kind
+    /// (and, for the HTTP bridge, the verified pid of the agent process).
+    pub(crate) fn open(token: &str, hello: Value) -> Result<Self, AdlError> {
+        let mut client = Client::connect(&paths::agent_socket())?;
+        let mut h = hello;
+        h["token"] = json!(token);
+        client.call("hello", h)?;
+        Ok(Session { client, task: None })
+    }
+
+    /// Handle one JSON-RPC message. Notifications (no id) get no reply.
+    pub(crate) fn handle(&mut self, msg: &Value) -> Option<Value> {
+        let id = msg.get("id").cloned()?;
         let method = msg.get("method").and_then(Value::as_str).unwrap_or_default();
         let params = msg.get("params").cloned().unwrap_or(json!({}));
         let result = match method {
@@ -181,19 +179,42 @@ pub fn serve_stdio(token: String) -> Result<(), AdlError> {
             "tools/call" => {
                 let name = params.get("name").and_then(Value::as_str).unwrap_or_default().to_string();
                 let args = params.get("arguments").cloned().unwrap_or(json!({}));
-                Ok(tool_result(&name, s.call(&name, &args)))
+                Ok(tool_result(&name, self.call(&name, &args)))
             }
             _ => Err(json!({"code": -32601, "message": format!("method not found: {method}")})),
         };
-        let resp = match result {
+        Some(match result {
             Ok(r) => json!({"jsonrpc": "2.0", "id": id, "result": r}),
             Err(e) => json!({"jsonrpc": "2.0", "id": id, "error": e}),
+        })
+    }
+
+    /// End any task this session still holds (the client went away).
+    pub(crate) fn close(&mut self) {
+        if let Some(t) = self.task.take() {
+            let _ = self.client.call("task.end", json!({"task": t, "outcome": "cancelled"}));
+        }
+    }
+}
+
+pub fn serve_stdio(token: String) -> Result<(), AdlError> {
+    let mut s = Session::open(&token, json!({"client": "mcp"}))?;
+    let stdin = std::io::stdin();
+    let mut out = std::io::stdout().lock();
+    for line in stdin.lock().lines() {
+        let Ok(line) = line else { break };
+        if line.trim().is_empty() {
+            continue;
+        }
+        let Ok(msg) = serde_json::from_str::<Value>(&line) else {
+            writeln!(out, "{}", json!({"jsonrpc": "2.0", "id": null, "error": {"code": -32700, "message": "parse error"}})).ok();
+            continue;
         };
-        writeln!(out, "{resp}").ok();
-        out.flush().ok();
+        if let Some(resp) = s.handle(&msg) {
+            writeln!(out, "{resp}").ok();
+            out.flush().ok();
+        }
     }
-    if let Some(t) = s.task.take() {
-        let _ = s.client.call("task.end", json!({"task": t, "outcome": "cancelled"}));
-    }
+    s.close();
     Ok(())
 }
