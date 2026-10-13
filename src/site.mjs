@@ -68,6 +68,7 @@ function header(active) {
     ['/specs', 'Standards'],
     ['/browse', 'Browse'],
     ['/prompts', 'Prompts'],
+    ['/desktop', 'Desktop'],
     ['/governance', 'Participate'],
   ]
     .map(
@@ -79,7 +80,7 @@ function header(active) {
     )}</nav><a class="header-action" href="/developers">Start building <span aria-hidden="true">↗</span></a></header>`;
 }
 function footer() {
-  return `<footer><div><a class="wordmark" href="/mission">w3bs<span class="wordmark-dot">.</span></a><p>Human-friendly. Agent-native.<br>Device-friendly. Open by design.</p></div><div><span class="eyebrow">THE INITIATIVE</span><a href="/governance">Governance & participation</a><a href="/docs/founding-prd.md">Founding PRD · v2.0</a><a href="/docs/roadmap.md">Implementation status</a></div><div><span class="eyebrow">FOR IMPLEMENTERS</span><a href="/developers">Developer guide</a><a href="/.well-known/w3bs.json">Machine discovery ↗</a><a href="/api">API reference ↗</a></div><div class="footer-bottom"><span>Open standards for the Agentic Era.</span><span>Community drafts · No Recommendations issued</span></div></footer>`;
+  return `<footer><div><a class="wordmark" href="/mission">w3bs<span class="wordmark-dot">.</span></a><p>Human-friendly. Agent-native.<br>Device-friendly. Open by design.</p></div><div><span class="eyebrow">THE INITIATIVE</span><a href="/governance">Governance & participation</a><a href="/docs/founding-prd.md">Founding PRD · v2.0</a><a href="/docs/roadmap.md">Implementation status</a><a href="/desktop">Agentic Desktop Layer</a></div><div><span class="eyebrow">FOR IMPLEMENTERS</span><a href="/developers">Developer guide</a><a href="/.well-known/w3bs.json">Machine discovery ↗</a><a href="/api">API reference ↗</a></div><div class="footer-bottom"><span>Open standards for the Agentic Era.</span><span>Community drafts · No Recommendations issued</span></div></footer>`;
 }
 async function home(store) {
   const count = (await store.search()).length;
@@ -158,6 +159,64 @@ function document(file, title) {
   if (!existsSync(filename)) throw new W3bsError('NOT_FOUND', 'Specification not found.', 404);
   return `<div class="document-top"><a href="/specs">← Standards & documentation</a><a href="/docs/${e(file)}.md">Raw Markdown ↗</a></div><article class="prose">${marked.parse(readFileSync(filename, 'utf8'))}</article>`;
 }
+const desktopDescription =
+  'Agentic Desktop Layer: an open, local-first layer that lets authorized agents use your real desktop with mouse and keyboard, behind a switch you control. KDE Plasma and GNOME first.';
+const prdPath = '/docs/agentic-desktop-layer-prd.md';
+const desktopPlatforms = [
+  ['First', 'KDE Plasma', 'System-tray item or Plasma widget', 'In development'],
+  ['First', 'GNOME', 'Top-panel extension and settings app', 'In development'],
+  ['Next', 'Windows', 'Taskbar notification-area icon', 'Planned'],
+  ['Next', 'macOS', 'Menu-bar item', 'Planned'],
+  ['Next', 'Cinnamon, Xfce, MATE, LXQt', 'Tray or panel integration', 'Planned'],
+  [
+    'Expansion',
+    'Vela, Sway, Hyprland and others',
+    'Capability-based compositor adapters',
+    'Planned',
+  ],
+];
+const desktopMenuItems = [
+  ['agents', 'Agents and permissions…'],
+  ['tasks', 'Current tasks…'],
+  ['activity', 'Activity and approvals…'],
+  ['apps', 'Applications and accounts…'],
+  ['settings', 'Settings…'],
+];
+const desktopArchitecture = `Claude Code / OpenCode / Codex / compatible clients
+                       |
+               MCP / CLI / local API
+                       |
+       Local authorization and task broker
+                       |
+      Shared input engine, leases, audit records
+                       |
+       Desktop and application/service adapters
+                       |
+                Existing OS and apps
+
+Native tray/panel/menu-bar control
+                       |
+          Separate human-management channel`;
+const desktopCommands = `w3bs desktop status --json
+w3bs desktop enable
+w3bs desktop disable
+w3bs desktop agents add claude-code
+w3bs desktop windows list --json
+w3bs desktop mouse click --button left
+w3bs desktop keyboard shortcut --window WINDOW_ID --keys Ctrl+S
+w3bs desktop mcp serve --stdio`;
+function desktopPage() {
+  const prd = readFileSync(resolve(ROOT, 'docs', 'agentic-desktop-layer-prd.md'), 'utf8');
+  const demo = `<div class="demo-frame" data-desktop-demo><p class="demo-label"><span aria-hidden="true">◇</span> Interactive preview - does not control your device</p><div class="demo-screen"><div class="demo-panel"><span class="demo-apps" aria-hidden="true">▤ Files · Editor · Browser</span><span class="demo-clock" aria-hidden="true">09:41</span><button type="button" class="demo-tray" id="demo-tray" aria-haspopup="true" aria-expanded="false" aria-controls="demo-menu"><span class="demo-icon" data-demo-icon aria-hidden="true">○</span><span class="sr-only">Agentic Desktop Layer preview menu. Status: </span><span data-demo-chip>Disabled</span></button></div><div class="demo-menu" id="demo-menu" role="group" aria-labelledby="demo-menu-title" hidden><p class="demo-menu-title" id="demo-menu-title">Agentic Desktop Layer</p><p class="demo-status">Status: <strong data-demo-state>Disabled</strong></p><p class="demo-detail" data-demo-detail hidden></p><button type="button" class="button dark demo-toggle" data-demo-toggle>Enable agent access</button><ul class="demo-items">${desktopMenuItems.map(([key, label]) => `<li><button type="button" data-demo-item="${key}">${label}</button></li>`).join('')}</ul><div class="demo-danger"><button type="button" data-demo-stop>Stop all agent activity</button><button type="button" data-demo-quit>Quit and disable</button></div></div></div><div class="demo-footer"><button type="button" class="button primary" data-demo-emergency>Emergency stop</button><p class="demo-log" role="status" aria-live="polite" data-demo-log>Preview state: Disabled. Nothing on this page talks to your computer.</p></div><noscript><p class="demo-log">The preview needs JavaScript. The menu it shows is listed in section 4 of the PRD below.</p></noscript></div>`;
+  return `<section class="page-head desktop-head"><div class="eyebrow">AGENTIC DESKTOP LAYER · W3BS</div><h1>Your desktop.<br>Your agents.<br><em>Your switch.</em></h1><p>An open, local-first layer that lets the agents you authorize use your real desktop: move the mouse, click, drag, type, use shortcuts and read what is on screen. You keep your desktop. A control in your taskbar, panel or menu bar turns it on and off.</p></section><div class="draft-note desktop-status" id="status"><strong>Release status.</strong> M0/M1 in progress. Broker, mock adapter, CLI and MCP are in the repo. No certified platform. No downloads yet.</div>
+  <section class="section desktop-demo" aria-labelledby="demo-title"><div class="section-heading"><div><div class="eyebrow">THE NATIVE CONTROL</div><h2 id="demo-title">One switch.<br>Always in reach.</h2></div><p>Access starts Disabled after install, login, restart or a crash. Enabling needs a human. Disabling works at any time and stops everything the layer mediates. Try the menu below. It is a simulation.</p></div>${demo}</section>
+  <section class="section"><div class="section-heading"><div><div class="eyebrow">WHAT IT DOES</div><h2>Real input.<br>Real limits.</h2></div><p>Agents need an observe, act, observe loop. They also need a human who can see what is happening and stop it.</p></div><div class="principle-grid"><article><span class="card-index">01 / MOUSE AND KEYBOARD</span><h3>The core, not an add-on.</h3><p>OS-level pointer and keyboard input: move, click, drag, scroll, hover, type, shortcuts and explicit key and button holds. Every coordinate names its space, and stale screenshots are rejected.</p></article><article><span class="card-index">02 / YOUR AGENTS</span><h3>The tools you already use.</h3><p>Claude Code, OpenCode and Codex connect through a local stdio MCP server. The same capability model backs the CLI and the local API. No cloud service sits in the middle.</p></article><article><span class="card-index">03 / YOUR SWITCH</span><h3>Stop means stop.</h3><p>Disable closes the authorization gate first, revokes the input lease, cancels queued work, closes capture streams and releases any keys the layer is holding.</p></article></div></section>
+  <section class="section"><div class="section-heading"><div><div class="eyebrow">PLATFORMS</div><h2>KDE and GNOME first.<br><em>Then everywhere.</em></h2></div><p>These are targets, not compatibility claims. A platform is certified only when the full mouse, keyboard and stop workflow passes on it.</p></div><div class="table-wrap"><table class="platform-table"><caption class="sr-only">Platform delivery order</caption><thead><tr><th scope="col">Priority</th><th scope="col">Platform</th><th scope="col">Human control</th><th scope="col">Status</th></tr></thead><tbody>${desktopPlatforms.map(([priority, platform, control, status]) => `<tr><td>${priority}</td><th scope="row">${platform}</th><td>${control}</td><td>${pill(status)}</td></tr>`).join('')}</tbody></table></div><p class="table-note">Wayland first on KDE and GNOME, with X11 tested where the desktop still supports it. Vela support is a clean-room adapter built from public interface facts. No Vela code is used.</p></section>
+  <section class="section"><div class="section-heading"><div><div class="eyebrow">ARCHITECTURE</div><h2>One broker.<br>Thin adapters.</h2></div><p>The broker is platform-neutral and runs with your user's privileges. Desktop adapters only report what exists and emit events. Authorization, leases and cancellation stay in the broker, so a new platform cannot weaken them.</p></div><figure class="architecture"><pre aria-describedby="architecture-caption">${e(desktopArchitecture)}</pre><figcaption id="architecture-caption">Agents reach the broker over MCP, the CLI or a local API. The human's native control uses a separate channel that agents cannot call.</figcaption></figure></section>
+  <section class="section"><div class="section-heading"><div><div class="eyebrow">PERMISSIONS</div><h2>Authority,<br><em>on purpose.</em></h2></div><p>Mouse, keyboard, screen capture, clipboard and account access are separate, visible grants per agent.</p></div><div class="principle-grid"><article><span class="card-index">RESTRICTED</span><h3>Named apps only.</h3><p>The agent may act only on the applications you granted. Input aimed anywhere else is denied. Keyboard input must name its target window, and focus is checked before every chunk of text.</p></article><article><span class="card-index">BROAD DESKTOP</span><h3>Whole desktop, with a warning.</h3><p>Visual and input control of everything on screen. In this mode business rules cannot always be enforced: a draft-only mail grant does not stop sending through a browser.</p></article><article><span class="card-index">APPROVALS</span><h3>Bound to one exact request.</h3><p>An approval covers one agent, task, target and argument digest, and it expires. Agents cannot enable the layer or approve their own access. Input pauses while an approval is on screen.</p></article></div><aside class="callout"><strong>What disabling cannot undo.</strong><p>Turning the switch off stops new work at once. It cannot take back input already delivered, unsend an email, or erase data an agent already received. It also does not control tools or credentials an agent holds outside this layer.</p></aside></section>
+  <section class="section"><div class="section-heading"><div><div class="eyebrow">COMMAND LINE</div><h2>Proposed, not yet installable.</h2></div><p>The <code>w3bs desktop</code> namespace as specified. These commands are not install instructions. They will ship through the W3BS Package Manager when a platform passes certification.</p></div><figure class="architecture"><figcaption class="eyebrow">PROPOSED, NOT YET INSTALLABLE</figcaption><pre>${e(desktopCommands)}</pre></figure></section>
+  <section class="section prd-share" aria-labelledby="prd-title"><div class="section-heading"><div><div class="eyebrow">THE SPECIFICATION</div><h2 id="prd-title">Read the PRD.</h2></div><p>Version 0.2, October 12, 2026. An implementation specification, not a claim of released software. Source: <a class="inline-link" href="https://github.com/profullstack/w3bs.org/tree/main/desktop">github.com/profullstack/w3bs.org/desktop</a>.</p></div><div class="actions"><button type="button" class="button dark" data-copy-prd="${prdPath}">Copy Markdown</button><a class="button primary" href="${prdPath}" download="agentic-desktop-layer-prd.md">Download PRD <span aria-hidden="true">↓</span></a><a class="text-link" href="${prdPath}">Raw Markdown <span aria-hidden="true">↗</span></a></div><p class="copy-status" role="status" aria-live="polite" data-copy-status></p><div class="copy-fallback" data-copy-fallback hidden><label for="prd-fallback">Copying failed. The Markdown is below: select it all and copy it.</label><textarea id="prd-fallback" readonly rows="14" spellcheck="false"></textarea></div><details class="inspector-panel prd-full"><summary>Read the full PRD on this page</summary><article class="prose">${marked.parse(prd)}</article></details></section>`;
+}
 export async function renderPage({ path, host, query, store, origin }) {
   if (path === '/')
     path = host.startsWith('browse.')
@@ -169,7 +228,10 @@ export async function renderPage({ path, host, query, store, origin }) {
           : '/mission';
   let content,
     title,
-    active = path;
+    active = path,
+    description =
+      'Open standards for a Web where humans, agents and devices can discover, communicate and collaborate. Explore the W3BS community drafts and reference stack.',
+    scripts = '';
   if (path === '/mission') {
     title = 'Like Nostr but for everything';
     content = await home(store);
@@ -191,10 +253,15 @@ export async function renderPage({ path, host, query, store, origin }) {
   } else if (path === '/developers') {
     title = 'Build with W3BS';
     content = document('developers', title);
+  } else if (path === '/desktop') {
+    title = 'Agentic Desktop Layer';
+    description = desktopDescription;
+    scripts = '<script type="module" src="/assets/desktop.js"></script>';
+    content = desktopPage();
   } else if (/^\/specs\/W3BS-[A-Z]+-1$/.test(path)) {
     title = path.split('/').at(-1);
     content = document(title, title);
     active = '/specs';
   } else throw new W3bsError('NOT_FOUND', 'Page not found.', 404);
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${e(title)} — W3BS</title><meta name="description" content="Open standards for a Web where humans, agents and devices can discover, communicate and collaborate. Explore the W3BS community drafts and reference stack."><meta name="theme-color" content="#f6f4ed"><link rel="icon" type="image/svg+xml" href="/assets/mark.svg"><link rel="manifest" href="/manifest.webmanifest"><link rel="stylesheet" href="/assets/style.css"><script type="module" src="/assets/app.js"></script></head><body>${header(active)}<main id="main">${content}</main>${footer()}<div id="toast" class="toast" role="status" aria-live="polite" hidden></div></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${e(title)} — W3BS</title><meta name="description" content="${e(description)}"><meta name="theme-color" content="#f6f4ed"><link rel="icon" type="image/svg+xml" href="/assets/mark.svg"><link rel="manifest" href="/manifest.webmanifest"><link rel="stylesheet" href="/assets/style.css"><script type="module" src="/assets/app.js"></script>${scripts}</head><body>${header(active)}<main id="main">${content}</main>${footer()}<div id="toast" class="toast" role="status" aria-live="polite" hidden></div></body></html>`;
 }

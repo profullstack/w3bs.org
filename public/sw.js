@@ -1,10 +1,11 @@
 // Deliberately cache only static assets. Resolution, manifests and revocation
 // state always require the network; offline UI never claims current validity.
-const CACHE = 'w3bs-assets-v1';
+const CACHE = 'w3bs-assets-v2';
 const ASSETS = [
   '/assets/style.css',
   '/assets/tokens.css',
   '/assets/app.js',
+  '/assets/desktop.js',
   '/assets/mark.svg',
   '/assets/offline.html',
 ];
