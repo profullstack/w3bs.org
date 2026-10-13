@@ -1818,3 +1818,56 @@ textarea {
 .usage-steps .muted {
   font-size: 13px;
 }
+
+/* /desktop install steps */
+.desktop-steps {
+  list-style: none;
+  counter-reset: step;
+  display: grid;
+  gap: 18px;
+  margin: 24px 0;
+  padding: 0;
+}
+.desktop-steps li {
+  counter-increment: step;
+  position: relative;
+  padding: 18px 20px 18px 64px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+}
+.desktop-steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 20px;
+  top: 18px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--sage);
+  font-weight: 600;
+  line-height: 30px;
+  text-align: center;
+}
+.desktop-steps h3 {
+  margin: 0 0 8px;
+}
+.desktop-steps .identity-line {
+  flex-wrap: wrap;
+  margin: 0 0 8px;
+}
+.desktop-steps .identity-line code {
+  overflow-wrap: anywhere;
+}
+.desktop-steps p {
+  margin: 0;
+}
+@media (max-width: 640px) {
+  .desktop-steps li {
+    padding: 56px 16px 16px;
+  }
+  .desktop-steps li::before {
+    left: 16px;
+    top: 16px;
+  }
+}

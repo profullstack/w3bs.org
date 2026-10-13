@@ -224,13 +224,23 @@ test('Agentic Desktop Layer page, typo redirect, raw PRD and navigation', async 
       'Copy Markdown',
       'Download PRD',
       'Your switch.',
-      'No certified platform. No downloads yet.',
-      'Proposed, not yet installable',
+      'No platform is certified yet.',
+      'INSTALL AND USE',
+      'curl -fsSL https://w3bs.org/desktop/install.sh | sh',
+      'Enable agent access',
+      'Disable agent access',
       '/assets/desktop.js',
     ])
       assert.ok(html.includes(text), `missing ${text}`);
     assert.match(html, /<a href="\/desktop" aria-current="page">Desktop<\/a>/);
-    assert.ok(!html.includes('—Agentic') && !/curl -fsSL[^<]*desktop/.test(html));
+    assert.ok(!html.includes('—Agentic') && !html.includes('Proposed, not yet installable'));
+    const installer = await fetch(`${origin}/desktop/install.sh`);
+    assert.equal(installer.status, 200);
+    assert.match(installer.headers.get('content-type'), /shellscript/);
+    const installScript = await installer.text();
+    // Nothing runs until the last line, so a truncated download does nothing.
+    assert.equal(installScript.trimEnd().split('\n').at(-1), 'adl_main "$@"');
+    assert.ok(installScript.includes("SHA256SUMS") && !installScript.includes("enable.confirm"));
     const home = await (await fetch(`${origin}/mission`)).text();
     assert.match(home, /<a href="\/desktop" >Desktop<\/a>/);
     for (const path of ['/desktpo', '/desktpo/', '/desktop/']) {

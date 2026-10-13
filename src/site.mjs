@@ -192,10 +192,10 @@ const desktopDescription =
   'Agentic Desktop Layer: an open, local-first layer that lets authorized agents use your real desktop with mouse and keyboard, behind a switch you control. KDE Plasma and GNOME first.';
 const prdPath = '/docs/agentic-desktop-layer-prd.md';
 const desktopPlatforms = [
-  ['First', 'KDE Plasma', 'System-tray item or Plasma widget', 'In development'],
-  ['First', 'GNOME', 'Top-panel extension and settings app', 'In development'],
-  ['Next', 'Windows', 'Taskbar notification-area icon', 'Planned'],
-  ['Next', 'macOS', 'Menu-bar item', 'Planned'],
+  ['First', 'KDE Plasma', 'System-tray item or Plasma widget', 'Installable, testing'],
+  ['First', 'GNOME', 'Top-panel extension and settings app', 'Installable, testing'],
+  ['Next', 'Windows', 'Taskbar notification-area icon', 'In development'],
+  ['Next', 'macOS', 'Menu-bar item', 'In development'],
   ['Next', 'Cinnamon, Xfce, MATE, LXQt', 'Tray or panel integration', 'Planned'],
   [
     'Expansion',
@@ -226,24 +226,71 @@ const desktopArchitecture = `Claude Code / OpenCode / Codex / compatible clients
 Native tray/panel/menu-bar control
                        |
           Separate human-management channel`;
-const desktopCommands = `w3bs desktop status --json
-w3bs desktop enable
-w3bs desktop disable
-w3bs desktop agents add claude-code
-w3bs desktop windows list --json
-w3bs desktop mouse click --button left
-w3bs desktop keyboard shortcut --window WINDOW_ID --keys Ctrl+S
-w3bs desktop mcp serve --stdio`;
+const DESKTOP_INSTALL = 'curl -fsSL https://w3bs.org/desktop/install.sh | sh';
+const desktopSteps = [
+  [
+    'Install',
+    DESKTOP_INSTALL,
+    'Checks the download against the release checksums, installs <code>~/.local/bin/w3bs-desktop</code>, starts the broker as a user service (agent access stays Disabled) and adds the control to your session: a tray icon on KDE Plasma and other desktops, the panel extension on GNOME (log out and back in once so GNOME loads it).',
+  ],
+  [
+    'Register your agent',
+    'w3bs-desktop agents add claude-code --preset broad',
+    'Presets: <code>observe</code> (windows and screenshots, no input), <code>restricted --app &lt;app id&gt;</code> (input only into the apps you name) or <code>broad</code> (the whole desktop). Add <code>--approve-for type</code> to approve each typing request yourself. The token is saved privately for the next step.',
+  ],
+  [
+    'Connect it to your agent',
+    'w3bs-desktop setup claude-code --agent claude-code',
+    'Prints the line to run, such as <code>claude mcp add w3bs-desktop -- w3bs-desktop mcp serve --stdio --agent claude-code</code>. Use <code>setup opencode</code> or <code>setup codex</code> for those clients. It is a local stdio MCP server; nothing goes through the cloud.',
+  ],
+  [
+    'Turn it on',
+    'Tray or panel: Enable agent access',
+    'Only you can do this, from the tray icon, the GNOME panel menu, or <code>w3bs-desktop control</code> in a terminal (type <code>enable</code>). The first time, the desktop asks for permission: allow Remote Control on KDE; on GNOME pick your screen and switch on Allow Remote Interaction.',
+  ],
+  [
+    'Ask your agent to work',
+    'Open the text editor and write a short note',
+    'The agent checks the status, starts a task, looks at the windows and screen, then clicks and types into the window it named. Requests that need approval appear in the tray or panel menu with Approve and Deny.',
+  ],
+  [
+    'Turn it off',
+    'Tray or panel: Disable agent access',
+    'Or press the emergency shortcut (Super+Alt+Escape; KDE shows it as Meta+Alt+Esc), run <code>w3bs-desktop disable</code>, or lock the screen. Everything stops at once, held keys are released, and nothing turns back on by itself.',
+  ],
+];
+const desktopCommands = `w3bs-desktop status                 # Disabled / Enabled, who holds the input lease
+w3bs-desktop doctor                 # session, backend, permissions, extension checks
+w3bs-desktop control                # terminal control: enable, disable, approve, deny
+w3bs-desktop tray                   # tray control (started for you on login)
+w3bs-desktop disable                # stop everything now
+w3bs-desktop agents add|list|update|revoke|remove
+w3bs-desktop approvals list|approve|deny
+w3bs-desktop tasks list|inspect|cancel
+w3bs-desktop audit export|delete    # metadata only, kept 7 days
+w3bs-desktop layout|windows list|inspect --window ID      --agent NAME
+w3bs-desktop screen capture --display ID --output shot.png --agent NAME
+w3bs-desktop mouse move|click|drag|scroll ...              --agent NAME
+w3bs-desktop keyboard type --stdin|press|shortcut ...      --agent NAME
+w3bs-desktop mcp serve --stdio --agent NAME`;
+const desktopUninstall = `systemctl --user disable --now w3bs-desktop
+rm ~/.local/bin/w3bs-desktop ~/.config/systemd/user/w3bs-desktop.service \\
+   ~/.config/autostart/w3bs-desktop-tray.desktop
+gnome-extensions uninstall agentic-desktop@w3bs.org   # GNOME only`;
 function desktopPage() {
   const prd = readFileSync(resolve(ROOT, 'docs', 'agentic-desktop-layer-prd.md'), 'utf8');
   const demo = `<div class="demo-frame" data-desktop-demo><p class="demo-label"><span aria-hidden="true">◇</span> Interactive preview - does not control your device</p><div class="demo-screen"><div class="demo-panel"><span class="demo-apps" aria-hidden="true">▤ Files · Editor · Browser</span><span class="demo-clock" aria-hidden="true">09:41</span><button type="button" class="demo-tray" id="demo-tray" aria-haspopup="true" aria-expanded="false" aria-controls="demo-menu"><span class="demo-icon" data-demo-icon aria-hidden="true">○</span><span class="sr-only">Agentic Desktop Layer preview menu. Status: </span><span data-demo-chip>Disabled</span></button></div><div class="demo-menu" id="demo-menu" role="group" aria-labelledby="demo-menu-title" hidden><p class="demo-menu-title" id="demo-menu-title">Agentic Desktop Layer</p><p class="demo-status">Status: <strong data-demo-state>Disabled</strong></p><p class="demo-detail" data-demo-detail hidden></p><button type="button" class="button dark demo-toggle" data-demo-toggle>Enable agent access</button><ul class="demo-items">${desktopMenuItems.map(([key, label]) => `<li><button type="button" data-demo-item="${key}">${label}</button></li>`).join('')}</ul><div class="demo-danger"><button type="button" data-demo-stop>Stop all agent activity</button><button type="button" data-demo-quit>Quit and disable</button></div></div></div><div class="demo-footer"><button type="button" class="button primary" data-demo-emergency>Emergency stop</button><p class="demo-log" role="status" aria-live="polite" data-demo-log>Preview state: Disabled. Nothing on this page talks to your computer.</p></div><noscript><p class="demo-log">The preview needs JavaScript. The menu it shows is listed in section 4 of the PRD below.</p></noscript></div>`;
-  return `<section class="page-head desktop-head"><div class="eyebrow">AGENTIC DESKTOP LAYER · W3BS</div><h1>Your desktop.<br>Your agents.<br><em>Your switch.</em></h1><p>An open, local-first layer that lets the agents you authorize use your real desktop: move the mouse, click, drag, type, use shortcuts and read what is on screen. You keep your desktop. A control in your taskbar, panel or menu bar turns it on and off.</p></section><div class="draft-note desktop-status" id="status"><strong>Release status.</strong> M0/M1 done. On KDE Plasma 6.7 and GNOME Shell 50 test rigs, agents type, point, click, take screenshots and target named windows, and the tray, GNOME panel control and emergency stop switch access off. Known GNOME gap: characters outside the keyboard layout are dropped. Windows and macOS not started. No certified platform. No downloads yet.</div>
+  return `<section class="page-head desktop-head"><div class="eyebrow">AGENTIC DESKTOP LAYER · W3BS</div><h1>Your desktop.<br>Your agents.<br><em>Your switch.</em></h1><p>An open, local-first layer that lets the agents you authorize use your real desktop: move the mouse, click, drag, type, use shortcuts and read what is on screen. You keep your desktop. A control in your taskbar, panel or menu bar turns it on and off.</p></section><div class="draft-note desktop-status" id="status"><strong>Release status.</strong> M0/M1 done. On KDE Plasma 6.7 and GNOME Shell 50 test rigs, agents type, point, click, take screenshots and target named windows, and the tray, GNOME panel control and emergency stop switch access off. Known GNOME gap: characters outside the keyboard layout are dropped. Linux installs with one line (below). Windows and macOS ports are in progress. No platform is certified yet.</div>
   <section class="section desktop-demo" aria-labelledby="demo-title"><div class="section-heading"><div><div class="eyebrow">THE NATIVE CONTROL</div><h2 id="demo-title">One switch.<br>Always in reach.</h2></div><p>Access starts Disabled after install, login, restart or a crash. Enabling needs a human. Disabling works at any time and stops everything the layer mediates. Try the menu below. It is a simulation.</p></div>${demo}</section>
   <section class="section"><div class="section-heading"><div><div class="eyebrow">WHAT IT DOES</div><h2>Real input.<br>Real limits.</h2></div><p>Agents need an observe, act, observe loop. They also need a human who can see what is happening and stop it.</p></div><div class="principle-grid"><article><span class="card-index">01 / MOUSE AND KEYBOARD</span><h3>The core, not an add-on.</h3><p>OS-level pointer and keyboard input: move, click, drag, scroll, hover, type, shortcuts and explicit key and button holds. Every coordinate names its space, and stale screenshots are rejected.</p></article><article><span class="card-index">02 / YOUR AGENTS</span><h3>The tools you already use.</h3><p>Claude Code, OpenCode and Codex connect through a local stdio MCP server. The same capability model backs the CLI and the local API. No cloud service sits in the middle.</p></article><article><span class="card-index">03 / YOUR SWITCH</span><h3>Stop means stop.</h3><p>Disable closes the authorization gate first, revokes the input lease, cancels queued work, closes capture streams and releases any keys the layer is holding.</p></article></div></section>
   <section class="section"><div class="section-heading"><div><div class="eyebrow">PLATFORMS</div><h2>KDE and GNOME first.<br><em>Then everywhere.</em></h2></div><p>These are targets, not compatibility claims. A platform is certified only when the full mouse, keyboard and stop workflow passes on it.</p></div><div class="table-wrap"><table class="platform-table"><caption class="sr-only">Platform delivery order</caption><thead><tr><th scope="col">Priority</th><th scope="col">Platform</th><th scope="col">Human control</th><th scope="col">Status</th></tr></thead><tbody>${desktopPlatforms.map(([priority, platform, control, status]) => `<tr><td>${priority}</td><th scope="row">${platform}</th><td>${control}</td><td>${pill(status)}</td></tr>`).join('')}</tbody></table></div><p class="table-note">Wayland first on KDE and GNOME, with X11 tested where the desktop still supports it. Vela support is a clean-room adapter built from public interface facts. No Vela code is used.</p></section>
   <section class="section"><div class="section-heading"><div><div class="eyebrow">ARCHITECTURE</div><h2>One broker.<br>Thin adapters.</h2></div><p>The broker is platform-neutral and runs with your user's privileges. Desktop adapters only report what exists and emit events. Authorization, leases and cancellation stay in the broker, so a new platform cannot weaken them.</p></div><figure class="architecture"><pre aria-describedby="architecture-caption">${e(desktopArchitecture)}</pre><figcaption id="architecture-caption">Agents reach the broker over MCP, the CLI or a local API. The human's native control uses a separate channel that agents cannot call.</figcaption></figure></section>
   <section class="section"><div class="section-heading"><div><div class="eyebrow">PERMISSIONS</div><h2>Authority,<br><em>on purpose.</em></h2></div><p>Mouse, keyboard, screen capture, clipboard and account access are separate, visible grants per agent.</p></div><div class="principle-grid"><article><span class="card-index">RESTRICTED</span><h3>Named apps only.</h3><p>The agent may act only on the applications you granted. Input aimed anywhere else is denied. Keyboard input must name its target window, and focus is checked before every chunk of text.</p></article><article><span class="card-index">BROAD DESKTOP</span><h3>Whole desktop, with a warning.</h3><p>Visual and input control of everything on screen. In this mode business rules cannot always be enforced: a draft-only mail grant does not stop sending through a browser.</p></article><article><span class="card-index">APPROVALS</span><h3>Bound to one exact request.</h3><p>An approval covers one agent, task, target and argument digest, and it expires. Agents cannot enable the layer or approve their own access. Input pauses while an approval is on screen.</p></article></div><aside class="callout"><strong>What disabling cannot undo.</strong><p>Turning the switch off stops new work at once. It cannot take back input already delivered, unsend an email, or erase data an agent already received. It also does not control tools or credentials an agent holds outside this layer.</p></aside></section>
-  <section class="section"><div class="section-heading"><div><div class="eyebrow">COMMAND LINE</div><h2>Proposed, not yet installable.</h2></div><p>The <code>w3bs desktop</code> namespace as specified. These commands are not install instructions. They will ship through the W3BS Package Manager when a platform passes certification.</p></div><figure class="architecture"><figcaption class="eyebrow">PROPOSED, NOT YET INSTALLABLE</figcaption><pre>${e(desktopCommands)}</pre></figure></section>
+  <section class="section resource-feature" id="install" aria-labelledby="install-title"><div><div class="eyebrow">INSTALL AND USE</div><h2 id="install-title">One line to install.<br>One switch to control.</h2><p>Linux, x86_64 and arm64, on KDE Plasma and GNOME. Windows and macOS builds are in progress and will appear here once they pass their tests on real machines.</p><p class="muted">Read it first if you like: <code>curl -fsSL https://w3bs.org/desktop/install.sh -o install.sh &amp;&amp; less install.sh</code></p></div><div class="terminal"><div class="terminal-tabs"><span class="terminal-title">install the agentic desktop layer</span></div><pre><code>${e(DESKTOP_INSTALL)}</code></pre><div class="terminal-result"><button class="small-button" type="button" data-copy="${e(DESKTOP_INSTALL)}">Copy</button><span class="terminal-label">AGENT ACCESS AFTER INSTALL</span><code>Disabled</code><span class="terminal-muted">You turn it on from the tray or panel.</span></div></div></section>
+  <section class="section" aria-labelledby="steps-title"><div class="section-heading"><div><div class="eyebrow">HOW TO USE IT</div><h2 id="steps-title">Six steps.</h2></div><p>Commands are shown as <code>w3bs-desktop</code>; with the <a class="inline-link" href="/packages">w3bs CLI</a> installed, <code>w3bs desktop</code> works the same.</p></div><ol class="desktop-steps">${desktopSteps
+    .map(([title, cmd, text]) => `<li><h3>${title}</h3><div class="identity-line"><code>${e(cmd)}</code>${cmd.includes(' ') && !cmd.includes(':') && !cmd.startsWith('Open') ? `<button class="small-button" type="button" data-copy="${e(cmd)}">Copy</button>` : ''}</div><p>${text}</p></li>`)
+    .join('')}</ol><aside class="callout"><strong>Screenshots on Linux.</strong><p>Desktops ask before an app may take screenshots. Allow it in your privacy settings, or run <code>flatpak permission-set screenshot screenshot "" yes</code>. Without it, screenshot requests are refused instead of popping up a dialog in the middle of agent work.</p></aside></section>
+  <section class="section"><div class="section-heading"><div><div class="eyebrow">COMMAND REFERENCE</div><h2>Everything else.</h2></div><p>Run <code>w3bs-desktop --help</code> for every option. Text to type always comes from a file or standard input, never from the command line, so it stays out of shell history.</p></div><figure class="architecture"><pre>${e(desktopCommands)}</pre></figure><details class="inspector-panel"><summary>Uninstall</summary><pre class="instructions">${e(desktopUninstall)}</pre></details></section>
   <section class="section prd-share" aria-labelledby="prd-title"><div class="section-heading"><div><div class="eyebrow">THE SPECIFICATION</div><h2 id="prd-title">Read the PRD.</h2></div><p>Version 0.2, October 12, 2026. An implementation specification, not a claim of released software. Source: <a class="inline-link" href="https://github.com/profullstack/w3bs.org/tree/main/desktop">github.com/profullstack/w3bs.org/desktop</a>.</p></div><div class="actions"><button type="button" class="button dark" data-copy-prd="${prdPath}">Copy Markdown</button><a class="button primary" href="${prdPath}" download="agentic-desktop-layer-prd.md">Download PRD <span aria-hidden="true">↓</span></a><a class="text-link" href="${prdPath}">Raw Markdown <span aria-hidden="true">↗</span></a></div><p class="copy-status" role="status" aria-live="polite" data-copy-status></p><div class="copy-fallback" data-copy-fallback hidden><label for="prd-fallback">Copying failed. The Markdown is below: select it all and copy it.</label><textarea id="prd-fallback" readonly rows="14" spellcheck="false"></textarea></div><details class="inspector-panel prd-full"><summary>Read the full PRD on this page</summary><article class="prose">${marked.parse(prd)}</article></details></section>`;
 }
 // "What do I type?": install with w3bs, then the tool's own first commands from the
