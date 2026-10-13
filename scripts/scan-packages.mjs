@@ -38,8 +38,10 @@ if (positionals.length) {
   } catch {
     // No base catalog (first submission on a new branch layout): scan everything.
   }
-  const before = new Map(base.map((item) => [item.id, JSON.stringify(item)]));
-  selected = catalog.filter((item) => before.get(item.id) !== JSON.stringify(item));
+  // Only what changes the code users get: copy or example edits need no new scan.
+  const scanned = (item) => JSON.stringify([item.install, item.latest_version, item.repository]);
+  const before = new Map(base.map((item) => [item.id, scanned(item)]));
+  selected = catalog.filter((item) => before.get(item.id) !== scanned(item));
 } else if (values.all) selected = catalog;
 else {
   process.stderr.write('Name packages, or pass --base <catalog.json> or --all.\n');
