@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { Readable, Transform } from 'node:stream';
@@ -27,6 +28,16 @@ const MAX_SOURCE = 64 * 1024 * 1024;
 const MAX_UNPACKED = 512 * 1024 * 1024;
 const MAX_FINDINGS = 100;
 const USER_AGENT = 'w3bs.org package scanner (+https://w3bs.org/packages)';
+// Part of every fingerprint, so a ThreatCrush upgrade re-scans the whole catalog.
+const SCANNER_VERSION = (() => {
+  try {
+    return JSON.parse(
+      readFileSync(resolve(ROOT, 'node_modules/@profullstack/threatcrush/package.json'), 'utf8'),
+    ).version;
+  } catch {
+    return 'unknown';
+  }
+})();
 
 export const installerUrl = (entry) => /https:\/\/[^\s|'"]+/.exec(entry.install || '')?.[0];
 export function githubRepo(entry) {
@@ -193,7 +204,13 @@ export async function probe(entry, { fetch: fetchImpl = globalThis.fetch, github
     ...(repo ? { repository: `github.com/${repo.owner}/${repo.repo}`, commit } : {}),
   };
   const fingerprint = sha256(
-    JSON.stringify([entry.latest_version, entry.install, sources.installerSha256, commit]),
+    JSON.stringify([
+      entry.latest_version,
+      entry.install,
+      sources.installerSha256,
+      commit,
+      SCANNER_VERSION,
+    ]),
   );
   return { installer, sources, fingerprint, repo };
 }
