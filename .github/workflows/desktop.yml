@@ -50,6 +50,34 @@ jobs:
           workspaces: desktop
       - run: cargo test --locked -p adl-schema -p adl-broker -p w3bs-desktop
       - run: cargo clippy --locked -p adl-schema -p adl-broker -p w3bs-desktop --all-targets -- -D warnings
+  # The macOS backend end to end in the runner's logged-in GUI session: CGEvent input,
+  # CGWindowList windows/focus/occlusion, Accessibility inspect, screen capture, the menu-bar
+  # control and its emergency-stop hot key. See desktop/tests/rig/macos-e2e.sh.
+  macos-e2e:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+      - run: cargo clippy --locked -p adl-macos -p w3bs-desktop --all-targets -- -D warnings
+      - run: cargo test --locked -p adl-macos
+      - run: cargo build --release --locked -p w3bs-desktop
+      - run: tests/rig/macos-e2e.sh
+        timeout-minutes: 15
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-e2e-logs
+          path: ${{ runner.temp }}/adl-mac
+          if-no-files-found: ignore
   # The Windows native backend on a real interactive desktop: SendInput, window discovery and
   # occlusion, GDI capture, UI Automation, session events, the emergency hotkey, named pipes and
   # the notification-area tray, driven through the release binary (tests/windows/e2e-native.ps1).

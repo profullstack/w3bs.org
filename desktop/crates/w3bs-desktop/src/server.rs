@@ -262,7 +262,14 @@ fn control(b: &Arc<Broker>, c: &mut Conn, req: &Request) -> Result<Value> {
     match req.method.as_str() {
         "status" => to(b.status()),
         "capabilities" => to(b.capabilities()),
-        "doctor" => Ok(doctor(b)),
+        "doctor" => {
+            // Showing the OS permission prompts is a human action, like enabling.
+            let prompt = p.get("prompt").and_then(Value::as_bool).unwrap_or(false);
+            if prompt && peer.agent_descendant {
+                return Err(AdlError::denied("doctor --prompt must come from the human, not from an agent's process tree"));
+            }
+            Ok(doctor(b, prompt))
+        }
         "enable.request" => to(b.enable_request(&peer)?),
         "enable.confirm" => to(b.enable_confirm(&peer, &str_param(p, "code")?)?),
         "disable" => to(b.disable(&reason())),
@@ -330,15 +337,26 @@ fn control(b: &Arc<Broker>, c: &mut Conn, req: &Request) -> Result<Value> {
     }
 }
 
-fn doctor(b: &Broker) -> Value {
+#[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
+fn doctor(b: &Broker, prompt: bool) -> Value {
     let caps = b.capabilities();
     let session = std::env::var("XDG_SESSION_TYPE").unwrap_or_default();
     let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
     let mut checks = vec![];
     let mut check = |name: &str, ok: bool, detail: String| checks.push(json!({"check": name, "ok": ok, "detail": detail}));
     check("endpoints_private", endpoints_private(), paths::control_socket().to_string());
-    #[cfg(not(windows))]
+    #[cfg(not(any(target_os = "macos", windows)))]
     check("session", !session.is_empty(), format!("XDG_SESSION_TYPE={session:?} XDG_CURRENT_DESKTOP={desktop:?}"));
+    #[cfg(target_os = "macos")]
+    {
+        let _ = (&session, &desktop);
+        let (locked, on_console) = adl_macos::adapter::session_state();
+        check("session", on_console && !locked, format!("macOS window server session: on console {on_console}, locked {locked}"));
+        // TCC permissions of this (the broker's) process. `prompt` shows the system prompts.
+        for (name, ok, detail) in crate::platform::permission_checks(prompt) {
+            check(name, ok, detail);
+        }
+    }
     #[cfg(windows)]
     {
         let _ = (&session, &desktop);
