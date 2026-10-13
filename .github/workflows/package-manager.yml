@@ -1,4 +1,4 @@
-# W3BS Package Manager (package-manager/): test on every change; on a `w3bs-v*` tag,
+# The w3bs CLI (package-manager/): test on every change; on a `w3bs-v*` tag,
 # build the four supported platforms and attach them to a GitHub release. The release
 # archives are then signed into the official repository (registry/) on dev2, where the
 # signing keys live: `package-manager/scripts/publish-manager.sh <version>`.
@@ -110,6 +110,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
-            --title "W3BS Package Manager ${GITHUB_REF_NAME#w3bs-v}" \
+            --title "w3bs ${GITHUB_REF_NAME#w3bs-v}" \
             --notes "Install: \`curl -fsSL https://w3bs.org/install.sh | sh\`. These archives are signed into https://w3bs.org/repo/ (TUF); verify with \`w3bs\`, not by hand." \
             || gh release upload "$GITHUB_REF_NAME" dist/* --clobber --repo "$GITHUB_REPOSITORY"

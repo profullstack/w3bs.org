@@ -47,6 +47,63 @@ pub fn human(r: &OperationResult) {
         return;
     }
     match r.operation.as_str() {
+        "packages" => {
+            let pkgs = r.data["packages"].as_array().cloned().unwrap_or_default();
+            if pkgs.is_empty() {
+                println!("No matching packages.");
+                return;
+            }
+            let long = r.data["long"] == true;
+            table(
+                &["PACKAGE", "TYPE", "VENDOR", "INSTALL"],
+                pkgs.iter()
+                    .map(|p| {
+                        let ty = if p["agentic"] == true { "agentic" } else { "cli" };
+                        vec![s(&p["id"]), ty.into(), s(&p["vendor"]), s(&p["install"])]
+                    })
+                    .collect(),
+            );
+            if long {
+                println!();
+                for p in &pkgs {
+                    println!("{}  {}\n    {}", s(&p["id"]), s(&p["title"]), s(&p["description"]));
+                }
+            }
+            eprintln!("{} packages ({}). Install one with: w3bs install <package>", pkgs.len(), s(&r.data["source"]));
+            return;
+        }
+        "resource.search" => {
+            let items = r.data["resources"].as_array().cloned().unwrap_or_default();
+            table(
+                &["RESOURCE", "VERSION", "VERIFIED", "NAME"],
+                items.iter().map(|i| vec![s(&i["id"]), s(&i["version"]), if i["verification"]["valid"] == true { "yes".into() } else { "NO".into() }, s(&i["name"])]).collect(),
+            );
+            return;
+        }
+        "resource.resolve" | "resource.inspect" | "resource.verify" => {
+            let m = &r.data["manifest"];
+            let v = &r.data["verification"];
+            if !m.is_null() {
+                println!("{}\n  {}", s(&r.data["canonicalUri"]), s(&m["description"]));
+                println!("  publisher: {} ({})  license: {}", s(&m["publisher"]["name"]), s(&m["publisher"]["namespace"]), s(&m["license"]));
+            } else {
+                println!("{}", s(&r.data["canonicalUri"]));
+            }
+            println!(
+                "  verification: {}  signature: {}  publisher trusted: {}  revoked: {}  authority: {}",
+                if v["valid"] == true { "valid" } else { "INVALID" },
+                s(&v["signatureValid"]),
+                s(&v["publisherTrusted"]),
+                s(&v["revoked"]),
+                s(&v["authority"])
+            );
+            println!("  digest: {}", s(&v["digest"]));
+            return;
+        }
+        op if op.starts_with("resource.") => {
+            println!("{}", serde_json::to_string_pretty(&r.data).unwrap());
+            return;
+        }
         "list" => {
             let pkgs = r.data["packages"].as_array().cloned().unwrap_or_default();
             if pkgs.is_empty() {
