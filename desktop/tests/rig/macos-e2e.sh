@@ -66,40 +66,101 @@ fi
 A=(--agent ci)
 
 echo "== menu-bar control"
+osa() { osascript -e "$1" 2>&1; }
 "$B" tray >"$OUT/tray.log" 2>&1 &
 TRAY=$!; PIDS+=($TRAY)
 sleep 3
+# Find the menu-bar item through Accessibility (System Events). Before macOS 26 a status item is
+# `menu bar 2` of its own process; on macOS 26 Control Center draws status items, so look there
+# too. Prints the item's title/description, or the errors.
+find_item() {
+    osa "tell application \"System Events\"
+        try
+            tell (first process whose unix id is $TRAY) to return \"own:\" & (title of menu bar item 1 of menu bar 2) & \"|\" & (description of menu bar item 1 of menu bar 2)
+        end try
+        tell process \"ControlCenter\"
+            repeat with mb in menu bars
+                repeat with it in menu bar items of mb
+                    set t to \"\"
+                    try
+                        set t to (title of it as text) & \"|\" & (description of it as text) & \"|\" & (name of it as text)
+                    end try
+                    if t contains \"Agents\" then return \"cc:\" & t
+                end repeat
+            end repeat
+        end tell
+        return \"none\"
+    end tell"
+}
+open_item() { # click the item, then the named menu item of the menu that opens
+    osa "tell application \"System Events\"
+        set clicked to false
+        try
+            tell (first process whose unix id is $TRAY) to click menu bar item 1 of menu bar 2
+            set clicked to true
+        end try
+        if not clicked then
+            tell process \"ControlCenter\"
+                repeat with mb in menu bars
+                    repeat with it in menu bar items of mb
+                        set t to \"\"
+                        try
+                            set t to (title of it as text) & \"|\" & (description of it as text) & \"|\" & (name of it as text)
+                        end try
+                        if t contains \"Agents\" and not clicked then
+                            click it
+                            set clicked to true
+                        end if
+                    end repeat
+                end repeat
+            end tell
+        end if
+        if not clicked then return \"item not found\"
+        delay 1
+        tell (first process whose unix id is $TRAY)
+            set names to {}
+            repeat with e in (entire contents)
+                try
+                    if role of e is \"AXMenuItem\" then
+                        set end of names to (name of e as text)
+                        if name of e is \"$1\" then
+                            click e
+                            return \"clicked '$1' among \" & (names as text)
+                        end if
+                    end if
+                end try
+            end repeat
+            key code 53
+            return \"menu item '$1' not found; menu items: \" & (names as text)
+        end tell
+    end tell"
+}
 if ! kill -0 $TRAY 2>/dev/null; then
     bad "menu-bar control exited: $(cat "$OUT/tray.log")"
 else
-    MB=$(osascript -e "tell application \"System Events\" to tell (first process whose unix id is $TRAY) to get {title, description, name} of every menu bar item of menu bar 2" 2>&1)
-    note "System Events menu bar 2 of the control: $MB"
-    if echo "$MB" | grep -q "Agents: Disabled"; then
-        ok "menu-bar item exists and says 'Agents: Disabled'"
-        osascript -e "tell application \"System Events\" to tell (first process whose unix id is $TRAY)
-            click menu bar item 1 of menu bar 2
-            delay 0.7
-            set names to name of every menu item of menu 1 of menu bar item 1 of menu bar 2
-            click menu item \"Enable agent access\" of menu 1 of menu bar item 1 of menu bar 2
-            return names
-        end tell" >"$OUT/menu.txt" 2>&1
-        note "menu items: $(cat "$OUT/menu.txt")"
+    note "our process (System Events): $(osa "tell application \"System Events\" to tell (first process whose unix id is $TRAY) to get {count of menu bars, role of every UI element}")"
+    note "ControlCenter menu bar items: $(osa 'tell application "System Events" to tell process "ControlCenter" to get {name, title, description} of every menu bar item of every menu bar' | head -c 1500)"
+    ITEM=$(find_item)
+    note "status item: $ITEM"
+    if echo "$ITEM" | grep -q "Agents: Disabled"; then
+        ok "menu-bar item exists and says 'Agents: Disabled' ($ITEM)"
+        R=$(open_item "Enable agent access")
+        note "menu: $R"
         sleep 1
         S=$(state)
         if [ "$S" = enabled ]; then
             ok "Enable from the menu-bar menu enabled access"
-            MB2=$(osascript -e "tell application \"System Events\" to tell (first process whose unix id is $TRAY) to get title of every menu bar item of menu bar 2" 2>&1)
-            echo "$MB2" | grep -q "Agents: Enabled" && ok "menu-bar title follows the state ($MB2)" || bad "menu-bar title after enable: $MB2"
-        elif [ "$POST" != True ]; then
-            skp "menu Enable: broker state $S (posting events not allowed, so enabling is Blocked as designed: $("$B" status 2>&1 | head -1))"
+            ITEM2=$(find_item)
+            echo "$ITEM2" | grep -q "Agents: Enabled" && ok "menu-bar title follows the state ($ITEM2)" || bad "menu-bar title after enable: $ITEM2"
+            R=$(open_item "Disable agent access")
+            sleep 1
+            [ "$(state)" = disabled ] && ok "Disable from the menu-bar menu disabled access" || bad "menu Disable: $R state $(state)"
         else
-            bad "menu Enable did not enable (state $S): $(cat "$OUT/tray.log")"
+            bad "menu Enable did not enable (state $S): $R; $(cat "$OUT/tray.log")"
         fi
         "$B" disable >/dev/null 2>&1
-    elif echo "$MB" | grep -qi "not allowed\|assistive\|1719\|-25211"; then
-        skp "menu-bar item via System Events: osascript lacks Accessibility ($MB)"
     else
-        bad "menu-bar item not found ($MB)"
+        bad "menu-bar item not found through Accessibility ($ITEM)"
     fi
 fi
 
@@ -218,7 +279,7 @@ fi
 
 echo "== screen capture"
 D=$("$B" layout "${A[@]}" --json | j '[x for x in d["data"]["displays"] if x["primary"]][0]["id"]')
-WANT=$("$B" layout "${A[@]}" --json | j '[f"{round(x[\"logical\"][\"width\"]*x[\"scale\"])}x{round(x[\"logical\"][\"height\"]*x[\"scale\"])}" for x in d["data"]["displays"] if x["primary"]][0]')
+WANT=$("$B" layout "${A[@]}" --json | j "[str(round(x['logical']['width']*x['scale']))+'x'+str(round(x['logical']['height']*x['scale'])) for x in d['data']['displays'] if x['primary']][0]")
 note "layout: $("$B" layout "${A[@]}" --json | j 'd["data"]')"
 "$B" screen capture --display "$D" --output "$OUT/shot.png" "${A[@]}" --json >"$OUT/shot.json" 2>&1
 RC=$?
@@ -280,10 +341,15 @@ if [ "$ENABLED" = yes ]; then
     echo enable >&3
     wait_for 5 is_state enabled
     if [ "$(state)" = enabled ]; then
+        HOW="CGEvent chord from the probe"
         "$OUT/probe" hotkey
-        wait_for 5 is_state disabled
+        if ! wait_for 3 is_state disabled; then
+            HOW="System Events key code 53 using control, option, command"
+            osa 'tell application "System Events" to key code 53 using {control down, option down, command down}' >/dev/null
+            wait_for 3 is_state disabled
+        fi
         S=$("$B" status 2>&1 | head -1)
-        if [ "$(state)" = disabled ] && echo "$S" | grep -qi "emergency"; then ok "Control+Option+Command+Escape (posted by the probe) disabled access: $S"; else bad "emergency hot key: $S; tray log: $(tail -3 "$OUT/tray.log")"; fi
+        if [ "$(state)" = disabled ] && echo "$S" | grep -qi "emergency"; then ok "Control+Option+Command+Escape ($HOW) disabled access: $S"; else bad "emergency hot key: $S; tray log: $(tail -3 "$OUT/tray.log")"; fi
     else
         bad "could not re-enable for the emergency-stop check"
     fi

@@ -78,6 +78,20 @@ final class Delegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSWi
 
 let app = NSApplication.shared
 app.setActivationPolicy(.regular)
+// Key equivalents (Command+A, ...) come from the main menu, as in any real app.
+let mainMenu = NSMenu()
+let appItem = NSMenuItem()
+appItem.submenu = NSMenu()
+appItem.submenu!.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+let editItem = NSMenuItem()
+editItem.submenu = NSMenu(title: "Edit")
+editItem.submenu!.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+editItem.submenu!.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+editItem.submenu!.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+editItem.submenu!.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+mainMenu.addItem(appItem)
+mainMenu.addItem(editItem)
+app.mainMenu = mainMenu
 let delegate = Delegate()
 app.delegate = delegate
 app.run()

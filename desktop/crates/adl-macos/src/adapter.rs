@@ -4,15 +4,17 @@
 //!   main display, y down; other displays may sit at negative origins). Scale is the display
 //!   mode's pixel width over its point width. Rotation comes from `CGDisplayRotation`.
 //! - Windows: `CGWindowListCopyWindowInfo` (on-screen, desktop elements excluded), front to back.
-//!   Normal windows are layer 0. Every layer (menu bar, Dock, overlays) counts as an occluder in
-//!   `window_at`. Titles need Screen Recording permission; without it they are empty.
+//!   Normal windows are layer 0. Every layer (menu bar, status items, overlays) counts as an
+//!   occluder in `window_at`, except the Dock's transparent whole-display window, where only the
+//!   Dock bar (from Accessibility) counts. Titles need Screen Recording; without it they are empty.
 //! - Focus: the focused application comes from Accessibility when the process is trusted
 //!   (`AXFocusedApplication` / `AXFocusedWindow`), otherwise from the front-most normal window
 //!   (NSWorkspace's frontmost application is not updated in a process without a run loop).
 //! - Input: Core Graphics events from a private event source tagged with `SOURCE_TAG`, posted at
 //!   the HID tap. Text is Unicode strings on key events, never key positions.
 //! - Session: polled (`CGSessionCopyCurrentDictionary`), no run loop or event tap needed. Physical
-//!   input is detected from the HID system state's idle time; no keys are ever read.
+//!   input is detected from the HID system state's idle time (our own posted events reset it too,
+//!   so only events clearly after our last injection count); no keys are ever read.
 
 use crate::cf::{self, Owned};
 use crate::ffi::*;
@@ -99,6 +101,8 @@ pub struct MacAdapter {
     input: Mutex<InputState>,
     watch: Mutex<Watch>,
     apps: Mutex<HashMap<i32, (String, String)>>,
+    /// Visible Dock bar rectangles (from Accessibility), cached briefly: (when, Dock pid, rects).
+    dock: Mutex<Option<(Instant, i32, Vec<Rect>)>>,
 }
 
 impl Default for MacAdapter {
@@ -352,6 +356,7 @@ impl MacAdapter {
                 pending: vec![],
             }),
             apps: Mutex::new(HashMap::new()),
+            dock: Mutex::new(None),
         }
     }
 
@@ -399,6 +404,35 @@ impl MacAdapter {
             return Some(id);
         }
         raw.iter().find(|w| w.normal() && w.pid == front_pid).map(|w| w.id)
+    }
+
+    /// The Dock keeps a transparent window over each whole display (layer 20) for Mission
+    /// Control and Launchpad; only the Dock bar itself covers anything. True when `w` is that
+    /// overlay.
+    fn is_dock_overlay(w: &RawWindow, ds: &[DisplayInfo]) -> bool {
+        let same = |a: f64, b: f64| (a - b).abs() <= 1.0;
+        w.owner == "Dock" && w.layer > 0 && ds.iter().any(|d| same(d.logical.x, w.bounds.x) && same(d.logical.y, w.bounds.y) && same(d.logical.width, w.bounds.width) && same(d.logical.height, w.bounds.height))
+    }
+
+    /// Where the Dock bar is, from the Dock's accessibility tree (its `AXList` elements). Empty
+    /// without Accessibility, in which case the Dock is not counted as an occluder.
+    fn dock_regions(&self, pid: i32) -> Vec<Rect> {
+        if let Some((t, p, r)) = lock(&self.dock).as_ref()
+            && *p == pid
+            && t.elapsed() < Duration::from_secs(1)
+        {
+            return r.clone();
+        }
+        let mut regions = vec![];
+        if permissions::accessibility_trusted()
+            // SAFETY: +1 application element.
+            && let Some(app) = Owned::from_create(unsafe { AXUIElementCreateApplication(pid) })
+            && let Some(kids) = ax_attr(app.as_ptr(), "AXChildren")
+        {
+            regions = cf::array_items(kids.as_ptr()).into_iter().filter(|k| ax_string(*k, "AXRole").as_deref() == Some("AXList")).filter_map(ax_bounds).collect();
+        }
+        *lock(&self.dock) = Some((Instant::now(), pid, regions.clone()));
+        regions
     }
 
     fn post(&self, st: &mut InputState, e: CGEventRef) -> Result<()> {
@@ -702,8 +736,10 @@ impl Adapter for MacAdapter {
 
     fn window_at(&self, x: f64, y: f64) -> Result<Option<WindowInfo>> {
         let raw = window_list();
-        let Some(hit) = raw.iter().find(|w| w.alpha > 0.0 && w.bounds.contains(x, y)) else { return Ok(None) };
         let ds = displays();
+        let Some(hit) = raw.iter().filter(|w| w.alpha > 0.0 && w.bounds.contains(x, y)).find(|w| !Self::is_dock_overlay(w, &ds) || self.dock_regions(w.pid).iter().any(|r| r.contains(x, y))) else {
+            return Ok(None);
+        };
         let focused = hit.normal() && self.focused_id(&raw) == Some(hit.id);
         Ok(Some(self.info(hit, &ds, focused)))
     }
@@ -795,9 +831,11 @@ impl Adapter for MacAdapter {
         };
         let (locked, on_console) = session_state();
         let now_locked = locked || !on_console;
-        // SAFETY: plain query; HID system state counts hardware events only.
+        // SAFETY: plain query.
         let idle = unsafe { CGEventSourceSecondsSinceLastEventType(kCGEventSourceStateHIDSystemState, kCGAnyInputEventType) };
-        let injected_recently = lock(&self.input).last_inject.is_some_and(|t| t.elapsed() < Duration::from_millis(150));
+        // Our own posted events also reset the HID idle time (seen on macOS 26), so an event only
+        // counts as the human's when it came clearly after our last injection.
+        let ours = lock(&self.input).last_inject.is_some_and(|t| t.elapsed().as_secs_f64() < idle + 0.05);
         if polls % 10 == 0 {
             let _ = self.current_layout();
         }
@@ -810,7 +848,7 @@ impl Adapter for MacAdapter {
             w.locked = Some(now_locked);
         }
         let gap = w.last_poll.elapsed().as_secs_f64();
-        if idle < gap && !injected_recently {
+        if idle < gap && !ours {
             w.pending.push(SessionEvent::PhysicalInput);
         }
         if let Some(p) = perms {
