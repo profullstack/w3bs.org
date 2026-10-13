@@ -7,7 +7,7 @@
   "license": "MIT",
   "packageManager": "bun@1.4.0",
   "bin": {
-    "w3bs": "src/cli.mjs",
+    "w3bs-reference": "src/cli.mjs",
     "w3bs-open": "native/client.mjs"
   },
   "scripts": {

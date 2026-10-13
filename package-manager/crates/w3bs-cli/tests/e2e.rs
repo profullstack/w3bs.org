@@ -374,6 +374,30 @@ fn curl_catalog_entry_runs_publisher_installer() {
 }
 
 #[test]
+fn packages_lists_the_signed_catalog() {
+    let env = Env::new();
+    let ws = Workspace::open(env.p("pub-cat"));
+    rt().block_on(ws.init(365)).unwrap();
+    let entry = |id: &str, agentic: bool, vendor: &str| -> w3bs_schema::manifest::CatalogEntry {
+        serde_json::from_value(serde_json::json!({
+            "id": id, "name": id.split('/').nth(1).unwrap(), "description": "d", "vendor": vendor, "agentic": agentic,
+            "install": {"url": format!("https://{}/install.sh", id.split('/').next().unwrap()), "shell": "sh"}
+        }))
+        .unwrap()
+    };
+    ws.set_catalog(vec![entry("moshcode.sh/moshcode", true, "Profullstack"), entry("ollama.com/ollama", false, "Ollama")]).unwrap();
+    publish(&ws);
+    add_repo(&env, "w3bs", &ws);
+    let (code, v, _) = env.w3bs(&["packages"]);
+    assert_eq!((code, v["data"]["count"].as_u64()), (0, Some(2)), "{v}");
+    let (_, v, _) = env.w3bs(&["packages", "--agentic"]);
+    assert_eq!(v["data"]["packages"][0]["id"], "moshcode.sh/moshcode");
+    assert_eq!(v["data"]["packages"][0]["install"], "curl -fsSL https://moshcoding.sh/install.sh | sh".replace("moshcoding.sh", "moshcode.sh"));
+    let (_, v, _) = env.w3bs(&["pkg", "catalog", "--ours"]);
+    assert_eq!(v["data"]["count"], 1);
+}
+
+#[test]
 fn at14_concurrent_mutation_is_locked() {
     let env = Env::new();
     let a = publisher(&env, "tools.example", "atlas", &["1.0.0"]);

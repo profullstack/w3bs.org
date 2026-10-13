@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sign a W3BS Package Manager release (and the catalog) into the official repository
+# Sign a w3bs CLI release (and the catalog) into the official repository
 # served at https://w3bs.org/repo/, and regenerate https://w3bs.org/install.sh.
 #
 #   package-manager/scripts/publish-manager.sh <version>      # after the w3bs-v<version> release exists
@@ -28,7 +28,7 @@ if [ "${1:-}" != "--refresh" ]; then
   args=()
   for p in "${platforms[@]}"; do args+=(--artifact "$p=$dl/w3bs-$v-$p.tar.gz"); done
   "$pub" add "$ws" --id w3bs.org/w3bs --version "$v" "${args[@]}" --command w3bs=bin/w3bs \
-    --description "W3BS Package Manager" --license "MIT OR Apache-2.0"
+    --description "w3bs: the W3BS command line (packages, resources and more)" --license "MIT OR Apache-2.0"
   echo "$v" > "$ws/LATEST"
 fi
 v="$(cat "$ws/LATEST")"

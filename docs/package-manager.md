@@ -1,6 +1,6 @@
-# W3BS Package Manager
+# Packages in the w3bs CLI
 
-Install from any participating website or with `w3bs install`. Manage every package. Update all with one command.
+`w3bs` is the W3BS command line: one binary for every W3BS surface. Packages are its first app (install from any participating website or with `w3bs install`, manage every package, update all with one command). Resources are the second: `w3bs resolve`, `w3bs verify` and `w3bs resource …` work with signed `w3bs://` resources in a W3BS registry.
 
 ```sh
 curl -fsSL https://w3bs.org/install.sh | sh
@@ -13,6 +13,8 @@ The command is `w3bs`. It lives in `~/.local/bin` (add that to your `PATH` if th
 ## Everyday use
 
 ```sh
+w3bs packages                     # the whole catalog (same list as w3bs.org/packages)
+w3bs packages --agentic           # agentic tools only; --ours for Profullstack's; -l for descriptions
 w3bs search agent                 # search the catalog and every repository you trust
 w3bs install claude-code          # install by short name (or by full id: anthropic.com/claude-code)
 w3bs list                         # everything W3BS manages, no network
@@ -22,6 +24,8 @@ w3bs update                       # update everything eligible
 w3bs update moshcode              # or just one
 w3bs remove claude-code           # remove it (your config and data are kept)
 ```
+
+The full package manager is `w3bs pkg …` (`w3bs pkg --help`); the common commands above are shortcuts for it.
 
 Every command takes `--json` for one machine-readable result object on stdout, `--dry-run` (`-n`) to see the plan without changing anything, and `--yes` (`-y`) to approve without a prompt. Prompts read the terminal (`/dev/tty`), never a pipe, so a script cannot answer them for you.
 

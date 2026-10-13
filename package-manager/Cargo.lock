@@ -1321,6 +1321,8 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
+ "serde",
+ "serde_json",
  "sync_wrapper",
  "tokio",
  "tokio-rustls",
@@ -1485,6 +1487,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
+name = "ryu-js"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6518fc26bced4d53678a22d6e423e9d8716377def84545fe328236e3af070e7f"
+
+[[package]]
 name = "same-file"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1563,6 +1571,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.9",
+]
+
+[[package]]
+name = "serde_jcs"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3a60f3fda61525e439ef6d67422118f11e986566997d9021c56867ad814a0aa"
+dependencies = [
+ "ryu-js",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -2045,12 +2064,13 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "w3bs-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "flate2",
  "fs4",
  "hex",
+ "reqwest",
  "semver",
  "serde_json",
  "sha2",
@@ -2064,9 +2084,11 @@ dependencies = [
 
 [[package]]
 name = "w3bs-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
+ "aws-lc-rs",
+ "base64 0.23.1",
  "bytes",
  "flate2",
  "fs4",
@@ -2078,6 +2100,7 @@ dependencies = [
  "rusqlite",
  "semver",
  "serde",
+ "serde_jcs",
  "serde_json",
  "sha2",
  "tar",
@@ -2091,7 +2114,7 @@ dependencies = [
 
 [[package]]
 name = "w3bs-publish"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "aws-lc-rs",
@@ -2110,7 +2133,7 @@ dependencies = [
 
 [[package]]
 name = "w3bs-schema"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hex",
  "semver",

@@ -1,12 +1,12 @@
 #!/bin/sh
-# W3BS Package Manager installer. https://w3bs.org/packages
+# w3bs installer: the W3BS command line. https://w3bs.org/packages
 #
 #   curl --proto '=https' --proto-redir '=https' -fsSL <this url> | sh
 #
 # Inspect first if you like:  curl -fsSL <this url> -o install.sh && less install.sh && sh install.sh
 #
 # What this does:
-#   1. If W3BS Package Manager (`w3bs`) is not installed, download the prebuilt binary for
+#   1. If the w3bs CLI is not installed, download the prebuilt binary for
 #      this machine, check its SHA-256, and let it install itself from its signed repository.
 #   2. If this installer is for an application, register the publisher's signed repository
 #      (first-use trust: you are shown its fingerprint) and run `w3bs install <package>`.
@@ -88,8 +88,8 @@ w3bs_main() {
     for pair in $MANAGER_SHA256S; do
       [ "${pair%%=*}" = "$triple" ] && expected="${pair#*=}"
     done
-    [ -n "$expected" ] || die "no W3BS Package Manager build for $triple yet"
-    say "W3BS Package Manager $MANAGER_VERSION will be installed to manage this and future applications."
+    [ -n "$expected" ] || die "no w3bs build for $triple yet"
+    say "The w3bs CLI $MANAGER_VERSION will be installed. It manages this and future packages, and much more."
     say "  It keeps everything it installs updatable with one command: w3bs update"
     tmp="$(mktemp -d 2>/dev/null || mktemp -d -t w3bs)" || die "cannot create a temporary directory"
     trap 'rm -rf "$tmp"' EXIT INT TERM
@@ -111,7 +111,7 @@ w3bs_main() {
   fi
 
   say ""
-  say "W3BS Package Manager: $manager"
+  say "w3bs: $manager   (try: w3bs packages, w3bs --help)"
   case ":${PATH:-}:" in
     *":$bin:"*) say "Update everything later with:  w3bs update" ;;
     *)
