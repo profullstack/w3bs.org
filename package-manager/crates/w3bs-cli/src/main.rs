@@ -6,6 +6,7 @@ mod render;
 use clap::{Args, Parser, Subcommand};
 use serde_json::{Value, json};
 use std::io::{BufRead, Write};
+use std::ffi::OsString;
 use std::path::PathBuf;
 use w3bs_core::resources::{self, Registry};
 use w3bs_core::{Engine, InstallRequest, Interact, Layout, Options, RepoAdd, UpdateRequest};
@@ -445,6 +446,10 @@ enum Cmd {
     /// Manage the w3bs CLI itself
     #[command(name = "self", subcommand)]
     SelfCmd(SelfCmd),
+    /// Any other `w3bs NAME ...` runs `w3bs-NAME ...` from PATH, e.g. `w3bs desktop` from the
+    /// agentic-desktop-layer package.
+    #[command(external_subcommand)]
+    External(Vec<OsString>),
 }
 
 impl Cmd {
@@ -499,6 +504,9 @@ impl Interact for Tty {
 fn main() {
     let cli = Cli::parse();
     let out = cli.out.clone();
+    if let Cmd::External(args) = &cli.cmd {
+        external(args, &out);
+    }
     let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("runtime");
     let (op, res) = rt.block_on(run(cli));
     let res = res.unwrap_or_else(|e| w3bs_core::engine::failed(op, &e));
@@ -512,6 +520,37 @@ fn main() {
         handoff();
     }
     std::process::exit(code);
+}
+
+/// Run `w3bs-NAME` with the remaining arguments, replacing this process.
+fn external(args: &[OsString], out: &Output) -> ! {
+    let name = args.first().and_then(|a| a.to_str()).unwrap_or_default();
+    if name.is_empty() || !name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+        eprintln!("w3bs: unknown command {name:?}; see `w3bs --help`");
+        std::process::exit(exit::USAGE);
+    }
+    let bin = format!("w3bs-{name}");
+    let mut cmd = std::process::Command::new(&bin);
+    if out.json {
+        cmd.arg("--json");
+    }
+    cmd.args(&args[1..]);
+    #[cfg(unix)]
+    let err = {
+        use std::os::unix::process::CommandExt;
+        cmd.exec()
+    };
+    #[cfg(not(unix))]
+    let err = match cmd.status() {
+        Ok(s) => std::process::exit(s.code().unwrap_or(1)),
+        Err(e) => e,
+    };
+    if err.kind() == std::io::ErrorKind::NotFound {
+        eprintln!("w3bs: unknown command `{name}` (no `{bin}` on PATH); install it with `w3bs install` or see `w3bs --help`");
+    } else {
+        eprintln!("w3bs: could not run {bin}: {err}");
+    }
+    std::process::exit(exit::USAGE);
 }
 
 /// After updating the CLI itself, continue the same command with the new binary, once.
@@ -547,6 +586,7 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
                 SelfCmd::Install { repository_url, root_fingerprint, root, m } => ("self.install", mk(&m).self_install(&repository_url, root_fingerprint, root).await),
             }
         }
+        Err(Cmd::External(_)) => unreachable!("external commands exec before the runtime starts"),
         Err(_) => unreachable!("every command is dispatched"),
     }
 }
