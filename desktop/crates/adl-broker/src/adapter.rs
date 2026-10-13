@@ -4,7 +4,7 @@
 //! authorization, leases, coordinate validation, chunking and cancellation live in the broker,
 //! so a new platform cannot accidentally weaken the safety model.
 
-use adl_schema::{AccessNode, Axis, Button, CapabilityReport, Key, Layout, Result, WindowInfo};
+use adl_schema::{AccessNode, Action, Axis, Button, CapabilityReport, Key, Layout, Result, WindowInfo};
 
 /// One primitive input event, in desktop logical coordinates.
 #[derive(Clone, Debug, PartialEq)]
@@ -64,6 +64,12 @@ pub trait Adapter: Send + Sync {
         Ok(None)
     }
     fn emit(&self, event: &InputEvent) -> Result<()>;
+    /// Refuse an action this backend cannot deliver exactly (e.g. text with characters the
+    /// compositor would silently drop). Called for every action of a batch before any of its
+    /// events is sent, so a refused batch types nothing at all.
+    fn preflight(&self, _action: &Action) -> Result<()> {
+        Ok(())
+    }
     /// Reason input must not be delivered right now (lock screen, an OS authentication prompt,
     /// a pointer lock). Checked before every action; `None` means clear.
     fn safety_interlock(&self) -> Option<String> {
