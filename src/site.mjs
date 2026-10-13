@@ -281,9 +281,7 @@ rm ~/.local/bin/w3bs-desktop ~/.config/systemd/user/w3bs-desktop.service \\
 gnome-extensions uninstall agentic-desktop@w3bs.org   # GNOME only
 
 # macOS
-launchctl bootout gui/$(id -u)/org.w3bs.desktop.broker
-launchctl bootout gui/$(id -u)/org.w3bs.desktop.menubar
-rm ~/Library/LaunchAgents/org.w3bs.desktop.*.plist ~/.local/bin/w3bs-desktop
+curl -fsSL https://w3bs.org/desktop/install.sh | sh -s -- --uninstall
 
 # Windows (PowerShell)
 & ([scriptblock]::Create((irm https://w3bs.org/desktop/install.ps1))) -Uninstall`;
