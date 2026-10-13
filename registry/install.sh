@@ -1,12 +1,12 @@
 #!/bin/sh
-# W3BS Package Manager installer. https://w3bs.org/packages
+# w3bs installer: the W3BS command line. https://w3bs.org/packages
 #
 #   curl --proto '=https' --proto-redir '=https' -fsSL <this url> | sh
 #
 # Inspect first if you like:  curl -fsSL <this url> -o install.sh && less install.sh && sh install.sh
 #
 # What this does:
-#   1. If W3BS Package Manager (`w3bs`) is not installed, download the prebuilt binary for
+#   1. If the w3bs CLI is not installed, download the prebuilt binary for
 #      this machine, check its SHA-256, and let it install itself from its signed repository.
 #   2. If this installer is for an application, register the publisher's signed repository
 #      (first-use trust: you are shown its fingerprint) and run `w3bs install <package>`.
@@ -32,8 +32,8 @@ w3bs_main() {
   MANAGER_REPO_URL='https://w3bs.org/repo/'
   MANAGER_FINGERPRINT='sha256:48d521f7610117c95cc782982e5c05b641b18bdfa8e48b36a634186133bc766f'
   MANAGER_DOWNLOAD_BASE='https://github.com/profullstack/w3bs.org/releases/download'
-  MANAGER_VERSION='0.2.0'
-  MANAGER_SHA256S='x86_64-unknown-linux-gnu=617c0f33c39ffed992cacc71c23614a015441f036dfd9117d1778e3dfd7be60a aarch64-unknown-linux-gnu=7db81b9c8ce073a3f472e3d3a820a93455f056717f11e1e8352cc1a444ca9316 x86_64-apple-darwin=ed35d2ff77e85151bec6e81fb92d08eb3702259d725a14b655a2be57696c6000 aarch64-apple-darwin=180afda6235a8e493697ecc959ec6bb8e4593843826ce1261f7549d5fcdb7733'
+  MANAGER_VERSION='0.1.1'
+  MANAGER_SHA256S='x86_64-unknown-linux-gnu=bc782649cf1b67007356d9d1ab474c92b3e92158ce61191ca2f14c7351c053b9 aarch64-unknown-linux-gnu=a33df5ebf05855e8003fff2b8894d605b086dd6b79607a2c46b396a3d24d693c x86_64-apple-darwin=f016733862dc58475821018aebd2cc565ff66ad8acb7c65d7931feb24e2dc8dd aarch64-apple-darwin=1ee58020ecf7bd25a72856cf0257f38a27dd8d4e6fc456055e4fe7199ad4649e'
 
   say() { printf '%s\n' "$*" >&2; }
   die() { say "w3bs installer: $*"; exit "${2:-4}"; }
@@ -88,8 +88,8 @@ w3bs_main() {
     for pair in $MANAGER_SHA256S; do
       [ "${pair%%=*}" = "$triple" ] && expected="${pair#*=}"
     done
-    [ -n "$expected" ] || die "no W3BS Package Manager build for $triple yet"
-    say "W3BS Package Manager $MANAGER_VERSION will be installed to manage this and future applications."
+    [ -n "$expected" ] || die "no w3bs build for $triple yet"
+    say "The w3bs CLI $MANAGER_VERSION will be installed. It manages this and future packages, and much more."
     say "  It keeps everything it installs updatable with one command: w3bs update"
     tmp="$(mktemp -d 2>/dev/null || mktemp -d -t w3bs)" || die "cannot create a temporary directory"
     trap 'rm -rf "$tmp"' EXIT INT TERM
@@ -111,7 +111,7 @@ w3bs_main() {
   fi
 
   say ""
-  say "W3BS Package Manager: $manager"
+  say "w3bs: $manager   (try: w3bs packages, w3bs --help)"
   case ":${PATH:-}:" in
     *":$bin:"*) say "Update everything later with:  w3bs update" ;;
     *)

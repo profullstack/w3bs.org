@@ -2,43 +2,55 @@
   "signed": {
     "_type": "targets",
     "spec_version": "1.0.0",
-    "version": 3,
-    "expires": "2027-10-13T00:25:43.767768133Z",
+    "version": 4,
+    "expires": "2027-10-13T00:31:10.179780641Z",
     "targets": {
-      "artifacts/w3bs/0.2.0/w3bs-0.2.0-x86_64-apple-darwin.tar.gz": {
-        "length": 5039171,
-        "hashes": {
-          "sha256": "ed35d2ff77e85151bec6e81fb92d08eb3702259d725a14b655a2be57696c6000"
-        }
-      },
-      "manifests/w3bs/0.2.0.json": {
-        "length": 1881,
-        "hashes": {
-          "sha256": "df618f9eb086044e0a589d1cbc967d3418a09e297d67668babde98df201314b0"
-        }
-      },
-      "artifacts/w3bs/0.2.0/w3bs-0.2.0-aarch64-unknown-linux-gnu.tar.gz": {
-        "length": 4802176,
-        "hashes": {
-          "sha256": "7db81b9c8ce073a3f472e3d3a820a93455f056717f11e1e8352cc1a444ca9316"
-        }
-      },
-      "artifacts/w3bs/0.2.0/w3bs-0.2.0-x86_64-unknown-linux-gnu.tar.gz": {
-        "length": 5058633,
-        "hashes": {
-          "sha256": "617c0f33c39ffed992cacc71c23614a015441f036dfd9117d1778e3dfd7be60a"
-        }
-      },
       "artifacts/w3bs/0.1.0/w3bs-0.1.0-aarch64-apple-darwin.tar.gz": {
         "length": 4451702,
         "hashes": {
           "sha256": "c15e3e1d6f46d7b490c234410229a433fb799f2c7f91a2acd89f1338d5e2f07c"
         }
       },
+      "artifacts/w3bs/0.1.1/w3bs-0.1.1-x86_64-unknown-linux-gnu.tar.gz": {
+        "length": 5059336,
+        "hashes": {
+          "sha256": "bc782649cf1b67007356d9d1ab474c92b3e92158ce61191ca2f14c7351c053b9"
+        }
+      },
+      "manifests/w3bs/0.1.1.json": {
+        "length": 1881,
+        "hashes": {
+          "sha256": "69f423ef65ed42a10427aeba7b24cc9add154b88fb61b8fcd7c6453bd0c5ec23"
+        }
+      },
+      "manifests/w3bs/0.1.0.json": {
+        "length": 1843,
+        "hashes": {
+          "sha256": "697f8c4589efceff88de4666903e8701d454c4c7f37c6bc3149c4be798d9fffd"
+        }
+      },
       "artifacts/w3bs/0.1.0/w3bs-0.1.0-x86_64-apple-darwin.tar.gz": {
         "length": 4821092,
         "hashes": {
           "sha256": "4ab729720f12cbb8f5050d383c0d9c60dafde457e9ea3f6eaf0b5abfeebb06b2"
+        }
+      },
+      "artifacts/w3bs/0.1.1/w3bs-0.1.1-aarch64-apple-darwin.tar.gz": {
+        "length": 4646760,
+        "hashes": {
+          "sha256": "1ee58020ecf7bd25a72856cf0257f38a27dd8d4e6fc456055e4fe7199ad4649e"
+        }
+      },
+      "artifacts/w3bs/0.1.1/w3bs-0.1.1-x86_64-apple-darwin.tar.gz": {
+        "length": 5038920,
+        "hashes": {
+          "sha256": "f016733862dc58475821018aebd2cc565ff66ad8acb7c65d7931feb24e2dc8dd"
+        }
+      },
+      "artifacts/w3bs/0.1.1/w3bs-0.1.1-aarch64-unknown-linux-gnu.tar.gz": {
+        "length": 4802389,
+        "hashes": {
+          "sha256": "a33df5ebf05855e8003fff2b8894d605b086dd6b79607a2c46b396a3d24d693c"
         }
       },
       "artifacts/w3bs/0.1.0/w3bs-0.1.0-x86_64-unknown-linux-gnu.tar.gz": {
@@ -62,19 +74,7 @@
       "channels/w3bs/stable.json": {
         "length": 292,
         "hashes": {
-          "sha256": "fbe49857b308770c84ed2e3ed655253b52f73211c73213531be32cf18412580c"
-        }
-      },
-      "manifests/w3bs/0.1.0.json": {
-        "length": 1843,
-        "hashes": {
-          "sha256": "697f8c4589efceff88de4666903e8701d454c4c7f37c6bc3149c4be798d9fffd"
-        }
-      },
-      "artifacts/w3bs/0.2.0/w3bs-0.2.0-aarch64-apple-darwin.tar.gz": {
-        "length": 4646713,
-        "hashes": {
-          "sha256": "180afda6235a8e493697ecc959ec6bb8e4593843826ce1261f7549d5fcdb7733"
+          "sha256": "685158876fa31170458fffddd821b9b536b6a8810f29ab429d60ee1f0b63e93b"
         }
       },
       "artifacts/w3bs/0.1.0/w3bs-0.1.0-aarch64-unknown-linux-gnu.tar.gz": {
@@ -92,7 +92,7 @@
   "signatures": [
     {
       "keyid": "b5c2610d3f919c261ea8d0c601939256fd468cfebcd040b856639abb08504a1f",
-      "sig": "767a3f8b49ccea8166804820c2d586f64d80baa5f58fa5eb8ca007e676392978399b88fea08319397fed37390ba61cbd3b37aa64ded1ac09f541b2edc10d6b05"
+      "sig": "f94062eff3d9eb38d23eb3fba74ab84fe033f11fa8c10e90cf8a1a7d10a74c3eb1b4bb9bf59a1879b705613de570bf7ddbacfc2d38ea826b765f5afdd7413104"
     }
   ]
 }

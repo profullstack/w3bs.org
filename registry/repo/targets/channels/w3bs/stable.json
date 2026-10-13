@@ -8,8 +8,8 @@
       "manifest": "manifests/w3bs/0.1.0.json"
     },
     {
-      "version": "0.2.0",
-      "manifest": "manifests/w3bs/0.2.0.json"
+      "version": "0.1.1",
+      "manifest": "manifests/w3bs/0.1.1.json"
     }
   ],
   "revoked": []
