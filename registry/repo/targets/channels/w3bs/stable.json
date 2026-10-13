@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "package_id": "w3bs.org/w3bs",
+  "channel": "stable",
+  "releases": [
+    {
+      "version": "0.1.0",
+      "manifest": "manifests/w3bs/0.1.0.json"
+    }
+  ],
+  "revoked": []
+}
