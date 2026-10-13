@@ -317,6 +317,12 @@ fn doctor(b: &Broker) -> Value {
     check("session", !session.is_empty(), format!("XDG_SESSION_TYPE={session:?} XDG_CURRENT_DESKTOP={desktop:?}"));
     let input_ok = caps.iter().any(|c| c.capability == Capability::Pointer && c.availability == Availability::Available);
     check("pointer_backend", input_ok, b.adapter_name());
+    if adl_linux::gnome::detect() {
+        match adl_linux::gnome::extension_present() {
+            Ok(owner) => check("gnome_shell_extension", true, format!("{} is loaded in gnome-shell ({owner})", adl_linux::gnome::EXTENSION_UUID)),
+            Err(e) => check("gnome_shell_extension", false, format!("{}; {}", e.message, if e.message.contains("setup gnome-extension") { "" } else { adl_linux::gnome::INSTALL_HINT })),
+        }
+    }
     check("native_control", true, "the tray, panel extension or `w3bs desktop control` must be running before enable".into());
     json!({"status": b.status(), "capabilities": caps, "checks": checks, "paths": {
         "agent_socket": paths::agent_socket(), "control_socket": paths::control_socket(), "config": paths::config_dir(), "state": paths::state_dir()}})

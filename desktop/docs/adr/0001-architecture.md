@@ -23,7 +23,8 @@ Status: accepted, 2026-10-13
 6. **Desktop logical coordinates** are canonical. Display, window and capture spaces map into it;
    captures carry the layout generation and expire.
 7. **Linux backends:** XDG RemoteDesktop + ScreenCast (Notify* methods only, never mixed with EIS on
-   the same session) for KDE/GNOME; KWin scripting (scripts call back over D-Bus) for windows on Plasma; Vela's
+   the same session) for KDE/GNOME; KWin scripting (scripts call back over D-Bus) for windows on Plasma; a W3BS
+   GNOME Shell extension (read-only D-Bus service plus the top-bar native control) for windows on GNOME; Vela's
    command socket for observation and interlocks; logind for lock/suspend. A wlroots virtual-input backend (Vela with `VELA_DEBUG_INPUT=1`, Sway, Hyprland,
    labwc) is planned.
 8. **Clean room for Vela** (GPL-3.0): see `../clean-room.md`.
@@ -44,6 +45,11 @@ Status: accepted, 2026-10-13
 
 - On Plasma, window list, focus, stacking and activation come from one-shot KWin scripts that
   report back over D-Bus (`adl-linux/src/kwin.rs`, wrapped around the portal adapter; added
-  2026-10-13). GNOME has no window data until the W3BS Shell extension exists, so targeted input
-  there is refused rather than guessed.
+  2026-10-13). On GNOME the same data comes from the W3BS GNOME Shell extension
+  (`gnome-extension/`, `adl-linux/src/gnome.rs`; added 2026-10-13): it exports
+  `org.w3bs.Desktop.Shell` from inside gnome-shell and answers only the process at the other end
+  of its control.sock subscription (SO_PEERCRED pid, same uid), and the broker talks to it only
+  when its owner is the gnome-shell process. The extension never injects input; it is also the
+  GNOME native control, so unloading it disables access. Without it, targeted input on GNOME is
+  refused rather than guessed.
 - Same-user hostile processes are out of scope, as the PRD states.
