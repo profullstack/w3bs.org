@@ -6,7 +6,7 @@
       "name": "w3bs",
       "dependencies": {
         "@modelcontextprotocol/sdk": "1.30.0",
-        "@profullstack/threatcrush": "0.13.29",
+        "@profullstack/threatcrush": "0.13.30",
         "canonicalize": "2.1.0",
         "express": "5.1.0",
         "marked": "16.4.2",
@@ -103,7 +103,7 @@
 
     "@profullstack/hqtui": ["@profullstack/hqtui@0.7.1", "", { "bin": { "hqtui": "bin/hqtui.mjs" } }, "sha512-tEEdQlg/UZXj929ycP7MIxff/zFBnUwtIkhDEKO8rf5Xd7Jewo/hIVaxyng0LAki2PmitbaKPMMxHdINvoEuGg=="],
 
-    "@profullstack/threatcrush": ["@profullstack/threatcrush@0.13.29", "", { "dependencies": { "@iarna/toml": "^2.2.5", "@profullstack/hqtui": "^0.7.0", "@sentry/node": "^8.45.0", "better-sqlite3": "^13.0.3", "chalk": "^5.4.1", "commander": "^13.1.0", "nodemailer": "^6.9.16", "ora": "^8.2.0" }, "bin": { "threatcrush": "dist/index.js" } }, "sha512-isB2KhlT44eVNJbKk0yDn/foVCwhiv+rMQoVbkb567eGxnZvyaGOSbK2UAG5qqK2XW7Wtk8WZJAbEPlzXfHpMQ=="],
+    "@profullstack/threatcrush": ["@profullstack/threatcrush@0.13.30", "", { "dependencies": { "@iarna/toml": "^2.2.5", "@profullstack/hqtui": "^0.7.0", "@sentry/node": "^8.45.0", "better-sqlite3": "^13.0.3", "chalk": "^5.4.1", "commander": "^13.1.0", "nodemailer": "^6.9.16", "ora": "^8.2.0" }, "bin": { "threatcrush": "dist/index.js" } }, "sha512-YU6h7oLvgEsKCsMPIYGZPWXeKp2iqK5+o3GCKBCfeGv+tK/3SLdwP05Y6yHG66qv/meIV9wqlWEs7jXxWEOyMQ=="],
 
     "@sentry/core": ["@sentry/core@8.55.2", "", {}, "sha512-YlEBwybUcOQ/KjMHDmof1vwweVnBtBxYlQp7DE3fOdtW4pqqdHWTnTntQs4VgYfxzjJYgtkd9LHlGtg8qy+JVQ=="],
 
