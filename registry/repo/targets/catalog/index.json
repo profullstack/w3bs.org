@@ -1147,6 +1147,23 @@
       "vendor": "Daniel Miessler",
       "license": "MIT",
       "agentic": false
+    },
+    {
+      "id": "w3bs.org/agentic-desktop-layer",
+      "name": "agentic-desktop-layer",
+      "description": "Lets Claude Code, OpenCode and Codex use your real desktop with mouse and keyboard on Linux, macOS and Windows, through a local broker and MCP server. Starts disabled; you turn it on and off from the tray, panel or menu bar.",
+      "commands": [
+        "w3bs-desktop"
+      ],
+      "install": {
+        "url": "https://w3bs.org/desktop/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://w3bs.org/desktop",
+      "repository": "https://github.com/profullstack/w3bs.org/tree/main/desktop",
+      "vendor": "Profullstack",
+      "license": "Apache-2.0",
+      "agentic": true
     }
   ]
 }
