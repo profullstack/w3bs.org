@@ -8,7 +8,7 @@ use crate::paths;
 use adl_schema::rpc::{Request, Response};
 use adl_schema::SCHEMA_VERSION;
 use serde_json::{json, Value};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, IsTerminal, Write};
 use std::sync::mpsc;
 
 const HELP: &str = "commands: enable | disable | stop | confirm | approve <id> | deny <id> | approvals | tasks | status | quit (quitting disables access)";
@@ -23,6 +23,20 @@ fn print_state(v: &Value) {
     };
     let reason = v["reason"].as_str().map(|r| format!(" ({r})")).unwrap_or_default();
     println!("{icon} Agent access: {}{reason}", st.to_uppercase());
+    match st {
+        "disabled" | "blocked" => println!("      Type `enable` and press Enter to turn agent access on."),
+        "enabled" => println!("      Agents may work now. Type `disable` (or quit, or close this window) to turn it off."),
+        _ => {}
+    }
+    prompt();
+}
+
+/// Show an input prompt when a person is typing (not when commands are piped in).
+fn prompt() {
+    if std::io::stdin().is_terminal() {
+        print!("> ");
+        let _ = std::io::stdout().flush();
+    }
 }
 
 pub fn run() -> std::io::Result<()> {
@@ -88,10 +102,13 @@ pub fn run() -> std::io::Result<()> {
         let arg = parts.next();
         let r = match cmd {
             "" => continue,
-            "enable" => call("enable.request", json!({})).and_then(|c| match c["code"].as_str() {
+            "enable" => {
+                println!("  Enabling. If your desktop shows a permission dialog (Remote Control, screen sharing), allow it there.");
+                call("enable.request", json!({})).and_then(|c| match c["code"].as_str() {
                 Some(code) => call("enable.confirm", json!({"code": code})).map(|_| json!("enabled")),
                 None => Ok(c),
-            }),
+            })
+            }
             "confirm" => match last_code.lock().unwrap().take() {
                 Some(code) => call("enable.confirm", json!({"code": code})),
                 None => Err("no pending enable request".into()),
@@ -113,6 +130,7 @@ pub fn run() -> std::io::Result<()> {
             Ok(v) => println!("{}", serde_json::to_string_pretty(&v).unwrap()),
             Err(e) => println!("  error: {e}"),
         }
+        prompt();
     }
     let _ = call("disable", json!({"reason": "terminal control closed"}));
     Ok(())

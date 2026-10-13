@@ -4,7 +4,7 @@
 #
 # Inspect first if you like:  irm https://w3bs.org/desktop/install.ps1 -OutFile install.ps1; notepad install.ps1; .\install.ps1
 # Options (from a saved copy, or with the one-liner as a script block):
-#   & ([scriptblock]::Create((irm https://w3bs.org/desktop/install.ps1))) -Version 0.2.0 -NoService
+#   & ([scriptblock]::Create((irm https://w3bs.org/desktop/install.ps1))) -Version 0.2.1 -NoService
 #   & ([scriptblock]::Create((irm https://w3bs.org/desktop/install.ps1))) -Uninstall [-Purge]
 #
 # What this does, for the current user only (no administrator rights needed):
@@ -29,7 +29,7 @@
 function Install-W3bsDesktop {
     [CmdletBinding()]
     param(
-        [string]$Version = $(if ($env:W3BS_DESKTOP_VERSION) { $env:W3BS_DESKTOP_VERSION } else { '0.2.0' }),
+        [string]$Version = $(if ($env:W3BS_DESKTOP_VERSION) { $env:W3BS_DESKTOP_VERSION } else { '0.2.1' }),
         [switch]$NoService,
         [switch]$Uninstall,
         [switch]$Purge
@@ -192,12 +192,12 @@ public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wP
     if (-not $NoService) {
         # Sign-in autostart without console windows: w3bs-desktopw.exe is the GUI-subsystem build.
         New-Item -Path $runKey -Force -ErrorAction SilentlyContinue | Out-Null
-        Set-ItemProperty -Path $runKey -Name $runBroker -Value "`"$bg`" daemon --adapter auto"
+        Set-ItemProperty -Path $runKey -Name $runBroker -Value "`"$bg`" daemon --adapter auto --mcp-http 127.0.0.1:7801"
         Set-ItemProperty -Path $runKey -Name $runTray -Value "`"$bg`" tray --wait-for-broker 60"
         Say "Broker and tray registered to start when you sign in (HKCU Run: '$runBroker', '$runTray')"
         $interactive = [Environment]::UserInteractive -and (Get-Process -Id $PID).SessionId -ne 0
         if ($interactive) {
-            Start-Process -FilePath $bg -ArgumentList 'daemon', '--adapter', 'auto' -WorkingDirectory $root
+            Start-Process -FilePath $bg -ArgumentList 'daemon', '--adapter', 'auto', '--mcp-http', '127.0.0.1:7801' -WorkingDirectory $root
             Start-Process -FilePath $bg -ArgumentList 'tray', '--wait-for-broker', '60' -WorkingDirectory $root
             $up = $false
             for ($i = 0; $i -lt 60 -and -not $up; $i++) {
@@ -213,7 +213,7 @@ public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wP
     Say ''
     Say 'Next:'
     Say '  1. Register an agent:   w3bs-desktop agents add claude-code --preset broad'
-    Say '  2. Connect it:          w3bs-desktop setup claude-code --agent claude-code   (prints the claude mcp add line)'
+    Say '  2. Connect it:          w3bs-desktop setup claude-code --agent claude-code --http   (prints the claude mcp add line)'
     Say '  3. Enable access from the tray icon when you want the agent to work; disable it the same way.'
     Say '     Emergency stop: Win+Alt+Esc. Quitting the tray disables access.'
     Say "Logs: $data\state\logs   Uninstall: & ([scriptblock]::Create((irm https://w3bs.org/desktop/install.ps1))) -Uninstall"
