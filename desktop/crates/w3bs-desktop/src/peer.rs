@@ -61,10 +61,11 @@ pub fn parent_of(pid: u32) -> Option<u32> {
     bsdinfo(pid).map(|i| i.pbi_ppid).filter(|p| *p > 0)
 }
 
+/// Parent pid of a process (Toolhelp32 snapshot). Windows does not re-parent orphans, so a
+/// recorded parent may have exited (and its pid been reused); `lineage` stops at cycles.
 #[cfg(windows)]
-pub fn parent_of(_pid: u32) -> Option<u32> {
-    // Implemented in the Windows port (Toolhelp32 snapshot).
-    None
+pub fn parent_of(pid: u32) -> Option<u32> {
+    win::processes().get(&pid).map(|p| p.0).filter(|p| *p != 0 && *p != pid)
 }
 
 /// The pid itself followed by its ancestors, stopping at init/launchd.
@@ -98,8 +99,62 @@ pub fn has_tty(pid: u32) -> bool {
     bsdinfo(pid).is_some_and(|i| i.e_tdev != u32::MAX && i.e_tdev != 0)
 }
 
+/// Whether the process was started from the person's interactive desktop.
+///
+/// Windows has no controlling terminal to look up, so this is a heuristic, and unknown answers
+/// count as non-interactive: the process must run in the broker's own session (not session 0,
+/// not another user's) and its ancestry, walked up through the Toolhelp32 snapshot, must reach
+/// the interactive shell (`explorer.exe`) or a terminal emulator (Windows Terminal, conhost
+/// started directly, Alacritty, WezTerm, mintty) before anything else ends the chain. Services,
+/// scheduled tasks, SSH sessions (`sshd.exe`) and CI runners do not qualify.
 #[cfg(windows)]
-pub fn has_tty(_pid: u32) -> bool {
-    // Implemented in the Windows port. Unknown counts as non-interactive.
+pub fn has_tty(pid: u32) -> bool {
+    const ROOTS: &[&str] = &["explorer.exe", "windowsterminal.exe", "wt.exe", "conhost.exe", "openconsole.exe", "alacritty.exe", "wezterm-gui.exe", "mintty.exe"];
+    const REMOTE: &[&str] = &["sshd.exe", "services.exe", "svchost.exe", "wininit.exe", "winlogon.exe"];
+    if win::session_of(pid).is_none_or(|s| s == 0 || Some(s) != win::session_of(std::process::id())) {
+        return false;
+    }
+    let procs = win::processes();
+    let mut cur = pid;
+    for _ in 0..32 {
+        let Some((parent, exe)) = procs.get(&cur) else { return false };
+        let exe = exe.to_ascii_lowercase();
+        if cur != pid && ROOTS.contains(&exe.as_str()) {
+            return true;
+        }
+        if REMOTE.contains(&exe.as_str()) || *parent == 0 || *parent == cur {
+            return false;
+        }
+        cur = *parent;
+    }
     false
+}
+
+#[cfg(windows)]
+mod win {
+    use std::collections::HashMap;
+    use windows::Win32::System::Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS};
+
+    /// pid -> (parent pid, executable name), from one snapshot.
+    pub fn processes() -> HashMap<u32, (u32, String)> {
+        let mut out = HashMap::new();
+        // SAFETY: snapshot handle owned and closed below; entries are correctly sized.
+        unsafe {
+            let Ok(snap) = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) else { return out };
+            let snap = adl_windows::win::Owned(snap);
+            let mut e = PROCESSENTRY32W { dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32, ..Default::default() };
+            let mut ok = Process32FirstW(snap.0, &mut e).is_ok();
+            while ok {
+                out.insert(e.th32ProcessID, (e.th32ParentProcessID, adl_windows::win::wstr(&e.szExeFile)));
+                ok = Process32NextW(snap.0, &mut e).is_ok();
+            }
+        }
+        out
+    }
+
+    pub fn session_of(pid: u32) -> Option<u32> {
+        let mut s = 0u32;
+        // SAFETY: out-parameter.
+        unsafe { windows::Win32::System::RemoteDesktop::ProcessIdToSessionId(pid, &mut s) }.ok().map(|_| s)
+    }
 }

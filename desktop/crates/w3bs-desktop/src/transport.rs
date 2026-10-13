@@ -84,23 +84,5 @@ mod imp {
 }
 
 #[cfg(windows)]
-mod imp {
-    //! Named pipes. Implemented in the Windows port; until then the broker cannot start here.
-    use super::*;
-
-    pub struct Listener;
-
-    impl Listener {
-        pub fn bind(_ep: &Endpoint) -> io::Result<Self> {
-            Err(io::Error::new(io::ErrorKind::Unsupported, "named-pipe transport not implemented yet"))
-        }
-        pub fn accept(&self) -> io::Result<(Box<dyn Duplex>, Option<PeerInfo>)> {
-            Err(io::Error::new(io::ErrorKind::Unsupported, "named-pipe transport not implemented yet"))
-        }
-        pub fn remove(_ep: &Endpoint) {}
-    }
-
-    pub fn connect(_ep: &Endpoint) -> io::Result<Box<dyn Duplex>> {
-        Err(io::Error::new(io::ErrorKind::Unsupported, "named-pipe transport not implemented yet"))
-    }
-}
+#[path = "transport_windows.rs"]
+mod imp;
