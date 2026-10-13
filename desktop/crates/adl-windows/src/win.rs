@@ -149,8 +149,8 @@ pub fn sid_string(sid: &[u8]) -> String {
     }
     let auth = sid[2..8].iter().fold(0u64, |a, b| (a << 8) | *b as u64);
     let mut s = format!("S-{}-{}", sid[0], auth);
-    for c in sid[8..].chunks_exact(4) {
-        s += &format!("-{}", u32::from_le_bytes([c[0], c[1], c[2], c[3]]));
+    for c in sid[8..].as_chunks::<4>().0 {
+        s += &format!("-{}", u32::from_le_bytes(*c));
     }
     s
 }

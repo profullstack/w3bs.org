@@ -138,7 +138,7 @@ pub fn capture(m: &Monitor) -> Result<(Vec<u8>, u32, u32)> {
         result?;
     }
     let mut rgb = Vec::with_capacity((w as usize) * (h as usize) * 3);
-    for px in bgra.chunks_exact(4) {
+    for px in bgra.as_chunks::<4>().0 {
         rgb.extend_from_slice(&[px[2], px[1], px[0]]);
     }
     let mut out = Vec::new();
