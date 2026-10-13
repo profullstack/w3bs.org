@@ -9,3 +9,5 @@
 !Dockerfile
 !catalog/**
 !registry/**
+!bunfig.toml
+!scripts/scan-packages.mjs

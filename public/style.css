@@ -1727,3 +1727,49 @@ textarea {
     font-size: 11px;
   }
 }
+/* Package pages: ThreatCrush malware scan */
+.prompt-card .scan-badge {
+  align-self: flex-start;
+  margin: -4px 0 10px;
+}
+.scan-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+.scan-facts dt {
+  color: var(--muted);
+}
+.scan-facts dd {
+  margin: 0;
+}
+.scan-findings {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+.scan-findings li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+}
+.scan-findings li > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.scan-findings code {
+  overflow-wrap: anywhere;
+}
+.scan-other {
+  margin-top: 16px;
+}
+.scan-other summary {
+  cursor: pointer;
+  font-size: 14px;
+}

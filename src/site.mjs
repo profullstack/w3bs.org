@@ -128,13 +128,41 @@ function resourceDetail(result) {
     )}<label class="consent"><input type="checkbox" id="run-consent" required> I authorize rendering this template with the inputs above.</label><button class="button dark" type="submit" ${!v.valid ? 'disabled' : ''}>Render instructions <span aria-hidden="true">→</span></button><p id="run-status" role="status" aria-live="polite"></p><pre class="instructions" id="run-output" hidden></pre></form></section><details class="inspector-panel"><summary>Canonical manifest</summary><pre class="json-source">${e(JSON.stringify(m, null, 2))}</pre></details></div><aside><section class="inspector-panel metadata"><h3>Resource details</h3><dl><dt>Version</dt><dd>${e(m.version)}</dd><dt>Publisher</dt><dd>${e(m.publisher.name)}</dd><dt>License</dt><dd>${e(m.license)}</dd><dt>Created</dt><dd>${e(m.createdAt.slice(0, 10))}</dd><dt>Runtime</dt><dd>${e(m.content.runtime)}</dd><dt>Permissions</dt><dd>${m.permissions.length ? e(m.permissions.join(', ')) : 'None requested'}</dd><dt>Dependencies</dt><dd>${m.dependencies.length ? e(m.dependencies.join(', ')) : 'None'}</dd><dt>Declared class</dt><dd>${e(m.trust.classification)}</dd><dt>Effective authority</dt><dd>${e(v.authority)}</dd></dl></section><section class="inspector-panel metadata"><h3>Verification</h3><dl><dt>Signature</dt><dd>${v.signatureValid ? 'Valid Ed25519 signature' : 'Not verified'}</dd><dt>Publisher key</dt><dd>${v.publisherTrusted ? 'Pinned by registry operator' : 'Untrusted'}</dd><dt>Revocation</dt><dd>${v.revoked ? 'Revoked' : 'Not revoked'}</dd><dt>Key ID</dt><dd>${e(v.keyId)}</dd><dt>Digest</dt><dd class="digest">${e(v.digest)}</dd></dl><a class="text-link" href="/api/manifest?uri=${encodeURIComponent(m.id)}">Download manifest ↗</a><a class="text-link" href="/api/conformance?uri=${encodeURIComponent(m.id)}">View fixture checks ↗</a></section><section class="inspector-panel"><h3>Provenance</h3><a class="break" href="${e(m.provenance.source)}">${e(m.provenance.source)}</a><p>${m.provenance.derivedFrom.length ? `Derived from ${e(m.provenance.derivedFrom.join(', '))}` : 'Original reference example.'}</p></section></aside></div></section>`;
 }
 const INSTALL = 'curl -fsSL https://w3bs.org/install.sh | sh';
+// ThreatCrush scan state for a catalog package (src/scan.mjs).
+const SCAN_LABELS = {
+  passed: ['No malware found', 'green', '#3f7d3a'],
+  flagged: ['Malware flagged', 'red', '#b5432a'],
+  error: ['Scan failed', '', '#8a8a80'],
+  pending: ['Scan pending', '', '#8a8a80'],
+};
+const scanLabel = (scan) => SCAN_LABELS[scan?.status] || SCAN_LABELS.pending;
+const scanPill = (scan) => {
+  const [text, tone] = scanLabel(scan);
+  return `<span class="pill scan-badge ${tone}" title="ThreatCrush malware scan">ThreatCrush · ${e(text)}</span>`;
+};
+export function scanBadgeSvg(scan) {
+  const [text, , color] = scanLabel(scan);
+  const label = 'threatcrush',
+    value = text.toLowerCase();
+  const width = (value) => Math.round(value.length * 6.6 + 12);
+  const left = width(label),
+    right = width(value);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${left + right}" height="20" role="img" aria-label="${label}: ${e(value)}"><title>${label}: ${e(value)}</title><rect width="${left}" height="20" fill="#2b2b27"/><rect x="${left}" width="${right}" height="20" fill="${color}"/><g fill="#fff" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11" text-anchor="middle"><text x="${left / 2}" y="14">${label}</text><text x="${left + right / 2}" y="14">${e(value)}</text></g></svg>`;
+}
+const packageLink = (id) => `/packages/${id.split('/').map(encodeURIComponent).join('/')}`;
 async function packagesPage(store, query) {
-  const filter = query.show === 'agentic' ? { agentic: true } : query.show === 'ours' ? { publisher: 'profullstack' } : {};
+  const filter =
+    query.show === 'agentic'
+      ? { agentic: true }
+      : query.show === 'ours'
+        ? { publisher: 'profullstack' }
+        : {};
   const items = await store.packages(String(query.q || ''), filter);
   const all = await store.packages('');
   const tab = (show, label, count) =>
     `<a class="pill ${(query.show || '') === show ? 'green' : ''}" href="/packages${show ? `?show=${show}` : ''}">${e(label)} · ${count}</a>`;
-  const copy = (text) => `<button class="small-button" type="button" data-copy="${e(text)}">Copy</button>`;
+  const copy = (text) =>
+    `<button class="small-button" type="button" data-copy="${e(text)}">Copy</button>`;
   return `<section class="page-head"><div class="eyebrow">THE W3BS CLI · PACKAGES</div><h1>Install from anywhere.<br><em>Update everything</em> at once.</h1><p><code>w3bs</code> is the W3BS command line, and packages are its first app. Every listed tool installs with its publisher's <code>curl | sh</code>; <code>w3bs packages</code> prints this list and <code>w3bs update</code> keeps everything current. The same CLI resolves, verifies and runs signed <code>w3bs://</code> resources.</p></section>
   <section class="section resource-feature"><div><div class="eyebrow">GET STARTED</div><h2>One line.<br>Then one command.</h2><p>The installer downloads the prebuilt <code>w3bs</code> CLI for your machine (Linux or macOS, x86_64 or arm64), checks it, and lets it install itself from the signed W3BS repository. No Node, Python or Rust needed.</p><a class="text-link" href="/docs/package-manager.md">Read the guide <span aria-hidden="true">→</span></a></div><div class="terminal"><div class="terminal-tabs"><span class="terminal-title">install w3bs</span></div><pre><code>${e(INSTALL)}</code></pre><div class="terminal-result">${copy(INSTALL)}<span class="terminal-label">THEN</span><code>w3bs packages</code><code>w3bs install claude-code</code><code>w3bs update</code></div></div></section>
   <section class="section"><div class="section-heading"><div><div class="eyebrow">THE CATALOG</div><h2>${all.length} tools,<br>one update command.</h2></div><p>Agentic coding tools, MCP servers and the CLIs around them. Search, copy the publisher's own installer, or let <code>w3bs install</code> run it and track it for you.</p></div>
@@ -144,11 +172,12 @@ async function packagesPage(store, query) {
     items
       .map(
         (item) =>
-          `<article class="prompt-card" id="${e(item.id)}"><div class="prompt-top">${pill(item.agentic ? 'Agentic' : 'CLI', item.agentic ? 'green' : '')}<span class="verified-small">${e(item.vendor || '')}</span></div><h2>${e(item.name)}</h2><p>${e(item.description)}</p><code>${e(item.install)}</code><div class="prompt-bottom"><span>${copy(item.install)} <code>w3bs install ${e(item.id)}</code></span>${item.homepage ? `<a href="${e(item.homepage)}" rel="noopener">Site ↗</a>` : ''}</div></article>`,
+          `<article class="prompt-card" id="${e(item.id)}"><div class="prompt-top">${pill(item.agentic ? 'Agentic' : 'CLI', item.agentic ? 'green' : '')}<span class="verified-small">${e(item.vendor || '')}</span></div><h2><a href="${e(packageLink(item.id))}">${e(item.name)}</a></h2>${scanPill(item.scan)}<p>${e(item.description)}</p><code>${e(item.install)}</code><div class="prompt-bottom"><span>${copy(item.install)} <code>w3bs install ${e(item.id)}</code></span>${item.homepage ? `<a href="${e(item.homepage)}" rel="noopener">Site ↗</a>` : ''}</div></article>`,
       )
-      .join('') || '<div class="empty"><h2>No matching tools.</h2><p><a href="/packages">See every package</a>.</p></div>'
+      .join('') ||
+    '<div class="empty"><h2>No matching tools.</h2><p><a href="/packages">See every package</a>.</p></div>'
   }</div>
-  <aside class="callout"><strong>The listing rule: a curl installer, or you're not listed.</strong><p>Every tool here installs with one <code>curl … | sh</code> from its publisher. The script may use npm or pip inside, but <code>w3bs</code> only ever runs that installer. W3BS records what it ran, re-runs it on <code>w3bs update</code>, and is honest that it cannot roll back or verify a publisher's script. Publishers who want signed releases, pins and rollback can host a W3BS repository with <code>w3bs-publish</code>.</p><a href="/docs/package-manager.md#publishers">List your tool →</a></aside></section>
+  <aside class="callout"><strong>Every package is scanned for malware.</strong><p>W3BS runs <a href="https://threatcrush.com" rel="noopener">ThreatCrush</a> over each tool's installer and source when it is submitted, and again whenever it changes: a new version, a different installer or a new commit. Each package page shows the result.</p></aside><aside class="callout"><strong>The listing rule: a curl installer, or you're not listed.</strong><p>Every tool here installs with one <code>curl … | sh</code> from its publisher. The script may use npm or pip inside, but <code>w3bs</code> only ever runs that installer. W3BS records what it ran, re-runs it on <code>w3bs update</code>, and is honest that it cannot roll back or verify a publisher's script. Publishers who want signed releases, pins and rollback can host a W3BS repository with <code>w3bs-publish</code>.</p><a href="/docs/package-manager.md#publishers">List your tool →</a></aside></section>
   <section class="section"><div class="section-heading"><div><div class="eyebrow">HOW IT WORKS</div><h2>Your inventory.<br>Their release hosting.</h2></div><p>Publishers keep their domains, hosting and signing keys. You keep one inventory, one update command, pins, rollback and removal.</p></div><div class="principle-grid"><article><span class="card-index">01 / INSTALL</span><h3>From the website or by name.</h3><p>A publisher's <code>curl | sh</code> and <code>w3bs install</code> run the same engine and write the same receipt.</p></article><article><span class="card-index">02 / VERIFY</span><h3>Signed by the publisher.</h3><p>Native packages come from TUF-signed repositories: every artifact's length and SHA-256 is checked before anything is activated.</p></article><article><span class="card-index">03 / MAINTAIN</span><h3>Update all. Undo one.</h3><p><code>w3bs update</code> respects pins and major versions; <code>w3bs rollback</code> restores the previous files. Machine output with <code>--json</code>.</p></article></div></section>`;
 }
 function specIndex() {
@@ -217,6 +246,41 @@ function desktopPage() {
   <section class="section"><div class="section-heading"><div><div class="eyebrow">COMMAND LINE</div><h2>Proposed, not yet installable.</h2></div><p>The <code>w3bs desktop</code> namespace as specified. These commands are not install instructions. They will ship through the W3BS Package Manager when a platform passes certification.</p></div><figure class="architecture"><figcaption class="eyebrow">PROPOSED, NOT YET INSTALLABLE</figcaption><pre>${e(desktopCommands)}</pre></figure></section>
   <section class="section prd-share" aria-labelledby="prd-title"><div class="section-heading"><div><div class="eyebrow">THE SPECIFICATION</div><h2 id="prd-title">Read the PRD.</h2></div><p>Version 0.2, October 12, 2026. An implementation specification, not a claim of released software. Source: <a class="inline-link" href="https://github.com/profullstack/w3bs.org/tree/main/desktop">github.com/profullstack/w3bs.org/desktop</a>.</p></div><div class="actions"><button type="button" class="button dark" data-copy-prd="${prdPath}">Copy Markdown</button><a class="button primary" href="${prdPath}" download="agentic-desktop-layer-prd.md">Download PRD <span aria-hidden="true">↓</span></a><a class="text-link" href="${prdPath}">Raw Markdown <span aria-hidden="true">↗</span></a></div><p class="copy-status" role="status" aria-live="polite" data-copy-status></p><div class="copy-fallback" data-copy-fallback hidden><label for="prd-fallback">Copying failed. The Markdown is below: select it all and copy it.</label><textarea id="prd-fallback" readonly rows="14" spellcheck="false"></textarea></div><details class="inspector-panel prd-full"><summary>Read the full PRD on this page</summary><article class="prose">${marked.parse(prd)}</article></details></section>`;
 }
+async function packageDetail(store, id, origin) {
+  const item = await store.package(id);
+  const scan = item.scan;
+  const copy = (text) =>
+    `<button class="small-button" type="button" data-copy="${e(text)}">Copy</button>`;
+  const badgeUrl = `${origin}/api/packages/${id}/badge.svg`;
+  const badgeMarkdown = `[![ThreatCrush scan](${badgeUrl})](${origin}${packageLink(id)})`;
+  const counts = scan.summary
+    ? ['critical', 'high', 'medium', 'low', 'info']
+        .filter((level) => scan.summary[level])
+        .map((level) => `${scan.summary[level]} ${level}`)
+        .join(' · ') || 'none'
+    : '';
+  const listFindings = (list) =>
+    list
+      .map(
+        (finding) =>
+          `<li class="${finding.malware ? 'malware' : ''}">${pill(finding.malware ? 'Malware indicator' : finding.severity, finding.malware ? 'red' : '')}<div><strong>${e(finding.title)}</strong><code>${e(finding.file)}${finding.line ? `:${e(finding.line)}` : ''}</code><span class="muted">${e(finding.ruleId)}${finding.cwe ? ` · ${e(finding.cwe)}` : ''}</span></div></li>`,
+      )
+      .join('');
+  const malwareFindings = listFindings((scan.findings || []).filter((item) => item.malware));
+  const otherCount = (scan.findings || []).filter((item) => !item.malware).length;
+  const otherFindings = otherCount
+    ? `<details class="scan-other"><summary>${otherCount}${scan.truncated ? '+' : ''} other finding${otherCount === 1 ? '' : 's'} (not malware)</summary><ul class="scan-findings">${listFindings((scan.findings || []).filter((item) => !item.malware))}</ul>${scan.truncated ? '<p class="muted">Showing the first 100 findings.</p>' : ''}</details>`
+    : '';
+  const explanation = {
+    passed: `ThreatCrush found no malware indicators in ${e(item.name)} ${e(scan.version || '')}.${scan.findings?.length ? ' The other findings below are ordinary code-review notes, not malware.' : ''}`,
+    flagged:
+      'ThreatCrush found code shaped like malware: a hidden payload executed at runtime or secrets sent off the machine. Read the findings before installing. W3BS reviews flagged packages and delists confirmed ones.',
+    error: `The last scan could not finish: ${e(scan.error || 'unknown error')}. It is retried on the next pass.`,
+    pending:
+      'This version has not been scanned yet. Scans run when a package is submitted and whenever it changes.',
+  }[scan.status];
+  return `<section class="resource-detail"><div class="resource-title"><div><div class="eyebrow"><a href="/packages">PACKAGES</a> / ${e(item.vendor || item.publisher)}</div><h2>${e(item.name)}</h2><p>${e(item.description)}</p></div>${scanPill(scan)}</div><div class="identity-line"><span class="eyebrow">INSTALL</span><code>${e(item.install)}</code>${copy(item.install)}</div><div class="inspector-grid"><div><section class="inspector-panel" id="scan"><h3>Malware scan</h3><p>${explanation}</p>${scan.status === 'passed' || scan.status === 'flagged' ? `<dl class="scan-facts"><dt>Scanned</dt><dd>${e(scan.scannedAt?.slice(0, 16).replace('T', ' '))} UTC · ${e(scan.scanner)}</dd><dt>Files</dt><dd>${e(scan.filesScanned)} (installer${scan.sources?.repository ? ` + ${e(scan.sources.repository)}${scan.sources.commit ? `@${e(scan.sources.commit.slice(0, 12))}` : ''}` : ''})</dd><dt>Findings</dt><dd>${e(counts)}${scan.malware ? ` · <strong>${e(scan.malware)} malware indicator${scan.malware === 1 ? '' : 's'}</strong>` : ''}</dd></dl>` : ''}${(scan.notes || []).map((note) => `<p class="muted">${e(note)}</p>`).join('')}${malwareFindings ? `<ul class="scan-findings">${malwareFindings}</ul>` : ''}${otherFindings}</section><section class="inspector-panel"><h3>Badge for your README</h3><p><img src="/api/packages/${e(id)}/badge.svg" alt="ThreatCrush: ${e(scanLabel(scan)[0])}" height="20"></p><pre class="instructions">${e(badgeMarkdown)}</pre>${copy(badgeMarkdown)}</section></div><aside><section class="inspector-panel metadata"><h3>Package details</h3><dl><dt>ID</dt><dd>${e(item.id)}</dd><dt>Version</dt><dd>${e(item.latest_version || 'Publisher managed')}</dd><dt>Vendor</dt><dd>${e(item.vendor || '')}</dd><dt>License</dt><dd>${e(item.license || 'Not stated')}</dd><dt>Commands</dt><dd>${e((item.commands || []).join(', '))}</dd><dt>Kind</dt><dd>${item.agentic ? 'Agentic' : 'CLI'}</dd></dl><code>${e(item.w3bs)}</code>${item.homepage ? `<a class="text-link" href="${e(item.homepage)}" rel="noopener">Website ↗</a>` : ''}${item.repository ? `<a class="text-link" href="${e(item.repository)}" rel="noopener">Source ↗</a>` : ''}<a class="text-link" href="/api/packages/${e(id)}">Package JSON ↗</a></section></aside></div></section>`;
+}
 export async function renderPage({ path, host, query, store, origin }) {
   if (path === '/')
     path = host.startsWith('browse.')
@@ -244,6 +308,16 @@ export async function renderPage({ path, host, query, store, origin }) {
   } else if (path === '/packages') {
     title = 'Packages · the w3bs CLI';
     content = await packagesPage(store, query);
+  } else if (/^\/packages\/[^/]+\/[^/]+$/.test(path)) {
+    let id;
+    try {
+      id = path.slice('/packages/'.length).split('/').map(decodeURIComponent).join('/');
+    } catch {
+      throw new W3bsError('NOT_FOUND', 'Page not found.', 404);
+    }
+    content = await packageDetail(store, id, origin);
+    title = `${id} · Packages`;
+    active = '/packages';
   } else if (path === '/specs') {
     title = 'Open Standards';
     content = specIndex();

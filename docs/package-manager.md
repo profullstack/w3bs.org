@@ -85,6 +85,18 @@ There are two ways to be in `w3bs`:
 1. **Be in the catalog.** Ship a `curl -fsSL https://<your-site>/install.sh | sh` installer, then open a pull request adding your tool to [`catalog/catalog.json`](https://github.com/profullstack/w3bs.org/blob/main/catalog/catalog.json). No installer, no listing.
 2. **Run a signed repository** with `w3bs-publish`. Static hosting is enough.
 
+### Malware scanning
+
+Every catalog package is scanned with [ThreatCrush](https://threatcrush.com). The check on your catalog pull request downloads your installer and, if `repository` is a public GitHub repo, its source at the default branch head, and scans both. Nothing is executed. The check fails on a malware indicator (a decoded payload run as code, the environment serialised into a request, or any CWE-506 finding) or a scan that cannot finish. Other findings are listed but do not block.
+
+After listing, w3bs.org re-scans your package whenever it changes: a new `latest_version`, different installer bytes or a new commit. Until the new scan lands the package shows **Scan pending**. The result is on `w3bs.org/packages/<id>` and in `/api/packages/<id>`, and there is a README badge:
+
+```markdown
+[![ThreatCrush scan](https://w3bs.org/api/packages/<id>/badge.svg)](https://w3bs.org/packages/<id>)
+```
+
+A false positive is fixed at the source: add `// threatcrush-disable-next-line <rule-id>` above the line, or list the path in a `.threatcrushignore`, and the next scan picks it up. Operators re-scan by hand with `bun scripts/scan-packages.mjs --record <id>` in the app container.
+
 ```sh
 w3bs-publish init ./myrepo                         # keys/ (keep secret) + signed root; prints your fingerprint
 w3bs-publish add ./myrepo --id tools.example/atlas --version 1.2.3 \

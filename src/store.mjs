@@ -15,12 +15,16 @@ const SCHEMA = {
     CREATE INDEX IF NOT EXISTS resources_base ON resources(base);
     CREATE TABLE IF NOT EXISTS revocations (id TEXT PRIMARY KEY REFERENCES resources(id), reason TEXT NOT NULL, revoked_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS audit (sequence INTEGER PRIMARY KEY AUTOINCREMENT, operation TEXT NOT NULL, resource_id TEXT NOT NULL, at TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, agentic INTEGER NOT NULL, publisher TEXT NOT NULL, entry TEXT NOT NULL, updated_at TEXT NOT NULL);`,
+    CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, agentic INTEGER NOT NULL, publisher TEXT NOT NULL, entry TEXT NOT NULL, updated_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS package_scans (sequence INTEGER PRIMARY KEY AUTOINCREMENT, package_id TEXT NOT NULL, fingerprint TEXT NOT NULL, status TEXT NOT NULL, result TEXT NOT NULL, scanned_at TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS package_scans_package ON package_scans(package_id, sequence);`,
   postgres: `CREATE TABLE IF NOT EXISTS resources (id TEXT PRIMARY KEY, base TEXT NOT NULL, version TEXT NOT NULL, manifest TEXT NOT NULL, published_at TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS resources_base ON resources(base);
     CREATE TABLE IF NOT EXISTS revocations (id TEXT PRIMARY KEY REFERENCES resources(id), reason TEXT NOT NULL, revoked_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS audit (sequence BIGSERIAL PRIMARY KEY, operation TEXT NOT NULL, resource_id TEXT NOT NULL, at TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, agentic INTEGER NOT NULL, publisher TEXT NOT NULL, entry TEXT NOT NULL, updated_at TEXT NOT NULL);`,
+    CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, agentic INTEGER NOT NULL, publisher TEXT NOT NULL, entry TEXT NOT NULL, updated_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS package_scans (sequence BIGSERIAL PRIMARY KEY, package_id TEXT NOT NULL, fingerprint TEXT NOT NULL, status TEXT NOT NULL, result TEXT NOT NULL, scanned_at TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS package_scans_package ON package_scans(package_id, sequence);`,
 };
 
 async function openSqlite(path) {
@@ -240,7 +244,15 @@ export async function openStore({
           throw new Error(`catalog entry ${row.id} has no curl | sh installer`);
         await tx.run(
           'INSERT INTO packages(id, name, kind, agentic, publisher, entry, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET name = excluded.name, kind = excluded.kind, agentic = excluded.agentic, publisher = excluded.publisher, entry = excluded.entry, updated_at = excluded.updated_at',
-          [row.id, row.name, 'curl', row.agentic ? 1 : 0, row.publisher || 'third-party', JSON.stringify(row), now],
+          [
+            row.id,
+            row.name,
+            'curl',
+            row.agentic ? 1 : 0,
+            row.publisher || 'third-party',
+            JSON.stringify(row),
+            now,
+          ],
         );
       }
       for (const { id } of await tx.all('SELECT id FROM packages'))
@@ -248,10 +260,52 @@ export async function openStore({
     });
     return rows.length;
   }
+  // ThreatCrush results (src/scan.mjs). Each scan is a row; the newest one per package
+  // is its current state, and the last few are kept as history.
+  async function recordScan(packageId, result) {
+    await db.transaction(async (tx) => {
+      await tx.run(
+        'INSERT INTO package_scans(package_id, fingerprint, status, result, scanned_at) VALUES (?, ?, ?, ?, ?)',
+        [
+          packageId,
+          result.fingerprint || '',
+          result.status,
+          JSON.stringify(result),
+          result.scannedAt,
+        ],
+      );
+      await tx.run(
+        'DELETE FROM package_scans WHERE package_id = ? AND sequence NOT IN (SELECT sequence FROM package_scans WHERE package_id = ? ORDER BY sequence DESC LIMIT 20)',
+        [packageId, packageId],
+      );
+    });
+  }
+  async function latestScan(packageId) {
+    const row = await db.get(
+      'SELECT result FROM package_scans WHERE package_id = ? ORDER BY sequence DESC LIMIT 1',
+      [packageId],
+    );
+    return row ? JSON.parse(row.result) : undefined;
+  }
+  async function latestScans() {
+    const rows = await db.all(
+      'SELECT package_id, result FROM package_scans WHERE sequence IN (SELECT MAX(sequence) FROM package_scans GROUP BY package_id)',
+    );
+    return new Map(rows.map((row) => [row.package_id, JSON.parse(row.result)]));
+  }
+  // The scan state a listing shows. A package changed since its last scan is
+  // "pending" until the re-scan lands: an old pass must not vouch for new code.
+  const scanState = (item, scan, detail = false) => {
+    if (!scan || (scan.version ?? null) !== (item.latest_version ?? null))
+      return { status: 'pending', scanner: 'threatcrush' };
+    const { findings, fingerprint, ...summary } = scan;
+    return detail ? { ...summary, findings: findings || [] } : summary;
+  };
   async function packages(query = '', { agentic, publisher } = {}) {
     if (typeof query !== 'string' || query.length > 200)
       throw new W3bsError('INVALID_QUERY', 'Search is limited to 200 characters.');
     const q = query.toLowerCase();
+    const scans = await latestScans();
     return (await db.all('SELECT entry FROM packages ORDER BY id'))
       .map((row) => JSON.parse(row.entry))
       .filter(
@@ -262,13 +316,21 @@ export async function openStore({
             .toLowerCase()
             .includes(q),
       )
-      .map(({ evidence, ...item }) => ({ ...item, w3bs: `w3bs install ${item.id}` }));
+      .map(({ evidence, ...item }) => ({
+        ...item,
+        w3bs: `w3bs install ${item.id}`,
+        scan: scanState(item, scans.get(item.id)),
+      }));
   }
   async function packageById(id) {
     const row = await db.get('SELECT entry FROM packages WHERE id = ?', [id]);
     if (!row) throw new W3bsError('NOT_FOUND', `No package ${id} in the catalog.`, 404);
     const { evidence, ...item } = JSON.parse(row.entry);
-    return { ...item, w3bs: `w3bs install ${item.id}` };
+    return {
+      ...item,
+      w3bs: `w3bs install ${item.id}`,
+      scan: scanState(item, await latestScan(id), true),
+    };
   }
   await syncPackages();
   if (seed) {
@@ -290,6 +352,8 @@ export async function openStore({
     packages,
     package: packageById,
     syncPackages,
+    recordScan,
+    latestScan,
     trust,
     dialect: db.dialect,
     close: () => db.close(),

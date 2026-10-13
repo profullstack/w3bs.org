@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
+    "@profullstack/threatcrush": "0.13.29",
     "canonicalize": "2.1.0",
     "express": "5.1.0",
     "marked": "16.4.2",
