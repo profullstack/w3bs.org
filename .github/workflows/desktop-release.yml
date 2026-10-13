@@ -1,6 +1,7 @@
 # Agentic Desktop Layer releases: on a `desktop-v*` tag, build w3bs-desktop for every platform
 # whose backend is real, and attach the archives plus SHA256SUMS to a GitHub release.
-# https://w3bs.org/desktop/install.sh downloads from here and checks SHA256SUMS.
+# https://w3bs.org/desktop/install.sh (Linux, macOS) and https://w3bs.org/desktop/install.ps1
+# (Windows) download from here and check SHA256SUMS.
 name: Desktop release
 on:
   push:
@@ -19,8 +20,15 @@ jobs:
           # glibc 2.28 baseline so the binary runs on every supported distro.
           - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, zig: x86_64-unknown-linux-gnu.2.28 }
           - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, container: 'quay.io/pypa/manylinux_2_28_aarch64' }
+          # macOS 11 baseline; both architectures built on Apple silicon.
+          - { os: macos-14, target: aarch64-apple-darwin }
+          - { os: macos-14, target: x86_64-apple-darwin }
+          # Console CLI plus the GUI-subsystem w3bs-desktopw.exe for the broker and tray.
+          - { os: windows-latest, target: x86_64-pc-windows-msvc }
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
     steps:
       - uses: actions/checkout@v4
       - if: matrix.container
@@ -45,18 +53,13 @@ jobs:
         run: cargo build --locked --release --target ${{ matrix.target }} -p w3bs-desktop
       - name: Package
         shell: bash
-        run: |
-          v="${GITHUB_REF_NAME#desktop-v}"
-          d="$RUNNER_TEMP/pkg"; mkdir -p "$d/bin" "$d/share"
-          cp "target/${{ matrix.target }}/release/w3bs-desktop" "$d/bin/"
-          cp LICENSE README.md "$d/"
-          cp -r packaging "$d/share/"
-          tar -czf "$RUNNER_TEMP/w3bs-desktop-$v-${{ matrix.target }}.tar.gz" -C "$d" .
-          ls -l "$RUNNER_TEMP"/*.tar.gz
+        run: sh packaging/package.sh "${{ matrix.target }}" "${GITHUB_REF_NAME#desktop-v}" "$RUNNER_TEMP/dist"
       - uses: actions/upload-artifact@v4
         with:
           name: w3bs-desktop-${{ matrix.target }}
-          path: ${{ runner.temp }}/*.tar.gz
+          path: |
+            ${{ runner.temp }}/dist/*.tar.gz
+            ${{ runner.temp }}/dist/*.zip
 
   release:
     needs: build
@@ -71,11 +74,18 @@ jobs:
         with:
           path: dist
           merge-multiple: true
-      - run: (cd dist && sha256sum *.tar.gz > SHA256SUMS && cat SHA256SUMS)
+      # Artifacts from container jobs keep their in-container path (__w/_temp/...); flatten so
+      # every archive sits directly in dist/, and fail if one of the five is missing.
+      - run: |
+          find dist -mindepth 2 -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec mv -t dist {} +
+          find dist -mindepth 1 -type d -exec rm -rf {} +
+          ls -l dist
+          test "$(ls dist/*.tar.gz dist/*.zip | wc -l)" -eq 5
+          (cd dist && sha256sum *.tar.gz *.zip > SHA256SUMS && cat SHA256SUMS)
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.zip dist/SHA256SUMS --repo "$GITHUB_REPOSITORY" \
             --title "Agentic Desktop Layer ${GITHUB_REF_NAME#desktop-v}" \
-            --notes "Install: \`curl -fsSL https://w3bs.org/desktop/install.sh | sh\`. Agent access starts Disabled. Docs: https://w3bs.org/desktop. No platform is certified yet." \
-            || gh release upload "$GITHUB_REF_NAME" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+            --notes "Install on Linux and macOS: \`curl -fsSL https://w3bs.org/desktop/install.sh | sh\`. On Windows (PowerShell): \`irm https://w3bs.org/desktop/install.ps1 | iex\`. Agent access starts Disabled. Docs: https://w3bs.org/desktop. Binaries are not code-signed. No platform is certified yet." \
+            || gh release upload "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.zip dist/SHA256SUMS --clobber --repo "$GITHUB_REPOSITORY"

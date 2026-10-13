@@ -242,6 +242,15 @@ test('Agentic Desktop Layer page, typo redirect, raw PRD and navigation', async 
     // Nothing runs until the last line, so a truncated download does nothing.
     assert.equal(installScript.trimEnd().split('\n').at(-1), 'adl_main "$@"');
     assert.ok(installScript.includes("SHA256SUMS") && !installScript.includes("enable.confirm"));
+    const ps = await fetch(`${origin}/desktop/install.ps1`);
+    assert.equal(ps.status, 200);
+    assert.match(ps.headers.get('content-type'), /text\/plain/);
+    const psScript = await ps.text();
+    // `irm | iex` safety: everything is inside one function, invoked only on the last line.
+    assert.equal(psScript.trimEnd().split('\n').at(-1).trim(), 'Install-W3bsDesktop @args');
+    assert.match(psScript, /^function Install-W3bsDesktop \{/m);
+    assert.ok(psScript.includes('SHA256SUMS') && psScript.includes('Get-FileHash'));
+    assert.ok(!/enable\.(request|confirm)/.test(psScript), 'the Windows installer must never enable access');
     const home = await (await fetch(`${origin}/mission`)).text();
     assert.match(home, /<a href="\/desktop" >Desktop<\/a>/);
     for (const path of ['/desktpo', '/desktpo/', '/desktop/']) {

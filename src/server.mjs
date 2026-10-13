@@ -241,7 +241,7 @@ export function createApp({
     res.type('text/markdown').send(readFileSync(path, 'utf8'));
   });
   // The PRD's original typo, and trailing-slash variants, land on the canonical page.
-  // Agentic Desktop Layer installer (Linux/macOS sh; Windows PowerShell once released).
+  // Agentic Desktop Layer installers: install.sh (Linux, macOS) and install.ps1 (Windows).
   for (const [route, file, type] of [
     ['/desktop/install.sh', 'install.sh', 'text/x-shellscript; charset=utf-8'],
     ['/desktop/install.ps1', 'install.ps1', 'text/plain; charset=utf-8'],
