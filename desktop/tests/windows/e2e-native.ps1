@@ -65,7 +65,12 @@ function until($block, [int]$ms = 10000) {
     return $false
 }
 function state { (W status).v.state }
-function form($path) { try { Get-Content -Raw -Encoding utf8 $path | ConvertFrom-Json } catch { $null } }
+# The test forms write their state on a timer; wait for the first write before reading.
+function form($path) {
+    $deadline = (Get-Date).AddSeconds(5)
+    while (-not (Test-Path $path) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 100 }
+    try { Get-Content -Raw -Encoding utf8 -ErrorAction Stop $path | ConvertFrom-Json } catch { $null }
+}
 function find-window($list, $title) { $list | Where-Object { $_.title -eq $title } | Select-Object -First 1 }
 
 Write-Host "== session: $env:USERNAME session=$((Get-Process -Id $PID).SessionId) console=$([N]::WTSGetActiveConsoleSessionId()) SESSIONNAME=$env:SESSIONNAME"

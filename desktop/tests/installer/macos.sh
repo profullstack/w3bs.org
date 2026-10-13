@@ -80,7 +80,7 @@ echo "== uninstall"
 sh packaging/install.sh --uninstall >"$OUT/uninstall.txt" 2>&1
 rc=$?; cat "$OUT/uninstall.txt"
 check "uninstall exits 0" [ "$rc" -eq 0 ]
-check "broker job unloaded" sh -c "! launchctl print gui/$U/org.w3bs.desktop.broker >/dev/null 2>&1"
+check "broker job unloaded" sh -c "for i in \$(seq 1 50); do launchctl print gui/$U/org.w3bs.desktop.broker >/dev/null 2>&1 || exit 0; sleep 0.2; done; exit 1"
 check "menubar job unloaded" sh -c "! launchctl print gui/$U/org.w3bs.desktop.menubar >/dev/null 2>&1"
 check "LaunchAgent plists removed" sh -c "[ ! -e '$LA/org.w3bs.desktop.broker.plist' ] && [ ! -e '$LA/org.w3bs.desktop.menubar.plist' ]"
 check "binary removed" [ ! -e "$B" ]

@@ -65,7 +65,13 @@ adl_main() {
   uid="$(id -u)"
 
   # macOS LaunchAgents live in the user's GUI domain.
-  la_unload() { launchctl bootout "gui/$uid/$1" >/dev/null 2>&1 || true; }
+  la_unload() {
+    launchctl bootout "gui/$uid/$1" >/dev/null 2>&1 || true
+    # bootout returns before launchd has finished stopping the job; wait (up to 10 s) so callers
+    # see it gone.
+    n=0
+    while launchctl print "gui/$uid/$1" >/dev/null 2>&1 && [ "$n" -lt 50 ]; do sleep 0.2; n=$((n + 1)); done
+  }
   la_load() {
     # bootout completes asynchronously and a bootstrap right after it can fail, so retry.
     for _ in 1 2 3 4 5 6 7 8 9; do
