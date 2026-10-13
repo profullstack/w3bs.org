@@ -79,7 +79,11 @@ export async function conformance() {
       ['stdio', stdioClient],
     ]) {
       const tools = await client.listTools();
-      assert.equal(tools.tools.length, 8, `${name} missing shared operations`);
+      assert.equal(tools.tools.length, 10, `${name} missing shared operations`);
+      assert.ok(
+        tools.tools.some((tool) => tool.name === 'w3bs_packages'),
+        `${name} is missing the package catalog`,
+      );
       const denied = await client.callTool({
         name: 'w3bs_run',
         arguments: { uri, inputs: { topic: 'open web' }, consent: false },

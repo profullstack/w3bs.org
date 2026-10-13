@@ -1,0 +1,722 @@
+[
+ {
+  "id": "moshcode.sh/moshcode",
+  "name": "moshcode",
+  "commands": [
+   "moshcode",
+   "moshscript"
+  ],
+  "description": "Wrapper CLI that installs and drives coding agents such as opencode, Claude Code and codex, with a small scripting toolkit called moshscript.",
+  "homepage": "https://moshcode.sh",
+  "repository": "https://github.com/moshcoder/moshcode",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "0.115.0",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://moshcoding.com/install.sh | sh",
+  "evidence": "npm view moshcode; moshcoding.com/install.sh 200",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "profullstack.com/cli-tools",
+  "name": "cli-tools",
+  "commands": [
+   "cli-tools",
+   "gh-prs",
+   "gh-prs-merge",
+   "websearch",
+   "ask-web",
+   "domainjson",
+   "domainfree",
+   "openinstall",
+   "openmcp",
+   "proxy",
+   "codeburn",
+   "jobhunt",
+   "img",
+   "vid",
+   "dl",
+   "tts"
+  ],
+  "description": "A collection of TypeScript command-line tools for working across many repositories, searching the web, checking domains, handling media and provisioning servers.",
+  "homepage": "https://github.com/profullstack/cli-tools",
+  "repository": "https://github.com/profullstack/cli-tools",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "0.68.0",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/cli-tools/master/install.sh | sh",
+  "evidence": "cli-tools README; raw install.sh 200; gh release v0.68.0",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "mynaposter.com/myna",
+  "name": "myna",
+  "commands": [
+   "myna"
+  ],
+  "description": "Terminal social media manager that writes, schedules and posts to about 25 networks from one queue.",
+  "homepage": "https://mynaposter.com",
+  "repository": "https://github.com/profullstack/mynaposter",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "0.44.2",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://mynaposter.com/install.sh | sh",
+  "evidence": "mynaposter/apps/cli/package.json bin myna; installer 200; gh release v0.44.2",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "sh1pt.com/sh1pt",
+  "name": "sh1pt",
+  "commands": [
+   "sh1pt"
+  ],
+  "description": "CLI that builds one codebase and ships it to app stores, package registries, CDNs and deploy targets, then promotes it.",
+  "homepage": "https://sh1pt.com",
+  "repository": "https://github.com/profullstack/sh1pt",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "0.3.5",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://sh1pt.com/install.sh | sh",
+  "evidence": "npm view @profullstack/sh1pt; sh1pt.com/install.sh 200",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "logicsrc.com/logicsrc",
+  "name": "logicsrc",
+  "commands": [
+   "logicsrc"
+  ],
+  "description": "CLI for LogicSRC, an open standards initiative for coordinating humans and AI agents.",
+  "homepage": "https://logicsrc.com",
+  "repository": "https://github.com/profullstack/logicsrc",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "0.7.0",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://logicsrc.com/install.sh | sh",
+  "evidence": "logicsrc/packages/cli/package.json; logicsrc.com/install.sh 200",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "logicsrc.com/openmcp",
+  "name": "openmcp",
+  "commands": [
+   "openmcp"
+  ],
+  "description": "Client and reference server for OpenMCP, an open catalog of MCP relays.",
+  "homepage": "https://logicsrc.com/openmcp",
+  "repository": "https://github.com/logicsrc/openmcp",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "0.4.0",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://openmcp.logicsrc.com/install.sh | sh",
+  "evidence": "npm view @logicsrc/openmcp; installer 200",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "agenticjobs.work/agenticjobs",
+  "name": "agenticjobs",
+  "commands": [
+   "agenticjobs",
+   "agenticjobs-mcp"
+  ],
+  "description": "Self-hosted job board for agents and people, with a CLI and an MCP server.",
+  "homepage": "https://agenticjobs.work",
+  "repository": "https://github.com/profullstack/agenticjobs",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "0.22.4",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://agenticjobs.work/install.sh | sh",
+  "evidence": "npm view @profullstack/agenticjobs; installer 200",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "hqterm.sh/hqterm",
+  "name": "hqterm",
+  "commands": [
+   "hqterm",
+   "hqsh"
+  ],
+  "description": "Persistent terminal sessions over SSH that survive disconnects and pass through images and other escape sequences.",
+  "homepage": "https://hqterm.sh",
+  "repository": "https://github.com/profullstack/hqterm",
+  "license": "MIT",
+  "agentic": false,
+  "latest_version": "0.4.1",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://hqterm.sh/install | sh",
+  "evidence": "hqterm.sh/install 200; gh release v0.4.1",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "c0mpute.com/c0mpute",
+  "name": "c0mpute",
+  "commands": [
+   "c0mpute"
+  ],
+  "description": "CLI for a decentralized compute network that runs transcoding and GPU inference jobs and pays workers.",
+  "homepage": "https://c0mpute.com",
+  "repository": "https://github.com/profullstack/c0mpute",
+  "license": "MIT",
+  "agentic": false,
+  "latest_version": "0.2.28",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://c0mpute.com/install.sh | sh",
+  "evidence": "c0mpute Cargo.toml; c0mpute.com/install.sh 200",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "infernetprotocol.com/infernet",
+  "name": "infernet",
+  "commands": [
+   "infernet"
+  ],
+  "description": "GPU node CLI and daemon that registers a GPU server with the Infernet Protocol and serves inference jobs.",
+  "homepage": "https://infernetprotocol.com",
+  "repository": "https://github.com/InfernetProtocol/infernet-protocol",
+  "license": "MIT",
+  "agentic": false,
+  "latest_version": "0.1.59",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://c0mpute.com/plugins/infernet/install.sh | sh",
+  "evidence": "npm view @infernetprotocol/cli; installer 200",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "diskpush.com/diskpush",
+  "name": "diskpush",
+  "commands": [
+   "diskpush"
+  ],
+  "description": "Rsync-based CLI and desktop app that syncs only changed files to remote servers.",
+  "homepage": "https://diskpush.com",
+  "repository": "https://github.com/profullstack/diskpush",
+  "license": "MIT",
+  "agentic": false,
+  "latest_version": "0.12.5",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://diskpush.com/install.sh | sh",
+  "evidence": "diskpush.com/install.sh 200; gh release v0.12.5",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "nixamp.com/nixamp",
+  "name": "nixamp",
+  "commands": [
+   "nixamp"
+  ],
+  "description": "Winamp-style audio player and streaming client for the terminal.",
+  "homepage": "https://nixamp.com",
+  "repository": "https://github.com/profullstack/nixamp",
+  "license": "MIT",
+  "agentic": false,
+  "latest_version": "0.28.44",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://nixamp.com/install.sh | sh",
+  "evidence": "npm view nixamp; nixamp.com/install.sh 200",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "threatcrush.com/threatcrush",
+  "name": "threatcrush",
+  "commands": [
+   "threatcrush"
+  ],
+  "description": "Security agent daemon that monitors, scans and protects servers in real time.",
+  "homepage": "https://threatcrush.com",
+  "repository": "https://github.com/profullstack/threatcrush",
+  "license": "MIT",
+  "agentic": false,
+  "latest_version": "0.13.28",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://threatcrush.com/install.sh | sh",
+  "evidence": "npm view @profullstack/threatcrush; installer 200",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "coinpayportal.com/coinpay",
+  "name": "coinpay",
+  "commands": [
+   "coinpay"
+  ],
+  "description": "SDK and CLI for accepting crypto and card payments, with wallet and swap commands.",
+  "homepage": "https://coinpayportal.com",
+  "repository": "https://github.com/profullstack/coinpayportal",
+  "license": "MIT",
+  "agentic": false,
+  "latest_version": "0.16.0",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://coinpayportal.com/install.sh | sh",
+  "evidence": "npm view @profullstack/coinpay; installer 200",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "ugig.net/ugig",
+  "name": "ugig",
+  "commands": [
+   "ugig"
+  ],
+  "description": "CLI for ugig.net, a marketplace for AI-assisted engineers and skilled workers.",
+  "homepage": "https://ugig.net",
+  "repository": "https://github.com/profullstack/ugig.net",
+  "license": "MIT",
+  "agentic": false,
+  "latest_version": "0.3.0",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://ugig.net/install.sh | bash",
+  "evidence": "ugig.net/cli/package.json; installer 200",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "rssamplifier.com/rssamplifier",
+  "name": "rssamplifier",
+  "commands": [
+   "rssamplifier",
+   "rssamp"
+  ],
+  "description": "CLI for the rssamplifier.com feed directory that finds feeds by topic, searches, exports OPML and submits blogs.",
+  "homepage": "https://rssamplifier.com",
+  "repository": "https://github.com/profullstack/rssamplifier.com",
+  "license": "MIT",
+  "agentic": false,
+  "latest_version": "0.4.0",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://rssamplifier.com/install.sh | sh",
+  "evidence": "npm view @profullstack/rssamplifier; installer 200",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "wx93.me/wx93",
+  "name": "wx93",
+  "commands": [
+   "wx93"
+  ],
+  "description": "CLI and TUI for the wx93.me link shortener that creates short links, shows stats and prints QR codes.",
+  "homepage": "https://wx93.me",
+  "repository": "https://github.com/profullstack/wx93.me",
+  "license": "MIT",
+  "agentic": false,
+  "latest_version": "0.1.0",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://wx93.me/install | sh",
+  "evidence": "npm view @profullstack/wx93; wx93.me/install 200",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "tronbrowser.dev/tronbrowser",
+  "name": "tronbrowser",
+  "commands": [
+   "tron",
+   "tronbrowser"
+  ],
+  "description": "Privacy-focused Chromium-based browser with a tron command for launching, upgrading and removing it.",
+  "homepage": "https://tronbrowser.dev",
+  "repository": "https://github.com/profullstack/tronbrowser.dev",
+  "license": "MIT",
+  "agentic": false,
+  "latest_version": "3.16.1",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://tronbrowser.dev/install.sh | sh",
+  "evidence": "tronbrowser.dev/install.sh 200; homebrew-tap Formula/tronbrowser.rb",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "anthropic.com/claude-code",
+  "name": "Claude Code",
+  "commands": [
+   "claude"
+  ],
+  "description": "Agentic coding tool that runs in the terminal, reads and edits a codebase, runs commands and handles git workflows.",
+  "homepage": "https://claude.com/product/claude-code",
+  "repository": "https://github.com/anthropics/claude-code",
+  "license": "proprietary",
+  "agentic": true,
+  "latest_version": "2.1.296",
+  "vendor": "Anthropic",
+  "install": "curl -fsSL https://claude.ai/install.sh | bash",
+  "evidence": "https://github.com/anthropics/claude-code README; npm view @anthropic-ai/claude-code",
+  "publisher": "third-party"
+ },
+ {
+  "id": "openai.com/codex",
+  "name": "OpenAI Codex CLI",
+  "commands": [
+   "codex"
+  ],
+  "description": "Lightweight coding agent from OpenAI that runs in the terminal.",
+  "homepage": "https://developers.openai.com/codex/cli",
+  "repository": "https://github.com/openai/codex",
+  "license": "Apache-2.0",
+  "agentic": true,
+  "latest_version": "0.162.1",
+  "vendor": "OpenAI",
+  "install": "curl -fsSL https://chatgpt.com/codex/install.sh | sh",
+  "evidence": "https://github.com/openai/codex README; npm view @openai/codex",
+  "publisher": "third-party"
+ },
+ {
+  "id": "github.com/copilot-cli",
+  "name": "GitHub Copilot CLI",
+  "commands": [
+   "copilot"
+  ],
+  "description": "Brings the GitHub Copilot coding agent to the terminal.",
+  "homepage": "https://github.com/github/copilot-cli",
+  "repository": "https://github.com/github/copilot-cli",
+  "license": "proprietary",
+  "agentic": true,
+  "latest_version": "1.0.96",
+  "vendor": "GitHub",
+  "install": "curl -fsSL https://gh.io/copilot-install | bash",
+  "evidence": "https://github.com/github/copilot-cli README; npm view @github/copilot",
+  "publisher": "third-party"
+ },
+ {
+  "id": "aider.chat/aider",
+  "name": "Aider",
+  "commands": [
+   "aider"
+  ],
+  "description": "AI pair programming tool that edits code in a local git repository from the terminal.",
+  "homepage": "https://aider.chat",
+  "repository": "https://github.com/Aider-AI/aider",
+  "license": "Apache-2.0",
+  "agentic": true,
+  "latest_version": "0.86.2",
+  "vendor": "Aider-AI",
+  "install": "curl -LsSf https://aider.chat/install.sh | sh",
+  "evidence": "https://aider.chat/docs/install.html; https://pypi.org/pypi/aider-chat/json",
+  "publisher": "third-party"
+ },
+ {
+  "id": "opencode.ai/opencode",
+  "name": "OpenCode",
+  "commands": [
+   "opencode"
+  ],
+  "description": "Open source AI coding agent with a terminal UI that works with many model providers.",
+  "homepage": "https://opencode.ai",
+  "repository": "https://github.com/anomalyco/opencode",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "2.0.27",
+  "vendor": "Anomaly (formerly SST)",
+  "install": "curl -fsSL https://opencode.ai/install | bash",
+  "evidence": "https://github.com/anomalyco/opencode README; npm view @opencode/cli",
+  "publisher": "third-party"
+ },
+ {
+  "id": "block.xyz/goose",
+  "name": "goose",
+  "commands": [
+   "goose"
+  ],
+  "description": "Open source, extensible AI agent that can install, execute, edit and test code with any LLM.",
+  "homepage": "https://goose-docs.ai",
+  "repository": "https://github.com/aaif-goose/goose",
+  "license": "Apache-2.0",
+  "agentic": true,
+  "latest_version": "1.54.0",
+  "vendor": "AAIF (originally Block)",
+  "install": "curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | bash",
+  "evidence": "https://github.com/aaif-goose/goose README; gh release view -R aaif-goose/goose",
+  "publisher": "third-party"
+ },
+ {
+  "id": "ampcode.com/amp",
+  "name": "Amp",
+  "commands": [
+   "amp"
+  ],
+  "description": "Agentic coding tool from Sourcegraph that runs in the terminal and in editors.",
+  "homepage": "https://ampcode.com",
+  "repository": null,
+  "license": "proprietary",
+  "agentic": true,
+  "latest_version": null,
+  "vendor": "Amp (Sourcegraph)",
+  "install": "curl -fsSL https://ampcode.com/install.sh | bash",
+  "evidence": "https://ampcode.com/docs/cli; npm view @sourcegraph/amp",
+  "publisher": "third-party"
+ },
+ {
+  "id": "cursor.com/cursor-cli",
+  "name": "Cursor CLI",
+  "commands": [
+   "agent"
+  ],
+  "description": "Terminal version of the Cursor coding agent.",
+  "homepage": "https://cursor.com/cli",
+  "repository": null,
+  "license": "proprietary",
+  "agentic": true,
+  "latest_version": null,
+  "vendor": "Anysphere (Cursor)",
+  "install": "curl https://cursor.com/install -fsS | bash",
+  "evidence": "https://cursor.com/docs/cli/installation",
+  "publisher": "third-party"
+ },
+ {
+  "id": "qwen.ai/qwen-code",
+  "name": "Qwen Code",
+  "commands": [
+   "qwen"
+  ],
+  "description": "Open source AI coding agent for the terminal, tuned for Qwen models.",
+  "homepage": "https://qwenlm.github.io/qwen-code-docs/",
+  "repository": "https://github.com/QwenLM/qwen-code",
+  "license": "Apache-2.0",
+  "agentic": true,
+  "latest_version": "0.25.1",
+  "vendor": "Alibaba Qwen",
+  "install": "curl -fsSL https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh | bash",
+  "evidence": "https://github.com/QwenLM/qwen-code README; npm view @qwen-code/qwen-code",
+  "publisher": "third-party"
+ },
+ {
+  "id": "kiro.dev/kiro-cli",
+  "name": "Kiro CLI",
+  "commands": [
+   "kiro-cli"
+  ],
+  "description": "Terminal agent from Kiro, the AWS agentic development environment.",
+  "homepage": "https://kiro.dev/cli/",
+  "repository": null,
+  "license": "proprietary",
+  "agentic": true,
+  "latest_version": null,
+  "vendor": "Amazon (Kiro)",
+  "install": "curl -fsSL https://cli.kiro.dev/install | bash",
+  "evidence": "https://kiro.dev/cli/; https://kiro.dev/docs/cli/",
+  "publisher": "third-party"
+ },
+ {
+  "id": "openinterpreter.com/open-interpreter",
+  "name": "Open Interpreter",
+  "commands": [
+   "interpreter",
+   "i"
+  ],
+  "description": "Coding agent built for low-cost and open models, now a Rust fork of OpenAI Codex.",
+  "homepage": "https://www.openinterpreter.com",
+  "repository": "https://github.com/openinterpreter/openinterpreter",
+  "license": "Apache-2.0",
+  "agentic": true,
+  "latest_version": "0.0.56",
+  "vendor": "Open Interpreter",
+  "install": "curl -fsSL https://www.openinterpreter.com/install | sh",
+  "evidence": "https://github.com/openinterpreter/openinterpreter README; gh release view",
+  "publisher": "third-party"
+ },
+ {
+  "id": "continue.dev/cli",
+  "name": "Continue CLI",
+  "commands": [
+   "cn"
+  ],
+  "description": "Terminal version of the open source Continue coding agent.",
+  "homepage": "https://continue.dev",
+  "repository": "https://github.com/continuedev/continue",
+  "license": "Apache-2.0",
+  "agentic": true,
+  "latest_version": "1.5.47",
+  "vendor": "Continue",
+  "install": "curl -fsSL https://raw.githubusercontent.com/continuedev/continue/main/extensions/cli/scripts/install.sh | bash",
+  "evidence": "npm view @continuedev/cli",
+  "publisher": "third-party"
+ },
+ {
+  "id": "factory.ai/droid",
+  "name": "Factory Droid",
+  "commands": [
+   "droid"
+  ],
+  "description": "Terminal coding agent from Factory.",
+  "homepage": "https://factory.ai",
+  "repository": null,
+  "license": "proprietary",
+  "agentic": true,
+  "latest_version": "0.239.1",
+  "vendor": "Factory",
+  "install": "curl -fsSL https://app.factory.ai/cli | sh",
+  "evidence": "https://docs.factory.com/cli/getting-started/quickstart.md; npm view droid",
+  "publisher": "third-party"
+ },
+ {
+  "id": "moonshot.ai/kimi-code",
+  "name": "Kimi Code CLI",
+  "commands": [
+   "kimi"
+  ],
+  "description": "Terminal AI coding agent that works with Kimi models and other compatible providers.",
+  "homepage": "https://moonshotai.github.io/kimi-code/en/",
+  "repository": "https://github.com/MoonshotAI/kimi-code",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "2.1.1",
+  "vendor": "Moonshot AI",
+  "install": "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash",
+  "evidence": "https://github.com/MoonshotAI/kimi-code README",
+  "publisher": "third-party"
+ },
+ {
+  "id": "mistral.ai/vibe",
+  "name": "Mistral Vibe",
+  "commands": [
+   "vibe"
+  ],
+  "description": "Minimal command line coding agent from Mistral AI.",
+  "homepage": "https://github.com/mistralai/mistral-vibe",
+  "repository": "https://github.com/mistralai/mistral-vibe",
+  "license": "Apache-2.0",
+  "agentic": true,
+  "latest_version": "2.26.1",
+  "vendor": "Mistral AI",
+  "install": "curl -LsSf https://mistral.ai/vibe/install.sh | bash",
+  "evidence": "https://github.com/mistralai/mistral-vibe README; https://pypi.org/pypi/mistral-vibe/json",
+  "publisher": "third-party"
+ },
+ {
+  "id": "openhands.dev/openhands-cli",
+  "name": "OpenHands CLI",
+  "commands": [
+   "openhands"
+  ],
+  "description": "Terminal client for the OpenHands AI software development agent.",
+  "homepage": "https://docs.openhands.dev",
+  "repository": "https://github.com/OpenHands/OpenHands-CLI",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "1.16.0",
+  "vendor": "OpenHands (All Hands AI)",
+  "install": "curl -fsSL https://install.openhands.dev/install.sh | sh",
+  "evidence": "https://github.com/OpenHands/OpenHands-CLI README; https://pypi.org/pypi/openhands/json",
+  "publisher": "third-party"
+ },
+ {
+  "id": "gptme.org/gptme",
+  "name": "gptme",
+  "commands": [
+   "gptme"
+  ],
+  "description": "Terminal agent with local tools that writes code, runs shell commands and browses the web.",
+  "homepage": "https://gptme.org",
+  "repository": "https://github.com/gptme/gptme",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "0.34.0",
+  "vendor": "gptme (Erik Bjareholt)",
+  "install": "curl -sSf https://gptme.ai/install.sh | sh",
+  "evidence": "https://github.com/gptme/gptme README; https://pypi.org/pypi/gptme/json",
+  "publisher": "third-party"
+ },
+ {
+  "id": "kilo.ai/kilo",
+  "name": "Kilo Code CLI",
+  "commands": [
+   "kilo",
+   "kilocode"
+  ],
+  "description": "Terminal version of the open source Kilo Code agentic engineering platform.",
+  "homepage": "https://kilo.ai",
+  "repository": "https://github.com/Kilo-Org/kilocode",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "7.8.8",
+  "vendor": "Kilo Code",
+  "install": "curl -fsSL https://kilo.ai/cli/install | bash",
+  "evidence": "https://github.com/Kilo-Org/kilocode README; npm view @kilocode/cli",
+  "publisher": "third-party"
+ },
+ {
+  "id": "jetbrains.com/junie",
+  "name": "Junie CLI",
+  "commands": [
+   "junie"
+  ],
+  "description": "Terminal version of the JetBrains Junie coding agent.",
+  "homepage": "https://junie.jetbrains.com",
+  "repository": null,
+  "license": "proprietary",
+  "agentic": true,
+  "latest_version": null,
+  "vendor": "JetBrains",
+  "install": "curl -fsSL https://junie.jetbrains.com/install.sh | bash",
+  "evidence": "https://junie.jetbrains.com/docs/junie-cli.html",
+  "publisher": "third-party"
+ },
+ {
+  "id": "superagent.sh/grok-cli",
+  "name": "Grok CLI",
+  "commands": [
+   "grok"
+  ],
+  "description": "Open source terminal coding agent for the xAI Grok API.",
+  "homepage": "https://github.com/superagent-ai/grok-cli",
+  "repository": "https://github.com/superagent-ai/grok-cli",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "1.1.7",
+  "vendor": "Superagent",
+  "install": "curl -fsSL https://raw.githubusercontent.com/superagent-ai/grok-cli/main/install.sh | bash",
+  "evidence": "https://github.com/superagent-ai/grok-cli README; npm view grok-dev",
+  "publisher": "third-party"
+ },
+ {
+  "id": "plandex.ai/plandex",
+  "name": "Plandex",
+  "commands": [
+   "plandex",
+   "pdx"
+  ],
+  "description": "Open source terminal AI coding agent designed for large projects.",
+  "homepage": "https://plandex.ai",
+  "repository": "https://github.com/plandex-ai/plandex",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "2.2.1",
+  "vendor": "Plandex",
+  "install": "curl -sL https://plandex.ai/install.sh | bash",
+  "evidence": "https://github.com/plandex-ai/plandex README; gh release view -R plandex-ai/plandex",
+  "publisher": "third-party"
+ },
+ {
+  "id": "ollama.com/ollama",
+  "name": "Ollama",
+  "commands": [
+   "ollama"
+  ],
+  "description": "Runs open-weight language models locally behind a CLI and a local HTTP API.",
+  "homepage": "https://ollama.com",
+  "repository": "https://github.com/ollama/ollama",
+  "license": "MIT",
+  "agentic": false,
+  "latest_version": "0.40.3",
+  "vendor": "Ollama",
+  "install": "curl -fsSL https://ollama.com/install.sh | sh",
+  "evidence": "https://github.com/ollama/ollama README; gh release view -R ollama/ollama",
+  "publisher": "third-party"
+ },
+ {
+  "id": "github.com/fabric",
+  "name": "Fabric",
+  "commands": [
+   "fabric"
+  ],
+  "description": "Open source framework and CLI that applies a library of crowdsourced AI prompt patterns to text.",
+  "homepage": "https://github.com/danielmiessler/Fabric",
+  "repository": "https://github.com/danielmiessler/Fabric",
+  "license": "MIT",
+  "agentic": false,
+  "latest_version": "1.4.518",
+  "vendor": "Daniel Miessler",
+  "install": "curl -fsSL https://raw.githubusercontent.com/danielmiessler/fabric/main/scripts/installer/install.sh | bash",
+  "evidence": "https://github.com/danielmiessler/Fabric README; gh release view",
+  "publisher": "third-party"
+ }
+]

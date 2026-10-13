@@ -1,0 +1,15 @@
+[package]
+name = "w3bs-schema"
+description = "W3BS Package Manifest and Lifecycle Specification types: manifests, indexes, receipts, results"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+semver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+sha2.workspace = true
+hex.workspace = true

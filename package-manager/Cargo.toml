@@ -1,0 +1,42 @@
+[workspace]
+resolver = "3"
+members = ["crates/w3bs-schema", "crates/w3bs-core", "crates/w3bs-cli", "crates/w3bs-publish"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/profullstack/w3bs.org"
+homepage = "https://w3bs.org/packages"
+rust-version = "1.88"
+
+[workspace.dependencies]
+w3bs-schema = { path = "crates/w3bs-schema" }
+w3bs-core = { path = "crates/w3bs-core" }
+anyhow = "1"
+async-trait = "0.1"
+bytes = "1"
+clap = { version = "4.6", features = ["derive", "wrap_help"] }
+flate2 = "1"
+fs4 = { version = "0.13", features = ["sync"] }
+futures = "0.3"
+hex = "0.4"
+jiff = "0.2"
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
+semver = { version = "1", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tar = "0.4"
+tempfile = "3"
+thiserror = "2"
+tokio = { version = "1", features = ["rt", "macros", "fs", "time"] }
+tough = { version = "0.24", features = ["http"] }
+aws-lc-rs = "1"
+url = "2"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

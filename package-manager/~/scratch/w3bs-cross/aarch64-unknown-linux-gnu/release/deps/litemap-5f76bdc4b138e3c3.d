@@ -1,0 +1,10 @@
+/home/anthony/src/profullstack/w3bs.org/.claude/worktrees/package-manager/package-manager/~/scratch/w3bs-cross/aarch64-unknown-linux-gnu/release/deps/litemap-5f76bdc4b138e3c3.d: /home/anthony/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/litemap-0.8.3/src/lib.rs /home/anthony/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/litemap-0.8.3/src/map.rs /home/anthony/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/litemap-0.8.3/src/store/mod.rs /home/anthony/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/litemap-0.8.3/src/store/slice_impl.rs
+
+/home/anthony/src/profullstack/w3bs.org/.claude/worktrees/package-manager/package-manager/~/scratch/w3bs-cross/aarch64-unknown-linux-gnu/release/deps/liblitemap-5f76bdc4b138e3c3.rlib: /home/anthony/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/litemap-0.8.3/src/lib.rs /home/anthony/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/litemap-0.8.3/src/map.rs /home/anthony/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/litemap-0.8.3/src/store/mod.rs /home/anthony/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/litemap-0.8.3/src/store/slice_impl.rs
+
+/home/anthony/src/profullstack/w3bs.org/.claude/worktrees/package-manager/package-manager/~/scratch/w3bs-cross/aarch64-unknown-linux-gnu/release/deps/liblitemap-5f76bdc4b138e3c3.rmeta: /home/anthony/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/litemap-0.8.3/src/lib.rs /home/anthony/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/litemap-0.8.3/src/map.rs /home/anthony/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/litemap-0.8.3/src/store/mod.rs /home/anthony/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/litemap-0.8.3/src/store/slice_impl.rs
+
+/home/anthony/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/litemap-0.8.3/src/lib.rs:
+/home/anthony/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/litemap-0.8.3/src/map.rs:
+/home/anthony/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/litemap-0.8.3/src/store/mod.rs:
+/home/anthony/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/litemap-0.8.3/src/store/slice_impl.rs:
