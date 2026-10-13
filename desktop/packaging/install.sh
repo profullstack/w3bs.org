@@ -28,7 +28,7 @@
 
 adl_main() {
   set -u
-  VERSION="${W3BS_DESKTOP_VERSION:-0.2.0}"
+  VERSION="${W3BS_DESKTOP_VERSION:-0.2.1}"
   BASE="https://github.com/profullstack/w3bs.org/releases/download/desktop-v$VERSION"
 
   say() { printf '%s\n' "$*" >&2; }
@@ -65,7 +65,13 @@ adl_main() {
   uid="$(id -u)"
 
   # macOS LaunchAgents live in the user's GUI domain.
-  la_unload() { launchctl bootout "gui/$uid/$1" >/dev/null 2>&1 || true; }
+  la_unload() {
+    launchctl bootout "gui/$uid/$1" >/dev/null 2>&1 || true
+    # bootout returns before launchd has finished stopping the job; wait (up to 10 s) so callers
+    # see it gone.
+    n=0
+    while launchctl print "gui/$uid/$1" >/dev/null 2>&1 && [ "$n" -lt 50 ]; do sleep 0.2; n=$((n + 1)); done
+  }
   la_load() {
     # bootout completes asynchronously and a bootstrap right after it can fail, so retry.
     for _ in 1 2 3 4 5 6 7 8 9; do
@@ -144,7 +150,7 @@ adl_main() {
 <dict>
   <key>Label</key><string>org.w3bs.desktop.broker</string>
   <key>ProgramArguments</key>
-  <array><string>$bin/w3bs-desktop</string><string>daemon</string><string>--adapter</string><string>auto</string></array>
+  <array><string>$bin/w3bs-desktop</string><string>daemon</string><string>--adapter</string><string>auto</string><string>--mcp-http</string><string>127.0.0.1:7801</string></array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
   <key>ThrottleInterval</key><integer>5</integer>
@@ -204,7 +210,7 @@ PartOf=graphical-session.target
 After=graphical-session.target
 
 [Service]
-ExecStart=$bin/w3bs-desktop daemon --adapter auto
+ExecStart=$bin/w3bs-desktop daemon --adapter auto --mcp-http 127.0.0.1:7801
 Restart=on-failure
 RestartSec=2
 NoNewPrivileges=yes
@@ -266,7 +272,7 @@ EOF
   say ""
   say "Next:"
   say "  1. Register an agent:   w3bs-desktop agents add claude-code --preset broad"
-  say "  2. Connect it:          w3bs-desktop setup claude-code --agent claude-code   (prints the claude mcp add line)"
+  say "  2. Connect it:          w3bs-desktop setup claude-code --agent claude-code --http   (prints the claude mcp add line)"
   if [ "$os" = apple-darwin ]; then
     say "  3. Enable access from the menu bar (Agents: Disabled) when you want the agent to work; disable it the same way."
     say "     Emergency stop: Control+Option+Command+Escape."

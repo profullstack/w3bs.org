@@ -9,6 +9,7 @@ mod client;
 mod control;
 #[cfg(target_os = "linux")]
 mod gnome_ext;
+mod http_mcp;
 mod mcp;
 mod paths;
 mod peer;
@@ -84,8 +85,13 @@ enum Cmd {
         /// Audit metadata retention in days
         #[arg(long, default_value_t = 7)]
         retention_days: u64,
+        /// Also serve MCP over HTTP on this loopback address (e.g. 127.0.0.1:7801), so agents
+        /// connect to the running broker instead of spawning `mcp serve --stdio`
+        #[arg(long, value_name = "ADDR", env = "W3BS_DESKTOP_MCP_HTTP")]
+        mcp_http: Option<String>,
     },
     /// Terminal native control: shows state, enable codes and approvals; quitting disables access
+    #[command(long_about = "Terminal native control: the on/off switch for agent access, in a terminal.\n\nRun it, then type a command and press Enter:\n  enable            turn agent access on (your desktop may ask for permission the first time)\n  disable           turn it off\n  stop              cancel all agent activity but stay enabled\n  approvals         list requests waiting for you\n  approve <id>      allow one request; deny <id> refuses it\n  confirm           confirm an enable request started from another terminal\n  tasks, status     what agents are doing\n  quit              leave (this also turns agent access off)\n\nKeep it open while agents work. The tray icon or GNOME panel menu does the same thing.")]
     Control,
     /// Tray/menu-bar native control (StatusNotifierItem on Linux, a menu-bar item on macOS) with an emergency-stop shortcut; quitting disables access
     Tray {
@@ -158,6 +164,9 @@ enum Cmd {
         /// Registered agent name whose token file to use
         #[arg(long)]
         agent: Option<String>,
+        /// Connect over HTTP to a broker started with `daemon --mcp-http` instead of stdio
+        #[arg(long, value_name = "URL", num_args = 0..=1, default_missing_value = "http://127.0.0.1:7801/mcp")]
+        http: Option<String>,
     },
 }
 
@@ -530,12 +539,19 @@ pub fn run_background() {
 fn run_with(cli: Cli) {
     let j = cli.json;
     let r: Result<Value> = (|| match cli.cmd {
-        Cmd::Daemon { adapter, no_native_control, retention_days } => {
+        Cmd::Daemon { adapter, no_native_control, retention_days, mcp_http } => {
+            let mcp_addr = mcp_http.filter(|s| !s.is_empty()).map(|s| http_mcp::parse_addr(&s)).transpose().map_err(AdlError::invalid)?;
             let adapter = platform::make_adapter(adapter)?;
             let store = AgentStore::open(paths::config_dir().join("agents.json"))?;
             let audit = Audit::open(paths::state_dir().join("audit"), retention_days);
             let cfg = Config { require_native_control: !no_native_control, ..Config::default() };
             let broker = Arc::new(Broker::new(adapter, store, audit, cfg));
+            // A busy port must not take the broker down with it: stdio MCP and the controls still work.
+            if let Some(addr) = mcp_addr
+                && let Err(e) = http_mcp::spawn(addr)
+            {
+                eprintln!("w3bs-desktop: MCP HTTP endpoint {addr} not started ({e}); stdio MCP still works");
+            }
             server::serve(broker).map_err(|e| AdlError::new(ErrorCode::Blocked, e.to_string()))?;
             Ok(Value::Null)
         }
@@ -698,12 +714,21 @@ fn run_with(cli: Cli) {
             #[cfg(not(target_os = "linux"))]
             Err(AdlError::unsupported("the GNOME Shell extension is Linux-only"))
         }
-        Cmd::Setup { client, agent } => {
+        Cmd::Setup { client, agent, http } => {
             let name = agent.unwrap_or_else(|| "claude-code".into());
             if !paths::token_file(&name).exists() {
                 return Err(AdlError::not_found(format!("no saved token for {name}; run `w3bs desktop agents add {name}` first")));
             }
             let bin = std::env::current_exe().map(|p| p.display().to_string()).unwrap_or_else(|_| "w3bs-desktop".into());
+            if let Some(url) = http {
+                let tok = paths::token_file(&name).display().to_string();
+                return Ok(json!(match client {
+                    SetupClient::ClaudeCode => format!("claude mcp add --transport http w3bs-desktop {url} --header \"Authorization: Bearer $(cat '{tok}')\""),
+                    SetupClient::Opencode => serde_json::to_string_pretty(&json!({"mcp": {"w3bs-desktop": {"type": "remote", "url": url, "headers": {"Authorization": format!("Bearer {{file:{tok}}}")}, "enabled": true}}})).unwrap(),
+                    SetupClient::Codex => format!("# ~/.codex/config.toml (needs a Codex version with streamable HTTP MCP)\n[mcp_servers.w3bs-desktop]\nurl = \"{url}\"\nbearer_token_env_var = \"W3BS_DESKTOP_TOKEN\"\n# then: export W3BS_DESKTOP_TOKEN=$(cat '{tok}')"),
+                    SetupClient::GnomeExtension => unreachable!("handled above"),
+                }));
+            }
             Ok(json!(match client {
                 SetupClient::ClaudeCode => format!("claude mcp add w3bs-desktop -- {bin} mcp serve --stdio --agent {name}"),
                 SetupClient::Opencode => serde_json::to_string_pretty(&json!({"mcp": {"w3bs-desktop": {"type": "local", "command": [bin, "mcp", "serve", "--stdio", "--agent", name], "enabled": true}}})).unwrap(),
