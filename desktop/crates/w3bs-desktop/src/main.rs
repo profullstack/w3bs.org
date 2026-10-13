@@ -82,7 +82,7 @@ enum Cmd {
     },
     /// Terminal native control: shows state, enable codes and approvals; quitting disables access
     Control,
-    /// Tray/panel native control (StatusNotifierItem) with an emergency-stop shortcut; quitting disables access
+    /// Tray/menu-bar native control (StatusNotifierItem on Linux, a menu-bar item on macOS) with an emergency-stop shortcut; quitting disables access
     Tray,
     /// Show the layer state
     Status,
@@ -96,7 +96,11 @@ enum Cmd {
         all: bool,
     },
     /// Diagnose the session, backend and permissions
-    Doctor,
+    Doctor {
+        /// Show the operating system's permission prompts for anything missing (macOS)
+        #[arg(long)]
+        prompt: bool,
+    },
     /// What this desktop backend can do
     Capabilities,
     /// Register and manage agents
@@ -536,7 +540,7 @@ fn main() {
             Ok(if j { v } else { json!(format!("Agent access: DISABLED ({} tasks cancelled, {} inputs released). {}", v["tasks_cancelled"], v["synthetic_inputs_released"].as_array().map_or(0, Vec::len), v["note"].as_str().unwrap_or(""))) })
         }
         Cmd::Stop { all: _ } => control_client()?.call("stop", json!({"reason": "stopped from the CLI"})),
-        Cmd::Doctor => control_client()?.call("doctor", json!({})),
+        Cmd::Doctor { prompt } => control_client()?.call("doctor", json!({"prompt": prompt})),
         Cmd::Capabilities => control_client()?.call("capabilities", json!({})),
         Cmd::Agents(a) => {
             let mut c = control_client()?;

@@ -8,7 +8,7 @@ pub use linux::{make_adapter, run_tray};
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "macos")]
-pub use macos::{make_adapter, run_tray};
+pub use macos::{make_adapter, permission_checks, run_tray};
 
 #[cfg(windows)]
 mod windows;
