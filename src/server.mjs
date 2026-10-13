@@ -9,7 +9,8 @@ import { openStore, ROOT } from './store.mjs';
 import { W3bsError, manifestJsonSchema } from './core.mjs';
 import { dispatch, operations } from './operations.mjs';
 import { createMcp } from './mcp.mjs';
-import { renderPage } from './site.mjs';
+import { renderPage, scanBadgeSvg } from './site.mjs';
+import { createScanner } from './scan.mjs';
 
 export function createApp({
   store,
@@ -119,19 +120,32 @@ export function createApp({
   );
   app.get('/api/packages', async (req, res) => {
     const args = { query: String(req.query.q || '') };
-    if (req.query.agentic === 'true' || req.query.agentic === 'false') args.agentic = req.query.agentic === 'true';
+    if (req.query.agentic === 'true' || req.query.agentic === 'false')
+      args.agentic = req.query.agentic === 'true';
     if (req.query.publisher) args.publisher = String(req.query.publisher);
     res.json(await invoke(req, 'packages', args));
   });
   app.get('/api/packages/:publisher/:name', async (req, res) =>
     res.json(await invoke(req, 'package', { id: `${req.params.publisher}/${req.params.name}` })),
   );
+  // A ThreatCrush scan badge publishers can embed in a README. Cached briefly, as
+  // shields-style badges are.
+  app.get('/api/packages/:publisher/:name/badge.svg', async (req, res) => {
+    const item = await store.package(`${req.params.publisher}/${req.params.name}`);
+    res
+      .type('image/svg+xml')
+      .set('Cache-Control', 'public, max-age=300')
+      .send(scanBadgeSvg(item.scan));
+  });
   // W3BS Package Manager: the bootstrap installer and the official signed repository.
   const registry = resolve(ROOT, 'registry');
   app.get('/install.sh', (_req, res) => {
     const path = resolve(registry, 'install.sh');
     if (!existsSync(path)) throw new W3bsError('NOT_FOUND', 'Installer not published yet.', 404);
-    res.type('text/x-shellscript; charset=utf-8').set('Cache-Control', 'public, max-age=300').send(readFileSync(path));
+    res
+      .type('text/x-shellscript; charset=utf-8')
+      .set('Cache-Control', 'public, max-age=300')
+      .send(readFileSync(path));
   });
   const safeTarget = /^(?:[a-z0-9][a-z0-9._-]*\/)*[a-z0-9][a-z0-9._-]*$/i;
   app.get('/repo/metadata/:file', (req, res) => {
@@ -146,9 +160,13 @@ export function createApp({
     if (!safeTarget.test(target) || target.split('/').some((part) => part === '..' || part === '.'))
       throw new W3bsError('NOT_FOUND', 'No such target.', 404);
     // Release binaries live on GitHub releases; TUF verifies length and hash either way.
-    const artifact = /^artifacts\/w3bs\/([0-9][0-9A-Za-z.+-]*)\/(w3bs-[0-9A-Za-z._+-]+\.tar\.gz)$/.exec(target);
+    const artifact =
+      /^artifacts\/w3bs\/([0-9][0-9A-Za-z.+-]*)\/(w3bs-[0-9A-Za-z._+-]+\.tar\.gz)$/.exec(target);
     if (artifact)
-      return res.redirect(302, `https://github.com/profullstack/w3bs.org/releases/download/w3bs-v${artifact[1]}/${artifact[2]}`);
+      return res.redirect(
+        302,
+        `https://github.com/profullstack/w3bs.org/releases/download/w3bs-v${artifact[1]}/${artifact[2]}`,
+      );
     const path = resolve(registry, 'repo/targets', target);
     if (!path.startsWith(resolve(registry, 'repo/targets') + '/') || !existsSync(path))
       throw new W3bsError('NOT_FOUND', 'No such target.', 404);
@@ -268,6 +286,15 @@ export function createApp({
 }
 export async function startServer(options = {}) {
   const { app, store } = createApp({ ...options, store: options.store ?? (await openStore()) });
+  // Background ThreatCrush re-scans of the package catalog. On in production (it
+  // downloads every installer and repository), off elsewhere unless asked for.
+  const scanSetting = process.env.W3BS_PACKAGE_SCAN;
+  const scanner =
+    options.scanner ??
+    (scanSetting === 'on' || (process.env.NODE_ENV === 'production' && scanSetting !== 'off')
+      ? createScanner(store)
+      : undefined);
+  scanner?.start();
   const server = createServer({ requestTimeout: 30000, headersTimeout: 10000 }, app);
   await new Promise((resolve, reject) => {
     server.once('error', reject);
@@ -281,6 +308,7 @@ export async function startServer(options = {}) {
     server,
     store,
     close: async () => {
+      scanner?.stop();
       server.closeAllConnections();
       await new Promise((resolve) => server.close(resolve));
       await store.close();

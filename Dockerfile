@@ -5,7 +5,9 @@
 # bun.lock, then run src/bootstrap.mjs directly.
 FROM oven/bun:1.4.0-slim AS deps
 WORKDIR /app
-COPY package.json bun.lock ./
+# bunfig.toml turns lifecycle scripts off: ThreatCrush's daemon-only better-sqlite3
+# would otherwise try to compile, and the scanner does not need it.
+COPY package.json bun.lock bunfig.toml ./
 RUN bun install --frozen-lockfile --production
 
 FROM oven/bun:1.4.0-slim AS runtime
@@ -19,6 +21,8 @@ COPY --chown=bun:bun fixtures ./fixtures
 COPY --chown=bun:bun docs ./docs
 COPY --chown=bun:bun catalog ./catalog
 COPY --chown=bun:bun registry ./registry
+# Operators re-scan a package by hand with: bun scripts/scan-packages.mjs --record <id>
+COPY --chown=bun:bun scripts/scan-packages.mjs ./scripts/scan-packages.mjs
 # Production storage is PostgreSQL (DATABASE_URL). Without it the store falls
 # back to SQLite in W3BS_DATA_DIR, so keep that directory writable by uid 1000.
 RUN mkdir -p /data && chown bun:bun /data
