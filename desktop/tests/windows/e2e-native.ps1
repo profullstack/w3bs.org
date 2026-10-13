@@ -226,20 +226,15 @@ $audit = W audit export
 check ($fired -and $audit.raw -match 'emergency stop') "emergency chord ($desc, injected) disables, audited as emergency stop"
 
 # ---------------------------------------------------------------- takeover by other input
+# A real human takeover cannot be produced on a runner: all synthetic input carries Windows'
+# injected flag, which is exactly what the adapter uses to recognize a physical mouse. What can be
+# checked: input from another process while the agent holds no lease is ordinary use, not a
+# takeover.
 $ctl.StandardInput.WriteLine('enable'); $ctl.StandardInput.Flush()
-check (until { (state) -eq 'enabled' }) "re-enabled for the takeover check"
-[N]::Chord([byte[]](0x1B))   # close anything the injected Win chord may have opened
-Start-Sleep -Milliseconds 600   # let the broker see this outside input while idle (not a takeover)
-$r = W mouse click --agent tester --window $wb.id --x 400 --y 250
-check (until { (form $fb).focused }) "B focused for the takeover check" $r.raw
-$before = (form $fb).text.Length
-$lt = Start-Process -FilePath $Bin -ArgumentList '--json', 'keyboard', 'type', '--agent', 'tester', '--window', $wb.id, '--from-file', $long -RedirectStandardOutput (Join-Path $Work 'take.out') -RedirectStandardError (Join-Path $Work 'take.err') -NoNewWindow -PassThru
-until { (form $fb).text.Length -gt $before + 20 } | Out-Null
-[N]::mouse_event(1, 3, 0, 0, [UIntPtr]::Zero)   # a relative move from another process, as a person would
-check (until { (state) -eq 'disabled' } 5000) "input from outside the broker during agent typing = human takeover -> disabled"
-$lt.WaitForExit(15000) | Out-Null
-$audit = W audit export
-check ($audit.raw -match 'human takeover') "audited as human takeover"
+check (until { (state) -eq 'enabled' }) "re-enabled for the idle-input check"
+[N]::mouse_event(1, 3, 0, 0, [UIntPtr]::Zero)
+Start-Sleep -Milliseconds 800
+check ((state) -eq 'enabled') "outside input while no agent holds the lease does not disable"
 
 # ---------------------------------------------------------------- tray
 $ctl.StandardInput.WriteLine('quit'); $ctl.StandardInput.Flush()

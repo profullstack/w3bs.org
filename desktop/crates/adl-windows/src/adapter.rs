@@ -218,7 +218,7 @@ impl Adapter for WindowsAdapter {
                 Capability::Keyboard,
                 avail,
                 format!(
-                    "SendInput delivers to the foreground window (not target-bound); the broker checks focus before every 32-character chunk. {} Physical-input detection uses GetLastInputInfo and cannot tell other software's injected input from the human's.",
+                    "SendInput delivers to the foreground window (not target-bound); the broker checks focus before every 32-character chunk. {} Physical-input detection: a real mouse is recognized by Windows' injected flag (low-level mouse hook, no positions kept); keyboard use only via GetLastInputInfo, which is blind while the agent is typing and cannot tell other software's injected input from the human's. No keyboard hook is installed.",
                     self.uipi_note()
                 ),
                 kb,

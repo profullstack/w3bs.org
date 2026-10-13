@@ -7,8 +7,15 @@
 //!
 //! Received: `WM_WTSSESSION_CHANGE` (lock, unlock, logoff, console/remote disconnect),
 //! `WM_POWERBROADCAST` (suspend, resume), `WM_DISPLAYCHANGE`, `WM_QUERYENDSESSION`, and
-//! `WM_HOTKEY` for the emergency stop. No keyboard or mouse hook is installed; keys are never
-//! observed, only the registered chord is delivered by Windows.
+//! `WM_HOTKEY` for the emergency stop.
+//!
+//! Physical pointer use is detected with a low-level *mouse* hook (`WH_MOUSE_LL`) that looks at
+//! one bit only: whether Windows marked the event as injected (`LLMHF_INJECTED`). A non-injected
+//! event is the human's hand on a real mouse and becomes `SessionEvent::PhysicalInput` (at most
+//! once per 250 ms); positions and buttons are not recorded. No keyboard hook is installed, so
+//! keystrokes are never observed; the human's keyboard use is seen only through
+//! `GetLastInputInfo` in the adapter, which cannot tell it apart from injected input while the
+//! agent is typing.
 
 use crate::win;
 use adl_broker::SessionEvent;
@@ -65,6 +72,25 @@ fn push(e: SessionEvent) {
         }
         s.events.lock().unwrap_or_else(|e| e.into_inner()).push(e);
     }
+}
+
+static LAST_PHYSICAL: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+unsafe extern "system" fn mouse_hook(code: i32, wp: WPARAM, lp: LPARAM) -> LRESULT {
+    if code >= 0 && lp.0 != 0 {
+        // SAFETY: for WH_MOUSE_LL, lParam points at an MSLLHOOKSTRUCT.
+        let flags = unsafe { (*(lp.0 as *const MSLLHOOKSTRUCT)).flags };
+        if flags & (LLMHF_INJECTED | LLMHF_LOWER_IL_INJECTED) == 0 {
+            let now = unsafe { windows::Win32::System::SystemInformation::GetTickCount() };
+            let last = LAST_PHYSICAL.load(std::sync::atomic::Ordering::Relaxed);
+            if now.wrapping_sub(last) > 250 {
+                LAST_PHYSICAL.store(now, std::sync::atomic::Ordering::Relaxed);
+                push(SessionEvent::PhysicalInput);
+            }
+        }
+    }
+    // SAFETY: always pass the event on.
+    unsafe { CallNextHookEx(None, code, wp, lp) }
 }
 
 unsafe extern "system" fn wndproc(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
@@ -134,6 +160,9 @@ fn run(shared: Arc<Shared>, ready: mpsc::Sender<()>) {
             eprintln!("adl-windows: no emergency-stop chord could be registered (all taken)");
         }
         *shared.hotkey.lock().unwrap_or_else(|e| e.into_inner()) = hk;
+        if let Err(e) = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook), Some(hinst.into()), 0) {
+            eprintln!("adl-windows: physical mouse detection unavailable ({e})");
+        }
         let _ = ready.send(());
         let mut msg = MSG::default();
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {
