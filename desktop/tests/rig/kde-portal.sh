@@ -3,6 +3,7 @@
 # session, inside a disposable container. Nothing is installed on the host.
 #
 #   desktop/tests/rig/kde-portal.sh [SCRATCH_DIR]
+#   TRAY=1 desktop/tests/rig/kde-portal.sh [SCRATCH_DIR]    # plus the tray stage (tray.sh below)
 #
 # Needs: docker, and a DRM render node on the host (/dev/dri/renderD*). KWin's screencast
 # plugin (used by the KDE RemoteDesktop/ScreenCast portal) refuses QPainter compositing
@@ -268,8 +269,221 @@ busctl --user call org.freedesktop.impl.portal.desktop.kde "$S" org.freedesktop.
 sleep 2
 w3bs-desktop --json status | grep -q '"state": "disabled"' && ok "portal session closed -> broker disabled" || bad "broker still $(w3bs-desktop --json status | grep '"state"')"
 
+[ "${TRAY:-0}" = 1 ] && . /rig/tray.sh
+
 echo "== $pass passed, $fail failed"
 [ $fail = 0 ]
 EOF
+# ---------------------------------------------------------------- tray stage (TRAY=1)
+# menu.py drives the StatusNotifierItem and its com.canonical.dbusmenu menu the way a tray host
+# (plasmashell) does; appr.py is an agent that retries one identical request until approved.
+cat > "$RIG/menu.py" <<'EOF'
+# menu.py: drive the w3bs-desktop StatusNotifierItem over D-Bus with busctl (no extra packages).
+#   menu.py items            -> registered SNI items, one per line
+#   menu.py title            -> the item's Title
+#   menu.py labels           -> menu labels, one per line ("-" prefix = insensitive)
+#   menu.py click LABEL [N]  -> com.canonical.dbusmenu Event(id, "clicked") on the Nth item with that label
+#   menu.py activate         -> org.kde.StatusNotifierItem.Activate(0, 0) (a left click)
+import json, subprocess, sys, time
+
+def bus(*a):
+    r = subprocess.run(["busctl", "--user", "--json=short", *a], capture_output=True, text=True)
+    if r.returncode:
+        sys.exit("busctl %s: %s" % (" ".join(a), r.stderr.strip()))
+    return json.loads(r.stdout) if r.stdout.strip() else None
+
+def items():
+    v = bus("get-property", "org.kde.StatusNotifierWatcher", "/StatusNotifierWatcher", "org.kde.StatusNotifierWatcher", "RegisteredStatusNotifierItems")
+    return v["data"]
+
+def ours():
+    for it in items():
+        svc, _, path = it.partition("/")
+        path = "/" + path if path else "/StatusNotifierItem"
+        try:
+            if bus("get-property", svc, path, "org.kde.StatusNotifierItem", "Id")["data"] == "w3bs-desktop":
+                return svc, path
+        except SystemExit:
+            pass
+    sys.exit("no w3bs-desktop item registered")
+
+def prop(name):
+    svc, path = ours()
+    return bus("get-property", svc, path, "org.kde.StatusNotifierItem", name)["data"]
+
+def unvar(v):
+    return v["data"] if isinstance(v, dict) and "type" in v and "data" in v else v
+
+def flat(node, out):
+    node = unvar(node)
+    nid, props, kids = node
+    props = {k: unvar(x) for k, x in props.items()}
+    if nid != 0:
+        out.append((nid, props.get("label", "-" if props.get("type") == "separator" else ""), props.get("enabled", True)))
+    for k in kids:
+        flat(k, out)
+    return out
+
+def layout():
+    svc, _ = ours()
+    m = prop("Menu")
+    v = bus("call", "--", svc, m, "com.canonical.dbusmenu", "GetLayout", "iias", "0", "-1", "0")
+    return svc, m, flat(v["data"][1], [])
+
+cmd = sys.argv[1]
+if cmd == "items":
+    print("\n".join(items()))
+elif cmd == "title":
+    print(prop("Title"))
+elif cmd == "labels":
+    for _, l, en in layout()[2]:
+        print(("" if en else "-") + l)
+elif cmd == "click":
+    want, nth = sys.argv[2], int(sys.argv[3]) if len(sys.argv) > 3 else 1
+    svc, m, ls = layout()
+    hits = [i for i, l, en in ls if l.strip() == want and en]
+    if len(hits) < nth:
+        sys.exit("no enabled menu item %r in %r" % (want, [l for _, l, _ in ls]))
+    bus("call", svc, m, "com.canonical.dbusmenu", "Event", "isvu", str(hits[nth - 1]), "clicked", "s", "", str(int(time.time())))
+elif cmd == "activate":
+    svc, path = ours()
+    bus("call", svc, path, "org.kde.StatusNotifierItem", "Activate", "ii", "0", "0")
+EOF
+cat > "$RIG/appr.py" <<'EOF'
+# appr.py AGENT TEXT: one agent task that types TEXT; on approval_required it prints the
+# approval id and retries the IDENTICAL request (same task, same actions) once a second for 30 s,
+# through the broker's busy answers while the approval is pending.
+import json, os, socket, sys, time
+agent, text = sys.argv[1], sys.argv[2]
+cfg = os.environ["W3BS_DESKTOP_CONFIG_DIR"]; run = os.environ["W3BS_DESKTOP_RUNTIME_DIR"]
+token = open(f"{cfg}/tokens/{agent}.token").read().strip()
+s = socket.socket(socket.AF_UNIX); s.connect(f"{run}/agent.sock"); f = s.makefile("rw")
+n = 0
+def call(method, params):
+    global n
+    n += 1
+    f.write(json.dumps({"v": 1, "id": str(n), "method": method, "params": params}) + "\n"); f.flush()
+    while True:
+        v = json.loads(f.readline())
+        if "event" not in v and v.get("id") == str(n):
+            return v
+hello = call("hello", {"token": token, "client": "rig"})
+if hello.get("error"): sys.exit("hello: %s" % hello)
+task = call("task.begin", {"description": "rig approval"})["result"]["id"]
+batch = {"task": task, "target": {"window": None}, "actions": [{"type": "type", "text": text}]}
+first = True
+for _ in range(30):
+    r = call("lease.acquire", {"task": task})
+    r = call("input", batch)
+    err = r.get("error")
+    # approval_required first; then busy ("input is suspended while an approval is on screen")
+    if err and err.get("code") in ("approval_required", "busy"):
+        if first and err.get("code") == "approval_required":
+            print("approval_required", err.get("details", {}).get("approval_id"), flush=True); first = False
+        time.sleep(1); continue
+    print(json.dumps(r), flush=True)
+    call("task.end", {"task": task, "outcome": "completed"})
+    sys.exit(0 if not err and r.get("result", {}).get("outcome") == "completed" else 1)
+sys.exit("still waiting for approval after 30 s")
+EOF
+
+# The tray is the ONLY native control here: the terminal `control` is stopped and the broker
+# restarted. kded6 provides org.kde.StatusNotifierWatcher (on a real desktop plasmashell is the
+# host); KWin itself serves org.kde.kglobalaccel, the GlobalShortcuts portal's backend. Plasma asks
+# the human to confirm a new global shortcut ("Global Shortcuts Requested"); the rig answers it
+# in-session with Enter, sent through the portal by the test agent standing in for the human.
+cat > "$RIG/tray.sh" <<'EOF'
+echo "== tray (StatusNotifierItem, dbusmenu, GlobalShortcuts)"
+dnf -y install --setopt=install_weak_deps=False kf6-kded plasma-workspace-libs >$L/dnf-tray.log 2>&1
+pkill -f '^w3bs-desktop control' || true; pkill -f '^sleep infinity' || true
+pkill -f '^w3bs-desktop daemon' || true; sleep 1
+setsid w3bs-desktop daemon --adapter auto >$L/daemon-tray.log 2>&1 &
+setsid kded6 >$L/kded.log 2>&1 &
+for i in $(seq 1 50); do busctl --user status org.kde.StatusNotifierWatcher >/dev/null 2>&1 && break; sleep 0.2; done
+busctl --user status org.kde.StatusNotifierWatcher >/dev/null 2>&1 && busctl --user status org.kde.kglobalaccel >/dev/null 2>&1 \
+  && ok "StatusNotifierWatcher (kded6) and kglobalaccel (KWin) on the bus" || bad "no StatusNotifierWatcher/kglobalaccel"
+# a rerun starts from an unbound shortcut, so the confirmation dialog appears every time
+busctl --user call org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel unRegister as 4 org.w3bs.Desktop emergency-stop "" "" >/dev/null 2>&1 || true
+M() { python3 /rig/menu.py "$@"; }
+# T1's `cat > file` keeps its write offset, so truncating would leave a hole: read what was
+# appended since a mark instead.
+mark() { MARK=$(wc -c < /root/t1.txt); }
+since() { tail -c +$((MARK + 1)) /root/t1.txt; }
+state() { w3bs-desktop --json status | grep -o '"state": "[a-z]*"' | head -1 | cut -d'"' -f4; }
+until_() { for i in $(seq 1 ${2:-25}); do eval "$1" && return 0; sleep 0.2; done; return 1; }
+tray_up() {
+  setsid w3bs-desktop tray >>$L/tray.log 2>&1 &
+  TP=$!
+  until_ 'M items 2>/dev/null | grep -q "StatusNotifierItem-$TP-"' 50
+}
+tray_up && ok "item registered: $(M items | grep "StatusNotifierItem-$TP-")" || { bad "tray did not register: $(cat $L/tray.log)"; echo "== $pass passed, $fail failed"; exit 1; }
+M title | grep -q Disabled && ok "title: $(M title)" || bad "title: $(M title)"
+M labels > /root/menu0.txt
+grep -qx "Enable agent access" /root/menu0.txt && grep -qx "Stop all agent activity" /root/menu0.txt && grep -qx "Quit and disable" /root/menu0.txt \
+  && ok "menu has Enable / Stop all / Quit and disable" || bad "menu: $(cat /root/menu0.txt)"
+
+echo "== tray: enable from the menu"
+sleep 1
+[ "$(/rig/active.sh)" = "Global Shortcuts Requested" ] && DLG=1 || DLG=0
+M click "Enable agent access"
+until_ '[ "$(state)" = enabled ]' && ok "Enable clicked -> broker enabled$( [ $DLG = 1 ] && echo ' (while the shortcut dialog was still open)')" || bad "enable from tray: $(state); $(tail -3 $L/tray.log)"
+until_ 'M title | grep -q Enabled' && ok "title: $(M title)" || bad "title: $(M title)"
+
+echo "== tray: emergency-stop shortcut"
+if [ "$(/rig/active.sh)" = "Global Shortcuts Requested" ]; then
+  W keyboard press --agent tester --key Enter >/dev/null     # the human accepting the binding
+fi
+SC=
+until_ 'M labels | grep -q "^-Emergency stop: "' 25 && SC=$(M labels | sed -n 's/^-Emergency stop: //p')
+case "$SC" in
+  *Esc*) ok "shortcut bound by the desktop: $SC" ;;
+  *) bad "shortcut not bound: '$SC' $(grep shortcut $L/tray.log)" ;;
+esac
+
+echo "== tray: agent input works under the tray"
+set -- $(/rig/geom.sh T1)
+W mouse click --agent tester --x $(( $1 + 15 )) --y $(( $2 + $4 / 2 )) >/dev/null; sleep 0.3
+mark; type_ "via tray"; sleep 0.5
+[ "$(since)" = "via tray" ] && ok "agent typed into T1 after a tray enable" || bad "T1: $(since)"
+
+echo "== tray: approval"
+w3bs-desktop agents add ap --preset broad --approve-for type >/dev/null 2>&1 || true
+mark; python3 /rig/appr.py ap "approved text" > /root/appr.out 2>&1 &
+APID=$!
+until_ 'grep -q approval_required /root/appr.out' && ok "agent got approval_required" || bad "appr: $(cat /root/appr.out)"
+until_ 'M labels | grep -q "^-Approval: ap wants: "' && M labels | grep -qx "    Approve" && M labels | grep -qx "    Deny" \
+  && ok "menu shows the approval: $(M labels | sed -n 's/^-Approval: //p')" || bad "approval menu: $(M labels)"
+[ -z "$(since)" ] && ok "nothing typed before approval" || bad "typed before approval: $(since)"
+M click Approve
+wait $APID && rc=0 || rc=$?
+sleep 0.5
+[ $rc = 0 ] && [ "$(since)" = "approved text" ] && ok "Approve clicked -> identical retry typed: $(since)" || bad "after approve rc=$rc $(cat /root/appr.out) / $(since)"
+! M labels | grep -q "Approval:" && ok "approval gone from the menu" || bad "approval still listed: $(M labels)"
+
+echo "== tray: left click"
+M activate
+until_ '[ "$(state)" = disabled ]' && ok "left click while enabled -> disabled" || bad "activate: $(state)"
+M activate; sleep 2
+[ "$(state)" = disabled ] && M title | grep -q Disabled && ok "left click while disabled does nothing ($(M title))" || bad "activate while disabled: $(state)"
+
+echo "== tray: emergency stop"
+M click "Enable agent access"; until_ '[ "$(state)" = enabled ]' || bad "re-enable: $(state)"
+E0=$(cat /root/w3bs/state/audit/* | grep -c '"reason":"emergency stop"' || true)
+W keyboard shortcut --agent tester --keys Super+Alt+Escape >/dev/null 2>&1 || true   # KWin takes the chord
+until_ '[ "$(state)" = disabled ]' && [ "$(cat /root/w3bs/state/audit/* | grep -c '"reason":"emergency stop"')" -gt "$E0" ] \
+  && ok "Super+Alt+Escape (through KWin + GlobalShortcuts) -> disabled, audited as emergency stop" || bad "emergency: $(state)"
+kill -0 $TP 2>/dev/null && until_ 'M title | grep -q Disabled' && ok "tray still running: $(M title)" || bad "tray after emergency: $(M title)"
+
+echo "== tray: losing the tray"
+M click "Enable agent access"; until_ '[ "$(state)" = enabled ]' || bad "re-enable: $(state)"
+kill -9 $TP
+until_ '[ "$(state)" = disabled ]' && ok "tray killed (SIGKILL) while enabled -> broker disabled" || bad "after kill: $(state)"
+tray_up || bad "tray restart"
+M click "Enable agent access"; until_ '[ "$(state)" = enabled ]' || bad "re-enable: $(state)"
+M click "Quit and disable"
+until_ '! kill -0 $TP 2>/dev/null' && until_ '[ "$(state)" = disabled ]' && until_ '! M items 2>/dev/null | grep -q "StatusNotifierItem-$TP-"' \
+  && ok "Quit and disable -> tray exited, item unregistered, broker disabled" || bad "quit: alive=$(kill -0 $TP 2>/dev/null && echo yes) state=$(state)"
+EOF
+
 chmod +x "$RIG"/*.sh
-docker exec "$NAME" /rig/inner.sh
+docker exec -e TRAY="${TRAY:-0}" "$NAME" /rig/inner.sh
