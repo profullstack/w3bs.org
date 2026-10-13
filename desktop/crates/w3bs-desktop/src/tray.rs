@@ -21,6 +21,7 @@ enum Act {
     ConfirmPending,
     Disable,
     Stop,
+    Emergency,
     Decide(String, bool),
     Quit,
 }
@@ -28,7 +29,7 @@ enum Act {
 /// The emergency shortcut disables access but keeps the tray, so the human can see the result.
 impl From<crate::shortcut::Emergency> for Act {
     fn from(_: crate::shortcut::Emergency) -> Self {
-        Act::Disable
+        Act::Emergency
     }
 }
 
@@ -158,6 +159,17 @@ impl ksni::Tray for DesktopTray {
     }
 }
 
+/// Agent id -> registered name, over a second control connection (the subscribed one is the
+/// event stream). Falls back to the id.
+fn agent_name(id: &str) -> String {
+    let lookup = || -> Option<String> {
+        let mut c = crate::client::Client::connect(&paths::control_socket()).ok()?;
+        let v = c.call("agents.list", json!({})).ok()?;
+        v.as_array()?.iter().find(|a| a["id"] == id)?["name"].as_str().map(Into::into)
+    };
+    lookup().unwrap_or_else(|| id.to_string())
+}
+
 pub fn run() -> std::io::Result<()> {
     let path = paths::control_socket();
     let stream = UnixStream::connect(&path).map_err(|e| std::io::Error::new(e.kind(), format!("{}: {e}; start the broker with `w3bs desktop daemon`", path.display())))?;
@@ -189,6 +201,8 @@ pub fn run() -> std::io::Result<()> {
         std::thread::spawn(move || {
             for v in ev_rx {
                 let data = &v["data"];
+                // Events carry agent ids; the human approves by name.
+                let who = data["agent"].as_str().map(agent_name).unwrap_or_default();
                 h.update(|t| match v["event"].as_str() {
                     Some("state") => {
                         t.view.state = data["state"].as_str().unwrap_or("").into();
@@ -202,8 +216,8 @@ pub fn run() -> std::io::Result<()> {
                         }
                     }
                     Some("enable_requested") => t.view.pending_code = data["code"].as_str().map(Into::into),
-                    Some("lease") => t.view.lease = data.as_object().map(|l| (l["agent"].as_str().unwrap_or("").into(), l["task"].as_str().unwrap_or("").into())),
-                    Some("approval_requested") => t.view.approvals.push((data["id"].as_str().unwrap_or("").into(), format!("{} wants: {}", data["agent"].as_str().unwrap_or(""), data["summary"].as_str().unwrap_or("")))),
+                    Some("lease") => t.view.lease = data.as_object().map(|l| (who.clone(), l["task"].as_str().unwrap_or("").into())),
+                    Some("approval_requested") => t.view.approvals.push((data["id"].as_str().unwrap_or("").into(), format!("{who} wants: {}", data["summary"].as_str().unwrap_or("")))),
                     Some("approval_decided") => t.view.approvals.retain(|(id, _)| Some(id.as_str()) != data["id"].as_str()),
                     _ => {}
                 });
@@ -228,9 +242,14 @@ pub fn run() -> std::io::Result<()> {
     };
     call("subscribe", json!({"native_control": true})).map_err(std::io::Error::other)?;
 
-    match crate::shortcut::register(act_tx.clone()) {
-        Ok(desc) => drop(handle.update(|t| t.view.shortcut = Some(desc))),
-        Err(e) => eprintln!("w3bs-desktop tray: emergency-stop shortcut unavailable ({e}); use the tray menu"),
+    // Off the action loop: binding can wait on the desktop's confirmation dialog (KDE shows one),
+    // and a menu click made meanwhile must act now, not minutes later when the dialog closes.
+    {
+        let (h, tx) = (handle.clone(), act_tx.clone());
+        std::thread::spawn(move || match crate::shortcut::register(tx) {
+            Ok(desc) => drop(h.update(|t| t.view.shortcut = Some(desc))),
+            Err(e) => eprintln!("w3bs-desktop tray: emergency-stop shortcut unavailable ({e}); use the tray menu"),
+        });
     }
 
     for act in act_rx {
@@ -245,6 +264,8 @@ pub fn run() -> std::io::Result<()> {
             },
             Act::Disable => call("disable", json!({"reason": "disabled from the tray"})),
             Act::Stop => call("stop", json!({"reason": "stopped from the tray"})),
+            // The broker's own emergency-stop event: disables, and is audited as such.
+            Act::Emergency => call("session.event", json!({"event": "emergency_stop"})),
             Act::Decide(id, ok) => call("approvals.decide", json!({"approval": id, "approve": ok})),
             Act::Quit => {
                 let _ = call("disable", json!({"reason": "tray closed"}));

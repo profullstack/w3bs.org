@@ -4,6 +4,7 @@
 //! keylogger (PRD section 6).
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
 use zbus::blocking::{Connection, Proxy};
@@ -13,7 +14,13 @@ const DEST: &str = "org.freedesktop.portal.Desktop";
 const PATH: &str = "/org/freedesktop/portal/desktop";
 const IFACE: &str = "org.freedesktop.portal.GlobalShortcuts";
 pub const SHORTCUT_ID: &str = "emergency-stop";
-const PREFERRED: &str = "SUPER+SHIFT+Escape";
+/// XDG shortcuts-spec syntax: the Super key is `LOGO` (KDE rejects "SUPER": "Unknown modifier").
+/// Super+Alt+Escape is free on Plasma and GNOME; the obvious neighbours are taken: KWin owns
+/// Super+Shift+Escape ("Disable Active Input Capture", which wins and swallows the key),
+/// Super+Ctrl+Escape and Ctrl+Alt+Escape (Kill Window); Mutter owns Super+Escape.
+const PREFERRED: &str = "LOGO+ALT+Escape";
+/// The app id the portal (and the desktop's shortcut settings) list the binding under.
+pub const APP_ID: &str = "org.w3bs.Desktop";
 
 type Results = HashMap<String, OwnedValue>;
 
@@ -36,12 +43,27 @@ fn wait_response(conn: &Connection, token: &str, call: impl FnOnce() -> zbus::Re
     }
 }
 
-/// Bind the shortcut and forward activations as `Quit` (disable and exit) to the tray.
+/// Bind the shortcut and forward each activation to the tray as `A::from(Emergency)`.
 pub fn register<A>(tx: mpsc::Sender<A>) -> Result<String, String>
 where
     A: From<Emergency> + Send + 'static,
 {
     let conn = Connection::session().map_err(|e| e.to_string())?;
+    // GlobalShortcuts refuses unsandboxed callers without an app id ("An app id is required",
+    // xdg-desktop-portal 1.19+). A host app names itself with the host Registry, on this same
+    // connection and before any other portal call (a raw call: a Proxy would prefetch properties
+    // first). The portal only accepts an id with an installed desktop entry. Older portals lack
+    // the Registry; then BindShortcuts decides.
+    let wrote = ensure_desktop_entry();
+    let register = || conn.call_method(Some(DEST), PATH, Some("org.freedesktop.host.portal.Registry"), "Register", &(APP_ID, HashMap::<&str, Value>::new()));
+    let mut reg = register();
+    if reg.is_err() && wrote {
+        std::thread::sleep(Duration::from_secs(2)); // the portal notices new desktop files by file monitor
+        reg = register();
+    }
+    if let Err(e) = reg {
+        eprintln!("w3bs-desktop tray: portal Registry.Register({APP_ID}): {e}");
+    }
     let gs = Proxy::new(&conn, DEST, PATH, IFACE).map_err(|e| e.to_string())?;
     let created = wait_response(&conn, "adlgs1", || {
         let opts: HashMap<&str, Value> = HashMap::from([("handle_token", Value::from("adlgs1")), ("session_handle_token", Value::from("adlgss"))]);
@@ -55,7 +77,13 @@ where
         let opts: HashMap<&str, Value> = HashMap::from([("handle_token", Value::from("adlgs2"))]);
         gs.call("BindShortcuts", &(&session, shortcuts, "", opts))
     })?;
-    let trigger = describe(&bound).unwrap_or_else(|| PREFERRED.replace('+', " + "));
+    // An empty description means the binding exists with no key (KDE keeps "none" once a human
+    // dismissed the dialog); say so rather than show a shortcut that does nothing.
+    let trigger = match describe(&bound) {
+        Some(d) if !d.trim().is_empty() => d,
+        Some(_) => "no key assigned (set one in the desktop's shortcut settings)".into(),
+        None => "Super+Alt+Escape".into(),
+    };
     let it = gs.receive_signal("Activated").map_err(|e| e.to_string())?;
     std::thread::spawn(move || {
         let _keep = conn;
@@ -85,6 +113,22 @@ fn describe(r: &Results) -> Option<String> {
         }
     }
     None
+}
+
+/// Install a hidden `org.w3bs.Desktop.desktop` in the user's data dir unless one is already on the
+/// XDG data path. Returns whether it wrote one.
+fn ensure_desktop_entry() -> bool {
+    let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
+    let user = std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).filter(|p| p.is_absolute()).unwrap_or_else(|| home.join(".local/share"));
+    let system = std::env::var("XDG_DATA_DIRS").unwrap_or_else(|_| "/usr/local/share:/usr/share".into());
+    let file = format!("applications/{APP_ID}.desktop");
+    if std::iter::once(user.clone()).chain(system.split(':').filter(|d| !d.is_empty()).map(PathBuf::from)).any(|d| d.join(&file).exists()) {
+        return false;
+    }
+    let exe = std::env::current_exe().map(|p| p.display().to_string()).unwrap_or_else(|_| "w3bs-desktop".into());
+    let body = format!("[Desktop Entry]\nType=Application\nName=Agentic Desktop Layer\nComment=Native control for agent access to this desktop\nExec={exe} tray\nIcon=changes-prevent\nNoDisplay=true\n");
+    let path = user.join(&file);
+    path.parent().is_some_and(|d| std::fs::create_dir_all(d).is_ok()) && std::fs::write(&path, body).is_ok()
 }
 
 /// Marker sent when the emergency shortcut fires.
