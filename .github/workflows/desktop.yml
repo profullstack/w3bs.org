@@ -114,3 +114,84 @@ jobs:
         with:
           name: w3bs-desktop-windows-x86_64-unsigned
           path: desktop/target/release/w3bs-desktop.exe
+  # The macOS installer end to end: package a release build exactly as the release workflow does,
+  # run packaging/install.sh on it (local archive + checksum override), then check the
+  # LaunchAgents, the launchd-run broker, the menu bar, crash restart, re-install and uninstall
+  # (tests/installer/macos.sh).
+  installer-macos:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+          key: installer-aarch64-apple-darwin
+      - run: cargo build --locked --release --target aarch64-apple-darwin -p w3bs-desktop
+      - name: Package (as the release workflow does)
+        run: |
+          v=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+          sh packaging/package.sh aarch64-apple-darwin "$v" "$RUNNER_TEMP/dist"
+      - name: Install, verify, uninstall
+        run: tests/installer/macos.sh "$RUNNER_TEMP/dist/w3bs-desktop-$VERSION-aarch64-apple-darwin.tar.gz" "$VERSION"
+      # The Intel release row is a cross build on Apple silicon; prove it builds and packages.
+      - name: Release build and package for x86_64-apple-darwin
+        run: |
+          cargo build --locked --release --target x86_64-apple-darwin -p w3bs-desktop
+          sh packaging/package.sh x86_64-apple-darwin "$VERSION" "$RUNNER_TEMP/dist-x86"
+          file target/x86_64-apple-darwin/release/w3bs-desktop
+          arch -x86_64 target/x86_64-apple-darwin/release/w3bs-desktop --version || echo "Rosetta not available on this runner; not run"
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-macos-logs
+          path: |
+            ${{ runner.temp }}/installer-mac
+            ~/Library/Logs/w3bs-desktop
+          if-no-files-found: ignore
+  # The Windows installer end to end: package the release build (console CLI + GUI-subsystem
+  # w3bs-desktopw.exe) as the release workflow does, run packaging/install.ps1 under Windows
+  # PowerShell 5.1 on it, then check autostart, the windowless broker and tray (no conhost),
+  # status, re-install and uninstall (tests/installer/windows.ps1).
+  installer-windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+          key: installer-x86_64-pc-windows-msvc
+      - run: cargo build --locked --release --target x86_64-pc-windows-msvc -p w3bs-desktop
+      - name: Package (as the release workflow does)
+        shell: bash
+        run: |
+          v=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+          sh packaging/package.sh x86_64-pc-windows-msvc "$v" "$RUNNER_TEMP/dist"
+      - name: Install, verify, uninstall
+        shell: pwsh
+        run: ./tests/installer/windows.ps1 -Archive "$env:RUNNER_TEMP\dist\w3bs-desktop-$env:VERSION-x86_64-pc-windows-msvc.zip" -Version $env:VERSION -Work "$env:RUNNER_TEMP\installer-win"
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-windows-logs
+          path: |
+            ${{ runner.temp }}/installer-win
+            ~/AppData/Local/w3bs/desktop/state/logs
+          if-no-files-found: ignore

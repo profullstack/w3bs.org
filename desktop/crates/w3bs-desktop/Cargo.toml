@@ -8,9 +8,20 @@ repository.workspace = true
 homepage.workspace = true
 rust-version.workspace = true
 
+[lib]
+name = "w3bs_desktop"
+path = "src/lib.rs"
+doctest = false
+
 [[bin]]
 name = "w3bs-desktop"
 path = "src/main.rs"
+
+# The same program for the Windows GUI subsystem: runs the broker and tray at logon with no
+# console window. Elsewhere it is identical to w3bs-desktop and is not shipped.
+[[bin]]
+name = "w3bs-desktopw"
+path = "src/bin/w3bs-desktopw.rs"
 
 [dependencies]
 adl-schema.workspace = true
