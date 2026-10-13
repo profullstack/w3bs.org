@@ -39,7 +39,8 @@ dl="$ws/downloads/$v"
 
 # Signed JSON goes into the site; artifacts stay on GitHub releases (the site redirects).
 mkdir -p "$here/registry/repo"
-rsync -a --delete --exclude 'targets/artifacts/' "$ws/repo/" "$here/registry/repo/"
+# No -t: copied files must get fresh mtimes, or git can miss same-size re-signed files.
+rsync -r --links --perms --checksum --delete --exclude 'targets/artifacts/' "$ws/repo/" "$here/registry/repo/"
 
 fp="$("$pub" fingerprint "$ws")"
 sums=()
