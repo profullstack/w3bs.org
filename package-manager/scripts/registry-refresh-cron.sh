@@ -27,7 +27,8 @@ trap 'git -C "$repo" worktree remove --force "$wt" 2>/dev/null || true' EXIT
 
 cd "$wt"
 package-manager/scripts/publish-manager.sh --refresh
-if git diff --quiet -- registry; then
+git update-index -q --really-refresh || true
+if git diff --quiet -- registry && [ -z "$(git ls-files --others --exclude-standard registry)" ]; then
   echo "registry unchanged"
   exit 0
 fi
