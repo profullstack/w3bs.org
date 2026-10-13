@@ -46,15 +46,23 @@ jobs:
       matrix:
         include:
           - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, zig: x86_64-unknown-linux-gnu.2.28 }
-          - { os: ubuntu-latest, target: aarch64-unknown-linux-gnu, zig: aarch64-unknown-linux-gnu.2.28 }
+          # zig cannot link aarch64 (rustc passes --fix-cortex-a53-843419); build natively on
+          # an arm runner inside manylinux_2_28 instead, which pins the same glibc 2.28 baseline.
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, container: 'quay.io/pypa/manylinux_2_28_aarch64' }
           - { os: macos-14, target: aarch64-apple-darwin }
           - { os: macos-14, target: x86_64-apple-darwin }
     runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
     env:
       MACOSX_DEPLOYMENT_TARGET: '11.0'
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - if: matrix.container
+        run: |
+          curl --proto '=https' -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - if: '!matrix.container'
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
