@@ -1,0 +1,36 @@
+# Every catalog submission is scanned for malware before it can merge. A pull
+# request that adds or changes an entry in catalog/catalog.json downloads that
+# package's installer and source (never runs them) and scans them with
+# ThreatCrush; a malware indicator or a scan that cannot finish fails the check.
+# After merge, the site re-scans each package whenever it changes (src/scan.mjs).
+name: Package scan
+on:
+  pull_request:
+    paths:
+      - catalog/catalog.json
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  threatcrush:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - name: Scan new and changed packages
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "$BASE_REF" ]; then
+            git show "origin/$BASE_REF:catalog/catalog.json" > "$RUNNER_TEMP/base-catalog.json" || echo '[]' > "$RUNNER_TEMP/base-catalog.json"
+            bun scripts/scan-packages.mjs --base "$RUNNER_TEMP/base-catalog.json" --summary "$GITHUB_STEP_SUMMARY"
+          else
+            bun scripts/scan-packages.mjs --all --summary "$GITHUB_STEP_SUMMARY"
+          fi
