@@ -78,3 +78,39 @@ jobs:
           name: macos-e2e-logs
           path: ${{ runner.temp }}/adl-mac
           if-no-files-found: ignore
+  # The Windows native backend on a real interactive desktop: SendInput, window discovery and
+  # occlusion, GDI capture, UI Automation, session events, the emergency hotkey, named pipes and
+  # the notification-area tray, driven through the release binary (tests/windows/e2e-native.ps1).
+  windows-native:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+      - run: cargo clippy --locked -p adl-windows -p w3bs-desktop --all-targets -- -D warnings
+      # Named-pipe transport (concurrent read/write, first-instance, peer SID), the mock-adapter
+      # end-to-end over named pipes, and the portable mapping tests.
+      - run: cargo test --locked -p adl-windows -p w3bs-desktop
+      - run: cargo build --release --locked -p w3bs-desktop
+      - name: Native end-to-end on the runner's desktop session
+        shell: pwsh
+        run: ./tests/windows/e2e-native.ps1 -Work "$env:RUNNER_TEMP\adl-e2e"
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-native-e2e-logs
+          path: ${{ runner.temp }}/adl-e2e
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: w3bs-desktop-windows-x86_64-unsigned
+          path: desktop/target/release/w3bs-desktop.exe

@@ -65,4 +65,17 @@ Status: accepted, 2026-10-13
   items are drawn by Control Center; the item remains an `AXMenuExtra` in the control's own
   accessibility tree. Captures use `CGDisplayCreateImage` (looked up with `dlsym`, deprecated) and
   fall back to `screencapture`; ScreenCaptureKit is the planned replacement.
+- Windows (added 2026-10-13, `adl-windows`): desktop logical coordinates are **virtual-screen
+  physical pixels**. The broker is per-monitor DPI aware (v2), so every Win32 call speaks physical
+  pixels; Windows has no single DIP plane across monitors with different scale factors, so DIPs
+  could not serve as one space. Displays report `scale = 1.0` (captures map 1:1) and state their
+  DPI in the name. Absolute pointer motion uses `MOUSEEVENTF_VIRTUALDESK` with
+  `ceil(offset * 65536 / len)` and confirms the landing pixel. The named-pipe transport uses
+  overlapped I/O because synchronous pipe handles serialize reads and writes per handle, which
+  would stall event delivery behind a pending read. The emergency stop is `Win+Alt+Esc`
+  (mirrors Super+Alt+Escape; fallback Ctrl+Alt+Shift+F12) registered by the adapter with
+  `RegisterHotKey`; the tray only names it. Physical mouse takeover uses a low-level mouse hook
+  that reads only the injected flag; there is no keyboard hook. Session events come from a hidden
+  top-level window (message-only windows get no broadcasts). UIPI silently drops input to
+  higher-integrity windows, so such targets are refused before sending.
 - Same-user hostile processes are out of scope, as the PRD states.

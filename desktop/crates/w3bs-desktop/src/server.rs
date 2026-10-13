@@ -38,13 +38,31 @@ fn install_shutdown_handlers() {
     }
 }
 
+/// Set once the supervisor has disabled access on the way out.
+#[cfg_attr(not(windows), allow(dead_code))]
+static SHUT_DOWN: AtomicBool = AtomicBool::new(false);
+
+/// Console control events: Ctrl+C, Ctrl+Break, console close, logoff and system shutdown all
+/// disable access and exit. For close/logoff/shutdown Windows ends the process once the handler
+/// returns, so the handler waits (bounded) until the supervisor has disabled.
 #[cfg(windows)]
 fn install_shutdown_handlers() {
-    // Console control events (Ctrl+C, close, logoff, shutdown) are wired in the Windows port.
+    unsafe extern "system" fn on_ctrl(_kind: u32) -> windows::core::BOOL {
+        request_shutdown();
+        let t = std::time::Instant::now();
+        while !SHUT_DOWN.load(Ordering::SeqCst) && t.elapsed() < Duration::from_secs(3) {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        windows::core::BOOL(1)
+    }
+    // SAFETY: the handler only touches atomics and sleeps.
+    if let Err(e) = unsafe { windows::Win32::System::Console::SetConsoleCtrlHandler(Some(on_ctrl), true) } {
+        eprintln!("w3bs-desktop: console control handler unavailable ({e}); Ctrl+C will not disable cleanly");
+    }
 }
 
 /// Ask the supervisor loop to disable and exit (used by platform shutdown hooks).
-#[allow(dead_code)]
+#[cfg_attr(not(windows), allow(dead_code))]
 pub fn request_shutdown() {
     SHUTDOWN.store(true, Ordering::SeqCst);
 }
@@ -84,6 +102,7 @@ pub fn serve(broker: Arc<Broker>) -> std::io::Result<()> {
     eprintln!("w3bs-desktop: disabled on shutdown ({} tasks cancelled)", report.tasks_cancelled);
     Listener::remove(&agent_ep);
     Listener::remove(&control_ep);
+    SHUT_DOWN.store(true, Ordering::SeqCst);
     Ok(())
 }
 
@@ -326,7 +345,7 @@ fn doctor(b: &Broker, prompt: bool) -> Value {
     let mut checks = vec![];
     let mut check = |name: &str, ok: bool, detail: String| checks.push(json!({"check": name, "ok": ok, "detail": detail}));
     check("endpoints_private", endpoints_private(), paths::control_socket().to_string());
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", windows)))]
     check("session", !session.is_empty(), format!("XDG_SESSION_TYPE={session:?} XDG_CURRENT_DESKTOP={desktop:?}"));
     #[cfg(target_os = "macos")]
     {
@@ -337,6 +356,15 @@ fn doctor(b: &Broker, prompt: bool) -> Value {
         for (name, ok, detail) in crate::platform::permission_checks(prompt) {
             check(name, ok, detail);
         }
+    }
+    #[cfg(windows)]
+    {
+        let _ = (&session, &desktop);
+        // Session 0 is where services run; it has no interactive desktop.
+        let id = adl_windows::win::current_session();
+        check("session", id.is_some_and(|s| s != 0), format!("session {id:?} SESSIONNAME={:?}", std::env::var("SESSIONNAME").unwrap_or_default()));
+        let hk = adl_windows::hotkey_description();
+        check("emergency_hotkey", hk.is_some(), hk.map(|h| format!("{h} disables access")).unwrap_or_else(|| "no emergency chord registered (not the native adapter, or every chord is taken); use the tray or `w3bs desktop disable`".into()));
     }
     let input_ok = caps.iter().any(|c| c.capability == Capability::Pointer && c.availability == Availability::Available);
     check("pointer_backend", input_ok, b.adapter_name());
@@ -360,6 +388,9 @@ fn endpoints_private() -> bool {
 
 #[cfg(windows)]
 fn endpoints_private() -> bool {
-    // The pipe is created with a user-only DACL (Windows port).
+    // The broker could not have started otherwise: both pipes are created (first instance, no
+    // squatter) with an owner of the current user and a protected DACL granting only that user.
+    // Token and state files live under %LOCALAPPDATA%, whose inherited ACL grants the user,
+    // SYSTEM and Administrators (as root can read 0600 files on Unix).
     true
 }
