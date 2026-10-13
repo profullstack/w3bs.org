@@ -9,6 +9,8 @@
 //!   [`gnome::WithGnome`] pairs it with the portal backend.
 //! - [`logind`]: lock, VT switch and suspend events from systemd-logind.
 //! - [`keymap`]: portable keys to evdev codes and keysyms.
+//! - [`xkb`]: which characters Mutter can type, from the compositor's live keymap.
+//! - [`screensaver`]: lock events from the desktop's ScreenSaver service (no logind needed).
 
 pub mod keymap;
 #[cfg(feature = "dbus")]
@@ -20,3 +22,6 @@ pub mod logind;
 #[cfg(feature = "dbus")]
 pub mod portal;
 pub mod vela;
+pub mod xkb;
+#[cfg(feature = "dbus")]
+pub mod screensaver;

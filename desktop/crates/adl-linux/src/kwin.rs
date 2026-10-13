@@ -508,6 +508,10 @@ impl<A: Adapter> Adapter for WithKWin<A> {
         self.input.emit(event)
     }
 
+    fn preflight(&self, action: &Action) -> Result<()> {
+        self.input.preflight(action)
+    }
+
     fn safety_interlock(&self) -> Option<String> {
         if let Some(why) = self.input.safety_interlock() {
             return Some(why);

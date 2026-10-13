@@ -23,6 +23,7 @@ version = "0.1.0"
 dependencies = [
  "adl-broker",
  "adl-schema",
+ "libc",
  "png",
  "serde",
  "serde_json",
