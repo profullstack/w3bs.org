@@ -163,6 +163,10 @@ impl PortalAdapter {
         std::fs::read_to_string(&self.token_file).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
     }
 
+    fn forget_restore_token(&self) {
+        let _ = std::fs::remove_file(&self.token_file);
+    }
+
     fn save_restore_token(&self, t: &str) {
         use std::io::Write;
         use std::os::unix::fs::OpenOptionsExt;
@@ -278,14 +282,20 @@ impl Adapter for PortalAdapter {
             })?;
             let devices = started.get("devices").and_then(|v| u32::try_from(v).ok()).unwrap_or(0);
             let streams = started.get("streams").map(Self::parse_streams).unwrap_or_default();
-            if let Some(t) = started.get("restore_token").and_then(|v| String::try_from(v.try_clone().ok()?).ok()) {
-                self.save_restore_token(&t);
-            }
+            // Keep a restore token only for a grant we can use. GNOME's dialog has "Allow Remote
+            // Interaction" off by default and still returns a token for a screen-share-only grant;
+            // saving it would replay that useless grant on every later enable with no dialog,
+            // locking the human out of fixing it. Drop any stored token in that case instead.
             if devices & DEVICE_POINTER == 0 && devices & DEVICE_KEYBOARD == 0 {
-                return Err(AdlError::new(ErrorCode::Denied, "the portal granted no input devices"));
+                self.forget_restore_token();
+                return Err(AdlError::new(ErrorCode::Denied, "the portal granted no input devices (turn on \"Allow Remote Interaction\" in the portal dialog)"));
             }
             if streams.is_empty() {
+                self.forget_restore_token();
                 return Err(AdlError::new(ErrorCode::Blocked, "the portal shared no monitors, so absolute pointer positions are unavailable"));
+            }
+            if let Some(t) = started.get("restore_token").and_then(|v| String::try_from(v.try_clone().ok()?).ok()) {
+                self.save_restore_token(&t);
             }
             Ok((devices, streams))
         };
@@ -328,6 +338,20 @@ impl Adapter for PortalAdapter {
         }
         *self.generation.lock().unwrap() += 1;
         *self.session.lock().unwrap() = Some(Session { handle, devices, streams });
+        // Mutter (GNOME 50) creates each virtual input device lazily, on the session's first key
+        // press / pointer event, and the events that arrive while that device is still being added
+        // are lost (seen: the first 2-5 typed characters of a fresh session vanished). Create both
+        // devices now with no-op events, a lone Shift tap and a zero relative motion, and give
+        // them a moment. A release alone does not work: Mutter rejects it before creating the device.
+        if devices & DEVICE_KEYBOARD != 0 {
+            const KEY_LEFTSHIFT: i32 = 42;
+            let _ = self.notify("NotifyKeyboardKeycode", &(self.handle()?, HashMap::<&str, Value>::new(), KEY_LEFTSHIFT, 1u32));
+            let _ = self.notify("NotifyKeyboardKeycode", &(self.handle()?, HashMap::<&str, Value>::new(), KEY_LEFTSHIFT, 0u32));
+        }
+        if devices & DEVICE_POINTER != 0 {
+            let _ = self.notify("NotifyPointerMotion", &(self.handle()?, HashMap::<&str, Value>::new(), 0f64, 0f64));
+        }
+        std::thread::sleep(Duration::from_millis(300));
         Ok(())
     }
 
