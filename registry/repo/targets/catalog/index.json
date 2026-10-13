@@ -328,6 +328,417 @@
       "agentic": false
     },
     {
+      "id": "logicsrc.com/opencontext",
+      "name": "opencontext",
+      "description": "Reference implementation of the LogicSRC OpenContext standard for portable, permissioned agent context.",
+      "commands": [
+        "opencontext"
+      ],
+      "install": {
+        "url": "https://logicsrc.com/opencontext/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://logicsrc.com/opencontext",
+      "repository": "https://github.com/profullstack/logicsrc",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "smshub.dev/smshub",
+      "name": "smshub",
+      "description": "CLI, TUI and MCP server for renting a phone number and receiving SMS verification codes.",
+      "commands": [
+        "smshub-cli"
+      ],
+      "install": {
+        "url": "https://smshub.dev/cli/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://smshub.dev",
+      "repository": "https://github.com/profullstack/smshub",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "pairux.com/pairux",
+      "name": "pairux",
+      "description": "Screen sharing app whose pairux command brings AI agents into a live PairUX session as participants.",
+      "commands": [
+        "pairux"
+      ],
+      "install": {
+        "url": "https://pairux.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://pairux.com",
+      "repository": "https://github.com/profullstack/pairux.com",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "wx93.me/wx93-mcp",
+      "name": "wx93-mcp",
+      "description": "MCP server that lets MCP clients shorten URLs, list links and read click stats on wx93.me.",
+      "commands": [
+        "wx93-mcp"
+      ],
+      "install": {
+        "url": "https://wx93.me/install-mcp",
+        "shell": "sh"
+      },
+      "homepage": "https://wx93.me/docs#mcp",
+      "repository": "https://github.com/profullstack/wx93.me",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "profullstack.com/x402",
+      "name": "x402",
+      "title": "x402-client",
+      "description": "Library and CLI that pays HTTP 402 x402 payment requests with a local key.",
+      "commands": [
+        "x402"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/profullstack/x402-client/main/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://github.com/profullstack/x402-client",
+      "repository": "https://github.com/profullstack/x402-client",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "profullstack.com/ai",
+      "name": "ai",
+      "description": "Simple CLI for interactive conversations with an AI model.",
+      "commands": [
+        "ai"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/profullstack/ai/master/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://github.com/profullstack/ai",
+      "repository": "https://github.com/profullstack/ai",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "profullstack.com/summary-forge",
+      "name": "summary-forge",
+      "description": "CLI that uses AI to write summaries of technical books.",
+      "commands": [
+        "summary"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/profullstack/summary-forge-module/master/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://github.com/profullstack/summary-forge-module",
+      "repository": "https://github.com/profullstack/summary-forge-module",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "hqtui.com/hqtui",
+      "name": "hqtui",
+      "description": "TypeScript terminal UI library for building dashboards, with a demo CLI.",
+      "commands": [
+        "hqtui"
+      ],
+      "install": {
+        "url": "https://hqtui.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://hqtui.com",
+      "repository": "https://github.com/profullstack/hqtui",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "bl0ggers.com/bl0ggers",
+      "name": "bl0ggers",
+      "description": "CLI for posting blog posts, newsletter issues and podcast episodes to bl0ggers.com publications.",
+      "commands": [
+        "bl0ggers"
+      ],
+      "install": {
+        "url": "https://bl0ggers.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://bl0ggers.com",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "crawlproof.com/crawlproof",
+      "name": "crawlproof",
+      "description": "Terminal dashboard showing CrawlProof traffic, ad delivery and CoinPay revenue for a fleet of sites.",
+      "commands": [
+        "crawlproof"
+      ],
+      "install": {
+        "url": "https://crawlproof.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://crawlproof.com",
+      "repository": "https://github.com/profullstack/crawlproof.com",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "qrypt.chat/qryptchat",
+      "name": "qryptchat",
+      "description": "End-to-end encrypted terminal chat client for qrypt.chat using ML-KEM-1024, with a scriptable CLI.",
+      "commands": [
+        "qc",
+        "qryptchat"
+      ],
+      "install": {
+        "url": "https://qrypt.chat/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://qrypt.chat",
+      "repository": "https://github.com/profullstack/qryptchat-web",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "readm3.com/readm3",
+      "name": "readm3",
+      "description": "Terminal markdown reader and editor with sharing, version history, an API and an MCP server.",
+      "commands": [
+        "readm3"
+      ],
+      "install": {
+        "url": "https://readm3.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://readm3.com",
+      "repository": "https://github.com/profullstack/readm3",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "hdtilt.com/hdtilt",
+      "name": "hdtilt",
+      "description": "Open source IPTV player for M3U, Xtream Codes and XMLTV with web, CLI, TUI and MCP interfaces.",
+      "commands": [
+        "hdtilt"
+      ],
+      "install": {
+        "url": "https://hdtilt.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://hdtilt.com",
+      "repository": "https://github.com/profullstack/hdtilt.com",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "profullstack.com/g1tz",
+      "name": "g1tz",
+      "description": "Git TUI that shows the state of a repository instead of a menu of git commands.",
+      "commands": [
+        "g1tz"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/profullstack/g1tz/main/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://github.com/profullstack/g1tz",
+      "repository": "https://github.com/profullstack/g1tz",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "profullstack.com/r3q",
+      "name": "r3q",
+      "description": "Terminal REST client that stores requests as files you can commit.",
+      "commands": [
+        "r3q"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/profullstack/r3q/main/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://github.com/profullstack/r3q",
+      "repository": "https://github.com/profullstack/r3q",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "profullstack.com/timer",
+      "name": "timer",
+      "description": "Time tracker for the terminal and for agents that records hours against projects.",
+      "commands": [
+        "timer"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/profullstack/timer/main/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://github.com/profullstack/timer",
+      "repository": "https://github.com/profullstack/timer",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "profullstack.com/billing",
+      "name": "billing",
+      "description": "Terminal tool for clients, rates and invoices that turns tracked hours into an invoice.",
+      "commands": [
+        "billing"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/profullstack/billing/main/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://github.com/profullstack/billing",
+      "repository": "https://github.com/profullstack/billing",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "profullstack.com/proxy",
+      "name": "proxy",
+      "description": "Library, CLI and local forward proxy for making requests through residential proxy providers.",
+      "commands": [
+        "proxy"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/profullstack/proxy/main/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://github.com/profullstack/proxy",
+      "repository": "https://github.com/profullstack/proxy",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "profullstack.com/kali",
+      "name": "kali",
+      "description": "Unofficial installer for common Kali-style web pentesting tools on Debian and Ubuntu.",
+      "commands": [
+        "kali"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/profullstack/kali/main/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://github.com/profullstack/kali",
+      "repository": "https://github.com/profullstack/kali",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "profullstack.com/orgs",
+      "name": "orgs",
+      "description": "Postgres library and CLI for organizations, teams, members, roles and invitations.",
+      "commands": [
+        "orgs"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/profullstack/orgs/master/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://github.com/profullstack/orgs",
+      "repository": "https://github.com/profullstack/orgs",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "profullstack.com/watchdog",
+      "name": "watchdog",
+      "description": "Detects when a dependency stops responding and restarts the process instead of letting it hang.",
+      "commands": [
+        "watchdog-autoheal"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/profullstack/watchdog/main/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://github.com/profullstack/watchdog",
+      "repository": "https://github.com/profullstack/watchdog",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "profullstack.com/encrypt",
+      "name": "encrypt",
+      "description": "Quantum-resistant file and text encryption CLI using ML-KEM-1024 and ChaCha20-Poly1305.",
+      "commands": [
+        "pfencrypt"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/profullstack/encrypt/main/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://github.com/profullstack/encrypt",
+      "repository": "https://github.com/profullstack/encrypt",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "profullstack.com/scanner",
+      "name": "scanner",
+      "description": "Web application security scanner CLI with OWASP-oriented checks.",
+      "commands": [
+        "scanner"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/profullstack/scanner/master/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://github.com/profullstack/scanner",
+      "repository": "https://github.com/profullstack/scanner",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "profullstack.com/transcoder",
+      "name": "transcoder",
+      "description": "FFmpeg-based CLI and module for transcoding video, audio and images with presets.",
+      "commands": [
+        "transcoder",
+        "install-ffmpeg",
+        "install-imagemagick"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/profullstack/transcoder/master/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://github.com/profullstack/transcoder",
+      "repository": "https://github.com/profullstack/transcoder",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
       "id": "anthropic.com/claude-code",
       "name": "claude-code",
       "title": "Claude Code",
