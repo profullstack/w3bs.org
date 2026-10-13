@@ -202,7 +202,7 @@ else
     sleep 0.7
     GOT=$(cat "$OUT/app/target.txt" 2>/dev/null)
     if [ $RC = 0 ] && [ "$GOT" = "$TEXT" ]; then ok "typed text landed exactly: '$GOT'"; else bad "type rc=$RC got '$GOT' expected '$TEXT' ($(cat "$OUT/type.json"))"; fi
-    note "HID idle right after typing: $("$OUT/probe" hid) s (large = synthetic events are not counted as hardware input)"
+    note "HID idle right after typing: $("$OUT/probe" hid) s (our own posted events reset it too on macOS 26, so the adapter compares it with its last injection)"
 
     "$B" keyboard type --window "$OID" --from-file "$OUT/text.txt" "${A[@]}" --json >"$OUT/stale.json" 2>&1
     RC=$?

@@ -52,4 +52,17 @@ Status: accepted, 2026-10-13
   when its owner is the gnome-shell process. The extension never injects input; it is also the
   GNOME native control, so unloading it disables access. Without it, targeted input on GNOME is
   refused rather than guessed.
+- macOS (`adl-macos`, added 2026-10-13): C frameworks are declared by hand (`ffi.rs`) rather than
+  through binding crates, so signatures are reviewable; objc2/objc2-app-kit are used only for
+  NSRunningApplication and the menu-bar control. Input is CGEvent from a private-state source
+  (does not inherit or suppress hardware state) tagged with a user-data value, posted at the HID
+  tap; text is Unicode strings on key events. Session state is polled from the supervisor loop
+  (no run loop or event tap in the broker); sleep is inferred from the wall clock outrunning the
+  monotonic clock. NSWorkspace's frontmost application is not used in the broker because it is
+  only refreshed by a run loop; focus comes from Accessibility, else the front-most normal window.
+  The emergency stop is a Carbon hot key in the menu-bar control (which has the event loop), sent
+  to the broker as `session.event emergency_stop`, mirroring the Linux tray. On macOS 26 status
+  items are drawn by Control Center; the item remains an `AXMenuExtra` in the control's own
+  accessibility tree. Captures use `CGDisplayCreateImage` (looked up with `dlsym`, deprecated) and
+  fall back to `screencapture`; ScreenCaptureKit is the planned replacement.
 - Same-user hostile processes are out of scope, as the PRD states.
