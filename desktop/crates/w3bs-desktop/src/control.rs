@@ -9,7 +9,6 @@ use adl_schema::rpc::{Request, Response};
 use adl_schema::SCHEMA_VERSION;
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
-use std::os::unix::net::UnixStream;
 use std::sync::mpsc;
 
 const HELP: &str = "commands: enable | disable | stop | confirm | approve <id> | deny <id> | approvals | tasks | status | quit (quitting disables access)";
@@ -28,8 +27,8 @@ fn print_state(v: &Value) {
 
 pub fn run() -> std::io::Result<()> {
     let path = paths::control_socket();
-    let stream = UnixStream::connect(&path).map_err(|e| std::io::Error::new(e.kind(), format!("{}: {e}; start the broker with `w3bs desktop daemon`", path.display())))?;
-    let mut writer = stream.try_clone()?;
+    let stream = crate::transport::connect(&path).map_err(|e| std::io::Error::new(e.kind(), format!("{path}: {e}; start the broker with `w3bs desktop daemon`")))?;
+    let mut writer = stream.try_clone_box()?;
     let reader = BufReader::new(stream);
     let (resp_tx, resp_rx) = mpsc::channel::<Response>();
     let last_code = std::sync::Arc::new(std::sync::Mutex::new(None::<String>));
@@ -68,7 +67,7 @@ pub fn run() -> std::io::Result<()> {
     let mut call = |method: &str, params: Value| -> Result<Value, String> {
         next += 1;
         let req = Request { v: SCHEMA_VERSION, id: next.to_string(), method: method.into(), params };
-        writeln!(writer, "{}", serde_json::to_string(&req).unwrap()).map_err(|e| e.to_string())?;
+        writeln!(writer, "{}", serde_json::to_string(&req).unwrap()).and_then(|_| writer.flush()).map_err(|e| e.to_string())?;
         loop {
             let r = resp_rx.recv().map_err(|e| e.to_string())?;
             if r.id == next.to_string() {

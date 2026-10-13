@@ -49,8 +49,7 @@ impl AgentStore {
         let tmp = path.with_extension("json.tmp");
         {
             use std::io::Write;
-            use std::os::unix::fs::OpenOptionsExt;
-            let mut out = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(&tmp).map_err(io)?;
+            let mut out = crate::util::private_file().write(true).create(true).truncate(true).open(&tmp).map_err(io)?;
             out.write_all(&serde_json::to_vec_pretty(f).unwrap()).map_err(io)?;
             out.sync_all().map_err(io)?;
         }

@@ -53,11 +53,10 @@ impl Audit {
     pub fn record(&self, r: AuditRecord) {
         let day = r.ts_ms / DAY_MS;
         if let Some(path) = self.file_for(day) {
-            use std::os::unix::fs::OpenOptionsExt;
             if let Some(dir) = path.parent() {
                 let _ = std::fs::create_dir_all(dir);
             }
-            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).mode(0o600).open(&path) {
+            if let Ok(mut f) = crate::util::private_file().create(true).append(true).open(&path) {
                 let _ = writeln!(f, "{}", serde_json::to_string(&r).unwrap());
             }
             let mut last = self.last_prune_day.lock().unwrap_or_else(|e| e.into_inner());

@@ -1,6 +1,6 @@
 [package]
 name = "w3bs-desktop"
-description = "Agentic Desktop Layer: `w3bs desktop` CLI, local broker daemon, terminal control and MCP server"
+description = "Agentic Desktop Layer: `w3bs desktop` CLI, local broker daemon, native controls and MCP server"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -15,12 +15,16 @@ path = "src/main.rs"
 [dependencies]
 adl-schema.workspace = true
 adl-broker.workspace = true
-adl-linux.workspace = true
 base64.workspace = true
 clap.workspace = true
-libc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+adl-linux.workspace = true
 ksni = { version = "0.3.6", default-features = false, features = ["blocking", "async-io"] }
 zbus = "5.19"
 
