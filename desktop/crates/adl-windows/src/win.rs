@@ -258,3 +258,10 @@ pub fn wide(s: &str) -> Vec<u16> {
 pub fn wstr(buf: &[u16]) -> String {
     wide_to_string(buf)
 }
+
+/// Terminal Services session of this process (0 = services, no interactive desktop).
+pub fn current_session() -> Option<u32> {
+    let mut s = 0u32;
+    // SAFETY: out-parameter.
+    unsafe { windows::Win32::System::RemoteDesktop::ProcessIdToSessionId(std::process::id(), &mut s) }.ok().map(|_| s)
+}

@@ -111,10 +111,10 @@ check ($disp -and $disp.logical.width -eq [N]::GetSystemMetrics(0) -and $disp.lo
 # ---------------------------------------------------------------- test windows
 $fa = Join-Path $Work 'a.json'; $fb = Join-Path $Work 'b.json'
 $formScript = Join-Path $Here 'testform.ps1'
-$pa = Start-Process powershell.exe -ArgumentList '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', $formScript, '-Title', 'W3BS Test A', '-Out', $fa, '-X', 100, '-Y', 100 -NoNewWindow -PassThru
+$pa = Start-Process powershell.exe -ArgumentList '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', $formScript, '-Title', 'W3BS Test A', '-Out', $fa, '-X', 100, '-Y', 100 -RedirectStandardOutput (Join-Path $Work 'forma.out') -RedirectStandardError (Join-Path $Work 'forma.err') -NoNewWindow -PassThru
 Start-Sleep -Milliseconds 1500
-$pb = Start-Process powershell.exe -ArgumentList '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', $formScript, '-Title', 'W3BS Test B', '-Out', $fb, '-X', 300, '-Y', 200 -NoNewWindow -PassThru
-check (until { (Test-Path $fa) -and (Test-Path $fb) } 20000) "two WinForms test windows are up"
+$pb = Start-Process powershell.exe -ArgumentList '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', $formScript, '-Title', 'W3BS Test B', '-Out', $fb, '-X', 300, '-Y', 200 -RedirectStandardOutput (Join-Path $Work 'formb.out') -RedirectStandardError (Join-Path $Work 'formb.err') -NoNewWindow -PassThru
+check (until { (Test-Path $fa) -and (Test-Path $fb) } 30000) "two WinForms test windows are up" "A alive=$(-not $pa.HasExited) B alive=$(-not $pb.HasExited) $(Get-Content -Raw (Join-Path $Work 'forma.err') -ErrorAction SilentlyContinue)"
 Start-Sleep -Milliseconds 500
 
 $wl = W windows list --agent tester
@@ -248,7 +248,7 @@ $trayErr = Join-Path $Work 'tray.err'
 $tray = Start-Process -FilePath $Bin -ArgumentList 'tray' -RedirectStandardError $trayErr -RedirectStandardOutput (Join-Path $Work 'tray.out') -NoNewWindow -PassThru
 check (until { (Get-Content -Raw $trayErr -ErrorAction SilentlyContinue) -match 'notification icon added' } 35000) "tray: Shell_NotifyIcon(NIM_ADD) succeeded" (Get-Content -Raw $trayErr -ErrorAction SilentlyContinue)
 check (until { (Get-Content -Raw $trayErr) -match 'state Disabled' }) "tray: subscribed as native control, shows Disabled"
-$th = [N]::FindWindow('W3bsDesktopTray', $null)
+$th = [N]::FindWindow('W3bsDesktopTray', [NullString]::Value)
 check ($th -ne [IntPtr]::Zero) "tray window found (class W3bsDesktopTray)"
 $WM_COMMAND = 0x0111; $WM_TRAY = 0x8001; $WM_CANCELMODE = 0x001F
 [void][N]::PostMessage($th, $WM_TRAY, [IntPtr]::Zero, [IntPtr]0x007B)   # WM_CONTEXTMENU from the icon
@@ -288,7 +288,7 @@ foreach ($p in @($pa, $pb, $daemon)) { try { Stop-Process -Id $p.Id -Force -Erro
 Write-Host ""
 Write-Host "windows native e2e: $script:passes passed, $script:fails failed"
 if ($script:fails -gt 0) {
-    foreach ($f in 'daemon.err', 'control.log', 'tray.err', 'cli.err', 'long.err', 'long.out') {
+    foreach ($f in 'daemon.err', 'control.log', 'tray.err', 'cli.err', 'long.err', 'long.out', 'forma.out', 'forma.err', 'formb.err') {
         $p = Join-Path $Work $f
         if (Test-Path $p) { Write-Host "---- $f"; Get-Content $p | Select-Object -Last 60 }
     }

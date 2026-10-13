@@ -13,9 +13,9 @@ pub fn make_adapter(kind: AdapterKind) -> Result<Arc<dyn Adapter>> {
     match kind {
         AdapterKind::Mock => Ok(Arc::new(adl_broker::mock::MockDesktop::new())),
         AdapterKind::Auto | AdapterKind::Native => {
-            // SESSIONNAME is unset for services (session 0), which have no interactive desktop.
-            if std::env::var_os("SESSIONNAME").is_none() && std::env::var_os("W3BS_DESKTOP_ALLOW_NO_SESSIONNAME").is_none() {
-                eprintln!("w3bs-desktop: SESSIONNAME is not set; if this is a service there is no interactive desktop to drive");
+            // Services run in session 0, which has no interactive desktop to drive.
+            if adl_windows::win::current_session() == Some(0) {
+                eprintln!("w3bs-desktop: running in session 0 (a service); there is no interactive desktop here");
             }
             Ok(Arc::new(adl_windows::WindowsAdapter::new()))
         }

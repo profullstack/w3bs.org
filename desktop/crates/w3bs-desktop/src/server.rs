@@ -342,9 +342,9 @@ fn doctor(b: &Broker) -> Value {
     #[cfg(windows)]
     {
         let _ = (&session, &desktop);
-        // SESSIONNAME is `Console` locally and `RDP-Tcp#N` over Remote Desktop; services have none.
-        let name = std::env::var("SESSIONNAME").unwrap_or_default();
-        check("session", !name.is_empty(), format!("SESSIONNAME={name:?}"));
+        // Session 0 is where services run; it has no interactive desktop.
+        let id = adl_windows::win::current_session();
+        check("session", id.is_some_and(|s| s != 0), format!("session {id:?} SESSIONNAME={:?}", std::env::var("SESSIONNAME").unwrap_or_default()));
         let hk = adl_windows::hotkey_description();
         check("emergency_hotkey", hk.is_some(), hk.map(|h| format!("{h} disables access")).unwrap_or_else(|| "no emergency chord registered (not the native adapter, or every chord is taken); use the tray or `w3bs desktop disable`".into()));
     }

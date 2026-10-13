@@ -510,16 +510,18 @@ pub fn run() -> std::io::Result<()> {
     }
     eprintln!("w3bs-desktop tray: notification icon added (Shell_NotifyIcon ok), window {}", adl_windows::map::window_id(hwnd.0 as isize));
 
-    match adl_windows::register_hotkey(hwnd) {
+    // The broker's native adapter normally holds the chord and reacts to it itself; only when
+    // it does not (mock adapter, chord taken) does the tray register one.
+    match broker_hotkey() {
         Some(desc) => {
-            ctx().own_hotkey.store(true, Ordering::SeqCst);
-            view().shortcut = Some(desc.to_string());
-            eprintln!("w3bs-desktop tray: emergency stop {desc} registered");
+            eprintln!("w3bs-desktop tray: emergency stop {desc} is held by the broker's adapter");
+            view().shortcut = Some(desc);
         }
-        None => match broker_hotkey() {
+        None => match adl_windows::register_hotkey(hwnd) {
             Some(desc) => {
-                eprintln!("w3bs-desktop tray: emergency stop {desc} is held by the broker's adapter");
-                view().shortcut = Some(format!("{desc} (handled by the broker)"));
+                ctx().own_hotkey.store(true, Ordering::SeqCst);
+                view().shortcut = Some(desc.to_string());
+                eprintln!("w3bs-desktop tray: emergency stop {desc} registered");
             }
             None => eprintln!("w3bs-desktop tray: no emergency-stop chord available; use the menu"),
         },
