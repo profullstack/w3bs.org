@@ -228,6 +228,8 @@ test('Agentic Desktop Layer page, typo redirect, raw PRD and navigation', async 
       'INSTALL AND USE',
       'curl -fsSL https://w3bs.org/desktop/install.sh | sh',
       'irm https://w3bs.org/desktop/install.ps1 | iex',
+      'w3bs install agentic-desktop-layer',
+      'curl -fsSL https://w3bs.org/install.sh | sh',
       'Enable agent access',
       'Disable agent access',
       '/assets/desktop.js',

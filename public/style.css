@@ -1858,6 +1858,7 @@ textarea {
 }
 .desktop-steps .identity-line code {
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 .desktop-steps p {
   margin: 0;
