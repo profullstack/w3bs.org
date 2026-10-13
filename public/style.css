@@ -1773,3 +1773,10 @@ textarea {
   cursor: pointer;
   font-size: 14px;
 }
+.install-hint {
+  margin: -8px 0 24px;
+  font-size: 14px;
+}
+.metadata dd code.break {
+  overflow-wrap: anywhere;
+}
