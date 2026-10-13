@@ -471,11 +471,10 @@ impl Broker {
     pub fn cancel_task(&self, id: &str, by: Option<&Principal>) -> Result<TaskInfo> {
         let mut g = self.lock();
         let t = g.tasks.get_mut(id).ok_or_else(|| AdlError::not_found(format!("no task {id}")))?;
-        if let Some(p) = by {
-            if t.info.agent != p.agent {
+        if let Some(p) = by
+            && t.info.agent != p.agent {
                 return Err(AdlError::denied("task belongs to another agent"));
             }
-        }
         if t.info.state == TaskState::Running {
             t.info.state = TaskState::Cancelled;
             t.info.ended_at_ms = Some(now_ms());
@@ -740,11 +739,10 @@ impl Broker {
             Some(_) => return Err(AdlError::new(ErrorCode::Cancelled, "task is not running")),
             None => return Err(AdlError::not_found(format!("no task {task}"))),
         }
-        if let Some(l) = &g.lease {
-            if l.info.expires_at_ms > now && l.info.generation == lease_gen && (l.info.agent != p.agent || l.info.task != task) {
+        if let Some(l) = &g.lease
+            && l.info.expires_at_ms > now && l.info.generation == lease_gen && (l.info.agent != p.agent || l.info.task != task) {
                 return Err(AdlError::new(ErrorCode::Busy, "another task holds the desktop input lease").with_details(json!({"holder": l.info.agent, "expires_at_ms": l.info.expires_at_ms})));
             }
-        }
         let info = LeaseInfo { id: random_id("lease", 8), agent: p.agent.clone(), task: task.into(), expires_at_ms: now + ttl, generation: lease_gen };
         g.lease = Some(Lease { info: info.clone() });
         Self::broadcast(&mut g, &json!({"v": SCHEMA_VERSION, "event": "lease", "data": info}));
@@ -866,15 +864,14 @@ impl Broker {
             return Err(AdlError::invalid(format!("({x}, {y}) is not on any display")));
         }
         let hit = self.adapter.window_at(x, y)?;
-        if check_target {
-            if let Some(t) = &ctx.target_window {
+        if check_target
+            && let Some(t) = &ctx.target_window {
                 match &hit {
                     Some(h) if &h.id == t => {}
                     Some(h) => return Err(AdlError::stale(format!("target is covered by {} ({})", h.title, h.app_id)).with_details(json!({"covering_window": h.id}))),
                     None => return Err(AdlError::stale("the point is not over the target window")),
                 }
             }
-        }
         if ctx.policy.mode == ControlMode::Restricted {
             match &hit {
                 Some(h) if ctx.policy.allows_app(&h.app_id) => {}
@@ -1106,11 +1103,10 @@ impl Broker {
         } else if pol.mode != ControlMode::BroadDesktop && batch.actions.iter().any(Action::is_keyboard) {
             return Err(AdlError::denied("restricted agents must name a target window for keyboard input"));
         }
-        if let Some(lg) = batch.target.layout_generation {
-            if lg != self.adapter.layout()?.generation {
+        if let Some(lg) = batch.target.layout_generation
+            && lg != self.adapter.layout()?.generation {
                 return Err(AdlError::stale("display layout changed; observe again"));
             }
-        }
         self.checkpoint(p, &batch.task, gen0)?;
         self.check_approval(p, &pol, batch, target_app.as_deref())?;
         self.check_rate(p, &pol, batch.actions.len())?;
@@ -1161,7 +1157,7 @@ impl Broker {
             Some(&p.agent),
             Some(&batch.task),
             "allowed",
-            &serde_json::to_value(outcome).unwrap().as_str().unwrap_or_default().to_string(),
+            serde_json::to_value(outcome).unwrap().as_str().unwrap_or_default(),
             json!({"kinds": kinds, "completed": done, "total": batch.actions.len(), "app": target_app, "released": released, "error": error.as_ref().map(|e| e.code)}),
         );
         Ok(BatchResult {

@@ -62,11 +62,10 @@ pub fn serve(broker: Arc<Broker>) -> std::io::Result<()> {
             for conn in listener.incoming().flatten() {
                 let b = b.clone();
                 std::thread::spawn(move || {
-                    if let Err(e) = handle(b, conn, kind) {
-                        if e.kind() != std::io::ErrorKind::BrokenPipe {
+                    if let Err(e) = handle(b, conn, kind)
+                        && e.kind() != std::io::ErrorKind::BrokenPipe {
                             eprintln!("w3bs-desktop: connection error: {e}");
                         }
-                    }
                 });
             }
         });
@@ -106,11 +105,10 @@ fn write_line(w: &Mutex<UnixStream>, line: &str) -> std::io::Result<()> {
 
 fn handle(broker: Arc<Broker>, stream: UnixStream, kind: Kind) -> std::io::Result<()> {
     let cred = peer::peer_cred(&stream);
-    if let Some(c) = cred {
-        if c.uid != peer::my_uid() {
+    if let Some(c) = cred
+        && c.uid != peer::my_uid() {
             return Ok(()); // other users never get an answer
         }
-    }
     let writer = Arc::new(Mutex::new(stream.try_clone()?));
     let mut conn = Conn { kind, cred, principal: None, native_control: false, writer: writer.clone() };
     let mut reader = BufReader::new(stream);
@@ -245,7 +243,7 @@ fn control(b: &Arc<Broker>, c: &mut Conn, req: &Request) -> Result<Value> {
         "stop" => to(b.stop_all(&reason())),
         "takeover" => to(b.takeover()),
         "agents.add" => {
-            let policy: Policy = p.get("policy").map(|v| params(v)).transpose()?.unwrap_or_default();
+            let policy: Policy = p.get("policy").map(params).transpose()?.unwrap_or_default();
             let (info, token) = b.add_agent(&peer, &str_param(p, "name")?, policy)?;
             Ok(json!({"agent": info, "token": token}))
         }

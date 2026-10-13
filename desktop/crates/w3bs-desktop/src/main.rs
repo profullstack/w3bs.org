@@ -38,10 +38,30 @@ struct Cli {
     cmd: Cmd,
 }
 
-#[derive(Clone, Copy, ValueEnum)]
+#[derive(Clone, Copy, ValueEnum, PartialEq)]
 enum AdapterKind {
+    /// Vela if running, else the XDG portal backend (KDE Plasma, GNOME); never the mock
+    Auto,
+    /// Vela compositor command socket (observation and interlocks; input needs VELA_DEBUG_INPUT)
+    Vela,
+    /// XDG RemoteDesktop/ScreenCast/Screenshot portals (KDE Plasma, GNOME)
+    Portal,
     /// Deterministic fake desktop for tests and demos
     Mock,
+}
+
+fn make_adapter(kind: AdapterKind) -> Result<Arc<dyn Adapter>> {
+    use adl_linux::{portal::PortalAdapter, vela::VelaAdapter};
+    let vela = || VelaAdapter::default_socket().map(VelaAdapter::new).ok_or_else(|| AdlError::new(ErrorCode::Blocked, "Vela command socket not found (needs XDG_RUNTIME_DIR and WAYLAND_DISPLAY)"));
+    let portal = || PortalAdapter::new(paths::config_dir().join("portal-restore-token"));
+    Ok(match kind {
+        AdapterKind::Mock => Arc::new(adl_broker::mock::MockDesktop::new()),
+        AdapterKind::Vela => Arc::new(vela()?),
+        AdapterKind::Portal => Arc::new(portal()),
+        AdapterKind::Auto if VelaAdapter::detect() => Arc::new(vela()?),
+        AdapterKind::Auto if PortalAdapter::detect() => Arc::new(portal()),
+        AdapterKind::Auto => return Err(AdlError::new(ErrorCode::Blocked, "no supported desktop session found (need a Wayland/X11 session with D-Bus, or Vela); use --adapter mock for a demo")),
+    })
 }
 
 #[derive(Args, Clone)]
@@ -55,7 +75,7 @@ struct AgentAuth {
 enum Cmd {
     /// Run the local broker (normally started by the user service)
     Daemon {
-        #[arg(long, value_enum, default_value = "mock")]
+        #[arg(long, value_enum, default_value = "auto")]
         adapter: AdapterKind,
         /// Allow enabling with no native control attached (headless test rigs only)
         #[arg(long, hide = true)]
@@ -461,9 +481,7 @@ fn main() {
     let j = cli.json;
     let r: Result<Value> = (|| match cli.cmd {
         Cmd::Daemon { adapter, no_native_control, retention_days } => {
-            let adapter: Arc<dyn Adapter> = match adapter {
-                AdapterKind::Mock => Arc::new(adl_broker::mock::MockDesktop::new()),
-            };
+            let adapter = make_adapter(adapter)?;
             let store = AgentStore::open(paths::config_dir().join("agents.json"))?;
             let audit = Audit::open(paths::state_dir().join("audit"), retention_days);
             let cfg = Config { require_native_control: !no_native_control, ..Config::default() };

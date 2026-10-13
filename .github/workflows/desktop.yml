@@ -1,0 +1,31 @@
+name: Agentic Desktop Layer
+on:
+  push:
+    paths: ["desktop/**", ".github/workflows/desktop.yml"]
+  pull_request:
+    paths: ["desktop/**", ".github/workflows/desktop.yml"]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+      # Broker conformance (mock adapter), Vela adapter against a fake command socket,
+      # and the end-to-end daemon + control + CLI + MCP test.
+      - run: cargo test --workspace --locked
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo build --release --locked -p w3bs-desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: w3bs-desktop-linux-x86_64-unsigned
+          path: desktop/target/release/w3bs-desktop

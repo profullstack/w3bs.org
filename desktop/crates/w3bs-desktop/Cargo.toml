@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 adl-schema.workspace = true
 adl-broker.workspace = true
+adl-linux.workspace = true
 base64.workspace = true
 clap.workspace = true
 libc.workspace = true
