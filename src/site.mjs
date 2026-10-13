@@ -194,8 +194,8 @@ const prdPath = '/docs/agentic-desktop-layer-prd.md';
 const desktopPlatforms = [
   ['First', 'KDE Plasma', 'System-tray item or Plasma widget', 'Installable, testing'],
   ['First', 'GNOME', 'Top-panel extension and settings app', 'Installable, testing'],
-  ['Next', 'Windows', 'Taskbar notification-area icon', 'In development'],
-  ['Next', 'macOS', 'Menu-bar item', 'In development'],
+  ['Next', 'Windows', 'Taskbar notification-area icon', 'Installable, testing'],
+  ['Next', 'macOS', 'Menu-bar item', 'Installable, testing'],
   ['Next', 'Cinnamon, Xfce, MATE, LXQt', 'Tray or panel integration', 'Planned'],
   [
     'Expansion',
@@ -227,11 +227,12 @@ Native tray/panel/menu-bar control
                        |
           Separate human-management channel`;
 const DESKTOP_INSTALL = 'curl -fsSL https://w3bs.org/desktop/install.sh | sh';
+const DESKTOP_INSTALL_WIN = 'irm https://w3bs.org/desktop/install.ps1 | iex';
 const desktopSteps = [
   [
     'Install',
     DESKTOP_INSTALL,
-    'Checks the download against the release checksums, installs <code>~/.local/bin/w3bs-desktop</code>, starts the broker as a user service (agent access stays Disabled) and adds the control to your session: a tray icon on KDE Plasma and other desktops, the panel extension on GNOME (log out and back in once so GNOME loads it).',
+    'On Windows, in PowerShell: <code>irm https://w3bs.org/desktop/install.ps1 | iex</code>. Both installers check the download against the release checksums, install <code>w3bs-desktop</code> for your user only, start the broker in the background (agent access stays Disabled) and add the control to your session: the tray icon on KDE Plasma, Windows and other desktops, the panel extension on GNOME (log out and back in once), the menu-bar item on macOS.',
   ],
   [
     'Register your agent',
@@ -246,7 +247,7 @@ const desktopSteps = [
   [
     'Turn it on',
     'Tray or panel: Enable agent access',
-    'Only you can do this, from the tray icon, the GNOME panel menu, or <code>w3bs-desktop control</code> in a terminal (type <code>enable</code>). The first time, the desktop asks for permission: allow Remote Control on KDE; on GNOME pick your screen and switch on Allow Remote Interaction.',
+    'Only you can do this, from the tray icon, the GNOME panel, the macOS menu bar, or <code>w3bs-desktop control</code> in a terminal (type <code>enable</code>). The first time, the system asks for permission: allow Remote Control on KDE; on GNOME pick your screen and switch on Allow Remote Interaction; on macOS allow <code>w3bs-desktop</code> under Privacy &amp; Security in Accessibility and Screen Recording (<code>w3bs-desktop doctor --prompt</code> opens the prompts). Windows needs no extra permission.',
   ],
   [
     'Ask your agent to work',
@@ -256,7 +257,7 @@ const desktopSteps = [
   [
     'Turn it off',
     'Tray or panel: Disable agent access',
-    'Or press the emergency shortcut (Super+Alt+Escape; KDE shows it as Meta+Alt+Esc), run <code>w3bs-desktop disable</code>, or lock the screen. Everything stops at once, held keys are released, and nothing turns back on by itself.',
+    'Or press the emergency shortcut: Super+Alt+Escape on Linux (KDE shows Meta+Alt+Esc), Win+Alt+Esc on Windows, Control+Option+Command+Escape on macOS. You can also run <code>w3bs-desktop disable</code> or lock the screen. Everything stops at once, held keys are released, and nothing turns back on by itself.',
   ],
 ];
 const desktopCommands = `w3bs-desktop status                 # Disabled / Enabled, who holds the input lease
@@ -273,15 +274,28 @@ w3bs-desktop screen capture --display ID --output shot.png --agent NAME
 w3bs-desktop mouse move|click|drag|scroll ...              --agent NAME
 w3bs-desktop keyboard type --stdin|press|shortcut ...      --agent NAME
 w3bs-desktop mcp serve --stdio --agent NAME`;
-const desktopUninstall = `systemctl --user disable --now w3bs-desktop
+const desktopUninstall = `# Linux
+systemctl --user disable --now w3bs-desktop
 rm ~/.local/bin/w3bs-desktop ~/.config/systemd/user/w3bs-desktop.service \\
    ~/.config/autostart/w3bs-desktop-tray.desktop
-gnome-extensions uninstall agentic-desktop@w3bs.org   # GNOME only`;
+gnome-extensions uninstall agentic-desktop@w3bs.org   # GNOME only
+
+# macOS
+launchctl bootout gui/$(id -u)/org.w3bs.desktop.broker
+launchctl bootout gui/$(id -u)/org.w3bs.desktop.menubar
+rm ~/Library/LaunchAgents/org.w3bs.desktop.*.plist ~/.local/bin/w3bs-desktop
+
+# Windows (PowerShell)
+& ([scriptblock]::Create((irm https://w3bs.org/desktop/install.ps1))) -Uninstall`;
 function desktopPage() {
   const prd = readFileSync(resolve(ROOT, 'docs', 'agentic-desktop-layer-prd.md'), 'utf8');
   const demo = `<div class="demo-frame" data-desktop-demo><p class="demo-label"><span aria-hidden="true">◇</span> Interactive preview - does not control your device</p><div class="demo-screen"><div class="demo-panel"><span class="demo-apps" aria-hidden="true">▤ Files · Editor · Browser</span><span class="demo-clock" aria-hidden="true">09:41</span><button type="button" class="demo-tray" id="demo-tray" aria-haspopup="true" aria-expanded="false" aria-controls="demo-menu"><span class="demo-icon" data-demo-icon aria-hidden="true">○</span><span class="sr-only">Agentic Desktop Layer preview menu. Status: </span><span data-demo-chip>Disabled</span></button></div><div class="demo-menu" id="demo-menu" role="group" aria-labelledby="demo-menu-title" hidden><p class="demo-menu-title" id="demo-menu-title">Agentic Desktop Layer</p><p class="demo-status">Status: <strong data-demo-state>Disabled</strong></p><p class="demo-detail" data-demo-detail hidden></p><button type="button" class="button dark demo-toggle" data-demo-toggle>Enable agent access</button><ul class="demo-items">${desktopMenuItems.map(([key, label]) => `<li><button type="button" data-demo-item="${key}">${label}</button></li>`).join('')}</ul><div class="demo-danger"><button type="button" data-demo-stop>Stop all agent activity</button><button type="button" data-demo-quit>Quit and disable</button></div></div></div><div class="demo-footer"><button type="button" class="button primary" data-demo-emergency>Emergency stop</button><p class="demo-log" role="status" aria-live="polite" data-demo-log>Preview state: Disabled. Nothing on this page talks to your computer.</p></div><noscript><p class="demo-log">The preview needs JavaScript. The menu it shows is listed in section 4 of the PRD below.</p></noscript></div>`;
-  return `<section class="page-head desktop-head"><div class="eyebrow">AGENTIC DESKTOP LAYER · W3BS</div><h1>Your desktop.<br>Your agents.<br><em>Your switch.</em></h1><p>An open, local-first layer that lets the agents you authorize use your real desktop: move the mouse, click, drag, type, use shortcuts and read what is on screen. You keep your desktop. A control in your taskbar, panel or menu bar turns it on and off.</p><div class="desktop-install-box"><span class="eyebrow">INSTALL ON LINUX</span><div class="identity-line"><code>${e(DESKTOP_INSTALL)}</code><button class="small-button" type="button" data-copy="${e(DESKTOP_INSTALL)}">Copy</button></div><div class="actions"><a class="button primary" href="#steps">How to use it <span aria-hidden="true">↓</span></a><a class="text-link" href="#install">What the installer does <span aria-hidden="true">→</span></a></div></div></section><div class="draft-note desktop-status" id="status"><strong>Release status.</strong> M0/M1 done. On KDE Plasma 6.7 and GNOME Shell 50 test rigs, agents type, point, click, take screenshots and target named windows, and the tray, GNOME panel control and emergency stop switch access off. Known GNOME gap: characters outside the keyboard layout are dropped. Linux installs with one line (below). Windows and macOS ports are in progress. No platform is certified yet.</div>
-  <section class="section resource-feature" id="install" aria-labelledby="install-title"><div><div class="eyebrow">INSTALL AND USE</div><h2 id="install-title">One line to install.<br>One switch to control.</h2><p>Linux, x86_64 and arm64, on KDE Plasma and GNOME. Windows and macOS builds are in progress and will appear here once they pass their tests on real machines.</p><p class="muted">Read it first if you like: <code>curl -fsSL https://w3bs.org/desktop/install.sh -o install.sh &amp;&amp; less install.sh</code></p></div><div class="terminal"><div class="terminal-tabs"><span class="terminal-title">install the agentic desktop layer</span></div><pre><code>${e(DESKTOP_INSTALL)}</code></pre><div class="terminal-result"><button class="small-button" type="button" data-copy="${e(DESKTOP_INSTALL)}">Copy</button><span class="terminal-label">AGENT ACCESS AFTER INSTALL</span><code>Disabled</code><span class="terminal-muted">You turn it on from the tray or panel.</span></div></div></section>
+  return `<section class="page-head desktop-head"><div class="eyebrow">AGENTIC DESKTOP LAYER · W3BS</div><h1>Your desktop.<br>Your agents.<br><em>Your switch.</em></h1><p>An open, local-first layer that lets the agents you authorize use your real desktop: move the mouse, click, drag, type, use shortcuts and read what is on screen. You keep your desktop. A control in your taskbar, panel or menu bar turns it on and off.</p><div class="desktop-install-box"><span class="eyebrow">MACOS AND LINUX</span><div class="identity-line"><code>${e(DESKTOP_INSTALL)}</code><button class="small-button" type="button" data-copy="${e(DESKTOP_INSTALL)}">Copy</button></div><span class="eyebrow">WINDOWS (POWERSHELL)</span><div class="identity-line"><code>${e(DESKTOP_INSTALL_WIN)}</code><button class="small-button" type="button" data-copy="${e(DESKTOP_INSTALL_WIN)}">Copy</button></div><div class="actions"><a class="button primary" href="#steps">How to use it <span aria-hidden="true">↓</span></a><a class="text-link" href="#install">What the installer does <span aria-hidden="true">→</span></a></div></div></section><div class="draft-note desktop-status" id="status"><strong>Release status.</strong> M0/M1 done. On KDE Plasma 6.7 and GNOME Shell 50 test rigs, agents type, point, click, take screenshots and target named windows, and the tray, GNOME panel control and emergency stop switch access off. On Windows and macOS the same workflow passes end to end on real GitHub-hosted desktops (Windows 54 of 54 checks, macOS 22 of 22). On GNOME, text with characters the keyboard layout lacks is refused rather than typed partially. Install with one line on each system (above). No platform is certified yet.</div>
+  <section class="section resource-feature" id="install" aria-labelledby="install-title"><div><div class="eyebrow">INSTALL AND USE</div><h2 id="install-title">One line to install.<br>One switch to control.</h2><p>Linux (KDE Plasma, GNOME; x86_64 and arm64), macOS 11 or later (Apple silicon and Intel) and Windows 10 or 11 (x64). Per-user install, no administrator rights.</p><p class="muted">Read it first if you like: <code>curl -fsSL https://w3bs.org/desktop/install.sh -o install.sh &amp;&amp; less install.sh</code>, or open <a class="inline-link" href="/desktop/install.ps1">install.ps1</a>.</p></div><div class="terminal"><div class="terminal-tabs"><span class="terminal-title">install the agentic desktop layer</span></div><pre><code># macOS and Linux
+${e(DESKTOP_INSTALL)}
+
+# Windows (PowerShell)
+${e(DESKTOP_INSTALL_WIN)}</code></pre><div class="terminal-result"><button class="small-button" type="button" data-copy="${e(DESKTOP_INSTALL)}">Copy macOS/Linux</button><button class="small-button" type="button" data-copy="${e(DESKTOP_INSTALL_WIN)}">Copy Windows</button><span class="terminal-label">AGENT ACCESS AFTER INSTALL</span><code>Disabled</code><span class="terminal-muted">You turn it on from the tray, panel or menu bar.</span></div></div></section>
   <section class="section" id="steps" aria-labelledby="steps-title"><div class="section-heading"><div><div class="eyebrow">HOW TO USE IT</div><h2 id="steps-title">Six steps.</h2></div><p>Commands are shown as <code>w3bs-desktop</code>; with the <a class="inline-link" href="/packages">w3bs CLI</a> installed, <code>w3bs desktop</code> works the same.</p></div><ol class="desktop-steps">${desktopSteps
     .map(([title, cmd, text]) => `<li><h3>${title}</h3><div class="identity-line"><code>${e(cmd)}</code>${cmd.includes(' ') && !cmd.includes(':') && !cmd.startsWith('Open') ? `<button class="small-button" type="button" data-copy="${e(cmd)}">Copy</button>` : ''}</div><p>${text}</p></li>`)
     .join('')}</ol><aside class="callout"><strong>Screenshots on Linux.</strong><p>Desktops ask before an app may take screenshots. Allow it in your privacy settings, or run <code>flatpak permission-set screenshot screenshot "" yes</code>. Without it, screenshot requests are refused instead of popping up a dialog in the middle of agent work.</p></aside></section>

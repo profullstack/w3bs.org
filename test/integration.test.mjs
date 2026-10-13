@@ -227,6 +227,7 @@ test('Agentic Desktop Layer page, typo redirect, raw PRD and navigation', async 
       'No platform is certified yet.',
       'INSTALL AND USE',
       'curl -fsSL https://w3bs.org/desktop/install.sh | sh',
+      'irm https://w3bs.org/desktop/install.ps1 | iex',
       'Enable agent access',
       'Disable agent access',
       '/assets/desktop.js',
