@@ -241,6 +241,17 @@ export function createApp({
     res.type('text/markdown').send(readFileSync(path, 'utf8'));
   });
   // The PRD's original typo, and trailing-slash variants, land on the canonical page.
+  // Agentic Desktop Layer installer (Linux/macOS sh; Windows PowerShell once released).
+  for (const [route, file, type] of [
+    ['/desktop/install.sh', 'install.sh', 'text/x-shellscript; charset=utf-8'],
+    ['/desktop/install.ps1', 'install.ps1', 'text/plain; charset=utf-8'],
+  ]) {
+    app.get(route, (_req, res) => {
+      const path = resolve(ROOT, 'desktop/packaging', file);
+      if (!existsSync(path)) throw new W3bsError('NOT_FOUND', 'Installer not published yet.', 404);
+      res.type(type).set('Cache-Control', 'public, max-age=300').send(readFileSync(path));
+    });
+  }
   app.get([/^\/desktpo\/?$/, /^\/desktop\/$/], (req, res) => {
     const query = req.originalUrl.indexOf('?');
     res.redirect(301, `/desktop${query === -1 ? '' : req.originalUrl.slice(query)}`);
