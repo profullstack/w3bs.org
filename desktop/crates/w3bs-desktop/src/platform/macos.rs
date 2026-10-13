@@ -45,10 +45,10 @@ mod menubar {
     use objc2::rc::Retained;
     use objc2::runtime::{AnyObject, NSObject};
     use objc2::{define_class, msg_send, sel, DefinedClass, MainThreadMarker, MainThreadOnly};
-    use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy, NSMenu, NSMenuItem, NSStatusBar, NSStatusItem, NSVariableStatusItemLength};
+    use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy, NSMenu, NSMenuItem, NSScreen, NSStatusBar, NSStatusItem, NSVariableStatusItemLength};
     use objc2_foundation::{NSObjectProtocol, NSString, NSTimer};
     use serde_json::{json, Value};
-    use std::cell::RefCell;
+    use std::cell::{Cell, RefCell};
     use std::io::{BufRead, BufReader, Write};
     use std::sync::mpsc;
 
@@ -131,6 +131,8 @@ mod menubar {
         acts: RefCell<Vec<Act>>,
         ui_rx: mpsc::Receiver<Ui>,
         act_tx: mpsc::Sender<Act>,
+        /// Ticks until the item's position is logged (it is placed once the run loop runs).
+        log_frame_in: Cell<u32>,
     }
 
     define_class!(
@@ -152,6 +154,14 @@ mod menubar {
 
             #[unsafe(method(tick:))]
             fn tick(&self, _timer: &NSTimer) {
+                match self.ivars().log_frame_in.get() {
+                    0 => {}
+                    1 => {
+                        self.ivars().log_frame_in.set(0);
+                        self.log_frame();
+                    }
+                    n => self.ivars().log_frame_in.set(n - 1),
+                }
                 let mut changed = false;
                 while let Ok(msg) = self.ivars().ui_rx.try_recv() {
                     let mut v = self.ivars().view.borrow_mut();
@@ -193,6 +203,16 @@ mod menubar {
                 None => it.setEnabled(false),
             }
             menu.addItem(&it);
+        }
+
+        /// Log where the item is, in Quartz points (for test rigs and support: on macOS 26 the
+        /// item is drawn by Control Center, so the process's own accessibility tree lacks it).
+        fn log_frame(&self) {
+            let mtm = self.mtm();
+            let Some(win) = self.ivars().item.button(mtm).and_then(|b| b.window()) else { return };
+            let f = win.frame();
+            let h = NSScreen::screens(mtm).firstObject().map(|s| s.frame().size.height).unwrap_or(0.0);
+            eprintln!("w3bs-desktop menu bar: status item at {},{} {}x{} (Quartz points)", f.origin.x, h - f.origin.y - f.size.height, f.size.width, f.size.height);
         }
 
         /// Rebuild the menu and the menu-bar title from the view.
@@ -351,7 +371,7 @@ mod menubar {
                 }
             }
         };
-        let target = Target::new(mtm, Ivars { item, view: RefCell::new(View { shortcut, ..View::default() }), acts: RefCell::new(vec![]), ui_rx, act_tx });
+        let target = Target::new(mtm, Ivars { item, view: RefCell::new(View { shortcut, ..View::default() }), acts: RefCell::new(vec![]), ui_rx, act_tx, log_frame_in: Cell::new(10) });
         target.rebuild();
         // SAFETY: `tick:` is implemented by `Target` and takes the timer.
         let _timer = unsafe { NSTimer::scheduledTimerWithTimeInterval_target_selector_userInfo_repeats(0.1, &target, sel!(tick:), None, true) };

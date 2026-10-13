@@ -92,13 +92,18 @@ find_item() {
         return \"none\"
     end tell"
 }
-open_item() { # click the item, then the named menu item of the menu that opens
+open_item() { # open_item NAME [X Y]: click the item (System Events, or a real click at X,Y), then the named menu item
+    local pre=""
+    if [ $# -ge 3 ]; then "$OUT/probe" click "$2" "$3"; pre="set clicked to true"; fi
     osa "tell application \"System Events\"
         set clicked to false
-        try
-            tell (first process whose unix id is $TRAY) to click menu bar item 1 of menu bar 2
-            set clicked to true
-        end try
+        $pre
+        if not clicked then
+            try
+                tell (first process whose unix id is $TRAY) to click menu bar item 1 of menu bar 2
+                set clicked to true
+            end try
+        end if
         if not clicked then
             tell process \"ControlCenter\"
                 repeat with mb in menu bars
@@ -140,6 +145,24 @@ if ! kill -0 $TRAY 2>/dev/null; then
 else
     note "our process (System Events): $(osa "tell application \"System Events\" to tell (first process whose unix id is $TRAY) to get {count of menu bars, role of every UI element}")"
     note "ControlCenter menu bar items: $(osa 'tell application "System Events" to tell process "ControlCenter" to get {name, title, description} of every menu bar item of every menu bar' | head -c 1500)"
+    note "ControlCenter items in detail: $(osa 'tell application "System Events" to tell process "ControlCenter"
+        set out to ""
+        repeat with mbi in menu bar items of menu bar 1
+            set t to ""
+            repeat with a in {"AXRole", "AXSubrole", "AXTitle", "AXDescription", "AXHelp", "AXIdentifier", "AXValue"}
+                try
+                    set t to t & a & "=" & (value of attribute a of mbi as text) & " "
+                end try
+            end repeat
+            try
+                set t to t & "pos=" & ((item 1 of (position of mbi)) as text) & "," & ((item 2 of (position of mbi)) as text) & " size=" & ((item 1 of (size of mbi)) as text) & "x" & ((item 2 of (size of mbi)) as text)
+            end try
+            set out to out & "[" & t & "] "
+        end repeat
+        return out
+    end tell' | head -c 3000)"
+    note "our menu bar 1 items: $(osa "tell application \"System Events\" to tell (first process whose unix id is $TRAY) to get {name, role, subrole} of every menu bar item of menu bar 1")"
+    note "tray log: $(cat "$OUT/tray.log")"
     ITEM=$(find_item)
     note "status item: $ITEM"
     if echo "$ITEM" | grep -q "Agents: Disabled"; then
@@ -159,8 +182,32 @@ else
             bad "menu Enable did not enable (state $S): $R; $(cat "$OUT/tray.log")"
         fi
         "$B" disable >/dev/null 2>&1
+    elif FR=$(grep -o 'status item at [-0-9.]*,[-0-9.]* [0-9.]*x[0-9.]*' "$OUT/tray.log" | tail -1) && [ -n "$FR" ]; then
+        # macOS 26 draws status items in Control Center; when its accessibility tree does not
+        # name ours, use the position the control logged and a real click.
+        read -r CX CY <<<"$(echo "$FR" | python3 -c "import re,sys; x,y,w,h=map(float,re.findall(r'[-0-9.]+',sys.stdin.read())); print(int(x+w/2), int(y+h/2))")"
+        HIT=$("$OUT/probe" windows | python3 -c "
+import re, sys
+for l in sys.stdin:
+    m = re.search(r'owner=(.*?) pid=.*bounds=([-0-9.]+),([-0-9.]+),([-0-9.]+),([-0-9.]+) name=(.*)', l)
+    if m and float(m[2]) <= $CX < float(m[2]) + float(m[4]) and float(m[3]) <= $CY < float(m[3]) + float(m[5]):
+        print(m[1], m[6].strip()); break")
+        note "status item logged at $FR; window there: $HIT"
+        if [ -n "$HIT" ]; then ok "menu-bar item is on screen at its logged position ($FR, drawn by: $HIT)"; else bad "no window at the logged status item position ($FR)"; fi
+        R=$(open_item "Enable agent access" "$CX" "$CY")
+        note "menu: $R"
+        sleep 1
+        if [ "$(state)" = enabled ]; then
+            ok "Enable from the menu-bar menu (opened by a real click) enabled access"
+            R=$(open_item "Disable agent access" "$CX" "$CY")
+            sleep 1
+            [ "$(state)" = disabled ] && ok "Disable from the menu-bar menu disabled access" || bad "menu Disable: $R state $(state)"
+        else
+            bad "menu Enable did not enable (state $(state)): $R"
+        fi
+        "$B" disable >/dev/null 2>&1
     else
-        bad "menu-bar item not found through Accessibility ($ITEM)"
+        bad "menu-bar item not found through Accessibility ($ITEM) and no position logged"
     fi
 fi
 
