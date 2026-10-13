@@ -77,6 +77,29 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol
   | w3bs-desktop mcp serve --stdio --agent tester 2>&1 | tail -1
 EOF
 
+# win.py TITLE FIELD < windows-list JSON -> that window's field (bounds as "x y w h")
+cat > "$RIG/win.py" <<'EOF'
+import json, math, sys
+def find(v):
+    if isinstance(v, list) and v and isinstance(v[0], dict) and "app_id" in v[0]: return v
+    for c in (v.values() if isinstance(v, dict) else v if isinstance(v, list) else []):
+        r = find(c)
+        if r is not None: return r
+    return None
+ws = find(json.load(sys.stdin)) or []
+title, field = sys.argv[1], sys.argv[2]
+if title == "-":   # summary
+    print(len(ws), sum(1 for w in ws if w["focused"]), " ".join(sorted(w["title"] for w in ws)))
+    sys.exit()
+for w in ws:
+    if w["title"] == title:
+        v = w.get(field)
+        # rounded half-up like the KWin script's Math.round (frame geometry can be fractional)
+        if field == "bounds" and v: v = " ".join(str(math.floor(v[k] + 0.5)) for k in ("x", "y", "width", "height"))
+        print(v if v is not None else "")
+        break
+EOF
+
 cat > "$RIG/inner.sh" <<'EOF'
 #!/bin/sh
 set -eu
@@ -125,7 +148,7 @@ setsid foot --title=T2 sh -c 'stty -icanon -echo; exec cat > /root/t2.txt' >$L/f
 sleep 1.5
 
 echo "== broker"
-setsid w3bs-desktop daemon --adapter portal >$L/daemon.log 2>&1 &
+setsid w3bs-desktop daemon --adapter auto >$L/daemon.log 2>&1 &
 sleep 1
 w3bs-desktop agents add tester --preset broad >/dev/null
 rm -f /root/ctl.fifo; mkfifo /root/ctl.fifo
@@ -166,6 +189,61 @@ type_ "into T2"; sleep 0.5
 echo "== screenshot"
 W screen capture --agent tester --display $DISP --output /rig/shot.png >/dev/null
 file /rig/shot.png | grep -q "PNG image data, 1920 x 1080" && ok "$(file -b /rig/shot.png)" || bad "screenshot: $(file /rig/shot.png)"
+
+echo "== KWin window observer (window list, focus, stacking)"
+w3bs-desktop --json status | grep -q '"adapter": "linux-portal+kwin"' && ok "--adapter auto picked portal+kwin" || bad "adapter: $(w3bs-desktop --json status | grep adapter)"
+W windows list --agent tester > /root/wins.json
+set -- $(python3 /rig/win.py - - < /root/wins.json)
+[ "$1" = 2 ] && [ "$2" = 1 ] && [ "$3 $4" = "T1 T2" ] && ok "windows list: T1, T2, exactly one focused" || bad "windows list: $(cat /root/wins.json)"
+[ "$(python3 /rig/win.py T1 bounds < /root/wins.json)" = "$(/rig/geom.sh T1)" ] && [ "$(python3 /rig/win.py T2 bounds < /root/wins.json)" = "$(/rig/geom.sh T2)" ] \
+  && ok "geometry matches KWin frameGeometry ($(python3 /rig/win.py T1 bounds < /root/wins.json) / $(python3 /rig/win.py T2 bounds < /root/wins.json))" || bad "geometry: $(cat /root/wins.json)"
+APP=$(python3 /rig/win.py T1 app_id < /root/wins.json); echo "foot app id: $APP"
+T1=$(python3 /rig/win.py T1 id < /root/wins.json); T2=$(python3 /rig/win.py T2 id < /root/wins.json)
+[ "$(python3 /rig/win.py T2 focused < /root/wins.json)" = True ] && ok "T2 (clicked last) is the focused one" || bad "focus: $(cat /root/wins.json)"
+printf '%s' "to focused T2" | W keyboard type --agent tester --window "$T2" --stdin >/dev/null; sleep 0.5
+[ "$(cat /root/t2.txt)" = "into T2to focused T2" ] && ok "type --window <focused> delivered" || bad "T2: $(cat /root/t2.txt)"
+before=$(cat /root/t1.txt)
+set +e; printf '%s' "MUST NOT APPEAR" | W keyboard type --agent tester --window "$T1" --stdin >/root/stale.out 2>&1; rc=$?; set -e
+sleep 0.5
+[ $rc != 0 ] && grep -q target_stale /root/stale.out && [ "$(cat /root/t1.txt)" = "$before" ] && ! grep -q "MUST NOT" /root/t2.txt \
+  && ok "type --window <unfocused> refused: $(grep -o 'focus moved[^"]*' /root/stale.out | head -1)" || bad "unfocused type rc=$rc $(cat /root/stale.out)"
+set -- $(python3 /rig/win.py T1 bounds < /root/wins.json); t1x=$1 t1y=$2 t1w=$3 t1h=$4
+set -- $(python3 /rig/win.py T2 bounds < /root/wins.json); t2x=$1 t2y=$2 t2w=$3 t2h=$4
+W mouse click --agent tester --window "$T1" --x 15 --y $(( t1h / 2 )) >/root/click1.out 2>&1 && sleep 0.3 && [ "$(/rig/active.sh)" = T1 ] \
+  && ok "click --window T1 on its visible strip focused T1" || bad "click T1: $(cat /root/click1.out)"
+# T1 is raised now, so it covers T2 where they overlap; aim at T2 inside that overlap.
+ox=$(( (t2x > t1x ? t2x : t1x) )); oy=$(( (t2y > t1y ? t2y : t1y) ))
+ex=$(( (t2x + t2w < t1x + t1w ? t2x + t2w : t1x + t1w) )); ey=$(( (t2y + t2h < t1y + t1h ? t2y + t2h : t1y + t1h) ))
+cx=$(( (ox + ex) / 2 - t2x )); cy=$(( (oy + ey) / 2 - t2y ))
+echo "overlap ($ox,$oy)-($ex,$ey); T2-relative target ($cx,$cy)"
+set +e; W mouse click --agent tester --window "$T2" --x $cx --y $cy >/root/covered.out 2>&1; rc=$?; set -e
+sleep 0.3
+[ $rc != 0 ] && grep -q target_stale /root/covered.out && grep -q covered /root/covered.out && [ "$(/rig/active.sh)" = T1 ] \
+  && ok "click on covered part of T2 refused: $(grep -o 'target is covered[^"]*' /root/covered.out | head -1)" || bad "covered click rc=$rc $(cat /root/covered.out)"
+printf '%s' "kwin T1" | W keyboard type --agent tester --window "$T1" --stdin >/dev/null; sleep 0.5
+[ "$(cat /root/t1.txt)" = "${before}kwin T1" ] || [ "$(tail -c 7 /root/t1.txt)" = "kwin T1" ] && ok "type --window T1 after focusing it" || bad "T1: $(tail -c 40 /root/t1.txt)"
+set +e; W inspect --agent tester --window "$T1" >/root/inspect.out 2>&1; set -e
+grep -q unsupported /root/inspect.out && ok "inspect stays unsupported" || bad "inspect: $(cat /root/inspect.out)"
+
+echo "== restricted agent (app grant enforced against KWin's app ids)"
+w3bs-desktop agents add r --preset restricted --app "$APP" >/dev/null
+setsid foot --app-id=org.w3bs.rig.other --title=T3 sh -c 'stty -icanon -echo; exec cat > /root/t3.txt' >$L/foot3.log 2>&1 &
+sleep 1.5
+W windows list --agent tester > /root/wins3.json
+T3=$(python3 /rig/win.py T3 id < /root/wins3.json); echo "T3 app id: $(python3 /rig/win.py T3 app_id < /root/wins3.json)"
+W windows list --agent r > /root/winsr.json
+[ -n "$T3" ] && [ "$(python3 /rig/win.py - - < /root/winsr.json | cut -d' ' -f1)" = 2 ] && [ -z "$(python3 /rig/win.py T3 id < /root/winsr.json)" ] \
+  && ok "restricted agent sees only the granted app's 2 windows" || bad "restricted list: $(cat /root/winsr.json)"
+set +e; printf '%s' "NOPE" | W keyboard type --agent r --window "$T3" --stdin >/root/r3.out 2>&1; rc=$?; set -e
+sleep 0.3
+[ $rc = 4 ] && grep -q "not in this agent's application grant" /root/r3.out && [ ! -s /root/t3.txt ] && ok "restricted type into another app denied" || bad "restricted T3 rc=$rc $(cat /root/r3.out)"
+set -- $(python3 /rig/win.py T3 bounds < /root/wins3.json)
+set +e; W mouse click --agent r --x $(( $1 + $3 / 2 )) --y $(( $2 + $4 / 2 )) >/root/r3c.out 2>&1; rc=$?; set -e
+[ $rc = 4 ] && grep -q "org.w3bs.rig.other is not in this agent's application grant" /root/r3c.out && ok "restricted click on another app's window denied" || bad "restricted click rc=$rc $(cat /root/r3c.out)"
+W mouse click --agent r --window "$T1" --x 15 --y $(( t1h / 2 )) >/dev/null; sleep 0.3
+printf '%s' " restricted ok" | W keyboard type --agent r --window "$T1" --stdin >/root/r1.out 2>&1; sleep 0.5
+[ "$(tail -c 14 /root/t1.txt)" = " restricted ok" ] && ok "restricted agent typed into the granted terminal" || bad "restricted T1: $(cat /root/r1.out) / $(tail -c 40 /root/t1.txt)"
+pkill -f 'app-id=org.w3bs.rig.other' || true; sleep 0.5
 
 echo "== disable during a long type"
 W mouse click --agent tester --x $x1 --y $y1 >/dev/null; sleep 0.3
