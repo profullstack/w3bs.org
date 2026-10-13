@@ -1,0 +1,741 @@
+{
+  "schema_version": "1.0",
+  "entries": [
+    {
+      "id": "moshcode.sh/moshcode",
+      "name": "moshcode",
+      "description": "Wrapper CLI that installs and drives coding agents such as opencode, Claude Code and codex, with a small scripting toolkit called moshscript.",
+      "commands": [
+        "moshcode",
+        "moshscript"
+      ],
+      "install": {
+        "url": "https://moshcoding.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://moshcode.sh",
+      "repository": "https://github.com/moshcoder/moshcode",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "profullstack.com/cli-tools",
+      "name": "cli-tools",
+      "description": "A collection of TypeScript command-line tools for working across many repositories, searching the web, checking domains, handling media and provisioning servers.",
+      "commands": [
+        "cli-tools",
+        "gh-prs",
+        "gh-prs-merge",
+        "websearch",
+        "ask-web",
+        "domainjson",
+        "domainfree",
+        "openinstall",
+        "openmcp",
+        "proxy",
+        "codeburn",
+        "jobhunt",
+        "img",
+        "vid",
+        "dl",
+        "tts"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/profullstack/cli-tools/master/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://github.com/profullstack/cli-tools",
+      "repository": "https://github.com/profullstack/cli-tools",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "mynaposter.com/myna",
+      "name": "myna",
+      "description": "Terminal social media manager that writes, schedules and posts to about 25 networks from one queue.",
+      "commands": [
+        "myna"
+      ],
+      "install": {
+        "url": "https://mynaposter.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://mynaposter.com",
+      "repository": "https://github.com/profullstack/mynaposter",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "sh1pt.com/sh1pt",
+      "name": "sh1pt",
+      "description": "CLI that builds one codebase and ships it to app stores, package registries, CDNs and deploy targets, then promotes it.",
+      "commands": [
+        "sh1pt"
+      ],
+      "install": {
+        "url": "https://sh1pt.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://sh1pt.com",
+      "repository": "https://github.com/profullstack/sh1pt",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "logicsrc.com/logicsrc",
+      "name": "logicsrc",
+      "description": "CLI for LogicSRC, an open standards initiative for coordinating humans and AI agents.",
+      "commands": [
+        "logicsrc"
+      ],
+      "install": {
+        "url": "https://logicsrc.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://logicsrc.com",
+      "repository": "https://github.com/profullstack/logicsrc",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "logicsrc.com/openmcp",
+      "name": "openmcp",
+      "description": "Client and reference server for OpenMCP, an open catalog of MCP relays.",
+      "commands": [
+        "openmcp"
+      ],
+      "install": {
+        "url": "https://openmcp.logicsrc.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://logicsrc.com/openmcp",
+      "repository": "https://github.com/logicsrc/openmcp",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "agenticjobs.work/agenticjobs",
+      "name": "agenticjobs",
+      "description": "Self-hosted job board for agents and people, with a CLI and an MCP server.",
+      "commands": [
+        "agenticjobs",
+        "agenticjobs-mcp"
+      ],
+      "install": {
+        "url": "https://agenticjobs.work/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://agenticjobs.work",
+      "repository": "https://github.com/profullstack/agenticjobs",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "hqterm.sh/hqterm",
+      "name": "hqterm",
+      "description": "Persistent terminal sessions over SSH that survive disconnects and pass through images and other escape sequences.",
+      "commands": [
+        "hqterm",
+        "hqsh"
+      ],
+      "install": {
+        "url": "https://hqterm.sh/install",
+        "shell": "sh"
+      },
+      "homepage": "https://hqterm.sh",
+      "repository": "https://github.com/profullstack/hqterm",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "c0mpute.com/c0mpute",
+      "name": "c0mpute",
+      "description": "CLI for a decentralized compute network that runs transcoding and GPU inference jobs and pays workers.",
+      "commands": [
+        "c0mpute"
+      ],
+      "install": {
+        "url": "https://c0mpute.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://c0mpute.com",
+      "repository": "https://github.com/profullstack/c0mpute",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "infernetprotocol.com/infernet",
+      "name": "infernet",
+      "description": "GPU node CLI and daemon that registers a GPU server with the Infernet Protocol and serves inference jobs.",
+      "commands": [
+        "infernet"
+      ],
+      "install": {
+        "url": "https://c0mpute.com/plugins/infernet/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://infernetprotocol.com",
+      "repository": "https://github.com/InfernetProtocol/infernet-protocol",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "diskpush.com/diskpush",
+      "name": "diskpush",
+      "description": "Rsync-based CLI and desktop app that syncs only changed files to remote servers.",
+      "commands": [
+        "diskpush"
+      ],
+      "install": {
+        "url": "https://diskpush.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://diskpush.com",
+      "repository": "https://github.com/profullstack/diskpush",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "nixamp.com/nixamp",
+      "name": "nixamp",
+      "description": "Winamp-style audio player and streaming client for the terminal.",
+      "commands": [
+        "nixamp"
+      ],
+      "install": {
+        "url": "https://nixamp.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://nixamp.com",
+      "repository": "https://github.com/profullstack/nixamp",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "threatcrush.com/threatcrush",
+      "name": "threatcrush",
+      "description": "Security agent daemon that monitors, scans and protects servers in real time.",
+      "commands": [
+        "threatcrush"
+      ],
+      "install": {
+        "url": "https://threatcrush.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://threatcrush.com",
+      "repository": "https://github.com/profullstack/threatcrush",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "coinpayportal.com/coinpay",
+      "name": "coinpay",
+      "description": "SDK and CLI for accepting crypto and card payments, with wallet and swap commands.",
+      "commands": [
+        "coinpay"
+      ],
+      "install": {
+        "url": "https://coinpayportal.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://coinpayportal.com",
+      "repository": "https://github.com/profullstack/coinpayportal",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "ugig.net/ugig",
+      "name": "ugig",
+      "description": "CLI for ugig.net, a marketplace for AI-assisted engineers and skilled workers.",
+      "commands": [
+        "ugig"
+      ],
+      "install": {
+        "url": "https://ugig.net/install.sh",
+        "shell": "bash"
+      },
+      "homepage": "https://ugig.net",
+      "repository": "https://github.com/profullstack/ugig.net",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "rssamplifier.com/rssamplifier",
+      "name": "rssamplifier",
+      "description": "CLI for the rssamplifier.com feed directory that finds feeds by topic, searches, exports OPML and submits blogs.",
+      "commands": [
+        "rssamplifier",
+        "rssamp"
+      ],
+      "install": {
+        "url": "https://rssamplifier.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://rssamplifier.com",
+      "repository": "https://github.com/profullstack/rssamplifier.com",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "wx93.me/wx93",
+      "name": "wx93",
+      "description": "CLI and TUI for the wx93.me link shortener that creates short links, shows stats and prints QR codes.",
+      "commands": [
+        "wx93"
+      ],
+      "install": {
+        "url": "https://wx93.me/install",
+        "shell": "sh"
+      },
+      "homepage": "https://wx93.me",
+      "repository": "https://github.com/profullstack/wx93.me",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "tronbrowser.dev/tronbrowser",
+      "name": "tronbrowser",
+      "description": "Privacy-focused Chromium-based browser with a tron command for launching, upgrading and removing it.",
+      "commands": [
+        "tron",
+        "tronbrowser"
+      ],
+      "install": {
+        "url": "https://tronbrowser.dev/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://tronbrowser.dev",
+      "repository": "https://github.com/profullstack/tronbrowser.dev",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "anthropic.com/claude-code",
+      "name": "claude-code",
+      "title": "Claude Code",
+      "description": "Agentic coding tool that runs in the terminal, reads and edits a codebase, runs commands and handles git workflows.",
+      "commands": [
+        "claude"
+      ],
+      "install": {
+        "url": "https://claude.ai/install.sh",
+        "shell": "bash"
+      },
+      "homepage": "https://claude.com/product/claude-code",
+      "repository": "https://github.com/anthropics/claude-code",
+      "vendor": "Anthropic",
+      "license": "proprietary",
+      "agentic": true
+    },
+    {
+      "id": "openai.com/codex",
+      "name": "codex",
+      "title": "OpenAI Codex CLI",
+      "description": "Lightweight coding agent from OpenAI that runs in the terminal.",
+      "commands": [
+        "codex"
+      ],
+      "install": {
+        "url": "https://chatgpt.com/codex/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://developers.openai.com/codex/cli",
+      "repository": "https://github.com/openai/codex",
+      "vendor": "OpenAI",
+      "license": "Apache-2.0",
+      "agentic": true
+    },
+    {
+      "id": "github.com/copilot-cli",
+      "name": "copilot-cli",
+      "title": "GitHub Copilot CLI",
+      "description": "Brings the GitHub Copilot coding agent to the terminal.",
+      "commands": [
+        "copilot"
+      ],
+      "install": {
+        "url": "https://gh.io/copilot-install",
+        "shell": "bash"
+      },
+      "homepage": "https://github.com/github/copilot-cli",
+      "repository": "https://github.com/github/copilot-cli",
+      "vendor": "GitHub",
+      "license": "proprietary",
+      "agentic": true
+    },
+    {
+      "id": "aider.chat/aider",
+      "name": "aider",
+      "title": "Aider",
+      "description": "AI pair programming tool that edits code in a local git repository from the terminal.",
+      "commands": [
+        "aider"
+      ],
+      "install": {
+        "url": "https://aider.chat/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://aider.chat",
+      "repository": "https://github.com/Aider-AI/aider",
+      "vendor": "Aider-AI",
+      "license": "Apache-2.0",
+      "agentic": true
+    },
+    {
+      "id": "opencode.ai/opencode",
+      "name": "opencode",
+      "title": "OpenCode",
+      "description": "Open source AI coding agent with a terminal UI that works with many model providers.",
+      "commands": [
+        "opencode"
+      ],
+      "install": {
+        "url": "https://opencode.ai/install",
+        "shell": "bash"
+      },
+      "homepage": "https://opencode.ai",
+      "repository": "https://github.com/anomalyco/opencode",
+      "vendor": "Anomaly (formerly SST)",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "block.xyz/goose",
+      "name": "goose",
+      "description": "Open source, extensible AI agent that can install, execute, edit and test code with any LLM.",
+      "commands": [
+        "goose"
+      ],
+      "install": {
+        "url": "https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh",
+        "shell": "bash"
+      },
+      "homepage": "https://goose-docs.ai",
+      "repository": "https://github.com/aaif-goose/goose",
+      "vendor": "AAIF (originally Block)",
+      "license": "Apache-2.0",
+      "agentic": true
+    },
+    {
+      "id": "ampcode.com/amp",
+      "name": "amp",
+      "title": "Amp",
+      "description": "Agentic coding tool from Sourcegraph that runs in the terminal and in editors.",
+      "commands": [
+        "amp"
+      ],
+      "install": {
+        "url": "https://ampcode.com/install.sh",
+        "shell": "bash"
+      },
+      "homepage": "https://ampcode.com",
+      "vendor": "Amp (Sourcegraph)",
+      "license": "proprietary",
+      "agentic": true
+    },
+    {
+      "id": "cursor.com/cursor-cli",
+      "name": "cursor-cli",
+      "title": "Cursor CLI",
+      "description": "Terminal version of the Cursor coding agent.",
+      "commands": [
+        "agent"
+      ],
+      "install": {
+        "url": "https://cursor.com/install",
+        "shell": "bash"
+      },
+      "homepage": "https://cursor.com/cli",
+      "vendor": "Anysphere (Cursor)",
+      "license": "proprietary",
+      "agentic": true
+    },
+    {
+      "id": "qwen.ai/qwen-code",
+      "name": "qwen-code",
+      "title": "Qwen Code",
+      "description": "Open source AI coding agent for the terminal, tuned for Qwen models.",
+      "commands": [
+        "qwen"
+      ],
+      "install": {
+        "url": "https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh",
+        "shell": "bash"
+      },
+      "homepage": "https://qwenlm.github.io/qwen-code-docs/",
+      "repository": "https://github.com/QwenLM/qwen-code",
+      "vendor": "Alibaba Qwen",
+      "license": "Apache-2.0",
+      "agentic": true
+    },
+    {
+      "id": "kiro.dev/kiro-cli",
+      "name": "kiro-cli",
+      "title": "Kiro CLI",
+      "description": "Terminal agent from Kiro, the AWS agentic development environment.",
+      "commands": [
+        "kiro-cli"
+      ],
+      "install": {
+        "url": "https://cli.kiro.dev/install",
+        "shell": "bash"
+      },
+      "homepage": "https://kiro.dev/cli/",
+      "vendor": "Amazon (Kiro)",
+      "license": "proprietary",
+      "agentic": true
+    },
+    {
+      "id": "openinterpreter.com/open-interpreter",
+      "name": "open-interpreter",
+      "title": "Open Interpreter",
+      "description": "Coding agent built for low-cost and open models, now a Rust fork of OpenAI Codex.",
+      "commands": [
+        "interpreter",
+        "i"
+      ],
+      "install": {
+        "url": "https://www.openinterpreter.com/install",
+        "shell": "sh"
+      },
+      "homepage": "https://www.openinterpreter.com",
+      "repository": "https://github.com/openinterpreter/openinterpreter",
+      "vendor": "Open Interpreter",
+      "license": "Apache-2.0",
+      "agentic": true
+    },
+    {
+      "id": "continue.dev/cli",
+      "name": "cli",
+      "title": "Continue CLI",
+      "description": "Terminal version of the open source Continue coding agent.",
+      "commands": [
+        "cn"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/continuedev/continue/main/extensions/cli/scripts/install.sh",
+        "shell": "bash"
+      },
+      "homepage": "https://continue.dev",
+      "repository": "https://github.com/continuedev/continue",
+      "vendor": "Continue",
+      "license": "Apache-2.0",
+      "agentic": true
+    },
+    {
+      "id": "factory.ai/droid",
+      "name": "droid",
+      "title": "Factory Droid",
+      "description": "Terminal coding agent from Factory.",
+      "commands": [
+        "droid"
+      ],
+      "install": {
+        "url": "https://app.factory.ai/cli",
+        "shell": "sh"
+      },
+      "homepage": "https://factory.ai",
+      "vendor": "Factory",
+      "license": "proprietary",
+      "agentic": true
+    },
+    {
+      "id": "moonshot.ai/kimi-code",
+      "name": "kimi-code",
+      "title": "Kimi Code CLI",
+      "description": "Terminal AI coding agent that works with Kimi models and other compatible providers.",
+      "commands": [
+        "kimi"
+      ],
+      "install": {
+        "url": "https://code.kimi.com/kimi-code/install.sh",
+        "shell": "bash"
+      },
+      "homepage": "https://moonshotai.github.io/kimi-code/en/",
+      "repository": "https://github.com/MoonshotAI/kimi-code",
+      "vendor": "Moonshot AI",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "mistral.ai/vibe",
+      "name": "vibe",
+      "title": "Mistral Vibe",
+      "description": "Minimal command line coding agent from Mistral AI.",
+      "commands": [
+        "vibe"
+      ],
+      "install": {
+        "url": "https://mistral.ai/vibe/install.sh",
+        "shell": "bash"
+      },
+      "homepage": "https://github.com/mistralai/mistral-vibe",
+      "repository": "https://github.com/mistralai/mistral-vibe",
+      "vendor": "Mistral AI",
+      "license": "Apache-2.0",
+      "agentic": true
+    },
+    {
+      "id": "openhands.dev/openhands-cli",
+      "name": "openhands-cli",
+      "title": "OpenHands CLI",
+      "description": "Terminal client for the OpenHands AI software development agent.",
+      "commands": [
+        "openhands"
+      ],
+      "install": {
+        "url": "https://install.openhands.dev/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://docs.openhands.dev",
+      "repository": "https://github.com/OpenHands/OpenHands-CLI",
+      "vendor": "OpenHands (All Hands AI)",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "gptme.org/gptme",
+      "name": "gptme",
+      "description": "Terminal agent with local tools that writes code, runs shell commands and browses the web.",
+      "commands": [
+        "gptme"
+      ],
+      "install": {
+        "url": "https://gptme.ai/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://gptme.org",
+      "repository": "https://github.com/gptme/gptme",
+      "vendor": "gptme (Erik Bjareholt)",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "kilo.ai/kilo",
+      "name": "kilo",
+      "title": "Kilo Code CLI",
+      "description": "Terminal version of the open source Kilo Code agentic engineering platform.",
+      "commands": [
+        "kilo",
+        "kilocode"
+      ],
+      "install": {
+        "url": "https://kilo.ai/cli/install",
+        "shell": "bash"
+      },
+      "homepage": "https://kilo.ai",
+      "repository": "https://github.com/Kilo-Org/kilocode",
+      "vendor": "Kilo Code",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "jetbrains.com/junie",
+      "name": "junie",
+      "title": "Junie CLI",
+      "description": "Terminal version of the JetBrains Junie coding agent.",
+      "commands": [
+        "junie"
+      ],
+      "install": {
+        "url": "https://junie.jetbrains.com/install.sh",
+        "shell": "bash"
+      },
+      "homepage": "https://junie.jetbrains.com",
+      "vendor": "JetBrains",
+      "license": "proprietary",
+      "agentic": true
+    },
+    {
+      "id": "superagent.sh/grok-cli",
+      "name": "grok-cli",
+      "title": "Grok CLI",
+      "description": "Open source terminal coding agent for the xAI Grok API.",
+      "commands": [
+        "grok"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/superagent-ai/grok-cli/main/install.sh",
+        "shell": "bash"
+      },
+      "homepage": "https://github.com/superagent-ai/grok-cli",
+      "repository": "https://github.com/superagent-ai/grok-cli",
+      "vendor": "Superagent",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "plandex.ai/plandex",
+      "name": "plandex",
+      "title": "Plandex",
+      "description": "Open source terminal AI coding agent designed for large projects.",
+      "commands": [
+        "plandex",
+        "pdx"
+      ],
+      "install": {
+        "url": "https://plandex.ai/install.sh",
+        "shell": "bash"
+      },
+      "homepage": "https://plandex.ai",
+      "repository": "https://github.com/plandex-ai/plandex",
+      "vendor": "Plandex",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "ollama.com/ollama",
+      "name": "ollama",
+      "title": "Ollama",
+      "description": "Runs open-weight language models locally behind a CLI and a local HTTP API.",
+      "commands": [
+        "ollama"
+      ],
+      "install": {
+        "url": "https://ollama.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://ollama.com",
+      "repository": "https://github.com/ollama/ollama",
+      "vendor": "Ollama",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "github.com/fabric",
+      "name": "fabric",
+      "title": "Fabric",
+      "description": "Open source framework and CLI that applies a library of crowdsourced AI prompt patterns to text.",
+      "commands": [
+        "fabric"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/danielmiessler/fabric/main/scripts/installer/install.sh",
+        "shell": "bash"
+      },
+      "homepage": "https://github.com/danielmiessler/Fabric",
+      "repository": "https://github.com/danielmiessler/Fabric",
+      "vendor": "Daniel Miessler",
+      "license": "MIT",
+      "agentic": false
+    }
+  ]
+}

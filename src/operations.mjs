@@ -45,6 +45,19 @@ export const operations = {
     schema: z.strictObject({ uri, reason: z.string().min(3).max(1000) }),
     write: true,
   },
+  packages: {
+    description:
+      'Search the W3BS package catalog: command-line tools (agentic and otherwise) that install with their publisher\'s curl | sh installer and are managed by `w3bs`.',
+    schema: z.strictObject({
+      query: z.string().max(200).default(''),
+      agentic: z.boolean().optional(),
+      publisher: z.enum(['profullstack', 'third-party']).optional(),
+    }),
+  },
+  package: {
+    description: 'Get one catalog package by its publisher-qualified id, e.g. anthropic.com/claude-code.',
+    schema: z.strictObject({ id: z.string().min(3).max(200) }),
+  },
   conformance: {
     description:
       'Fetch protocol fixture checks for a resource. Cross-surface interoperability is tested by the separate conformance suite.',
@@ -75,6 +88,9 @@ export async function dispatch(store, operation, args, { token, publishToken } =
   if (definition.write) authorize(token, publishToken);
   const input = parsed.data;
   if (operation === 'search') return { resources: await store.search(input.query, input.type) };
+  if (operation === 'packages')
+    return { packages: await store.packages(input.query, input), install: 'curl -fsSL https://w3bs.org/install.sh | sh' };
+  if (operation === 'package') return store.package(input.id);
   if (operation === 'publish') return store.publish(input.manifest);
   if (operation === 'revoke') return store.revoke(input.uri, input.reason);
   const result = await store.inspect(input.uri);

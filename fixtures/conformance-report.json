@@ -1,9 +1,9 @@
 {
   "status": "passed",
-  "testedAt": "2026-09-16T17:31:35.889Z",
+  "testedAt": "2026-10-13T00:20:45.362Z",
   "implementationVersion": "0.1.0",
-  "sourceFingerprint": "5ef70588c02e655abee500bd3de87b75f3085e914fd02d2705143818d96558c7",
-  "nodeVersion": "v24.18.1",
+  "sourceFingerprint": "c14e2f8260521efdb1e4f1f71b90e4bdef97a0ae6afe7f42248fba98e24ee9fe",
+  "nodeVersion": "v26.3.0",
   "environment": "isolated loopback registry, not production",
   "resource": "w3bs://prompt/w3bs/research@1",
   "canonicalUri": "w3bs://prompt/w3bs/research@1.0.0",

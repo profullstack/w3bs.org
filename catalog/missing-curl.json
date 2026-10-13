@@ -1,0 +1,126 @@
+[
+ {
+  "id": "logicsrc.com/opencontext",
+  "owner": "profullstack"
+ },
+ {
+  "id": "smshub.dev/smshub",
+  "owner": "profullstack"
+ },
+ {
+  "id": "pairux.com/pairux",
+  "owner": "profullstack"
+ },
+ {
+  "id": "wx93.me/wx93-mcp",
+  "owner": "profullstack"
+ },
+ {
+  "id": "profullstack.com/x402",
+  "owner": "profullstack"
+ },
+ {
+  "id": "profullstack.com/ai",
+  "owner": "profullstack"
+ },
+ {
+  "id": "profullstack.com/summary-forge",
+  "owner": "profullstack"
+ },
+ {
+  "id": "hqtui.com/hqtui",
+  "owner": "profullstack"
+ },
+ {
+  "id": "bl0ggers.com/bl0ggers",
+  "owner": "profullstack"
+ },
+ {
+  "id": "crawlproof.com/crawlproof",
+  "owner": "profullstack"
+ },
+ {
+  "id": "qrypt.chat/qryptchat",
+  "owner": "profullstack"
+ },
+ {
+  "id": "readm3.com/readm3",
+  "owner": "profullstack"
+ },
+ {
+  "id": "hdtilt.com/hdtilt",
+  "owner": "profullstack"
+ },
+ {
+  "id": "profullstack.com/g1tz",
+  "owner": "profullstack"
+ },
+ {
+  "id": "profullstack.com/r3q",
+  "owner": "profullstack"
+ },
+ {
+  "id": "profullstack.com/timer",
+  "owner": "profullstack"
+ },
+ {
+  "id": "profullstack.com/billing",
+  "owner": "profullstack"
+ },
+ {
+  "id": "profullstack.com/proxy",
+  "owner": "profullstack"
+ },
+ {
+  "id": "profullstack.com/kali",
+  "owner": "profullstack"
+ },
+ {
+  "id": "profullstack.com/orgs",
+  "owner": "profullstack"
+ },
+ {
+  "id": "profullstack.com/watchdog",
+  "owner": "profullstack"
+ },
+ {
+  "id": "profullstack.com/encrypt",
+  "owner": "profullstack"
+ },
+ {
+  "id": "profullstack.com/scanner",
+  "owner": "profullstack"
+ },
+ {
+  "id": "profullstack.com/transcoder",
+  "owner": "profullstack"
+ },
+ {
+  "id": "google.com/gemini-cli",
+  "owner": "third-party"
+ },
+ {
+  "id": "charm.sh/crush",
+  "owner": "third-party"
+ },
+ {
+  "id": "cline.bot/cline",
+  "owner": "third-party"
+ },
+ {
+  "id": "warp.dev/oz",
+  "owner": "third-party"
+ },
+ {
+  "id": "datasette.io/llm",
+  "owner": "third-party"
+ },
+ {
+  "id": "augmentcode.com/auggie",
+  "owner": "third-party"
+ },
+ {
+  "id": "github.com/shell-gpt",
+  "owner": "third-party"
+ }
+]

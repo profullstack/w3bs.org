@@ -16,7 +16,7 @@ bun run start
 Open http://localhost:3000. The mission, specifications, prompt registry and resolver are available at `/mission`, `/specs`, `/prompts` and `/browse`. The same deployment can serve the four W3BS domains. Nothing in this README claims production DNS or deployment is complete.
 
 ```sh
-W3BS_API=http://localhost:3000 node src/cli.mjs resolve w3bs://prompt/w3bs/research@1
+W3BS_API=http://localhost:3000 w3bs resolve w3bs://prompt/w3bs/research@1
 W3BS_API=http://localhost:3000 node native/client.mjs w3bs://prompt/w3bs/research@1 --json
 ```
 

@@ -117,6 +117,43 @@ export function createApp({
   app.get('/api/manifest', async (req, res) =>
     res.json((await store.inspect(req.query.uri)).manifest),
   );
+  app.get('/api/packages', async (req, res) => {
+    const args = { query: String(req.query.q || '') };
+    if (req.query.agentic === 'true' || req.query.agentic === 'false') args.agentic = req.query.agentic === 'true';
+    if (req.query.publisher) args.publisher = String(req.query.publisher);
+    res.json(await invoke(req, 'packages', args));
+  });
+  app.get('/api/packages/:publisher/:name', async (req, res) =>
+    res.json(await invoke(req, 'package', { id: `${req.params.publisher}/${req.params.name}` })),
+  );
+  // W3BS Package Manager: the bootstrap installer and the official signed repository.
+  const registry = resolve(ROOT, 'registry');
+  app.get('/install.sh', (_req, res) => {
+    const path = resolve(registry, 'install.sh');
+    if (!existsSync(path)) throw new W3bsError('NOT_FOUND', 'Installer not published yet.', 404);
+    res.type('text/x-shellscript; charset=utf-8').set('Cache-Control', 'public, max-age=300').send(readFileSync(path));
+  });
+  const safeTarget = /^(?:[a-z0-9][a-z0-9._-]*\/)*[a-z0-9][a-z0-9._-]*$/i;
+  app.get('/repo/metadata/:file', (req, res) => {
+    if (!/^(?:[0-9]+\.)?(root|targets|snapshot|timestamp)\.json$/.test(req.params.file))
+      throw new W3bsError('NOT_FOUND', 'No such metadata.', 404);
+    const path = resolve(registry, 'repo/metadata', req.params.file);
+    if (!existsSync(path)) throw new W3bsError('NOT_FOUND', 'No such metadata.', 404);
+    res.type('application/json').set('Cache-Control', 'no-cache').send(readFileSync(path));
+  });
+  app.get(/^\/repo\/targets\/(.+)$/, (req, res) => {
+    const target = req.params[0];
+    if (!safeTarget.test(target) || target.split('/').some((part) => part === '..' || part === '.'))
+      throw new W3bsError('NOT_FOUND', 'No such target.', 404);
+    // Release binaries live on GitHub releases; TUF verifies length and hash either way.
+    const artifact = /^artifacts\/w3bs\/([0-9][0-9A-Za-z.+-]*)\/(w3bs-[0-9A-Za-z._+-]+\.tar\.gz)$/.exec(target);
+    if (artifact)
+      return res.redirect(302, `https://github.com/profullstack/w3bs.org/releases/download/w3bs-v${artifact[1]}/${artifact[2]}`);
+    const path = resolve(registry, 'repo/targets', target);
+    if (!path.startsWith(resolve(registry, 'repo/targets') + '/') || !existsSync(path))
+      throw new W3bsError('NOT_FOUND', 'No such target.', 404);
+    res.type('application/json').set('Cache-Control', 'no-cache').send(readFileSync(path));
+  });
   for (const name of Object.keys(operations)) {
     app.post(`/api/${name}`, async (req, res) => res.json(await invoke(req, name, req.body)));
     if (['search', 'resolve', 'inspect', 'verify', 'conformance'].includes(name)) {
@@ -175,7 +212,7 @@ export function createApp({
     res
       .type('application/xml')
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/specs', '/browse', '/prompts', '/desktop', '/governance', '/developers'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/packages', '/specs', '/browse', '/prompts', '/desktop', '/governance', '/developers'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
       ),
   );
   app.get('/docs/:file', (req, res) => {

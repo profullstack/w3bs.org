@@ -1,0 +1,115 @@
+# The w3bs CLI (package-manager/): test on every change; on a `w3bs-v*` tag,
+# build the four supported platforms and attach them to a GitHub release. The release
+# archives are then signed into the official repository (registry/) on dev2, where the
+# signing keys live: `package-manager/scripts/publish-manager.sh <version>`.
+name: Package manager
+on:
+  push:
+    branches: [main]
+    tags: ['w3bs-v*']
+    paths: ['package-manager/**', 'catalog/**', '.github/workflows/package-manager.yml']
+  pull_request:
+    paths: ['package-manager/**', 'catalog/**', '.github/workflows/package-manager.yml']
+permissions:
+  contents: read
+defaults:
+  run:
+    working-directory: package-manager
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: package-manager
+      - run: cargo test --locked
+      - name: Installer is POSIX sh and does nothing when truncated
+        run: |
+          sh -n bootstrap/install.sh
+          # A cut-off download must not run anything: main() is only called on the last line.
+          for n in 100 400 1200 2400 4000 6000; do
+            head -c $n bootstrap/install.sh | env -i HOME="$RUNNER_TEMP/h$n" PATH=/usr/bin:/bin sh >/dev/null 2>&1 || true
+            test ! -e "$RUNNER_TEMP/h$n"
+          done
+      - name: Catalog entries all have curl installers
+        run: |
+          cargo run -q --bin w3bs-publish -- init "$RUNNER_TEMP/cat" >/dev/null
+          cargo run -q --bin w3bs-publish -- catalog "$RUNNER_TEMP/cat" ../catalog/catalog.json
+
+  build:
+    if: startsWith(github.ref, 'refs/tags/w3bs-v')
+    needs: test
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, zig: x86_64-unknown-linux-gnu.2.28 }
+          # zig cannot link aarch64 (rustc passes --fix-cortex-a53-843419); build natively on
+          # an arm runner inside manylinux_2_28 instead, which pins the same glibc 2.28 baseline.
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, container: 'quay.io/pypa/manylinux_2_28_aarch64' }
+          - { os: macos-14, target: aarch64-apple-darwin }
+          - { os: macos-14, target: x86_64-apple-darwin }
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
+    steps:
+      - uses: actions/checkout@v4
+      - if: matrix.container
+        run: |
+          curl --proto '=https' -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - if: '!matrix.container'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: package-manager
+          key: ${{ matrix.target }}
+      - if: matrix.zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.13.0
+      - if: matrix.zig
+        run: cargo install --locked cargo-zigbuild@0.19.8 && cargo zigbuild --locked --release --target ${{ matrix.zig }} --bin w3bs --bin w3bs-publish
+      - if: '!matrix.zig'
+        run: cargo build --locked --release --target ${{ matrix.target }} --bin w3bs --bin w3bs-publish
+      - name: Package
+        run: |
+          v="${GITHUB_REF_NAME#w3bs-v}"
+          for b in w3bs w3bs-publish; do
+            d="$RUNNER_TEMP/$b"; mkdir -p "$d/bin"
+            cp "target/${{ matrix.target }}/release/$b" "$d/bin/"
+            cp ../LICENSE "$d/" 2>/dev/null || true
+            tar -czf "$RUNNER_TEMP/$b-$v-${{ matrix.target }}.tar.gz" -C "$d" .
+          done
+          ls -l "$RUNNER_TEMP"/*.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: w3bs-${{ matrix.target }}
+          path: ${{ runner.temp }}/*.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: (cd dist && sha256sum *.tar.gz > SHA256SUMS && cat SHA256SUMS)
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+            --title "w3bs ${GITHUB_REF_NAME#w3bs-v}" \
+            --notes "Install: \`curl -fsSL https://w3bs.org/install.sh | sh\`. These archives are signed into https://w3bs.org/repo/ (TUF); verify with \`w3bs\`, not by hand." \
+            || gh release upload "$GITHUB_REF_NAME" dist/* --clobber --repo "$GITHUB_REPOSITORY"
