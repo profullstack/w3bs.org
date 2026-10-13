@@ -7,6 +7,10 @@
 //! - Capture: `org.freedesktop.portal.Screenshot`, non-interactive, cropped per display.
 //! - Consent: the portal shows its own dialog when the human enables; the restore token is kept so
 //!   later enables can skip it where the portal allows (persist mode 2 = until revoked).
+//! - Text: keysyms through `NotifyKeyboardKeysym`. KWin types any keysym; Mutter only those on
+//!   the active layout, so on GNOME a [`KeysymResolver`] (`gnome::MutterKeys`) checks each batch's
+//!   text against the live keymap first and refuses it whole, naming the characters.
+//! - Lock: logind when present, plus the desktop's own ScreenSaver `ActiveChanged` signal.
 //!
 //! Window listing, focus and occlusion need desktop-specific help: on Plasma `kwin::WithKWin`
 //! wraps this adapter with KWin's window data, on GNOME `gnome::WithGnome` with the W3BS Shell
@@ -46,6 +50,12 @@ struct Session {
     streams: Vec<Stream>,
 }
 
+/// Maps text to the keysyms to send, or refuses it: on GNOME, Mutter drops keysyms that are not on
+/// the active layout, so the GNOME setup installs one that checks the live keymap (`xkb`).
+pub trait KeysymResolver: Send + Sync {
+    fn resolve(&self, text: &str) -> Result<Vec<u32>>;
+}
+
 pub struct PortalAdapter {
     conn: Mutex<Option<Connection>>,
     session: Mutex<Option<Session>>,
@@ -53,7 +63,9 @@ pub struct PortalAdapter {
     events: Arc<Mutex<Vec<SessionEvent>>>,
     token_file: PathBuf,
     logind: Option<crate::logind::LogindWatcher>,
+    screensaver: Option<crate::screensaver::ScreenSaverWatcher>,
     windows_note: String,
+    resolver: Option<Box<dyn KeysymResolver>>,
 }
 
 type Results = HashMap<String, OwnedValue>;
@@ -73,8 +85,31 @@ fn token() -> String {
 impl PortalAdapter {
     pub fn new(token_file: PathBuf) -> Self {
         let logind = crate::logind::LogindWatcher::start().map_err(|e| eprintln!("w3bs-desktop: logind unavailable ({e}); lock/suspend rely on the native control")).ok();
+        let screensaver = crate::screensaver::ScreenSaverWatcher::start().map_err(|e| eprintln!("w3bs-desktop: screen saver signals unavailable ({e})")).ok();
         let windows_note = "window data needs a desktop-specific observer (KWin on Plasma, the W3BS GNOME Shell extension on GNOME); targeted input is refused".into();
-        Self { conn: Mutex::new(None), session: Mutex::new(None), generation: Mutex::new(1), events: Arc::new(Mutex::new(vec![])), token_file, logind, windows_note }
+        Self { conn: Mutex::new(None), session: Mutex::new(None), generation: Mutex::new(1), events: Arc::new(Mutex::new(vec![])), token_file, logind, screensaver, windows_note, resolver: None }
+    }
+
+    /// Check and map text through `r` instead of sending every character's keysym as is.
+    pub fn with_keysym_resolver(mut self, r: Box<dyn KeysymResolver>) -> Self {
+        self.resolver = Some(r);
+        self
+    }
+
+    /// Keysyms for `text`: through the resolver when one is installed.
+    fn keysyms(&self, text: &str) -> Result<Vec<u32>> {
+        match &self.resolver {
+            Some(r) => r.resolve(text),
+            None => Ok(text.chars().map(keymap::char_keysym).collect()),
+        }
+    }
+
+    /// The keysym a key without an evdev code is sent as.
+    fn key_keysym(&self, key: &Key) -> Result<u32> {
+        match key {
+            Key::Char(c) => Ok(self.keysyms(&c.to_string())?[0]),
+            _ => keymap::keysym(key).ok_or_else(|| AdlError::unsupported(format!("{key} has no Linux equivalent"))),
+        }
     }
 
     /// Why window data is missing on this desktop, as `capabilities` and `windows` report it.
@@ -447,14 +482,11 @@ impl Adapter for PortalAdapter {
             InputEvent::Scroll { axis, steps } => self.notify("NotifyPointerAxisDiscrete", &(h, none(), matches!(axis, Axis::Horizontal) as u32, *steps)),
             InputEvent::Key { key, pressed } => match keymap::key_code(key) {
                 Some(code) => self.notify("NotifyKeyboardKeycode", &(h, none(), code as i32, *pressed as u32)),
-                None => {
-                    let sym = keymap::keysym(key).ok_or_else(|| AdlError::unsupported(format!("{key} has no Linux equivalent")))?;
-                    self.keysym(sym, *pressed)
-                }
+                None => self.keysym(self.key_keysym(key)?, *pressed),
             },
             InputEvent::Text { text } => {
-                for c in text.chars() {
-                    let sym = keymap::char_keysym(c);
+                // Resolved again per chunk: the layout may have changed since the preflight.
+                for sym in self.keysyms(text)? {
                     self.keysym(sym, true)?;
                     self.keysym(sym, false)?;
                 }
@@ -463,10 +495,26 @@ impl Adapter for PortalAdapter {
         }
     }
 
+    fn preflight(&self, action: &Action) -> Result<()> {
+        if self.resolver.is_none() {
+            return Ok(());
+        }
+        let key = match action {
+            Action::Type { text } => return self.keysyms(text).map(drop),
+            Action::KeyPress { key } | Action::KeyDown { key } | Action::KeyUp { key } => key,
+            Action::Shortcut { keys } => &keys.key,
+            _ => return Ok(()),
+        };
+        if keymap::key_code(key).is_none() { self.key_keysym(key).map(drop) } else { Ok(()) }
+    }
+
     fn poll_events(&self) -> Vec<SessionEvent> {
         let mut out = std::mem::take(&mut *self.events.lock().unwrap());
         if let Some(l) = &self.logind {
             out.extend(l.drain());
+        }
+        if let Some(s) = &self.screensaver {
+            out.extend(s.drain());
         }
         out
     }
