@@ -212,7 +212,7 @@ export function createApp({
     res
       .type('application/xml')
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/packages', '/specs', '/browse', '/prompts', '/governance', '/developers'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/packages', '/specs', '/browse', '/prompts', '/desktop', '/governance', '/developers'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
       ),
   );
   app.get('/docs/:file', (req, res) => {
@@ -221,6 +221,11 @@ export function createApp({
     const path = resolve(ROOT, 'docs', req.params.file);
     if (!existsSync(path)) throw new W3bsError('NOT_FOUND', 'Document not found.', 404);
     res.type('text/markdown').send(readFileSync(path, 'utf8'));
+  });
+  // The PRD's original typo, and trailing-slash variants, land on the canonical page.
+  app.get([/^\/desktpo\/?$/, /^\/desktop\/$/], (req, res) => {
+    const query = req.originalUrl.indexOf('?');
+    res.redirect(301, `/desktop${query === -1 ? '' : req.originalUrl.slice(query)}`);
   });
   app.get(/.*/, async (req, res, next) => {
     try {

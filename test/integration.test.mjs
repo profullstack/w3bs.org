@@ -208,3 +208,50 @@ test('independent clients reject a valid signed artifact returned for the wrong 
     await store.close();
   }
 });
+test('Agentic Desktop Layer page, typo redirect, raw PRD and navigation', async () => {
+  const instance = await startServer({
+    store: await openStore({ path: ':memory:' }),
+    port: 0,
+    publicOrigin: 'http://localhost:3000',
+  });
+  const origin = `http://127.0.0.1:${instance.server.address().port}`;
+  try {
+    const page = await fetch(`${origin}/desktop`);
+    assert.equal(page.status, 200);
+    const html = await page.text();
+    for (const text of [
+      'Interactive preview - does not control your device',
+      'Copy Markdown',
+      'Download PRD',
+      'Your switch.',
+      'No certified platform. No downloads yet.',
+      'Proposed, not yet installable',
+      '/assets/desktop.js',
+    ])
+      assert.ok(html.includes(text), `missing ${text}`);
+    assert.match(html, /<a href="\/desktop" aria-current="page">Desktop<\/a>/);
+    assert.ok(!html.includes('—Agentic') && !/curl -fsSL[^<]*desktop/.test(html));
+    const home = await (await fetch(`${origin}/mission`)).text();
+    assert.match(home, /<a href="\/desktop" >Desktop<\/a>/);
+    for (const path of ['/desktpo', '/desktpo/', '/desktop/']) {
+      const redirect = await fetch(`${origin}${path}`, { redirect: 'manual' });
+      assert.equal(redirect.status, 301, path);
+      assert.equal(redirect.headers.get('location'), '/desktop', path);
+    }
+    const withQuery = await fetch(`${origin}/desktpo?ref=a`, { redirect: 'manual' });
+    assert.equal(withQuery.headers.get('location'), '/desktop?ref=a');
+    const prd = await fetch(`${origin}/docs/agentic-desktop-layer-prd.md`);
+    assert.equal(prd.status, 200);
+    assert.match(prd.headers.get('content-type'), /^text\/markdown/);
+    const markdown = await prd.text();
+    assert.ok(
+      markdown.startsWith('# Agentic Desktop Layer\n## W3BS Product Requirements Document'),
+    );
+    assert.ok(markdown.includes('Interactive preview - does not control your device'));
+    assert.ok((await (await fetch(`${origin}/sitemap.xml`)).text()).includes('/desktop</loc>'));
+    const script = await (await fetch(`${origin}/assets/desktop.js`)).text();
+    assert.ok(!/localhost|127\.0\.0\.1|requestPermission|getUserMedia/.test(script));
+  } finally {
+    await instance.close();
+  }
+});

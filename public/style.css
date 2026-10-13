@@ -1451,3 +1451,279 @@ textarea {
   padding: 0;
   white-space: nowrap;
 }
+/* Agentic Desktop Layer page */
+.desktop-head h1 {
+  font-size: 65px;
+}
+.desktop-status strong {
+  color: var(--ink);
+}
+.desktop-demo {
+  padding-top: 40px;
+}
+.demo-frame {
+  border: 1px solid var(--line);
+  padding: 22px 24px 24px;
+}
+.demo-label {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+.demo-label span {
+  color: var(--orange);
+  margin-right: 6px;
+}
+.demo-screen {
+  position: relative;
+  min-height: 600px;
+  border: 1px solid #c9cdbd;
+  border-radius: 6px;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(103, 140, 79, 0.16), rgba(217, 82, 49, 0.08)), var(--sage);
+}
+.demo-panel {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: 44px;
+  padding: 0 10px 0 16px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 12px;
+}
+.demo-apps {
+  margin-right: auto;
+  opacity: 0.85;
+}
+.demo-clock {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+}
+.demo-tray {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+.demo-tray:hover,
+.demo-tray[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.14);
+}
+.demo-frame[data-state='enabled'] .demo-tray {
+  background: var(--orange);
+  border-color: var(--orange);
+}
+.demo-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+.demo-menu {
+  position: absolute;
+  top: 52px;
+  right: 10px;
+  width: min(330px, calc(100% - 20px));
+  padding: 18px;
+  background: #fffdf7;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 14px 40px rgba(35, 53, 47, 0.18);
+}
+.demo-menu-title {
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 14px;
+}
+.demo-status {
+  font-size: 13px;
+  margin: 4px 0 12px;
+}
+.demo-status strong {
+  color: var(--ink);
+}
+.demo-detail {
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  border-left: 3px solid var(--orange);
+  background: var(--sage);
+  color: var(--ink);
+}
+.demo-toggle {
+  width: 100%;
+}
+.demo-toggle[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: progress;
+}
+.demo-items,
+.demo-danger {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line);
+}
+.demo-items button,
+.demo-danger button {
+  display: block;
+  width: 100%;
+  padding: 7px 4px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  font-size: 13px;
+  border-radius: 3px;
+}
+.demo-items button:hover,
+.demo-danger button:hover {
+  background: var(--sage);
+}
+.demo-danger button {
+  font-weight: 600;
+}
+.demo-footer {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 18px;
+}
+.demo-log {
+  font-size: 13px;
+  color: var(--ink);
+}
+.table-wrap {
+  overflow-x: auto;
+  border-top: 1px solid var(--line);
+}
+.platform-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.platform-table th,
+.platform-table td {
+  text-align: left;
+  padding: 14px 16px 14px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.platform-table thead th {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.platform-table td {
+  color: var(--muted);
+}
+.table-note {
+  font-size: 13px;
+  margin-top: 18px;
+  max-width: 720px;
+}
+.architecture {
+  margin: 0;
+  border: 1px solid var(--line);
+  background: #fffdf7;
+  padding: 22px 24px;
+  overflow-x: auto;
+}
+.architecture pre {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.architecture figcaption {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 14px;
+}
+.architecture figcaption.eyebrow {
+  margin: 0 0 12px;
+  font-size: 10px;
+  color: var(--orange);
+}
+.inline-link {
+  color: var(--orange);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.copy-status {
+  min-height: 1.6em;
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--ink);
+}
+.copy-fallback label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.copy-fallback textarea {
+  width: 100%;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: #fffdf7;
+  color: var(--ink);
+}
+.prd-full {
+  margin: 30px 0 72px;
+}
+.prd-full summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+@media (max-width: 720px) {
+  .header nav {
+    gap: 10px;
+  }
+  .desktop-head h1 {
+    font-size: 48px;
+  }
+  .demo-frame {
+    padding: 16px;
+  }
+  .demo-apps {
+    display: none;
+  }
+  .demo-screen {
+    min-height: 320px;
+    padding-bottom: 10px;
+  }
+  .demo-menu {
+    position: static;
+    width: auto;
+    margin: 10px 10px 0;
+  }
+  .demo-panel {
+    justify-content: flex-end;
+  }
+  .demo-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .platform-table {
+    font-size: 13px;
+  }
+  .architecture {
+    padding: 16px;
+  }
+  .architecture pre {
+    font-size: 11px;
+  }
+}

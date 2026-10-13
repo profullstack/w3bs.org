@@ -1,0 +1,19 @@
+# User service. Starting it never enables agent access: the broker always starts Disabled.
+# Install: cp w3bs-desktop.service ~/.config/systemd/user/ && systemctl --user enable --now w3bs-desktop
+[Unit]
+Description=Agentic Desktop Layer broker (starts Disabled)
+Documentation=https://w3bs.org/desktop
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/bin/w3bs-desktop daemon --adapter auto
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=%t %h/.config/w3bs %h/.local/state/w3bs
+
+[Install]
+WantedBy=graphical-session.target

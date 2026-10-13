@@ -1,0 +1,25 @@
+[package]
+name = "adl-linux"
+description = "Agentic Desktop Layer: Linux adapters (Vela command socket, key mapping; portals and wlroots virtual input to follow)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+adl-schema.workspace = true
+adl-broker.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+png.workspace = true
+zbus = { version = "5.19", optional = true }
+
+[features]
+default = ["dbus"]
+# XDG desktop portals (RemoteDesktop, ScreenCast, Screenshot) and logind, over D-Bus.
+dbus = ["dep:zbus"]
+
+[dev-dependencies]
+tempfile.workspace = true
