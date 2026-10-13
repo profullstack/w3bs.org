@@ -23,8 +23,8 @@ Status: accepted, 2026-10-13
 6. **Desktop logical coordinates** are canonical. Display, window and capture spaces map into it;
    captures carry the layout generation and expire.
 7. **Linux backends:** XDG RemoteDesktop + ScreenCast (Notify* methods only, never mixed with EIS on
-   the same session) for KDE/GNOME; Vela's command socket for observation and interlocks; logind for
-   lock/suspend. A wlroots virtual-input backend (Vela with `VELA_DEBUG_INPUT=1`, Sway, Hyprland,
+   the same session) for KDE/GNOME; KWin scripting (scripts call back over D-Bus) for windows on Plasma; Vela's
+   command socket for observation and interlocks; logind for lock/suspend. A wlroots virtual-input backend (Vela with `VELA_DEBUG_INPUT=1`, Sway, Hyprland,
    labwc) is planned.
 8. **Clean room for Vela** (GPL-3.0): see `../clean-room.md`.
 9. **License:** Apache-2.0 for this directory. The w3bs.org site remains MIT.
@@ -42,6 +42,8 @@ Status: accepted, 2026-10-13
 
 ## Consequences
 
-- The KDE/GNOME backend has no window list or focus until the KWin script / GNOME Shell extension
-  exist, so targeted input on those desktops is refused rather than guessed.
+- On Plasma, window list, focus, stacking and activation come from one-shot KWin scripts that
+  report back over D-Bus (`adl-linux/src/kwin.rs`, wrapped around the portal adapter; added
+  2026-10-13). GNOME has no window data until the W3BS Shell extension exists, so targeted input
+  there is refused rather than guessed.
 - Same-user hostile processes are out of scope, as the PRD states.
