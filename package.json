@@ -35,6 +35,6 @@
     "prettier": "3.9.6"
   },
   "overrides": {
-    "nodemailer": "9.1.1"
+    "nodemailer": "10.1.0"
   }
 }
