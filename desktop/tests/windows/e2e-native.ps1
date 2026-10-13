@@ -111,9 +111,9 @@ check ($disp -and $disp.logical.width -eq [N]::GetSystemMetrics(0) -and $disp.lo
 # ---------------------------------------------------------------- test windows
 $fa = Join-Path $Work 'a.json'; $fb = Join-Path $Work 'b.json'
 $formScript = Join-Path $Here 'testform.ps1'
-$pa = Start-Process powershell.exe -ArgumentList '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', $formScript, '-Title', 'W3BS Test A', '-Out', $fa, '-X', 100, '-Y', 100 -RedirectStandardOutput (Join-Path $Work 'forma.out') -RedirectStandardError (Join-Path $Work 'forma.err') -NoNewWindow -PassThru
+$pa = Start-Process powershell.exe -ArgumentList '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', "`"$formScript`"", '-Title', '"W3BS Test A"', '-Out', "`"$fa`"", '-X', 100, '-Y', 100 -RedirectStandardOutput (Join-Path $Work 'forma.out') -RedirectStandardError (Join-Path $Work 'forma.err') -NoNewWindow -PassThru
 Start-Sleep -Milliseconds 1500
-$pb = Start-Process powershell.exe -ArgumentList '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', $formScript, '-Title', 'W3BS Test B', '-Out', $fb, '-X', 300, '-Y', 200 -RedirectStandardOutput (Join-Path $Work 'formb.out') -RedirectStandardError (Join-Path $Work 'formb.err') -NoNewWindow -PassThru
+$pb = Start-Process powershell.exe -ArgumentList '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', "`"$formScript`"", '-Title', '"W3BS Test B"', '-Out', "`"$fb`"", '-X', 300, '-Y', 200 -RedirectStandardOutput (Join-Path $Work 'formb.out') -RedirectStandardError (Join-Path $Work 'formb.err') -NoNewWindow -PassThru
 check (until { (Test-Path $fa) -and (Test-Path $fb) } 30000) "two WinForms test windows are up" "A alive=$(-not $pa.HasExited) B alive=$(-not $pb.HasExited) $(Get-Content -Raw (Join-Path $Work 'forma.err') -ErrorAction SilentlyContinue)"
 Start-Sleep -Milliseconds 500
 
@@ -271,7 +271,7 @@ if ($explorer) {
     check (until { (state) -eq 'enabled' }) "tray enabled before restarting Explorer"
     Stop-Process -Name explorer -Force
     $lost = until { (state) -eq 'disabled' } 15000
-    check $lost "Explorer gone: the tray disables access (the switch is not visible)"
+    check $lost "Explorer gone: the tray disables access (the switch is not visible)" (Get-Content -Raw $trayErr)
     if (-not (until { Get-Process explorer -ErrorAction SilentlyContinue } 8000)) { Start-Process explorer.exe }
     check (until { (Get-Content -Raw $trayErr) -match 'icon re-added: True' } 30000) "Explorer restarted: TaskbarCreated -> icon re-added" (Get-Content -Raw $trayErr)
 } else {

@@ -9,9 +9,11 @@
 //! * The emergency-stop chord (`Win+Alt+Esc`, or the fallback) is registered here with
 //!   `RegisterHotKey` unless the broker's native adapter already holds it, in which case the
 //!   broker reacts to it directly and the menu just names it.
-//! * Explorer restarts broadcast `TaskbarCreated`; the icon is added again. While the
-//!   notification area is gone (an update of the icon fails) access is disabled, because the
-//!   human can no longer see the switch.
+//! * The notification area belongs to Explorer. A watcher thread waits on the Explorer process
+//!   that owns the taskbar (`Shell_TrayWnd`); when it exits, access is disabled at once, because
+//!   the human can no longer see the switch. When Explorer comes back it broadcasts
+//!   `TaskbarCreated` and the icon is added again (access stays disabled until the human enables).
+//!   A failed icon update (checked every 2 s) is treated the same way.
 //!
 //! The window is a hidden top-level window (class `W3bsDesktopTray`), not a message-only one,
 //! because `TaskbarCreated` is a broadcast and message-only windows receive no broadcasts.
@@ -356,6 +358,31 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) 
 }
 
 /// Agent id -> registered name, over a second control connection.
+/// Wait on the Explorer process that owns the taskbar; disable access whenever it exits.
+fn watch_explorer(acts: mpsc::Sender<Act>) {
+    use windows::Win32::System::Threading::{OpenProcess, WaitForSingleObject, INFINITE, PROCESS_SYNCHRONIZE};
+    loop {
+        // SAFETY: plain window lookup and a process handle owned by `Owned`.
+        let owner = unsafe { FindWindowW(w!("Shell_TrayWnd"), PCWSTR::null()) }.ok().map(adl_windows::win::window_pid).filter(|p| *p != 0);
+        let Some(pid) = owner else {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            continue;
+        };
+        let Ok(h) = (unsafe { OpenProcess(PROCESS_SYNCHRONIZE, false, pid) }) else {
+            eprintln!("w3bs-desktop tray: cannot watch Explorer (pid {pid}); relying on icon updates");
+            return;
+        };
+        let h = adl_windows::win::Owned(h);
+        unsafe { WaitForSingleObject(h.0, INFINITE) };
+        eprintln!("w3bs-desktop tray: Explorer (pid {pid}, owner of the notification area) exited; disabling access");
+        ctx().icon_shown.store(false, Ordering::SeqCst);
+        if acts.send(Act::Disable("the notification area (Explorer) went away")).is_err() {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+}
+
 fn agent_name(id: &str) -> String {
     let lookup = || -> Option<String> {
         let mut c = crate::client::Client::connect(&paths::control_socket()).ok()?;
@@ -525,6 +552,10 @@ pub fn run() -> std::io::Result<()> {
             }
             None => eprintln!("w3bs-desktop tray: no emergency-stop chord available; use the menu"),
         },
+    }
+    {
+        let tx = act_tx.clone();
+        std::thread::spawn(move || watch_explorer(tx));
     }
     // SAFETY: timer on our own window.
     unsafe {
