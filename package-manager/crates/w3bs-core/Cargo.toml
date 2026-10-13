@@ -28,6 +28,9 @@ tokio.workspace = true
 tough.workspace = true
 url.workspace = true
 libc = "0.2"
+aws-lc-rs.workspace = true
+base64 = "0.23"
+serde_jcs = "0.2"
 
 
 [dev-dependencies]

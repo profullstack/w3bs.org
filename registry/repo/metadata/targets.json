@@ -2,19 +2,25 @@
   "signed": {
     "_type": "targets",
     "spec_version": "1.0.0",
-    "version": 2,
-    "expires": "2027-10-13T00:06:34.333952358Z",
+    "version": 4,
+    "expires": "2027-10-13T00:31:10.179780641Z",
     "targets": {
-      "channels/w3bs/stable.json": {
-        "length": 207,
+      "artifacts/w3bs/0.1.0/w3bs-0.1.0-aarch64-apple-darwin.tar.gz": {
+        "length": 4451702,
         "hashes": {
-          "sha256": "5fc9cef37494917261807c62cae274f1f1be4b1bb9fdb3d596d733b1fe656997"
+          "sha256": "c15e3e1d6f46d7b490c234410229a433fb799f2c7f91a2acd89f1338d5e2f07c"
         }
       },
-      "artifacts/w3bs/0.1.0/w3bs-0.1.0-x86_64-apple-darwin.tar.gz": {
-        "length": 4821092,
+      "artifacts/w3bs/0.1.1/w3bs-0.1.1-x86_64-unknown-linux-gnu.tar.gz": {
+        "length": 5059336,
         "hashes": {
-          "sha256": "4ab729720f12cbb8f5050d383c0d9c60dafde457e9ea3f6eaf0b5abfeebb06b2"
+          "sha256": "bc782649cf1b67007356d9d1ab474c92b3e92158ce61191ca2f14c7351c053b9"
+        }
+      },
+      "manifests/w3bs/0.1.1.json": {
+        "length": 1881,
+        "hashes": {
+          "sha256": "69f423ef65ed42a10427aeba7b24cc9add154b88fb61b8fcd7c6453bd0c5ec23"
         }
       },
       "manifests/w3bs/0.1.0.json": {
@@ -23,22 +29,34 @@
           "sha256": "697f8c4589efceff88de4666903e8701d454c4c7f37c6bc3149c4be798d9fffd"
         }
       },
-      "artifacts/w3bs/0.1.0/w3bs-0.1.0-aarch64-apple-darwin.tar.gz": {
-        "length": 4451702,
+      "artifacts/w3bs/0.1.0/w3bs-0.1.0-x86_64-apple-darwin.tar.gz": {
+        "length": 4821092,
         "hashes": {
-          "sha256": "c15e3e1d6f46d7b490c234410229a433fb799f2c7f91a2acd89f1338d5e2f07c"
+          "sha256": "4ab729720f12cbb8f5050d383c0d9c60dafde457e9ea3f6eaf0b5abfeebb06b2"
         }
       },
-      "packages/index.json": {
-        "length": 232,
+      "artifacts/w3bs/0.1.1/w3bs-0.1.1-aarch64-apple-darwin.tar.gz": {
+        "length": 4646760,
         "hashes": {
-          "sha256": "3645a12c13603e25f4fab4856bb879a65310c08194d063cf7feacdeeb0ee4dc6"
+          "sha256": "1ee58020ecf7bd25a72856cf0257f38a27dd8d4e6fc456055e4fe7199ad4649e"
         }
       },
-      "artifacts/w3bs/0.1.0/w3bs-0.1.0-aarch64-unknown-linux-gnu.tar.gz": {
-        "length": 4603990,
+      "artifacts/w3bs/0.1.1/w3bs-0.1.1-x86_64-apple-darwin.tar.gz": {
+        "length": 5038920,
         "hashes": {
-          "sha256": "6e130a723dac0d289828fcd4247b390d328757922869b5a51555d1fbbf616095"
+          "sha256": "f016733862dc58475821018aebd2cc565ff66ad8acb7c65d7931feb24e2dc8dd"
+        }
+      },
+      "artifacts/w3bs/0.1.1/w3bs-0.1.1-aarch64-unknown-linux-gnu.tar.gz": {
+        "length": 4802389,
+        "hashes": {
+          "sha256": "a33df5ebf05855e8003fff2b8894d605b086dd6b79607a2c46b396a3d24d693c"
+        }
+      },
+      "artifacts/w3bs/0.1.0/w3bs-0.1.0-x86_64-unknown-linux-gnu.tar.gz": {
+        "length": 4844991,
+        "hashes": {
+          "sha256": "6728bf7c8abfedfa3b288fbd7d7627ae0717e4d9c4650d2760f56f35b22284da"
         }
       },
       "catalog/index.json": {
@@ -47,10 +65,22 @@
           "sha256": "dd55dc3fb08ef73546c8518978026fe50b2239814851e2de94b68c8a049a66f3"
         }
       },
-      "artifacts/w3bs/0.1.0/w3bs-0.1.0-x86_64-unknown-linux-gnu.tar.gz": {
-        "length": 4844991,
+      "packages/index.json": {
+        "length": 270,
         "hashes": {
-          "sha256": "6728bf7c8abfedfa3b288fbd7d7627ae0717e4d9c4650d2760f56f35b22284da"
+          "sha256": "100e79343caac75ddc01e3965e894f1f924447e8368ffe6bce227a90cd261372"
+        }
+      },
+      "channels/w3bs/stable.json": {
+        "length": 292,
+        "hashes": {
+          "sha256": "685158876fa31170458fffddd821b9b536b6a8810f29ab429d60ee1f0b63e93b"
+        }
+      },
+      "artifacts/w3bs/0.1.0/w3bs-0.1.0-aarch64-unknown-linux-gnu.tar.gz": {
+        "length": 4603990,
+        "hashes": {
+          "sha256": "6e130a723dac0d289828fcd4247b390d328757922869b5a51555d1fbbf616095"
         }
       }
     },
@@ -62,7 +92,7 @@
   "signatures": [
     {
       "keyid": "b5c2610d3f919c261ea8d0c601939256fd468cfebcd040b856639abb08504a1f",
-      "sig": "45746d8fa703aed429d987b22c6f083d8fae46062ac24292c5e077fc39ab70c8e119811b4bfde8570753e9af2394adc211bde0aab04a767baf6ed3e3128c6b07"
+      "sig": "f94062eff3d9eb38d23eb3fba74ab84fe033f11fa8c10e90cf8a1a7d10a74c3eb1b4bb9bf59a1879b705613de570bf7ddbacfc2d38ea826b765f5afdd7413104"
     }
   ]
 }

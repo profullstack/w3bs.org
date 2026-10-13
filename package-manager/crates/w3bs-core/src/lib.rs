@@ -1,4 +1,5 @@
-//! W3BS Package Manager engine: trust, resolution, staging, activation, receipts and recovery.
+//! Engine behind the `w3bs` CLI: packages (trust, resolution, staging, activation, receipts,
+//! recovery) and W3BS resources (registry client with local verification).
 //!
 //! The reference implementation of the OpenPkg format (https://logicsrc.com/docs/openpkg).
 
@@ -10,6 +11,7 @@ pub mod fsutil;
 pub mod layout;
 pub mod lock;
 pub mod repo;
+pub mod resources;
 pub mod transport;
 
 pub use engine::repos_api::RepoAdd;

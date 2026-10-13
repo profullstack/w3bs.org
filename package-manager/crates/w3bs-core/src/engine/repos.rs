@@ -214,7 +214,7 @@ impl Engine {
             match r.catalog().await {
                 Ok(c) => {
                     for e in c.entries.iter().filter(|e| matches(&e.id.to_string(), &e.name, &e.description)) {
-                        hits.push(json!({ "id": e.id, "name": e.name, "description": e.description, "repository": a, "kind": "curl", "install": e.install.command(), "agentic": e.agentic }));
+                        hits.push(json!({ "id": e.id, "name": e.name, "title": e.title, "vendor": e.vendor, "homepage": e.homepage, "description": e.description, "repository": a, "kind": "curl", "install": e.install.command(), "agentic": e.agentic, "commands": e.commands }));
                     }
                 }
                 Err(e) => unreachable.push(json!({ "alias": a, "error": e.info() })),
