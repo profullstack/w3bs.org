@@ -186,3 +186,93 @@ fn daemon_control_cli_and_mcp() {
     assert!(!s.contains("typed from a file") && !s.contains("from MCP"));
     drop(ctl);
 }
+
+/// One HTTP/1.1 request to the broker's MCP endpoint; returns (status, headers, body).
+fn http(port: u16, method: &str, headers: &[(&str, &str)], body: &str) -> (u16, String, String) {
+    use std::io::Read;
+    let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+    let mut req = format!("{method} /mcp HTTP/1.1\r\nConnection: close\r\nContent-Length: {}\r\n", body.len());
+    if !headers.iter().any(|(k, _)| k.eq_ignore_ascii_case("host")) {
+        req.push_str(&format!("Host: 127.0.0.1:{port}\r\n"));
+    }
+    for (k, v) in headers {
+        req.push_str(&format!("{k}: {v}\r\n"));
+    }
+    req.push_str("\r\n");
+    req.push_str(body);
+    s.write_all(req.as_bytes()).unwrap();
+    let mut out = String::new();
+    s.read_to_string(&mut out).unwrap();
+    let (head, body) = out.split_once("\r\n\r\n").unwrap_or((&out, ""));
+    let status = head.split_whitespace().nth(1).and_then(|c| c.parse().ok()).unwrap_or(0);
+    (status, head.to_string(), body.to_string())
+}
+
+fn header<'a>(head: &'a str, name: &str) -> Option<&'a str> {
+    head.lines().find_map(|l| l.split_once(':').filter(|(k, _)| k.trim().eq_ignore_ascii_case(name)).map(|(_, v)| v.trim()))
+}
+
+#[test]
+fn mcp_over_http_in_the_daemon() {
+    let env = Env { dir: tempfile::tempdir().unwrap() };
+    let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+    let addr = format!("127.0.0.1:{port}");
+    // Non-loopback addresses are refused outright.
+    let refused = env.run(&["daemon", "--adapter", "mock", "--mcp-http", "0.0.0.0:7801"]);
+    assert_eq!(refused.status.code(), Some(2), "{}", String::from_utf8_lossy(&refused.stderr));
+    let _daemon = Kill(env.cmd().args(["daemon", "--adapter", "mock", "--mcp-http", &addr]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().unwrap());
+    wait_for(&env.dir.path().join("run/control.sock"));
+    let (code, added) = env.json(&["agents", "add", "claude-code", "--preset", "broad"]);
+    assert_eq!(code, 0, "{added}");
+    let token = std::fs::read_to_string(added["token_file"].as_str().unwrap()).unwrap();
+    let (_, other) = env.json(&["agents", "add", "codex", "--preset", "broad"]);
+    let other_token = std::fs::read_to_string(other["token_file"].as_str().unwrap()).unwrap();
+    let mut ctl = env.cmd().arg("control").stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().unwrap();
+    let mut ctl_in = ctl.stdin.take().unwrap();
+    let _ctl = Kill(ctl);
+    std::thread::sleep(Duration::from_millis(200));
+    writeln!(ctl_in, "enable").unwrap();
+    wait_state(&env, "enabled");
+
+    let bearer = format!("Bearer {token}");
+    let init = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0"}}}"#;
+    // No token, a browser Origin, or a foreign Host are refused before anything else.
+    assert_eq!(http(port, "POST", &[("Content-Type", "application/json")], init).0, 401);
+    assert_eq!(http(port, "POST", &[("Authorization", &bearer), ("Origin", "https://evil.example")], init).0, 403);
+    assert_eq!(http(port, "POST", &[("Authorization", &bearer), ("Host", "evil.example")], init).0, 403);
+    assert_eq!(http(port, "POST", &[("Authorization", "Bearer adl_nope")], init).0, 401);
+    assert_eq!(http(port, "GET", &[("Authorization", &bearer)], "").0, 405);
+
+    let (code, head, body) = http(port, "POST", &[("Authorization", &bearer), ("Content-Type", "application/json")], init);
+    assert_eq!(code, 200, "{head}\n{body}");
+    let sid = header(&head, "mcp-session-id").expect("session id").to_string();
+    let v: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v["result"]["serverInfo"]["name"], "w3bs-desktop");
+    let call = |b: &str| http(port, "POST", &[("Authorization", &bearer), ("Mcp-Session-Id", &sid)], b);
+    assert_eq!(call(r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#).0, 202);
+    let (code, _, body) = call(r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#);
+    assert_eq!(code, 200);
+    let tools: Value = serde_json::from_str(&body).unwrap();
+    let names: Vec<&str> = tools["result"]["tools"].as_array().unwrap().iter().filter_map(|t| t["name"].as_str()).collect();
+    assert!(names.contains(&"mouse_click"), "{names:?}");
+    assert!(!names.iter().any(|n| n.contains("enable") || n.contains("grant") || *n == "approve"), "no self-escalation tools: {names:?}");
+    let (_, _, body) = call(r#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"task_begin","arguments":{"description":"http"}}}"#);
+    assert!(body.contains("\"isError\":false"), "{body}");
+    let (_, _, body) = call(r#"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"keyboard_type","arguments":{"window":"w-editor","text":"over http"}}}"#);
+    assert!(body.contains("\"isError\":false"), "{body}");
+    // Another agent's token cannot use this session.
+    let stolen = http(port, "POST", &[("Authorization", &format!("Bearer {other_token}")), ("Mcp-Session-Id", &sid)], r#"{"jsonrpc":"2.0","id":5,"method":"tools/list"}"#);
+    assert_eq!(stolen.0, 404);
+    // On Linux the HTTP client (this test process) is now an agent root: it cannot add agents.
+    #[cfg(target_os = "linux")]
+    {
+        let (code, v) = env.json(&["agents", "add", "sneaky", "--preset", "broad"]);
+        assert_eq!(code, 4, "{v}");
+    }
+    // Disable stops HTTP sessions too.
+    env.json(&["disable"]);
+    let (_, _, body) = call(r#"{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"mouse_click","arguments":{"at":{"space":"desktop","x":5,"y":5}}}}"#);
+    assert!(body.contains("disabled"), "{body}");
+    assert_eq!(http(port, "DELETE", &[("Authorization", &bearer), ("Mcp-Session-Id", &sid)], "").0, 204);
+    assert_eq!(call(r#"{"jsonrpc":"2.0","id":7,"method":"tools/list"}"#).0, 404);
+}

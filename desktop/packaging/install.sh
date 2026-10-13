@@ -144,7 +144,7 @@ adl_main() {
 <dict>
   <key>Label</key><string>org.w3bs.desktop.broker</string>
   <key>ProgramArguments</key>
-  <array><string>$bin/w3bs-desktop</string><string>daemon</string><string>--adapter</string><string>auto</string></array>
+  <array><string>$bin/w3bs-desktop</string><string>daemon</string><string>--adapter</string><string>auto</string><string>--mcp-http</string><string>127.0.0.1:7801</string></array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
   <key>ThrottleInterval</key><integer>5</integer>
@@ -204,7 +204,7 @@ PartOf=graphical-session.target
 After=graphical-session.target
 
 [Service]
-ExecStart=$bin/w3bs-desktop daemon --adapter auto
+ExecStart=$bin/w3bs-desktop daemon --adapter auto --mcp-http 127.0.0.1:7801
 Restart=on-failure
 RestartSec=2
 NoNewPrivileges=yes
@@ -266,7 +266,7 @@ EOF
   say ""
   say "Next:"
   say "  1. Register an agent:   w3bs-desktop agents add claude-code --preset broad"
-  say "  2. Connect it:          w3bs-desktop setup claude-code --agent claude-code   (prints the claude mcp add line)"
+  say "  2. Connect it:          w3bs-desktop setup claude-code --agent claude-code --http   (prints the claude mcp add line)"
   if [ "$os" = apple-darwin ]; then
     say "  3. Enable access from the menu bar (Agents: Disabled) when you want the agent to work; disable it the same way."
     say "     Emergency stop: Control+Option+Command+Escape."

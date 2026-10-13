@@ -201,8 +201,17 @@ fn agent(b: &Arc<Broker>, c: &mut Conn, req: &Request) -> Result<Value> {
         // becomes an agent root, so the shell commands that app runs cannot raise access on
         // control.sock. One-shot CLI clients only mark themselves, so a human using an agent
         // token from their own terminal keeps their own shell.
-        let mcp = p.get("client").and_then(Value::as_str) == Some("mcp");
-        let root = c.cred.and_then(|cr| if mcp { peer::parent_of(cr.pid) } else { Some(cr.pid) });
+        let kind = p.get("client").and_then(Value::as_str).unwrap_or("cli");
+        // The in-process HTTP MCP bridge connects as the broker itself; it passes the pid of the
+        // HTTP client it resolved from the TCP connection (the agent app itself). Only trusted
+        // when the peer really is this process; never mark the broker's own parent.
+        let in_process = c.cred.is_some_and(|cr| cr.pid == std::process::id());
+        let root = match kind {
+            "http" if in_process => p.get("client_pid").and_then(Value::as_u64).map(|v| v as u32),
+            "http" => return Err(AdlError::denied("the http client kind is reserved for the broker's own MCP endpoint")),
+            "mcp" => c.cred.and_then(|cr| peer::parent_of(cr.pid)),
+            _ => c.cred.map(|cr| cr.pid),
+        };
         let pr = b.authenticate(&token, root)?;
         let agent = b.store.get(&pr.agent).unwrap();
         c.principal = Some(pr.clone());

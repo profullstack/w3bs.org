@@ -90,7 +90,7 @@ check ($ver -match " $([regex]::Escape($Version))$") "w3bs-desktop --version is 
 check ((subsystem $cli) -eq 3) "w3bs-desktop.exe is a console-subsystem binary" (subsystem $cli)
 check ((subsystem $bg) -eq 2) "w3bs-desktopw.exe is a GUI-subsystem binary (no console)" (subsystem $bg)
 $run = Get-ItemProperty -Path $runKey
-check ($run.'W3BS Desktop Broker' -eq "`"$bg`" daemon --adapter auto") "HKCU Run 'W3BS Desktop Broker' starts w3bs-desktopw daemon at sign-in" $run.'W3BS Desktop Broker'
+check ($run.'W3BS Desktop Broker' -eq "`"$bg`" daemon --adapter auto --mcp-http 127.0.0.1:7801") "HKCU Run 'W3BS Desktop Broker' starts w3bs-desktopw daemon at sign-in" $run.'W3BS Desktop Broker'
 check ($run.'W3BS Desktop Tray' -eq "`"$bg`" tray --wait-for-broker 60") "HKCU Run 'W3BS Desktop Tray' starts w3bs-desktopw tray at sign-in" $run.'W3BS Desktop Tray'
 check ((user-path) -split ';' -contains $binDir) "bin folder added to the user PATH (HKCU\Environment)" (user-path)
 $installText = Get-Content -Raw (Join-Path $Work 'install.txt')

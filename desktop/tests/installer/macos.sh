@@ -48,13 +48,13 @@ check "w3bs-desktop --version is $VERSION" sh -c "'$B' --version | grep -q ' $VE
 for l in broker menubar; do
     check "LaunchAgent org.w3bs.desktop.$l.plist written and valid" plutil -lint "$LA/org.w3bs.desktop.$l.plist"
 done
-check "broker plist: daemon --adapter auto, RunAtLoad, KeepAlive on crash" sh -c "plutil -convert json -o - '$LA/org.w3bs.desktop.broker.plist' | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d[\"ProgramArguments\"][1:]==[\"daemon\",\"--adapter\",\"auto\"] and d[\"RunAtLoad\"] and d[\"KeepAlive\"]=={\"SuccessfulExit\":False}'"
+check "broker plist: daemon --adapter auto, RunAtLoad, KeepAlive on crash" sh -c "plutil -convert json -o - '$LA/org.w3bs.desktop.broker.plist' | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d[\"ProgramArguments\"][1:]==[\"daemon\",\"--adapter\",\"auto\",\"--mcp-http\",\"127.0.0.1:7801\"] and d[\"RunAtLoad\"] and d[\"KeepAlive\"]=={\"SuccessfulExit\":False}'"
 check "menubar plist: tray, RunAtLoad, no KeepAlive" sh -c "plutil -convert json -o - '$LA/org.w3bs.desktop.menubar.plist' | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d[\"ProgramArguments\"][1]==\"tray\" and d[\"RunAtLoad\"] and \"KeepAlive\" not in d'"
 check "installer printed the Accessibility + Screen Recording onboarding" sh -c "grep -q 'Accessibility' '$OUT/install.txt' && grep -q 'Screen Recording' '$OUT/install.txt' && grep -q 'doctor --prompt' '$OUT/install.txt'"
 check "installer never enables access" sh -c "! grep -qi 'enable.confirm' packaging/install.sh"
 check "launchctl: org.w3bs.desktop.broker is running" wait_for 20 running org.w3bs.desktop.broker
 BPID=$(job_pid org.w3bs.desktop.broker)
-check "broker (pid $BPID) is a launchd child running ~/.local/bin/w3bs-desktop daemon" sh -c "[ \"\$(ps -o ppid= -p '$BPID' | tr -d ' ')\" = 1 ] && ps -o command= -p '$BPID' | grep -q '^$B daemon --adapter auto'"
+check "broker (pid $BPID) is a launchd child running ~/.local/bin/w3bs-desktop daemon" sh -c "[ \"\$(ps -o ppid= -p '$BPID' | tr -d ' ')\" = 1 ] && ps -o command= -p '$BPID' | grep -q '^$B daemon --adapter auto --mcp-http 127.0.0.1:7801'"
 check "w3bs-desktop status answers Disabled through the launchd broker" wait_for 20 is_disabled
 "$B" status --json >"$OUT/status.json" 2>&1; cat "$OUT/status.json"
 check "launchctl: org.w3bs.desktop.menubar is running" wait_for 20 running org.w3bs.desktop.menubar
