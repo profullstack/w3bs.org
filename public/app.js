@@ -1,5 +1,5 @@
 const codeExamples = {
-  cli: 'node src/cli.mjs resolve \\\n  w3bs://prompt/w3bs/research@1',
+  cli: 'w3bs resolve \\\n  w3bs://prompt/w3bs/research@1',
   api: 'curl --get https://w3bs.org/api/resolve \\\n  --data-urlencode "uri=w3bs://prompt/w3bs/research@1"',
   mcp: 'Tool: w3bs_resolve\n\n{ "uri": "w3bs://prompt/w3bs/research@1" }',
 };

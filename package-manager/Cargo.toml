@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/w3bs-schema", "crates/w3bs-core", "crates/w3bs-cli", "crates/w3bs-publish"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/profullstack/w3bs.org"
@@ -22,7 +22,7 @@ fs4 = { version = "0.13", features = ["sync"] }
 futures = "0.3"
 hex = "0.4"
 jiff = "0.2"
-reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream", "json"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 semver = { version = "1", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }

@@ -17,9 +17,11 @@ The standards, gateway and registry work at `/specs`, `/browse` and `/prompts`. 
 
 ## One resource, three interfaces
 
+Install the `w3bs` CLI (one binary: packages, resources and more) with `curl -fsSL https://w3bs.org/install.sh | sh`. The Node reference client is still `node src/cli.mjs` (`w3bs-reference`).
+
 ```sh
-W3BS_API=http://localhost:3000 node src/cli.mjs resolve w3bs://prompt/w3bs/research@1
-W3BS_API=http://localhost:3000 node src/cli.mjs verify w3bs://prompt/w3bs/research@1
+W3BS_API=http://localhost:3000 w3bs resolve w3bs://prompt/w3bs/research@1
+W3BS_API=http://localhost:3000 w3bs verify w3bs://prompt/w3bs/research@1
 curl --get http://localhost:3000/api/resolve --data-urlencode 'uri=w3bs://prompt/w3bs/research@1'
 ```
 
@@ -44,23 +46,23 @@ Both MCP transports expose `w3bs_search`, `w3bs_resolve`, `w3bs_inspect`, `w3bs_
 Create `inputs.json` containing `{ "topic": "Open protocols for sensor data" }`, then:
 
 ```sh
-W3BS_API=http://localhost:3000 node src/cli.mjs run w3bs://prompt/w3bs/research@1 --inputs inputs.json --consent
+W3BS_API=http://localhost:3000 w3bs resource run w3bs://prompt/w3bs/research@1 --inputs inputs.json --consent
 ```
 
 This runs a deterministic template renderer. The output is instructions, not an AI-generated research answer. It never calls a model or tool. Supply the rendered prompt to a separately authorized model runtime if needed. Manifests requesting tools or capabilities are rejected by this runtime.
 
 ## Publish your first artifact
 
-1. Generate an Ed25519 publisher key with `node src/cli.mjs keygen --out .local/my-key --namespace example`.
+1. Generate an Ed25519 publisher key with `w3bs resource keygen --out .local/my-key --namespace example`.
 2. Have the registry operator add the `public.json` entry to its pinned trust store. The namespace must be approved; do not send your private key.
 3. Set the same public trust policy for your client through `W3BS_TRUST_FILE`. A registry response alone does not establish client trust.
 4. Fork an example with the command below, edit its instructions and metadata, then sign it locally.
 5. Have the operator enable publishing with a random `W3BS_PUBLISH_TOKEN` of at least 32 characters. Publish using that token through an authorized CLI or MCP environment, or HTTP Authorization header.
 
 ```sh
-node src/cli.mjs fork w3bs://prompt/w3bs/research@1 --namespace example --name research --key-id example-1 --out .local/draft.json
-node src/cli.mjs sign .local/draft.json --key .local/my-key/private.pem --out .local/signed.json
-node src/cli.mjs publish .local/signed.json
+w3bs resource fork w3bs://prompt/w3bs/research@1 --namespace example --name research --key-id example-1 --out .local/draft.json
+w3bs resource sign .local/draft.json --key .local/my-key/private.pem --out .local/signed.json
+w3bs resource publish .local/signed.json
 ```
 
 The CLI's fork command initially proposes the reference registry's manifest URL. Change `locations.canonical` to your actual registry if publishing elsewhere, and update publisher display metadata before signing. A new artifact version is immutable once accepted; use `version URI --version 1.1.0 --out draft.json` to prepare an unsigned revision.
