@@ -28,7 +28,7 @@
 
 adl_main() {
   set -u
-  VERSION="${W3BS_DESKTOP_VERSION:-0.2.0}"
+  VERSION="${W3BS_DESKTOP_VERSION:-0.2.1}"
   BASE="https://github.com/profullstack/w3bs.org/releases/download/desktop-v$VERSION"
 
   say() { printf '%s\n' "$*" >&2; }
