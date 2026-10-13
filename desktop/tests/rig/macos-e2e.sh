@@ -80,10 +80,10 @@ find_item() {
         end try
         tell process \"ControlCenter\"
             repeat with mb in menu bars
-                repeat with it in menu bar items of mb
+                repeat with mbi in menu bar items of mb
                     set t to \"\"
                     try
-                        set t to (title of it as text) & \"|\" & (description of it as text) & \"|\" & (name of it as text)
+                        set t to (title of mbi as text) & \"|\" & (description of mbi as text) & \"|\" & (name of mbi as text)
                     end try
                     if t contains \"Agents\" then return \"cc:\" & t
                 end repeat
@@ -102,13 +102,13 @@ open_item() { # click the item, then the named menu item of the menu that opens
         if not clicked then
             tell process \"ControlCenter\"
                 repeat with mb in menu bars
-                    repeat with it in menu bar items of mb
+                    repeat with mbi in menu bar items of mb
                         set t to \"\"
                         try
-                            set t to (title of it as text) & \"|\" & (description of it as text) & \"|\" & (name of it as text)
+                            set t to (title of mbi as text) & \"|\" & (description of mbi as text) & \"|\" & (name of mbi as text)
                         end try
                         if t contains \"Agents\" and not clicked then
-                            click it
+                            click mbi
                             set clicked to true
                         end if
                     end repeat
@@ -348,7 +348,8 @@ if [ "$ENABLED" = yes ]; then
             osa 'tell application "System Events" to key code 53 using {control down, option down, command down}' >/dev/null
             wait_for 3 is_state disabled
         fi
-        S=$("$B" status 2>&1 | head -1)
+        # The reason of the last disable is in the audit metadata.
+        S=$("$B" audit export --json | python3 -c "import json,sys; d=json.load(sys.stdin); r=[e for e in (d if isinstance(d, list) else d.get('events', [])) if e.get('op')=='disable']; print(r[-1]['meta']['reason'] if r else 'no disable recorded')")
         if [ "$(state)" = disabled ] && echo "$S" | grep -qi "emergency"; then ok "Control+Option+Command+Escape ($HOW) disabled access: $S"; else bad "emergency hot key: $S; tray log: $(tail -3 "$OUT/tray.log")"; fi
     else
         bad "could not re-enable for the emergency-stop check"
