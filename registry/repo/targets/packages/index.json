@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "packages": [
+    {
+      "id": "w3bs.org/w3bs",
+      "name": "w3bs",
+      "description": "W3BS Package Manager",
+      "channels": {
+        "stable": "channels/w3bs/stable.json"
+      }
+    }
+  ]
+}

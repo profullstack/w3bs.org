@@ -94,7 +94,7 @@ w3bs_main() {
     tmp="$(mktemp -d 2>/dev/null || mktemp -d -t w3bs)" || die "cannot create a temporary directory"
     trap 'rm -rf "$tmp"' EXIT INT TERM
     archive="$tmp/w3bs.tar.gz"
-    fetch "$MANAGER_DOWNLOAD_BASE/w3bs-$MANAGER_VERSION-$triple.tar.gz" "$archive" || die "download failed"
+    fetch "$MANAGER_DOWNLOAD_BASE/w3bs-v$MANAGER_VERSION/w3bs-$MANAGER_VERSION-$triple.tar.gz" "$archive" || die "download failed"
     actual="$(sha256 "$archive")"
     [ "$actual" = "$expected" ] || die "checksum mismatch for the downloaded manager (got $actual, expected $expected)"
     mkdir "$tmp/x" && tar -xzf "$archive" -C "$tmp/x" || die "cannot unpack the manager"
