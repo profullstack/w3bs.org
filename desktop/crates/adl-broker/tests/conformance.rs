@@ -536,3 +536,18 @@ fn mock_adapter_reports_capabilities_honestly() {
     assert!(caps.iter().any(|c| c.capability == Capability::Email && c.availability == Availability::Unsupported));
     assert!(caps.iter().any(|c| c.capability == Capability::Pointer && c.availability == Availability::Available));
 }
+
+#[test]
+fn closed_connection_ends_its_tasks_and_lease() {
+    let h = harness();
+    h.enable();
+    let (a, t) = h.driver("claude-code", broad());
+    assert!(h.b.status().lease.is_some());
+    // The same agent on another connection keeps its own task.
+    let other = Principal { agent: a.agent.clone(), session: "sess_other".into() };
+    let t2 = h.b.task_begin(&other, "other connection").unwrap().id;
+    assert_eq!(h.b.end_session(&a), 1);
+    assert!(h.b.status().lease.is_none(), "lease freed when its connection closed");
+    assert_eq!(h.b.task(&t).unwrap().state, TaskState::Cancelled);
+    assert_eq!(h.b.task(&t2).unwrap().state, TaskState::Running);
+}

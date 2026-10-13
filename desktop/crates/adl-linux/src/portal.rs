@@ -91,7 +91,7 @@ impl PortalAdapter {
         let tok = token();
         let sender = conn.unique_name().map(|n| n.trim_start_matches(':').replace('.', "_")).ok_or_else(|| err("no unique bus name"))?;
         let req_path = format!("{PATH}/request/{sender}/{tok}");
-        let req = Proxy::new(conn, DEST, req_path, "org.freedesktop.portal.Request").map_err(err)?;
+        let req = Proxy::new(conn, DEST, req_path.clone(), "org.freedesktop.portal.Request").map_err(err)?;
         let signals = req.receive_signal("Response").map_err(err)?;
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
@@ -105,7 +105,14 @@ impl PortalAdapter {
             Ok(Ok((1, _))) => Err(AdlError::new(ErrorCode::Denied, format!("{method} was cancelled in the portal dialog"))),
             Ok(Ok((code, _))) => Err(err(format!("{method} failed (response {code})"))),
             Ok(Err(e)) => Err(err(e)),
-            Err(_) => Err(AdlError::new(ErrorCode::Blocked, format!("no answer to the {method} portal dialog"))),
+            Err(_) => {
+                // Withdraw the request so its dialog does not linger: a late "Allow" would otherwise
+                // grant a portal session the broker no longer tracks.
+                if let Ok(p) = Proxy::new(conn, DEST, req_path, "org.freedesktop.portal.Request") {
+                    let _ = p.call_method("Close", &());
+                }
+                Err(AdlError::new(ErrorCode::Blocked, format!("no answer to the {method} portal dialog")))
+            }
         }
     }
 
@@ -165,6 +172,16 @@ impl PortalAdapter {
         if let Ok(mut f) = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(&self.token_file) {
             let _ = f.write_all(t.as_bytes());
         }
+    }
+
+    /// Whether the permission store already allows unsandboxed callers (app id "") to take
+    /// non-interactive screenshots.
+    fn screenshot_granted(conn: &Connection) -> bool {
+        let Ok(store) = Proxy::new(conn, "org.freedesktop.impl.portal.PermissionStore", "/org/freedesktop/impl/portal/PermissionStore", "org.freedesktop.impl.portal.PermissionStore") else {
+            return false;
+        };
+        let reply: zbus::Result<(HashMap<String, Vec<String>>, OwnedValue)> = store.call("Lookup", &("screenshot", "screenshot"));
+        reply.is_ok_and(|(perms, _)| perms.get("").is_some_and(|p| p.iter().any(|v| v == "yes")))
     }
 
     fn keysym(&self, sym: u32, pressed: bool) -> Result<()> {
@@ -240,33 +257,47 @@ impl Adapter for PortalAdapter {
         })?;
         let handle: String = created.get("session_handle").and_then(|v| String::try_from(v.try_clone().ok()?).ok()).ok_or_else(|| err("no session_handle"))?;
         let handle = OwnedObjectPath::try_from(handle).map_err(err)?;
-        let restore = self.restore_token();
-        self.request(&conn, "RemoteDesktop", "SelectDevices", |tok| {
-            let mut opts: HashMap<&str, Value> = HashMap::from([("handle_token", Value::from(tok)), ("types", Value::from(DEVICE_KEYBOARD | DEVICE_POINTER)), ("persist_mode", Value::from(PERSIST_UNTIL_REVOKED))]);
-            if let Some(r) = restore.as_deref() {
-                opts.insert("restore_token", Value::from(r));
+        // Everything after CreateSession runs in a closure so a failure (refusal, timeout, nothing
+        // granted) closes the portal session instead of leaving it, or its dialog, behind.
+        let negotiate = || -> Result<(u32, Vec<Stream>)> {
+            let restore = self.restore_token();
+            self.request(&conn, "RemoteDesktop", "SelectDevices", |tok| {
+                let mut opts: HashMap<&str, Value> = HashMap::from([("handle_token", Value::from(tok)), ("types", Value::from(DEVICE_KEYBOARD | DEVICE_POINTER)), ("persist_mode", Value::from(PERSIST_UNTIL_REVOKED))]);
+                if let Some(r) = restore.as_deref() {
+                    opts.insert("restore_token", Value::from(r));
+                }
+                rd.call("SelectDevices", &(&handle, opts)).map_err(err)
+            })?;
+            self.request(&conn, "ScreenCast", "SelectSources", |tok| {
+                let opts: HashMap<&str, Value> = HashMap::from([("handle_token", Value::from(tok)), ("types", Value::from(SOURCE_MONITOR)), ("multiple", Value::from(true))]);
+                sc.call("SelectSources", &(&handle, opts)).map_err(err)
+            })?;
+            let started = self.request(&conn, "RemoteDesktop", "Start", |tok| {
+                let opts: HashMap<&str, Value> = HashMap::from([("handle_token", Value::from(tok))]);
+                rd.call("Start", &(&handle, "", opts)).map_err(err)
+            })?;
+            let devices = started.get("devices").and_then(|v| u32::try_from(v).ok()).unwrap_or(0);
+            let streams = started.get("streams").map(Self::parse_streams).unwrap_or_default();
+            if let Some(t) = started.get("restore_token").and_then(|v| String::try_from(v.try_clone().ok()?).ok()) {
+                self.save_restore_token(&t);
             }
-            rd.call("SelectDevices", &(&handle, opts)).map_err(err)
-        })?;
-        self.request(&conn, "ScreenCast", "SelectSources", |tok| {
-            let opts: HashMap<&str, Value> = HashMap::from([("handle_token", Value::from(tok)), ("types", Value::from(SOURCE_MONITOR)), ("multiple", Value::from(true))]);
-            sc.call("SelectSources", &(&handle, opts)).map_err(err)
-        })?;
-        let started = self.request(&conn, "RemoteDesktop", "Start", |tok| {
-            let opts: HashMap<&str, Value> = HashMap::from([("handle_token", Value::from(tok))]);
-            rd.call("Start", &(&handle, "", opts)).map_err(err)
-        })?;
-        let devices = started.get("devices").and_then(|v| u32::try_from(v).ok()).unwrap_or(0);
-        let streams = started.get("streams").map(Self::parse_streams).unwrap_or_default();
-        if let Some(t) = started.get("restore_token").and_then(|v| String::try_from(v.try_clone().ok()?).ok()) {
-            self.save_restore_token(&t);
-        }
-        if devices & DEVICE_POINTER == 0 && devices & DEVICE_KEYBOARD == 0 {
-            return Err(AdlError::new(ErrorCode::Denied, "the portal granted no input devices"));
-        }
-        if streams.is_empty() {
-            return Err(AdlError::new(ErrorCode::Blocked, "the portal shared no monitors, so absolute pointer positions are unavailable"));
-        }
+            if devices & DEVICE_POINTER == 0 && devices & DEVICE_KEYBOARD == 0 {
+                return Err(AdlError::new(ErrorCode::Denied, "the portal granted no input devices"));
+            }
+            if streams.is_empty() {
+                return Err(AdlError::new(ErrorCode::Blocked, "the portal shared no monitors, so absolute pointer positions are unavailable"));
+            }
+            Ok((devices, streams))
+        };
+        let (devices, streams) = match negotiate() {
+            Ok(v) => v,
+            Err(e) => {
+                if let Ok(p) = Proxy::new(&conn, DEST, handle.clone(), "org.freedesktop.portal.Session") {
+                    let _ = p.call_method("Close", &());
+                }
+                return Err(e);
+            }
+        };
         // The portal closes the session if the human revokes it from the desktop's own UI.
         {
             let (conn, ev, h) = (conn.clone(), self.events.clone(), handle.clone());
@@ -275,6 +306,23 @@ impl Adapter for PortalAdapter {
                 let Ok(it) = s.receive_signal("Closed") else { return };
                 if it.into_iter().next().is_some() {
                     ev.lock().unwrap().push(SessionEvent::PermissionLost("the RemoteDesktop portal session was closed".into()));
+                }
+            });
+        }
+        // If the portal frontend or its desktop backend restarts, the new process has no record of
+        // this session and silently drops every Notify* call (seen on Plasma 6.7: "non-existing
+        // session"), while the frontend still answers. Treat any owner change as revocation.
+        {
+            let (conn, ev) = (conn.clone(), self.events.clone());
+            std::thread::spawn(move || {
+                let Ok(bus) = Proxy::new(&conn, "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus") else { return };
+                let Ok(it) = bus.receive_signal("NameOwnerChanged") else { return };
+                for msg in it {
+                    let Ok((name, old, _new)) = msg.body().deserialize::<(String, String, String)>() else { continue };
+                    if !old.is_empty() && (name == DEST || name.starts_with("org.freedesktop.impl.portal.desktop.")) {
+                        ev.lock().unwrap().push(SessionEvent::AdapterFailed(format!("{name} restarted; its RemoteDesktop session is gone")));
+                        return;
+                    }
                 }
             });
         }
@@ -323,6 +371,15 @@ impl Adapter for PortalAdapter {
         let layout = self.layout()?;
         let d = layout.displays.iter().find(|d| d.id == display).ok_or_else(|| AdlError::not_found(format!("no display {display}")))?;
         let conn = self.conn()?;
+        // Without a stored grant the portal opens "Allow apps to take screenshots?", and while that
+        // dialog is up every portal call blocks, including this session's input. Refuse instead.
+        if !Self::screenshot_granted(&conn) {
+            return Err(AdlError::new(
+                ErrorCode::Blocked,
+                "screenshots are not pre-authorized; run `flatpak permission-set screenshot screenshot \"\" yes` (or allow it in the desktop's privacy settings) and try again",
+            )
+            .with_details(serde_json::json!({"availability": "permission_required"})));
+        }
         let shot = Proxy::new(&conn, DEST, PATH, "org.freedesktop.portal.Screenshot").map_err(err)?;
         let r = self.request(&conn, "Screenshot", "Screenshot", |tok| {
             let opts: HashMap<&str, Value> = HashMap::from([("handle_token", Value::from(tok)), ("interactive", Value::from(false))]);

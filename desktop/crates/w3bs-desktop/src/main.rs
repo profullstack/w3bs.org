@@ -113,6 +113,11 @@ enum Cmd {
     /// Local audit metadata (no screenshots, text or message bodies are kept)
     #[command(subcommand)]
     Audit(AuditCmd),
+    /// Displays, their logical geometry and the layout generation (agent)
+    Layout {
+        #[command(flatten)]
+        auth: AgentAuth,
+    },
     /// List windows (agent)
     #[command(subcommand)]
     Windows(WindowsCmd),
@@ -579,6 +584,7 @@ fn main() {
                 AuditCmd::Delete => c.call("audit.delete", json!({})),
             }
         }
+        Cmd::Layout { auth } => agent_client(&auth)?.call("layout", json!({})),
         Cmd::Windows(WindowsCmd::List { auth }) => agent_client(&auth)?.call("windows", json!({})),
         Cmd::Inspect { window, auth } => agent_client(&auth)?.call("inspect", json!({"window": window})),
         Cmd::Screen(ScreenCmd::Capture { display, output, auth }) => {
