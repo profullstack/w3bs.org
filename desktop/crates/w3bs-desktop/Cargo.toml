@@ -21,6 +21,8 @@ clap.workspace = true
 libc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+ksni = { version = "0.3.6", default-features = false, features = ["blocking", "async-io"] }
+zbus = "5.19"
 
 [dev-dependencies]
 tempfile.workspace = true

@@ -11,8 +11,8 @@ Page: https://w3bs.org/desktop · License: Apache-2.0
 | Milestone | State |
 |---|---|
 | M0: PRD, schemas, ADR, public page | Done |
-| M1: broker, input engine, mock adapter, native control, enable/disable, leases, cancellation, identity tests | Done (terminal native control; tray/panel extensions pending) |
-| M2: KDE Plasma + GNOME real input | KDE Plasma 6.7.5 (KWin Wayland, Fedora 44): real typing (incl. non-ASCII), pointer, clicks, portal screenshot, disable mid-typing and portal revocation pass on a headless test rig (`tests/rig/kde-portal.sh`, 29/29). Window list, geometry, focus, stacking (occlusion) and activation on Plasma come from KWin scripts (`kwin.rs`), so targeted typing/clicks and restricted per-app grants work there; polkit-prompt interlock unit-tested only. GNOME Shell 50.5 (Mutter Wayland, xdg-desktop-portal-gnome 50.0, Fedora 44): pointer, clicks, ASCII typing, portal screenshot (and a fast refusal without a grant), disable mid-typing, restore-token re-enable, top-bar Stop and portal-backend restart pass on a headless rig (`tests/rig/gnome-portal.sh`, 21/21); the consent dialog is answered in-session by the rig (GNOME has no headless pre-authorization). Known GNOME gaps: characters outside the active keyboard layout are dropped by Mutter, a backend-side impl `Session.Close` is not reported to the client, and window data needs the unwritten Shell extension. **Not certified** |
+| M1: broker, input engine, mock adapter, native control, enable/disable, leases, cancellation, identity tests | Done (terminal native control `control`; StatusNotifierItem tray `tray` with an emergency-stop shortcut, verified on KDE Plasma only) |
+| M2: KDE Plasma + GNOME real input | KDE Plasma 6.7.5 (KWin Wayland, Fedora 44): real typing (incl. non-ASCII), pointer, clicks, portal screenshot, disable mid-typing and portal revocation pass on a headless test rig (`tests/rig/kde-portal.sh`, 29/29). Window list, geometry, focus, stacking (occlusion) and activation on Plasma come from KWin scripts (`kwin.rs`), so targeted typing/clicks and restricted per-app grants work there; polkit-prompt interlock unit-tested only. With `TRAY=1` the same rig makes the tray the only native control (kded6 as the StatusNotifierWatcher) and passes 19 more checks (48/48): item registration and Disabled/Enabled title, enable from the dbusmenu menu (also while the shortcut dialog is open), an approval shown with Approve/Deny and approved from the menu, left click disables but never enables, Quit and disable, and SIGKILL of the tray disabling the broker; the emergency stop is bound through the GlobalShortcuts portal as Super+Alt+Escape (Plasma's confirmation dialog answered in-session) and fires from a real key chord through KWin. The tray names itself `org.w3bs.Desktop` to the portal and installs a hidden desktop entry for it, since GlobalShortcuts refuses host apps without an app id. The tray on GNOME (AppIndicator extension) is untested. GNOME Shell 50.5 (Mutter Wayland, xdg-desktop-portal-gnome 50.0, Fedora 44): pointer, clicks, ASCII typing, portal screenshot (and a fast refusal without a grant), disable mid-typing, restore-token re-enable, top-bar Stop and portal-backend restart pass on a headless rig (`tests/rig/gnome-portal.sh`, 21/21); the consent dialog is answered in-session by the rig (GNOME has no headless pre-authorization). Known GNOME gaps: characters outside the active keyboard layout are dropped by Mutter, a backend-side impl `Session.Close` is not reported to the client, and window data needs the unwritten Shell extension. **Not certified** |
 | Vela | Observation, focus, occlusion and lock/polkit interlocks (clean-room); input needs `VELA_DEBUG_INPUT=1` + the wlroots virtual-input backend (pending) |
 | Windows, macOS, other Linux desktops | Not started |
 
@@ -24,7 +24,7 @@ No platform is certified. There are no signed installers yet.
 crates/adl-schema    versioned schemas: states, errors, coordinate spaces, actions, results
 crates/adl-broker    authorization + task broker, input engine, leases, approvals, audit, mock adapter
 crates/adl-linux     Vela command-socket adapter, XDG portal adapter (KDE/GNOME), KWin window observer, logind, keymaps
-crates/w3bs-desktop  `w3bs desktop` CLI, broker daemon, terminal native control, stdio MCP server
+crates/w3bs-desktop  `w3bs desktop` CLI, broker daemon, terminal and tray native controls, stdio MCP server
 packaging/           systemd user unit
 docs/                ADRs and the clean-room record
 ```
@@ -37,6 +37,7 @@ B=target/release/w3bs-desktop
 $B daemon --adapter mock &               # starts Disabled
 $B agents add claude-code --preset broad # saves a 0600 token
 $B control                               # native control; type `enable`
+                                         # (or `$B tray`: StatusNotifierItem + Super+Alt+Escape stop)
 # in another terminal:
 $B mouse click --agent claude-code --window w-editor --x 40 --y 40
 $B setup claude-code --agent claude-code # prints `claude mcp add ...`
