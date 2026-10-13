@@ -4,7 +4,7 @@
     {
       "id": "w3bs.org/w3bs",
       "name": "w3bs",
-      "description": "W3BS Package Manager",
+      "description": "w3bs: the W3BS command line (packages, resources and more)",
       "channels": {
         "stable": "channels/w3bs/stable.json"
       }
