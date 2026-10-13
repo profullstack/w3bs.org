@@ -28,10 +28,31 @@ pub fn runtime_dir() -> PathBuf {
     }
     #[cfg(not(windows))]
     {
-        // macOS has no XDG_RUNTIME_DIR; its $TMPDIR is already per-user and private.
-        let base = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).unwrap_or_else(|| std::env::temp_dir().join(format!("w3bs-desktop-{}", crate::peer::my_uid())));
+        // macOS has no XDG_RUNTIME_DIR; its per-user temporary directory is already private.
+        let base = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).unwrap_or_else(|| user_temp_dir().join(format!("w3bs-desktop-{}", crate::peer::my_uid())));
         base.join("w3bs-desktop")
     }
+}
+
+/// The per-user temporary directory. On macOS this asks the system (`confstr`) rather than
+/// reading `$TMPDIR`, which launchd does not set for LaunchAgents: the broker started at login
+/// and the CLI started from a terminal must agree on where the sockets are.
+#[cfg(target_os = "macos")]
+fn user_temp_dir() -> PathBuf {
+    use std::os::unix::ffi::OsStrExt;
+    let mut buf = vec![0u8; 1024];
+    // SAFETY: confstr writes at most buf.len() bytes, NUL-terminated, and returns the length it
+    // needs including the NUL (0 on error).
+    let n = unsafe { libc::confstr(libc::_CS_DARWIN_USER_TEMP_DIR, buf.as_mut_ptr().cast(), buf.len()) };
+    if n > 1 && n <= buf.len() {
+        return PathBuf::from(std::ffi::OsStr::from_bytes(&buf[..n - 1]));
+    }
+    std::env::temp_dir()
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn user_temp_dir() -> PathBuf {
+    std::env::temp_dir()
 }
 
 #[cfg(not(windows))]
