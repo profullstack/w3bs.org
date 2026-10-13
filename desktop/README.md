@@ -18,7 +18,67 @@ Page: https://w3bs.org/desktop · License: Apache-2.0
 | Windows | Native adapter (`adl-windows`: SendInput, EnumWindows/DWM, WindowFromPoint occlusion, GDI capture, UI Automation, WTS/power/display events, Win+Alt+Esc emergency hotkey), named-pipe transport and a notification-area tray. On GitHub's `windows-latest` runner (Windows Server, 1024x768 at 96 dpi, broker elevated like everything on the runner) `tests/windows/e2e-native.ps1` drives the release binary against two WinForms windows: window list with HWND ids, DWM rects and one focused window; typing incl. `héllo € 😀` lands exactly in the target TextBox; typing into an unfocused window and clicking a covered part of a window are refused `target_stale`; pointer moves land on the exact physical pixel (corners included); a click moves focus; scroll; per-monitor PNG at the monitor's pixel size with real content; UI Automation returns the edit control with its value; disable mid-type stops typing part-way and later input exits 4; the injected Win+Alt+Esc chord disables (audited as emergency stop); the tray adds its icon, opens its menu (status in words, Enable, Stop all, Quit and disable), enables from the menu, left click disables but never enables, Explorer exiting disables and its restart re-adds the icon (`TaskbarCreated`), Quit and disable. The mock-adapter end-to-end and the named-pipe tests (concurrent read/write on one connection, first-instance ownership, parallel clients, peer SID) run there too. Not exercised on the runner: mixed-DPI and multi-monitor layouts with negative origins (code paths only; the runner has one 96 dpi monitor), lock/UAC/secure-desktop interlocks, suspend and logoff events, UIPI refusal of elevated windows (the runner broker is itself elevated), and physical-mouse takeover (all synthetic input carries the injected flag the adapter keys on). **Not certified** |
 | Other Linux desktops | Not started |
 
-No platform is certified. There are no signed installers yet.
+No platform is certified. Release binaries and installers are not code-signed.
+
+## Install
+
+Every installer is per-user (no root or administrator), checks the release archive against the
+release's `SHA256SUMS`, starts the broker **Disabled** and never enables access; you enable it
+from the native control.
+
+**Linux** (x86_64, aarch64; glibc 2.28+):
+
+```bash
+curl --proto '=https' --proto-redir '=https' -fsSL https://w3bs.org/desktop/install.sh | sh
+```
+
+Installs `~/.local/bin/w3bs-desktop`, a systemd user service for the broker, and the tray (KDE
+and others) or the GNOME Shell extension (GNOME) in your session.
+
+**macOS** 11+ (Apple silicon and Intel), same command. It installs `~/.local/bin/w3bs-desktop`
+and two LaunchAgents in your login session, and starts both:
+
+- `~/Library/LaunchAgents/org.w3bs.desktop.broker.plist`: `w3bs-desktop daemon --adapter auto`,
+  at login, restarted by launchd if it crashes (not after a clean exit). Log:
+  `~/Library/Logs/w3bs-desktop/broker.log`.
+- `~/Library/LaunchAgents/org.w3bs.desktop.menubar.plist`: the menu-bar control
+  (`w3bs-desktop tray`), at login only; Quit keeps it quit (and disables access).
+
+Then grant the permissions below to `~/.local/bin/w3bs-desktop` (see
+[macOS onboarding](#macos-onboarding)). Uninstall with
+`curl -fsSL https://w3bs.org/desktop/install.sh | sh -s -- --uninstall` (keeps
+`~/.config/w3bs/desktop`, your agents and settings).
+
+**Windows** 10/11 (x86_64; ARM64 under emulation), in PowerShell 5.1 or 7:
+
+```powershell
+irm https://w3bs.org/desktop/install.ps1 | iex
+```
+
+Installs to `%LOCALAPPDATA%\Programs\w3bs-desktop` (`bin\w3bs-desktop.exe`, the console CLI, and
+`bin\w3bs-desktopw.exe`, the same program built for the GUI subsystem), adds `bin` to your user
+PATH, and registers the broker and the notification-area tray to start at sign-in (HKCU `Run`
+entries `W3BS Desktop Broker` and `W3BS Desktop Tray`, both running `w3bs-desktopw.exe`, so no
+console window opens), then starts both. Their output goes to
+`%LOCALAPPDATA%\w3bs\desktop\state\logs\{daemon,tray}.log`. Emergency stop: Win+Alt+Esc.
+Options go through a script block:
+
+```powershell
+& ([scriptblock]::Create((irm https://w3bs.org/desktop/install.ps1))) -Version 0.2.0 -NoService
+& ([scriptblock]::Create((irm https://w3bs.org/desktop/install.ps1))) -Uninstall   # add -Purge to delete agents and settings
+```
+
+Then, on any system:
+
+```bash
+w3bs-desktop agents add claude-code --preset broad
+w3bs-desktop setup claude-code --agent claude-code   # prints the `claude mcp add` line
+```
+
+Testing hooks (all installers): `W3BS_DESKTOP_VERSION`, `W3BS_DESKTOP_NO_SERVICE=1`, and
+`W3BS_DESKTOP_ARCHIVE` (a local archive) with `W3BS_DESKTOP_SHA256` (its checksum, required).
+The `installer-macos` and `installer-windows` CI jobs install a freshly packaged build this way
+on GitHub's runners and check the result, then uninstall (`tests/installer/`).
 
 ## Layout
 
@@ -30,7 +90,7 @@ crates/adl-windows   Windows adapter: SendInput, UI Automation, GDI capture, DWM
 crates/adl-linux     Vela command-socket adapter, XDG portal adapter (KDE/GNOME), KWin and GNOME Shell window observers, logind, keymaps
 crates/w3bs-desktop  `w3bs desktop` CLI, broker daemon, terminal and tray native controls, stdio MCP server
 gnome-extension/     GNOME Shell extension: top-bar native control + window data (org.w3bs.Desktop.Shell)
-packaging/           systemd user unit
+packaging/           install.sh (Linux, macOS), install.ps1 (Windows), package.sh (release archives), systemd user unit
 docs/                ADRs and the clean-room record
 ```
 
@@ -64,8 +124,11 @@ targeted input is refused.
 
 ## macOS onboarding
 
-The broker needs two privacy permissions, granted to the app that starts it (Terminal, iTerm, or
-the login item once one is packaged):
+The broker needs two privacy permissions, granted to the process macOS holds responsible for it:
+`~/.local/bin/w3bs-desktop` when the installer's LaunchAgent runs it (the normal case), or your
+terminal app (Terminal, iTerm) when you start `w3bs desktop daemon` from it yourself. After
+granting, restart the broker (`launchctl kickstart -k gui/$(id -u)/org.w3bs.desktop.broker`). The
+binary is not code-signed, so macOS may ask again after an upgrade replaces it:
 
 1. **Accessibility** (System Settings > Privacy & Security > Accessibility): posting input events,
    focus and `inspect`. Without it, enabling is refused (Blocked) with the pane named.
@@ -124,4 +187,6 @@ cargo test --workspace   # broker conformance, Vela fake socket, KWin and GNOME 
 desktop/tests/rig/kde-portal.sh     # KDE Plasma in a container (TRAY=1 adds the tray stage)
 desktop/tests/rig/gnome-portal.sh   # GNOME Shell in a container, with the W3BS Shell extension
 desktop/tests/rig/macos-e2e.sh      # macOS logged-in session (GitHub macos-latest job `macos-e2e`)
+desktop/tests/installer/macos.sh     # install.sh on macOS: LaunchAgents, launchd broker, menu bar, uninstall (job `installer-macos`)
+desktop/tests/installer/windows.ps1  # install.ps1 on Windows: autostart, windowless broker + tray, uninstall (job `installer-windows`)
 ```
