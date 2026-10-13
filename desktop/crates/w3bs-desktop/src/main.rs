@@ -6,6 +6,8 @@ mod mcp;
 mod paths;
 mod peer;
 mod server;
+mod shortcut;
+mod tray;
 
 use adl_broker::audit::Audit;
 use adl_broker::store::AgentStore;
@@ -100,6 +102,8 @@ enum Cmd {
     },
     /// Terminal native control: shows state, enable codes and approvals; quitting disables access
     Control,
+    /// Tray/panel native control (StatusNotifierItem) with an emergency-stop shortcut; quitting disables access
+    Tray,
     /// Show the layer state
     Status,
     /// Ask to enable agent access (confirm in the native control or with its code)
@@ -506,6 +510,10 @@ fn main() {
             let cfg = Config { require_native_control: !no_native_control, ..Config::default() };
             let broker = Arc::new(Broker::new(adapter, store, audit, cfg));
             server::serve(broker).map_err(|e| AdlError::new(ErrorCode::Blocked, e.to_string()))?;
+            Ok(Value::Null)
+        }
+        Cmd::Tray => {
+            tray::run().map_err(|e| AdlError::new(ErrorCode::Blocked, e.to_string()))?;
             Ok(Value::Null)
         }
         Cmd::Control => {
