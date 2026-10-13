@@ -17,6 +17,13 @@
 #   - Screenshot (non-interactive): xdg-desktop-portal's own table `screenshot`, id `screenshot`,
 #     app id "". Without it the frontend shows "Allow Apps to Take Screenshots?" and BLOCKS every
 #     other portal call (including RemoteDesktop Notify*) until that dialog is answered.
+#
+# Interlocks (interlocks.sh, always the last stage). Polkit: KDE's agent cannot register without a
+# logind session, and the rig runs as root, whom polkit never asks; the rig tries the real agent
+# and records why it cannot take requests, then opens a window carrying the agent's app id (what
+# the KWin observer keys on) as the stand-in prompt. Lock: KWin's own screen locker, locked over
+# org.freedesktop.ScreenSaver; it cannot be unlocked here (no password, no logind), so this stage
+# runs last.
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
 SRC=${SRC:-$(cd "$HERE/../.." && pwd)}            # the desktop/ workspace
@@ -270,10 +277,68 @@ sleep 2
 w3bs-desktop --json status | grep -q '"state": "disabled"' && ok "portal session closed -> broker disabled" || bad "broker still $(w3bs-desktop --json status | grep '"state"')"
 
 [ "${TRAY:-0}" = 1 ] && . /rig/tray.sh
+. /rig/interlocks.sh
 
 echo "== $pass passed, $fail failed"
 [ $fail = 0 ]
 EOF
+# ---------------------------------------------------------------- interlocks (last stage)
+cat > "$RIG/interlocks.sh" <<'EOF'
+echo "== interlocks: setup"
+state() { w3bs-desktop --json status | grep -o '"state": "[a-z]*"' | head -1 | cut -d'"' -f4; }
+until_() { for i in $(seq 1 ${2:-25}); do eval "$1" && return 0; sleep 0.2; done; return 1; }
+pgrep -f '^w3bs-desktop daemon' >/dev/null || { setsid w3bs-desktop daemon --adapter auto >$L/daemon-lock.log 2>&1 & sleep 1; }
+if ! pgrep -f '^w3bs-desktop control' >/dev/null; then
+  rm -f /root/ctl.fifo; mkfifo /root/ctl.fifo
+  setsid sh -c 'exec sleep infinity > /root/ctl.fifo' &
+  setsid w3bs-desktop control < /root/ctl.fifo >> $L/control.log 2>&1 &
+  sleep 1
+fi
+echo enable > /root/ctl.fifo
+until_ '[ "$(state)" = enabled ]' 50 || bad "could not enable for the interlock stage: $(state)"
+set -- $(/rig/geom.sh T1)
+W mouse click --agent tester --x $(( $1 + 15 )) --y $(( $2 + $4 / 2 )) >/dev/null; sleep 0.3
+
+echo "== interlock: polkit authentication prompt"
+dnf -y install --setopt=install_weak_deps=False polkit polkit-kde >$L/dnf-polkit.log 2>&1 || true
+pgrep -x polkitd >/dev/null || { [ -S /run/dbus/system_bus_socket ] || { mkdir -p /run/dbus; setsid dbus-daemon --system --nofork --nopidfile >$L/sysdbus.log 2>&1 & sleep 1; }; }
+AGENT=$(rpm -ql polkit-kde 2>/dev/null | grep -m1 -E '/polkit-kde-authentication-agent-1$' || true)
+if [ -n "$AGENT" ]; then
+  setsid "$AGENT" >$L/polkit-agent.log 2>&1 & PKA=$!; sleep 3
+  echo "real polkit-kde agent: $(kill -0 $PKA 2>/dev/null && echo running || echo exited); log: $(grep -i -m2 -E 'regist|session|subject|error' $L/polkit-agent.log | tr '\n' ' ')"
+  kill $PKA 2>/dev/null || true
+else
+  echo "real polkit-kde agent: not installable ($(tail -1 $L/dnf-polkit.log))"
+fi
+setsid foot --app-id=org.kde.polkit-kde-authentication-agent-1 --title="Authentication Required" sh -c 'sleep 120' >$L/foot-pk.log 2>&1 &
+PK=$!
+until_ '[ -n "$(/rig/geom.sh "Authentication Required")" ]' 25 || true
+mark1=$(wc -c < /root/t1.txt)
+set +e; printf '%s' "POLKIT" | W keyboard type --agent tester --stdin >/root/pk.out 2>&1; rc=$?
+W mouse click --agent tester --x 960 --y 540 >/root/pkc.out 2>&1; rc2=$?; set -e
+[ $rc != 0 ] && [ $rc2 != 0 ] && grep -q -i "authentication" /root/pk.out && grep -q -i "authentication" /root/pkc.out && [ "$(wc -c < /root/t1.txt)" = "$mark1" ] && [ "$(state)" = enabled ] \
+  && ok "polkit-agent window up: type and click refused ($(grep -o 'input paused: [^;"(]*' /root/pk.out | head -1)), broker stays enabled" || bad "polkit interlock rc=$rc/$rc2 $(cat /root/pk.out) state=$(state)"
+kill $PK 2>/dev/null || true
+until_ '[ -z "$(/rig/geom.sh "Authentication Required")" ]' 25 || true
+set -- $(/rig/geom.sh T1)
+W mouse click --agent tester --x $(( $1 + 15 )) --y $(( $2 + $4 / 2 )) >/dev/null; sleep 0.3
+printf '%s' " after polkit" | W keyboard type --agent tester --stdin >/dev/null 2>&1 || true; sleep 0.5
+[ "$(tail -c 13 /root/t1.txt)" = " after polkit" ] && ok "prompt gone -> input flows again" || bad "after polkit: $(tail -c 30 /root/t1.txt)"
+
+echo "== interlock: KWin screen locker"
+if busctl --user status org.freedesktop.ScreenSaver >/dev/null 2>&1; then
+  echo "org.freedesktop.ScreenSaver owner: $(busctl --user status org.freedesktop.ScreenSaver 2>/dev/null | grep -m1 '^Comm=')"
+  busctl --user call org.freedesktop.ScreenSaver /ScreenSaver org.freedesktop.ScreenSaver Lock >/root/lock.out 2>&1 || echo "Lock: $(cat /root/lock.out)"
+  until_ '[ "$(state)" = disabled ]' 50 && R=$(tail -n 5 /root/w3bs/state/audit/* | grep -o '"reason":"[^"]*"' | tail -1) || R=
+  A=$(busctl --user call org.freedesktop.ScreenSaver /ScreenSaver org.freedesktop.ScreenSaver GetActive 2>/dev/null)
+  [ "$A" = "b true" ] && [ "$(state)" = disabled ] && ok "screen locked through KWin's locker (GetActive: $A) -> broker disabled: $R" || bad "lock: GetActive '$A', state $(state)"
+  set +e; printf '%s' "LOCKED" | W keyboard type --agent tester --stdin >/root/lk.out 2>&1; rc=$?; set -e
+  [ $rc = 4 ] && ok "input while locked: exit 4 ($(grep -o '"code": *"[a-z_]*"' /root/lk.out | head -1))" || bad "while locked rc=$rc $(cat /root/lk.out)"
+else
+  bad "org.freedesktop.ScreenSaver is not on the session bus (no screen locker to test)"
+fi
+EOF
+
 # ---------------------------------------------------------------- tray stage (TRAY=1)
 # menu.py drives the StatusNotifierItem and its com.canonical.dbusmenu menu the way a tray host
 # (plasmashell) does; appr.py is an agent that retries one identical request until approved.

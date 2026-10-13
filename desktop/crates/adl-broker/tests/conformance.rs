@@ -240,6 +240,26 @@ fn keyboard_workflow() {
 }
 
 #[test]
+fn untypeable_text_is_refused_before_anything_is_sent() {
+    let h = harness();
+    h.enable();
+    let (a, t) = h.driver("claude-code", broad());
+    h.m.set_untypeable("é€");
+    h.m.clear_events();
+    let e = h
+        .input(&a, &t, Some("w-editor"), vec![Action::Type { text: "fine ".into() }, Action::KeyPress { key: "Enter".parse().unwrap() }, Action::Type { text: "café €5".into() }])
+        .unwrap_err();
+    assert_eq!(e.code, ErrorCode::Unsupported, "{e:?}");
+    assert!(e.message.contains("é€"), "{}", e.message);
+    assert_eq!(h.m.typed("w-editor"), "", "not even the typeable first action");
+    assert!(h.m.events().is_empty(), "no event at all: {:?}", h.m.events());
+    assert!(h.b.approvals().is_empty(), "a refused batch is never put to the human");
+    assert_eq!(h.b.state(), GlobalState::Enabled, "a refusal is not a revocation");
+    h.input(&a, &t, Some("w-editor"), vec![Action::Type { text: "cafe 5".into() }]).unwrap();
+    assert_eq!(h.m.typed("w-editor"), "cafe 5");
+}
+
+#[test]
 fn long_text_is_chunked_and_focus_rechecked() {
     let h = harness();
     h.enable();

@@ -30,6 +30,22 @@
 #
 # Readback: pointer via global.get_pointer(), focus via global.display.focus_window (Eval).
 #
+# Characters outside the active layout: Mutter drops keysyms it has no key for, so the GNOME
+# backend checks text against the compositor's live keymap and refuses it whole, naming the
+# characters. The rig checks the refusal on `us` (nothing typed), then switches the input source to
+# `de` and checks that the characters `de` has (ä ö ü ß, and € on AltGr) are typed exactly.
+#
+# Interlocks (ext-interlocks.sh). Lock: GNOME Shell 50 builds its lock screen (Main.screenShield)
+# only when logind is present, and this container has none (see above), so the shield cannot be
+# raised here. The rig does what ScreenShield does when it locks: it switches the shell into the
+# `unlock-dialog` session mode, which unloads every extension that does not declare that mode
+# (the W3BS one included), and checks the broker disables. It also emits the
+# org.gnome.ScreenSaver.ActiveChanged(true) signal gnome-shell sends when its shield goes up, and
+# checks that disables too. Polkit: gnome-shell's polkit agent cannot register without a logind
+# session ("Failed to register AuthenticationAgent"), so pkexec cannot reach it; the rig opens the
+# shell's own authentication dialog through that agent's entry point instead (the dialog a real
+# request shows), checks input is refused while it is up, and cancels it.
+#
 # GNOME Shell extension (agentic-desktop@w3bs.org, gnome-extension/ in this workspace). It is
 # installed with `w3bs-desktop setup gnome-extension` before the shell starts (GNOME Shell loads
 # new extensions only at startup) and is the second native control next to the terminal one.
@@ -66,7 +82,7 @@ EOF
 
 mkdir -p "$RIG/ext"
 cat > "$RIG/ext/metadata.json" <<'EOF'
-{"uuid": "adl-rig@w3bs.org", "name": "ADL test rig", "description": "Test-only: unsafe mode, so the rig can read pointer/focus and stand in for the human via org.gnome.Shell.Eval.", "shell-version": ["50"]}
+{"uuid": "adl-rig@w3bs.org", "name": "ADL test rig", "description": "Test-only: unsafe mode, so the rig can read pointer/focus and stand in for the human via org.gnome.Shell.Eval.", "shell-version": ["50"], "session-modes": ["user", "unlock-dialog"]}
 EOF
 cat > "$RIG/ext/extension.js" <<'EOF'
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -307,30 +323,57 @@ set -- $(/rig/geom.sh T2); x2=$(( $1 + $3 - 15 )); y2=$(( $2 + $4 / 2 ))
 W mouse click --agent tester --x $x1 --y $y1 >/dev/null; sleep 0.3
 [ "$(/rig/active.sh)" = T1 ] && ok "click focused T1" || bad "click did not focus T1 (focus: $(/rig/active.sh))"
 type_ "hello from w3bs desktop 123"; W keyboard press --agent tester --key Enter >/dev/null
-type_ "héllo üß €"; W keyboard press --agent tester --key Enter >/dev/null
+set +e; printf '%s' "héllo üß €" | W keyboard type --agent tester --stdin >/root/nonascii.out 2>&1; NA_RC=$?; set -e
+type_ "ASCII ~!@#%&*()_+{}:<>?"; W keyboard press --agent tester --key Enter >/dev/null
 W mouse click --agent tester --x $x2 --y $y2 >/dev/null; sleep 0.3
 [ "$(/rig/active.sh)" = T2 ] && ok "click focused T2" || bad "click did not focus T2 (focus: $(/rig/active.sh))"
 type_ "into T2"; sleep 0.5
 [ "$(sed -n 1p /root/t1.txt)" = "hello from w3bs desktop 123" ] && ok "ASCII typed exactly" || bad "ASCII: $(sed -n 1p /root/t1.txt | od -c | head -2)"
-# Mutter maps a keysym only onto a keycode of the active layout (us here); é ü ß € are not on it,
-# so Mutter drops them ("No keycode found for keyval ... in current group") and the portal call
-# still succeeds. KWin remaps such keysyms; Mutter does not.
+# Mutter maps a keysym only onto a keycode of the active layout (us here) and drops the rest
+# ("No keycode found for keyval ... in current group") while the portal call succeeds, so the
+# backend refuses such text up front: whole, naming the characters, with nothing typed.
+[ $NA_RC != 0 ] && grep -q '"unsupported"' /root/nonascii.out && grep -q "'é' (U+00E9), 'ü' (U+00FC), 'ß' (U+00DF)" /root/nonascii.out \
+  && ! grep -q "No keycode found" $L/shell.log && ok "non-ASCII outside the us layout refused before typing: $(grep -o 'has no key for[^.]*' /root/nonascii.out | head -1)" \
+  || bad "non-ASCII on us: rc=$NA_RC $(cat /root/nonascii.out); shell.log: $(grep -m2 'No keycode' $L/shell.log)"
 l2=$(sed -n 2p /root/t1.txt)
-if [ "$l2" = "héllo üß €" ]; then ok "non-ASCII keysym text typed exactly"
-elif [ "$l2" = "hllo  " ] && grep -q "No keycode found for keyval e9" $L/shell.log; then kno "non-ASCII outside the layout dropped by Mutter: got '$l2' for 'héllo üß €'; shell.log: $(grep -m1 -o 'No keycode found for keyval e9 in current group' $L/shell.log)"
-else bad "non-ASCII: $(printf %s "$l2" | od -c | head -2)"; fi
+[ "$l2" = "ASCII ~!@#%&*()_+{}:<>?" ] && ok "nothing of the refused text reached T1; shifted ASCII typed exactly" || bad "line 2: $(printf %s "$l2" | od -c | head -3)"
 [ "$(cat /root/t2.txt)" = "into T2" ] && ok "second window got only its text" || bad "T2: $(cat /root/t2.txt | od -c | head -2)"
+
+echo "== non-ASCII on a layout that has it"
+# The us keymap Mutter builds has EuroSign on a third (AltGr) level, so '€' passes the check on
+# us; it must then arrive exactly.
+mark2=$(wc -c < /root/t2.txt)
+type_ " 5€"; sleep 0.5
+got=$(tail -c +$((mark2 + 1)) /root/t2.txt)
+[ "$got" = " 5€" ] && ok "on us: '€' typed exactly (the us keymap has EuroSign on AltGr)" || bad "€ on us: $(printf %s "$got" | od -c | head -3)"
+gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'de')]"
+/rig/eval.sh 'import("resource:///org/gnome/shell/misc/keyboardManager.js").then(m => { global._adlKbm = m.getKeyboardManager(); }); 1' >/dev/null
+until_ '[ "$(/rig/eval.sh "global._adlKbm?.currentLayout?.id")" = de ]' 25 || bad "layout did not switch to de: $(/rig/eval.sh "global._adlKbm?.currentLayout?.id")"
+sleep 0.5
+mark2=$(wc -c < /root/t2.txt)
+type_ "äöü ß € zy"; sleep 0.5
+set +e; printf '%s' "é" | W keyboard type --agent tester --stdin >/root/de-e.out 2>&1; rc=$?; set -e
+sleep 0.3
+got=$(tail -c +$((mark2 + 1)) /root/t2.txt)
+[ "$got" = "äöü ß € zy" ] && ok "on de: '$got' typed exactly (ß, ä ö ü on their keys, € through AltGr, y/z swapped keys)" || bad "on de: $(printf %s "$got" | od -c | head -3)"
+[ $rc != 0 ] && grep -q "'é' (U+00E9)" /root/de-e.out && grep -q German /root/de-e.out && [ "$(tail -c +$((mark2 + 1)) /root/t2.txt)" = "$got" ] \
+  && ok "on de: 'é' (a dead-key character, no keysym on any key) refused, layout named: $(grep -o 'layout ([^)]*)' /root/de-e.out | head -1)" || bad "é on de: rc=$rc $(cat /root/de-e.out)"
+gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us')]"
+until_ '[ "$(/rig/eval.sh "global._adlKbm?.currentLayout?.id")" = us ]' 25 || bad "layout did not switch back to us"
+sleep 0.5
+! grep -q "No keycode found" $L/shell.log && ok "Mutter never dropped a keysym (no 'No keycode found' in the shell log)" || bad "shell.log: $(grep -m3 'No keycode' $L/shell.log)"
 
 echo "== screenshot"
 set +e; timeout 30 w3bs-desktop --json screen capture --agent tester --display $DISP --output /rig/noshot.png >/root/noshot.out 2>&1; rc=$?; set -e
 [ $rc != 124 ] && grep -q 'not pre-authorized' /root/noshot.out && ok "capture without a grant fails fast (rc=$rc): blocked, not pre-authorized" || bad "capture without grant rc=$rc $(cat /root/noshot.out)"
 type_ "!"; sleep 0.3
-[ "$(cat /root/t2.txt)" = "into T2!" ] && ok "input still flows after the refused capture" || bad "input after refused capture: $(cat /root/t2.txt)"
+[ "$(tail -c 1 /root/t2.txt)" = "!" ] && ok "input still flows after the refused capture" || bad "input after refused capture: $(tail -c 20 /root/t2.txt)"
 flatpak permission-set screenshot screenshot "" yes
 W screen capture --agent tester --display $DISP --output /rig/shot.png >/dev/null
 file /rig/shot.png | grep -q "PNG image data, 1920 x 1080" && ok "$(file -b /rig/shot.png)" || bad "screenshot: $(file /rig/shot.png)"
 
 . /rig/ext-windows.sh
+. /rig/ext-interlocks.sh
 
 echo "== disable during a long type"
 W mouse click --agent tester --x $x1 --y $y1 >/dev/null; sleep 0.3
@@ -378,12 +421,17 @@ S=$(busctl --user tree org.freedesktop.impl.portal.desktop.gnome 2>/dev/null | g
 busctl --user call org.freedesktop.impl.portal.desktop.gnome "$S" org.freedesktop.impl.portal.Session Close
 sleep 2
 # xdg-desktop-portal-gnome stops the Mutter session on Close but, per the impl spec, emits no
-# Closed for a Close it was asked to do, so the frontend never tells the client. GNOME's own UI
-# never takes this path (its Stop button goes through Mutter, checked above).
+# Closed for a Close it was asked to do, so the frontend never tells the client. Mutter does report
+# the stop to the shell (remote-access handle 'stopped'); the extension lists the live sessions and
+# the broker treats its own one vanishing as revocation. GNOME's own UI never takes this path (its
+# Stop button goes through Mutter, checked above).
 st=$(state); s2=$(stat -c %s /root/t2.txt)
-W mouse click --agent tester --x $x2 --y $y2 >/dev/null || true; sleep 0.3; type_ "lost" || true; sleep 0.5
-if [ "$st" = disabled ]; then ok "impl Session.Close -> broker disabled"
-else kno "impl Session.Close: frontend sent no Closed, broker stays $st and input is silently lost (T2 grew $(( $(stat -c %s /root/t2.txt) - s2 )) bytes)"; fi
+set +e; W mouse click --agent tester --x $x2 --y $y2 >/root/closed-click.out 2>&1; rc1=$?
+printf lost | W keyboard type --agent tester --stdin >/root/closed-type.out 2>&1; rc2=$?; set -e
+sleep 0.5
+[ "$st" = disabled ] && grep -q "permission lost: the GNOME remote desktop session was stopped" /root/w3bs/state/audit/* \
+  && ok "impl Session.Close -> broker disabled ($(grep -o 'permission lost: the GNOME remote desktop session was stopped' /root/w3bs/state/audit/* | head -1 | cut -d: -f2-))" || bad "impl Session.Close: broker $st"
+[ $rc1 = 4 ] && [ $rc2 = 4 ] && [ "$(stat -c %s /root/t2.txt)" = "$s2" ] && ok "input after the backend-side close: click and type exit 4, nothing delivered" || bad "after close: click rc=$rc1 type rc=$rc2 $(cat /root/closed-type.out); T2 grew $(( $(stat -c %s /root/t2.txt) - s2 ))"
 
 . /rig/ext-panel.sh
 
@@ -457,6 +505,45 @@ printf '%s' " restricted ok" | W keyboard type --agent r --window "$T1" --stdin 
 pkill -f 'app-id=org.w3bs.rig.other' || true; sleep 0.5
 EOF
 
+# ---------------------------------------------------------------- interlocks: polkit dialog, lock
+cat > "$RIG/ext-interlocks.sh" <<'EOF'
+echo "== interlock: the shell's polkit authentication dialog"
+set -- $(/rig/geom.sh T1)
+W mouse click --agent tester --x $(( $1 + 15 )) --y $(( $2 + $4 / 2 )) >/dev/null; sleep 0.3
+PA='Main.componentManager._allComponents.polkitAgent'
+grep -q "Failed to register AuthenticationAgent" $L/shell.log && echo "(gnome-shell's polkit agent did not register: no logind session in this container)"
+/rig/eval.sh "$PA._onInitiate(null, 'org.w3bs.rig.check', 'Authentication is required to run the W3BS rig check', 'dialog-password-symbolic', 'rig-cookie', ['root']); 1" >/dev/null
+until_ '[ "$(/rig/eval.sh "Main.modalCount")" -gt 0 ]' 25 || true
+/rig/shellshot.sh /rig/polkit-dialog.png || true
+mark1=$(wc -c < /root/t1.txt)
+set +e; printf '%s' "POLKIT" | W keyboard type --agent tester --stdin >/root/pk.out 2>&1; rc=$?
+W mouse click --agent tester --x 960 --y 540 >/root/pkc.out 2>&1; rc2=$?; set -e
+dlg=$(/rig/eval.sh "$PA._currentDialog ? 'up' : 'none'")
+[ "$dlg" = up ] && [ $rc != 0 ] && [ $rc2 != 0 ] && grep -q "system dialog" /root/pk.out && grep -q "system dialog" /root/pkc.out && [ "$(wc -c < /root/t1.txt)" = "$mark1" ] && [ "$(state)" = enabled ] \
+  && ok "polkit dialog up (/rig/polkit-dialog.png): type and click refused (exit $rc/$rc2: $(grep -o 'input paused: [^;(]*' /root/pk.out | head -1)), broker stays enabled" \
+  || bad "polkit interlock: dialog=$dlg rc=$rc/$rc2 $(cat /root/pk.out) state=$(state)"
+/rig/eval.sh "$PA._currentDialog.cancel(); 1" >/dev/null
+until_ '[ "$(/rig/eval.sh "Main.modalCount")" = 0 ]' 25 || true
+set -- $(/rig/geom.sh T1); W mouse click --agent tester --x $(( $1 + 15 )) --y $(( $2 + $4 / 2 )) >/dev/null; sleep 0.3
+printf '%s' " after polkit" | W keyboard type --agent tester --stdin >/dev/null 2>&1 || true; sleep 0.5
+[ "$(tail -c 13 /root/t1.txt)" = " after polkit" ] && ok "dialog cancelled -> input flows again" || bad "after polkit: $(tail -c 30 /root/t1.txt)"
+
+echo "== interlock: lock-screen session mode (what ScreenShield does on lock)"
+/rig/eval.sh 'Main.sessionMode.pushMode("unlock-dialog"); 1' >/dev/null
+until_ '[ "$(state)" = disabled ]' 25 && R=$(tail -n 5 /root/w3bs/state/audit/* | grep -o '"reason":"[^"]*"' | tail -1) || R=
+[ "$(/rig/eval.sh "Main.sessionMode.isLocked")" = true ] && [ "$(state)" = disabled ] && ok "shell locked (isLocked=true, extensions unloaded) -> broker disabled: $R" || bad "lock: isLocked=$(/rig/eval.sh "Main.sessionMode.isLocked") state=$(state)"
+set +e; printf '%s' "LOCKED" | W keyboard type --agent tester --stdin >/root/lk.out 2>&1; rc=$?; set -e
+[ $rc = 4 ] && grep -q disabled /root/lk.out && ok "input while locked: exit 4 disabled" || bad "while locked rc=$rc $(cat /root/lk.out)"
+/rig/eval.sh 'Main.sessionMode.popMode("unlock-dialog"); 1' >/dev/null
+until_ '[ "$(/rig/eval.sh "$I._statusItem.label.text" 2>/dev/null)" = "Status: Disabled" ]' 50 || bad "extension did not come back after unlock"
+enable_ && [ $DIALOG = 0 ] && ok "unlocked, re-enabled by the human (no dialog)" || bad "re-enable after unlock: $(state) dialog=$DIALOG"
+
+echo "== interlock: org.gnome.ScreenSaver.ActiveChanged(true)"
+gdbus emit --session --object-path /org/gnome/ScreenSaver --signal org.gnome.ScreenSaver.ActiveChanged true >/dev/null
+until_ '[ "$(state)" = disabled ]' 25 && tail -n 5 /root/w3bs/state/audit/* | grep -q '"reason":"session locked"' && ok "ActiveChanged(true) -> broker disabled (session locked)" || bad "ActiveChanged: $(state)"
+enable_ && [ $DIALOG = 0 ] || bad "re-enable after ActiveChanged: $(state)"
+EOF
+
 # ---------------------------------------------------------------- extension: top-bar native control
 cat > "$RIG/ext-panel.sh" <<'EOF'
 echo "== GNOME Shell extension: top-bar native control (the only native control from here on)"
@@ -518,8 +605,8 @@ until_ '[ "$(state)" = disabled ]' && [ "$(/rig/eval.sh "!!$I")" = true ] && ok 
 echo "== top bar: disabling the extension while enabled"
 panel_enable || bad "re-enable from the panel: $(state)"
 gnome-extensions disable $UUID
-until_ '[ "$(state)" = disabled ]' && [ "$(/rig/eval.sh "!!$I")" = false ] && grep -q "native control lost" /root/w3bs/state/audit/* \
-  && ok "gnome-extensions disable while enabled -> indicator gone, broker disabled (native control lost)" || bad "after extension disable: $(state) indicator=$(/rig/eval.sh "!!$I")"
+until_ '[ "$(state)" = disabled ]' && [ "$(/rig/eval.sh "!!$I")" = false ] && tail -n 3 /root/w3bs/state/audit/* | grep -q -E "native control lost|extension went away" \
+  && ok "gnome-extensions disable while enabled -> indicator gone, broker disabled ($(tail -n 3 /root/w3bs/state/audit/* | grep -o -E 'native control lost|extension went away' | head -1))" || bad "after extension disable: $(state) indicator=$(/rig/eval.sh "!!$I")"
 set +e; printf hi | W keyboard type --agent tester --stdin >/root/noext.out 2>&1; rc=$?; set -e
 [ $rc = 4 ] && ok "agent input after the extension went away: exit 4 ($(grep -o '"code": *"[a-z_]*"' /root/noext.out | head -1))" || bad "after extension disable rc=$rc $(cat /root/noext.out)"
 gnome-extensions enable $UUID

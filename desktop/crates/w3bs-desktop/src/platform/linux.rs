@@ -25,6 +25,8 @@ pub fn make_adapter(kind: AdapterKind) -> Result<Arc<dyn Adapter>> {
             };
         }
         if gnome::detect() {
+            // Mutter drops keysyms that are not on the active layout; check text against it.
+            let p = p.with_keysym_resolver(Box::new(gnome::MutterKeys::from_shell()));
             return match ShellBus::connect() {
                 Ok(src) => Arc::new(WithGnome::new(p, ShellObserver::new(Box::new(src)))),
                 Err(e) => {

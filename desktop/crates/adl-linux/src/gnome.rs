@@ -8,6 +8,14 @@
 //! `GetInterlock() -> s` and `Activate(s) -> b`. It is read-only apart from activation and never
 //! injects input.
 //!
+//! Besides windows, a snapshot carries the lock state, the keyboard layout group (for the Mutter
+//! keysym check in `xkb`), and the ids of Mutter's live remote-access sessions. The last one closes
+//! a portal gap: when the RemoteDesktop session is stopped through xdg-desktop-portal-gnome's impl
+//! interface, the portal frontend never emits `Session.Closed`, so the client keeps sending input
+//! into nothing. [`WithGnome`] records which remote-access ids appeared while it enabled and
+//! reports `PermissionLost` as soon as one of them is gone. It also reports the extension itself
+//! going away while enabled (the shell unloads extensions when the screen locks).
+//!
 //! Trust runs both ways without a shared secret:
 //! - the extension answers only a caller whose bus connection has this user's uid AND the pid of
 //!   the process at the other end of its control.sock subscription (this broker, by SO_PEERCRED);
@@ -26,6 +34,7 @@ use adl_broker::{Adapter, InputEvent, SessionEvent};
 use adl_schema::*;
 use serde::Deserialize;
 use std::collections::BTreeSet;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -36,6 +45,8 @@ pub const EXTENSION_UUID: &str = "agentic-desktop@w3bs.org";
 const GNOME_SHELL: &str = "org.gnome.Shell";
 /// Snapshots older than this are re-queried. Focus and interlocks always re-query.
 const STATE_TTL: Duration = Duration::from_millis(100);
+/// While enabled, how often the supervisor re-checks the remote-access session and the lock.
+const PROBE_EVERY: Duration = Duration::from_millis(200);
 const CALL_TIMEOUT: Duration = Duration::from_secs(2);
 /// Snapshot format this observer understands.
 const SNAPSHOT_VERSION: u32 = 1;
@@ -108,6 +119,15 @@ pub struct ShellSnapshot {
     /// Why input must wait ("" when clear): lock screen, overview, a shell modal dialog or menu.
     #[serde(default)]
     pub interlock: String,
+    /// The shell is in its lock-screen mode.
+    #[serde(default)]
+    pub locked: bool,
+    /// Layout group of Mutter's keymap that is active; `None` when the shell does not say.
+    #[serde(default)]
+    pub keyboard_group: Option<u32>,
+    /// Ids of Mutter's live remote-access sessions; `None` when the extension cannot see them.
+    #[serde(default)]
+    pub remote_access: Option<Vec<String>>,
     #[serde(default)]
     pub windows: Vec<ShellWindow>,
 }
@@ -230,6 +250,74 @@ impl ShellSource for ShellBus {
     }
 }
 
+/// Keysyms for text on GNOME, checked against Mutter's live keymap ([`crate::xkb`]): text with a
+/// character Mutter would drop (or mistype) is refused whole, naming the characters.
+pub struct MutterKeys {
+    group: Box<dyn Fn() -> Option<u32> + Send + Sync>,
+    cache: Mutex<Option<KeymapCache>>,
+}
+
+/// When the keymap was read, for which group, and what it compiled to.
+type KeymapCache = (Instant, Option<u32>, std::result::Result<Vec<crate::xkb::Group>, String>);
+
+/// The keymap is re-read at most this often (a layout switch sends clients a new one).
+const KEYMAP_TTL: Duration = Duration::from_millis(250);
+
+impl MutterKeys {
+    /// `group` names the active layout group (from the Shell extension), `None` if unknown.
+    pub fn new(group: Box<dyn Fn() -> Option<u32> + Send + Sync>) -> Self {
+        Self { group, cache: Mutex::new(None) }
+    }
+
+    /// The layout group from a Shell extension connection of its own.
+    pub fn from_shell() -> Self {
+        let bus: Mutex<Option<ShellBus>> = Mutex::new(None);
+        Self::new(Box::new(move || {
+            let mut b = bus.lock().unwrap_or_else(|e| e.into_inner());
+            if b.is_none() {
+                *b = ShellBus::connect().ok();
+            }
+            let r = b.as_ref()?.snapshot();
+            if r.is_err() {
+                *b = None; // reconnect next time (the extension may have been reloaded)
+            }
+            r.ok()?.keyboard_group
+        }))
+    }
+
+    fn groups(&self) -> std::result::Result<Vec<crate::xkb::Group>, String> {
+        let group = (self.group)();
+        let mut c = self.cache.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some((t, g, r)) = &*c
+            && t.elapsed() < KEYMAP_TTL && *g == group {
+                return r.clone();
+            }
+        let r = crate::xkb::wayland_keymap().and_then(|km| crate::xkb::compile(&km, group));
+        *c = Some((Instant::now(), group, r.clone()));
+        r
+    }
+}
+
+impl crate::portal::KeysymResolver for MutterKeys {
+    fn resolve(&self, text: &str) -> Result<Vec<u32>> {
+        let (r, why) = match self.groups() {
+            Ok(groups) => {
+                let names: Vec<_> = groups.iter().map(|g| g.name.as_str()).filter(|n| !n.is_empty()).collect();
+                let layout = if names.is_empty() { "the active keyboard layout".to_string() } else { format!("the active keyboard layout ({})", names.join(" / ")) };
+                (crate::xkb::resolve(text, &groups, crate::xkb::utf32_to_keysym), format!("{layout} has no key for"))
+            }
+            Err(e) => (crate::xkb::resolve_ascii(text), format!("the compositor keymap is unreadable ({e}), so only ASCII is typed, not")),
+        };
+        r.map_err(|missing| {
+            AdlError::unsupported(format!(
+                "GNOME (Mutter) cannot type this text: {why} {}. Mutter would drop those characters silently, so nothing was typed; switch to a keyboard layout that has them, or leave them out",
+                crate::xkb::describe(&missing)
+            ))
+            .with_details(serde_json::json!({"characters": missing.iter().map(|c| c.to_string()).collect::<Vec<_>>()}))
+        })
+    }
+}
+
 /// Cached window state from a [`ShellSource`].
 pub struct ShellObserver {
     source: Box<dyn ShellSource>,
@@ -284,11 +372,72 @@ impl ShellObserver {
 pub struct WithGnome<A: Adapter> {
     input: A,
     shell: ShellObserver,
+    /// Between a successful begin and end.
+    active: AtomicBool,
+    /// Remote-access ids that appeared while this broker enabled: its RemoteDesktop session.
+    ours: Mutex<Option<BTreeSet<String>>>,
+    was_locked: AtomicBool,
+    last_probe: Mutex<Option<Instant>>,
+    events: Mutex<Vec<SessionEvent>>,
 }
 
 impl<A: Adapter> WithGnome<A> {
     pub fn new(input: A, shell: ShellObserver) -> Self {
-        Self { input, shell }
+        Self { input, shell, active: AtomicBool::new(false), ours: Mutex::new(None), was_locked: AtomicBool::new(false), last_probe: Mutex::new(None), events: Mutex::new(vec![]) }
+    }
+
+    fn push(&self, e: SessionEvent) {
+        self.events.lock().unwrap_or_else(|e| e.into_inner()).push(e);
+    }
+
+    /// React to what a fresh snapshot says about our session and the lock. Returns why input
+    /// must stop, if it must.
+    fn check(&self, s: &ShellSnapshot) -> Option<String> {
+        if s.locked && !self.was_locked.swap(true, Ordering::SeqCst) {
+            self.push(SessionEvent::Locked);
+        } else if !s.locked {
+            self.was_locked.store(false, Ordering::SeqCst);
+        }
+        let mut ours = self.ours.lock().unwrap_or_else(|e| e.into_inner());
+        let gone = match (&*ours, &s.remote_access) {
+            (Some(mine), Some(live)) => !mine.iter().all(|id| live.contains(id)),
+            // A snapshot without the list after one with it: a different extension instance,
+            // whose ids are not ours (they carry a per-instance prefix), so ours are gone.
+            (Some(_), None) => true,
+            (None, _) => false,
+        };
+        if gone {
+            *ours = None;
+            drop(ours);
+            let why = "the GNOME remote desktop session was stopped (Mutter ended it; the portal did not tell the client)";
+            self.push(SessionEvent::PermissionLost(why.into()));
+            return Some(why.into());
+        }
+        None
+    }
+
+    /// Supervisor probe while enabled: session gone, lock, or the extension itself gone.
+    fn probe(&self) {
+        if !self.active.load(Ordering::SeqCst) {
+            return;
+        }
+        {
+            let mut last = self.last_probe.lock().unwrap_or_else(|e| e.into_inner());
+            if last.is_some_and(|t| t.elapsed() < PROBE_EVERY) {
+                return;
+            }
+            *last = Some(Instant::now());
+        }
+        match self.shell.fetch() {
+            Ok(s) => drop(self.check(&s)),
+            Err(e) if e.message.contains("is not on the session bus") => {
+                // The shell unloads extensions when it locks the screen, and nothing targeted can
+                // be checked without them; stop rather than wait for a native-control signal.
+                self.active.store(false, Ordering::SeqCst);
+                self.push(SessionEvent::AdapterFailed("the W3BS GNOME Shell extension went away (screen locked, extension disabled, or GNOME Shell restarted)".into()));
+            }
+            Err(_) => {}
+        }
     }
 
     pub fn activate(&self, window: &str) -> Result<()> {
@@ -330,16 +479,32 @@ impl<A: Adapter> Adapter for WithGnome<A> {
     }
 
     fn begin(&self) -> Result<()> {
+        let before = self.shell.fetch().ok().and_then(|s| s.remote_access);
         self.input.begin()?;
         // Without window data every targeted action would be refused; say why at enable time.
-        if let Err(e) = self.shell.fetch() {
-            self.input.end();
-            return Err(AdlError::new(ErrorCode::Blocked, format!("cannot read window state: {}", e.message)));
+        let after = match self.shell.fetch() {
+            Ok(s) => s.remote_access,
+            Err(e) => {
+                self.input.end();
+                return Err(AdlError::new(ErrorCode::Blocked, format!("cannot read window state: {}", e.message)));
+            }
+        };
+        let mine: Option<BTreeSet<String>> = match (before, after) {
+            (Some(b), Some(a)) => Some(a.into_iter().filter(|id| !b.contains(id)).collect::<BTreeSet<_>>()).filter(|m| !m.is_empty()),
+            _ => None,
+        };
+        if mine.is_none() {
+            eprintln!("w3bs-desktop: no new Mutter remote-access session seen at enable; a backend-side stop of the portal session will not be noticed");
         }
+        *self.ours.lock().unwrap_or_else(|e| e.into_inner()) = mine;
+        self.was_locked.store(false, Ordering::SeqCst);
+        self.active.store(true, Ordering::SeqCst);
         Ok(())
     }
 
     fn end(&self) {
+        self.active.store(false, Ordering::SeqCst);
+        self.ours.lock().unwrap_or_else(|e| e.into_inner()).take();
         self.input.end();
         self.shell.invalidate();
     }
@@ -381,19 +546,26 @@ impl<A: Adapter> Adapter for WithGnome<A> {
         self.input.emit(event)
     }
 
+    fn preflight(&self, action: &Action) -> Result<()> {
+        self.input.preflight(action)
+    }
+
     fn safety_interlock(&self) -> Option<String> {
         if let Some(why) = self.input.safety_interlock() {
             return Some(why);
         }
         // Fresh every action; this also refreshes the cache that window_at reads right after.
         match self.shell.fetch() {
-            Ok(s) => s.interlock(),
+            Ok(s) => self.check(&s).or_else(|| s.interlock()),
             Err(e) => Some(format!("cannot read window state: {}", e.message)),
         }
     }
 
     fn poll_events(&self) -> Vec<SessionEvent> {
-        self.input.poll_events()
+        self.probe();
+        let mut out = self.input.poll_events();
+        out.append(&mut self.events.lock().unwrap_or_else(|e| e.into_inner()));
+        out
     }
 }
 
@@ -519,6 +691,102 @@ mod tests {
         assert!(a.begin().is_err());
         let w = a.capabilities().into_iter().find(|c| c.capability == Capability::Windows).unwrap();
         assert_eq!(w.availability, Availability::Degraded);
+    }
+
+    /// A source the test scripts while the adapter holds it: each snapshot takes the next queued
+    /// report and the last one repeats; "" means the extension's bus name is gone.
+    struct Live(std::sync::Arc<Mutex<Vec<String>>>);
+    impl ShellSource for Live {
+        fn snapshot(&self) -> Result<ShellSnapshot> {
+            let mut q = self.0.lock().unwrap();
+            let j = if q.len() > 1 { q.remove(0) } else { q[0].clone() };
+            if j.is_empty() {
+                return Err(err(format!("{SHELL_NAME} is not on the session bus; {INSTALL_HINT}")));
+            }
+            ShellSnapshot::parse(&j)
+        }
+        fn activate(&self, _: &str) -> Result<bool> {
+            Ok(false)
+        }
+    }
+
+    fn with(remote: &str, locked: bool) -> String {
+        REPORT.replace(r#""interlock": """#, &format!(r#""interlock": "", "locked": {locked}, "keyboard_group": 0, "remote_access": {remote}"#))
+    }
+
+    type Script = std::sync::Arc<Mutex<Vec<String>>>;
+
+    fn set(q: &Script, reports: &[String]) {
+        *q.lock().unwrap() = reports.to_vec();
+    }
+
+    /// Enabled, with "ep:7" appearing during begin (the portal's Mutter session).
+    fn enabled() -> (WithGnome<MockDesktop>, Script) {
+        let q: Script = std::sync::Arc::new(Mutex::new(vec![with(r#"["other:1"]"#, false), with(r#"["other:1", "ep:7"]"#, false)]));
+        let a = WithGnome::new(MockDesktop::new(), ShellObserver::new(Box::new(Live(q.clone()))));
+        a.begin().unwrap();
+        (a, q)
+    }
+
+    #[test]
+    fn begin_records_the_new_remote_access_session() {
+        let (a, _) = enabled();
+        assert_eq!(a.ours.lock().unwrap().clone(), Some(["ep:7".to_string()].into_iter().collect()));
+        assert_eq!(a.safety_interlock(), None);
+        assert!(a.poll_events().is_empty());
+        a.end();
+        assert!(a.ours.lock().unwrap().is_none());
+        // No new id at enable (e.g. an extension without the list): nothing to compare against.
+        let q: Script = std::sync::Arc::new(Mutex::new(vec![REPORT.into()]));
+        let b = WithGnome::new(MockDesktop::new(), ShellObserver::new(Box::new(Live(q))));
+        b.begin().unwrap();
+        assert!(b.ours.lock().unwrap().is_none());
+        assert_eq!(b.safety_interlock(), None);
+    }
+
+    #[test]
+    fn stopped_remote_access_session_is_permission_lost() {
+        let (a, q) = enabled();
+        set(&q, &[with(r#"["ep:7"]"#, false)]);
+        assert_eq!(a.safety_interlock(), None, "another session ending is not ours");
+        set(&q, &[with("[]", false)]);
+        let why = a.safety_interlock().unwrap();
+        assert!(why.contains("remote desktop session was stopped"), "{why}");
+        let ev = a.poll_events();
+        assert!(matches!(ev.as_slice(), [SessionEvent::PermissionLost(p)] if p.contains("stopped")), "{ev:?}");
+        std::thread::sleep(PROBE_EVERY);
+        assert!(a.poll_events().is_empty(), "reported once");
+    }
+
+    #[test]
+    fn supervisor_probe_sees_the_stop_without_any_input() {
+        let (a, q) = enabled();
+        set(&q, &[with(r#"["other:1"]"#, false)]);
+        let ev = a.poll_events();
+        assert!(matches!(ev.as_slice(), [SessionEvent::PermissionLost(_)]), "{ev:?}");
+    }
+
+    #[test]
+    fn reloaded_extension_means_our_session_is_unknown() {
+        let (a, q) = enabled();
+        set(&q, &[REPORT.into()]);
+        assert!(a.safety_interlock().is_some());
+    }
+
+    #[test]
+    fn lock_and_extension_loss_are_reported() {
+        let (a, q) = enabled();
+        set(&q, &[with(r#"["other:1", "ep:7"]"#, true)]);
+        assert!(matches!(a.poll_events().as_slice(), [SessionEvent::Locked]));
+        std::thread::sleep(PROBE_EVERY);
+        assert!(a.poll_events().is_empty(), "Locked once per lock");
+        set(&q, &[String::new()]);
+        std::thread::sleep(PROBE_EVERY);
+        let ev = a.poll_events();
+        assert!(matches!(ev.as_slice(), [SessionEvent::AdapterFailed(w)] if w.contains("went away")), "{ev:?}");
+        a.end();
+        std::thread::sleep(PROBE_EVERY);
+        assert!(a.poll_events().is_empty(), "nothing is probed once disabled");
     }
 
     #[test]

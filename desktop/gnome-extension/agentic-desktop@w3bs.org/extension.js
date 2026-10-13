@@ -14,7 +14,10 @@
 //
 // 2. Read-only window data for the broker, exported on the session bus as
 //    org.w3bs.Desktop.Shell at /org/w3bs/Desktop/Shell (interface org.w3bs.Desktop.Shell):
-//      GetWindows() -> s    JSON snapshot: every window actor topmost first, focus, interlock
+//      GetWindows() -> s    JSON snapshot: every window actor topmost first, focus, interlock,
+//                           lock state, the keyboard layout group, and the live Mutter
+//                           remote-access sessions (so the broker notices when its RemoteDesktop
+//                           session is stopped behind the portal's back)
 //      GetFocused() -> s    JSON of the focused window, or "null"
 //      GetInterlock() -> s  why agent input must wait right now ("" when clear)
 //      Activate(s id) -> b  raise and focus a window by id
@@ -38,6 +41,7 @@ import Shell from 'gi://Shell';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as KeyboardManager from 'resource:///org/gnome/shell/misc/keyboardManager.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
@@ -101,6 +105,61 @@ function interlock() {
     return '';
 }
 
+// The layout group Mutter's keyboard is in, as the shell's keyboard manager applied it. The
+// broker checks typed characters against this group of the keymap (Mutter types a keysym only if
+// the current group has it).
+function keyboardGroup() {
+    try {
+        const g = KeyboardManager.getKeyboardManager().currentLayout?.groupIndex;
+        return Number.isInteger(g) ? g : null;
+    } catch (_e) {
+        return null;
+    }
+}
+
+// Mutter's remote-access sessions (RemoteDesktop and screen casts), each with an id unique for
+// the life of this extension instance. xdg-desktop-portal-gnome does not tell portal clients
+// when their session is stopped through the backend (an impl Session.Close), but Mutter reports
+// the stop here, so the broker compares the ids it saw appear at enable time with this list.
+class RemoteAccessWatch {
+    constructor() {
+        this._epoch = GLib.uuid_string_random().slice(0, 8);
+        this._next = 1;
+        this._live = new Map();
+    }
+
+    start() {
+        const controller = global.backend.get_remote_access_controller?.();
+        if (!controller)
+            return;
+        this._controller = controller;
+        this._newId = controller.connect('new-handle', (_c, handle) => {
+            const id = `${this._epoch}:${this._next++}`;
+            const stoppedId = handle.connect('stopped', () => {
+                this._live.delete(id);
+                handle.disconnect(stoppedId);
+            });
+            this._live.set(id, {handle, stoppedId});
+        });
+    }
+
+    stop() {
+        if (this._controller && this._newId)
+            this._controller.disconnect(this._newId);
+        this._controller = null;
+        for (const {handle, stoppedId} of this._live.values())
+            handle.disconnect(stoppedId);
+        this._live.clear();
+    }
+
+    // null when this Mutter has no remote-access controller (nothing to compare against)
+    ids() {
+        return this._controller ? [...this._live.keys()] : null;
+    }
+}
+
+let remoteAccess = null;
+
 function describe(actor, focus, workspace) {
     const win = actor.get_meta_window();
     if (!win)
@@ -149,6 +208,9 @@ function snapshot() {
         source: 'get_window_actors',
         focused: focus ? String(focus.get_id()) : null,
         interlock: interlock(),
+        locked: !!(Main.sessionMode.isLocked || Main.screenShield?.locked),
+        keyboard_group: keyboardGroup(),
+        remote_access: remoteAccess?.ids() ?? null,
         windows,
     };
 }
@@ -774,6 +836,8 @@ export default class AgenticDesktopExtension extends Extension {
             onDown: () => this._indicator?.down(),
             onEvent: (name, data) => this._indicator?.event(name, data),
         });
+        remoteAccess = new RemoteAccessWatch();
+        remoteAccess.start();
         this._service = new WindowService(() => this.link?.brokerPid ?? null);
         this._service.export();
         this.link.start();
@@ -785,6 +849,8 @@ export default class AgenticDesktopExtension extends Extension {
         this.link = null;
         this._service?.unexport();
         this._service = null;
+        remoteAccess?.stop();
+        remoteAccess = null;
         this._indicator?.destroy();
         this._indicator = null;
     }

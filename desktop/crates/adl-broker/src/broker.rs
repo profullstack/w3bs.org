@@ -1131,6 +1131,11 @@ impl Broker {
             && lg != self.adapter.layout()?.generation {
                 return Err(AdlError::stale("display layout changed; observe again"));
             }
+        // Before approval and before any event: a batch the backend cannot deliver exactly is
+        // refused whole, never typed in part.
+        for a in &batch.actions {
+            self.adapter.preflight(a)?;
+        }
         self.checkpoint(p, &batch.task, gen0)?;
         self.check_approval(p, &pol, batch, target_app.as_deref())?;
         self.check_rate(p, &pol, batch.actions.len())?;
