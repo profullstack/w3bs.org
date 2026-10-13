@@ -2,6 +2,7 @@
 
 mod client;
 mod control;
+mod gnome_ext;
 mod mcp;
 mod paths;
 mod peer;
@@ -42,33 +43,44 @@ struct Cli {
 
 #[derive(Clone, Copy, ValueEnum, PartialEq)]
 enum AdapterKind {
-    /// Vela if running, else the XDG portal backend (KDE Plasma, GNOME; plus KWin windows on Plasma); never the mock
+    /// Vela if running, else the XDG portal backend (KDE Plasma, GNOME; windows from KWin or the W3BS GNOME Shell extension); never the mock
     Auto,
     /// Vela compositor command socket (observation and interlocks; input needs VELA_DEBUG_INPUT)
     Vela,
-    /// XDG RemoteDesktop/ScreenCast/Screenshot portals (KDE Plasma, GNOME); on Plasma windows come from KWin
+    /// XDG RemoteDesktop/ScreenCast/Screenshot portals (KDE Plasma, GNOME); windows come from KWin or the GNOME Shell extension
     Portal,
     /// Deterministic fake desktop for tests and demos
     Mock,
 }
 
 fn make_adapter(kind: AdapterKind) -> Result<Arc<dyn Adapter>> {
+    use adl_linux::gnome::{self, ShellBus, ShellObserver, WithGnome};
     use adl_linux::kwin::{KWinObserver, KWinScripts, WithKWin};
     use adl_linux::{portal::PortalAdapter, vela::VelaAdapter};
     let vela = || VelaAdapter::default_socket().map(VelaAdapter::new).ok_or_else(|| AdlError::new(ErrorCode::Blocked, "Vela command socket not found (needs XDG_RUNTIME_DIR and WAYLAND_DISPLAY)"));
-    // On Plasma the portal backend gets its window list, focus and stacking from KWin.
+    // The portal backend gets its window list, focus and stacking from KWin on Plasma and from
+    // the W3BS Shell extension on GNOME.
     let portal = || -> Arc<dyn Adapter> {
         let p = PortalAdapter::new(paths::config_dir().join("portal-restore-token"));
-        if !KWinObserver::detect() {
-            return Arc::new(p);
+        if KWinObserver::detect() {
+            return match KWinScripts::connect() {
+                Ok(src) => Arc::new(WithKWin::new(p, KWinObserver::new(Box::new(src)))),
+                Err(e) => {
+                    eprintln!("w3bs-desktop: KWin window observer unavailable ({}); targeted input will be refused", e.message);
+                    Arc::new(p.with_windows_note(format!("the KWin window observer is unavailable ({}); targeted input is refused", e.message)))
+                }
+            };
         }
-        match KWinScripts::connect() {
-            Ok(src) => Arc::new(WithKWin::new(p, KWinObserver::new(Box::new(src)))),
-            Err(e) => {
-                eprintln!("w3bs-desktop: KWin window observer unavailable ({}); targeted input will be refused", e.message);
-                Arc::new(p)
-            }
+        if gnome::detect() {
+            return match ShellBus::connect() {
+                Ok(src) => Arc::new(WithGnome::new(p, ShellObserver::new(Box::new(src)))),
+                Err(e) => {
+                    eprintln!("w3bs-desktop: no GNOME Shell window data ({}); targeted input will be refused", e.message);
+                    Arc::new(p.with_windows_note(format!("GNOME Shell window data is unavailable: {}; targeted input is refused until then (restart the daemon after installing)", e.message)))
+                }
+            };
         }
+        Arc::new(p)
     };
     Ok(match kind {
         AdapterKind::Mock => Arc::new(adl_broker::mock::MockDesktop::new()),
@@ -158,7 +170,7 @@ enum Cmd {
     /// Agent transport
     #[command(subcommand)]
     Mcp(McpCmd),
-    /// Print the MCP setup for an agent client
+    /// Print the MCP setup for an agent client, or install the GNOME Shell extension
     Setup {
         #[arg(value_enum)]
         client: SetupClient,
@@ -173,6 +185,8 @@ enum SetupClient {
     ClaudeCode,
     Opencode,
     Codex,
+    /// Install and enable the bundled GNOME Shell extension (top-bar control + window data)
+    GnomeExtension,
 }
 
 #[derive(Clone, Copy, ValueEnum, PartialEq)]
@@ -661,6 +675,10 @@ fn main() {
             mcp::serve_stdio(token_for(&auth)?)?;
             Ok(Value::Null)
         }
+        Cmd::Setup { client: SetupClient::GnomeExtension, .. } => {
+            let v = gnome_ext::install()?;
+            Ok(if j { v } else { json!(v["message"].as_str().unwrap_or_default()) })
+        }
         Cmd::Setup { client, agent } => {
             let name = agent.unwrap_or_else(|| "claude-code".into());
             if !paths::token_file(&name).exists() {
@@ -671,6 +689,7 @@ fn main() {
                 SetupClient::ClaudeCode => format!("claude mcp add w3bs-desktop -- {bin} mcp serve --stdio --agent {name}"),
                 SetupClient::Opencode => serde_json::to_string_pretty(&json!({"mcp": {"w3bs-desktop": {"type": "local", "command": [bin, "mcp", "serve", "--stdio", "--agent", name], "enabled": true}}})).unwrap(),
                 SetupClient::Codex => format!("# ~/.codex/config.toml\n[mcp_servers.w3bs-desktop]\ncommand = \"{bin}\"\nargs = [\"mcp\", \"serve\", \"--stdio\", \"--agent\", \"{name}\"]"),
+                SetupClient::GnomeExtension => unreachable!("handled above"),
             }))
         }
     })();

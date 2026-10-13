@@ -1,0 +1,8 @@
+{
+  "uuid": "agentic-desktop@w3bs.org",
+  "name": "Agentic Desktop Layer",
+  "description": "Native control for the W3BS Agentic Desktop Layer: a top-bar switch for agent access (enable, disable, approvals, stop) and read-only window data (list, geometry, stacking, focus, system-dialog interlock) for the local broker. It never injects input.",
+  "shell-version": ["46", "47", "48", "49", "50"],
+  "url": "https://w3bs.org/desktop",
+  "version-name": "0.1.0"
+}

@@ -1,0 +1,16 @@
+/* Agentic Desktop Layer top-bar indicator. State is always shown as text next to the icon. */
+.adl-indicator-label {
+  margin-left: 4px;
+}
+
+.adl-indicator-enabled .adl-indicator-label {
+  font-weight: bold;
+}
+
+.adl-menu-status {
+  font-weight: bold;
+}
+
+.adl-menu-note {
+  font-style: italic;
+}

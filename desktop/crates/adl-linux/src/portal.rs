@@ -9,8 +9,9 @@
 //!   later enables can skip it where the portal allows (persist mode 2 = until revoked).
 //!
 //! Window listing, focus and occlusion need desktop-specific help: on Plasma `kwin::WithKWin`
-//! wraps this adapter with KWin's window data; on GNOME the W3BS Shell extension does not exist
-//! yet, so there Windows is reported unsupported and targeted input is refused rather than guessed.
+//! wraps this adapter with KWin's window data, on GNOME `gnome::WithGnome` with the W3BS Shell
+//! extension's. Without either, Windows is reported unsupported (with the reason set by
+//! `with_windows_note`) and targeted input is refused rather than guessed.
 //!
 //! Status: compiles and follows the portal spec; NOT certified on any desktop yet.
 
@@ -52,6 +53,7 @@ pub struct PortalAdapter {
     events: Arc<Mutex<Vec<SessionEvent>>>,
     token_file: PathBuf,
     logind: Option<crate::logind::LogindWatcher>,
+    windows_note: String,
 }
 
 type Results = HashMap<String, OwnedValue>;
@@ -71,7 +73,14 @@ fn token() -> String {
 impl PortalAdapter {
     pub fn new(token_file: PathBuf) -> Self {
         let logind = crate::logind::LogindWatcher::start().map_err(|e| eprintln!("w3bs-desktop: logind unavailable ({e}); lock/suspend rely on the native control")).ok();
-        Self { conn: Mutex::new(None), session: Mutex::new(None), generation: Mutex::new(1), events: Arc::new(Mutex::new(vec![])), token_file, logind }
+        let windows_note = "window data needs a desktop-specific observer (KWin on Plasma, the W3BS GNOME Shell extension on GNOME); targeted input is refused".into();
+        Self { conn: Mutex::new(None), session: Mutex::new(None), generation: Mutex::new(1), events: Arc::new(Mutex::new(vec![])), token_file, logind, windows_note }
+    }
+
+    /// Why window data is missing on this desktop, as `capabilities` and `windows` report it.
+    pub fn with_windows_note(mut self, note: impl Into<String>) -> Self {
+        self.windows_note = note.into();
+        self
     }
 
     pub fn detect() -> bool {
@@ -245,7 +254,7 @@ impl Adapter for PortalAdapter {
             input(DEVICE_POINTER, Capability::Pointer, &["absolute_motion", "relative_motion", "button.back", "button.forward", "scroll.horizontal"]),
             input(DEVICE_KEYBOARD, Capability::Keyboard, &["keysym_text"]),
             CapabilityReport { capability: Capability::ScreenCapture, availability: Availability::Degraded, backend: "linux-portal".into(), reason: "Screenshot portal capture, cropped per monitor; the screenshot's pixel scale is chosen by the compositor".into(), features: BTreeSet::new() },
-            un(Capability::Windows, "on Plasma the KWin observer supplies this (see kwin.rs); GNOME needs the W3BS Shell extension, not implemented yet, so targeted input is refused"),
+            un(Capability::Windows, &self.windows_note),
             un(Capability::Accessibility, "AT-SPI adapter not implemented yet"),
         ]
     }
@@ -376,7 +385,7 @@ impl Adapter for PortalAdapter {
     }
 
     fn windows(&self) -> Result<Vec<WindowInfo>> {
-        Err(AdlError::unsupported("window listing on this desktop needs the KWin script or GNOME extension"))
+        Err(AdlError::unsupported(format!("window listing: {}", self.windows_note)))
     }
 
     fn focused_window(&self) -> Result<Option<WindowInfo>> {
