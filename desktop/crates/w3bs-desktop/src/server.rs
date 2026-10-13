@@ -139,6 +139,9 @@ fn handle(broker: Arc<Broker>, stream: UnixStream, kind: Kind) -> std::io::Resul
     if conn.native_control {
         broker.detach_native_control();
     }
+    if let Some(p) = &conn.principal {
+        broker.end_session(p);
+    }
     result
 }
 

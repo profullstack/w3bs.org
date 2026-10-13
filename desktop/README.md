@@ -12,7 +12,7 @@ Page: https://w3bs.org/desktop · License: Apache-2.0
 |---|---|
 | M0: PRD, schemas, ADR, public page | Done |
 | M1: broker, input engine, mock adapter, native control, enable/disable, leases, cancellation, identity tests | Done (terminal native control; tray/panel extensions pending) |
-| M2: KDE Plasma + GNOME real input | Portal backend written and compiling; **not certified on any desktop** |
+| M2: KDE Plasma + GNOME real input | KDE Plasma 6.7.5 (KWin Wayland, Fedora 44): real typing (incl. non-ASCII), pointer, clicks, portal screenshot, disable mid-typing and portal revocation pass on a headless test rig (`tests/rig/kde-portal.sh`, 15/15). GNOME not yet run. **Not certified**: window list/focus on KDE/GNOME still missing |
 | Vela | Observation, focus, occlusion and lock/polkit interlocks (clean-room); input needs `VELA_DEBUG_INPUT=1` + the wlroots virtual-input backend (pending) |
 | Windows, macOS, other Linux desktops | Not started |
 

@@ -88,6 +88,8 @@ struct Lease {
 
 struct Task {
     info: TaskInfo,
+    /// Connection that began it; its tasks end when that connection closes.
+    session: String,
 }
 
 #[derive(Clone)]
@@ -697,7 +699,7 @@ impl Broker {
             id: random_id("task", 8), agent: p.agent.clone(), description: description.chars().take(200).collect(), state: TaskState::Running,
             created_at_ms: now_ms(), ended_at_ms: None, batches_completed: 0, batches_cancelled: 0, batches_unknown: 0,
         };
-        g.tasks.insert(info.id.clone(), Task { info: info.clone() });
+        g.tasks.insert(info.id.clone(), Task { info: info.clone(), session: p.session.clone() });
         drop(g);
         self.audit.log("task.begin", Some(&p.agent), Some(&info.id), "allowed", "", serde_json::Value::Null);
         Ok(info)
@@ -718,6 +720,28 @@ impl Broker {
             g.lease = None;
         }
         Ok(info)
+    }
+
+    /// An agent connection closed (client exited, timed out or crashed): cancel the tasks it
+    /// began and free the input lease if one of them held it, so nothing keeps running unowned.
+    pub fn end_session(&self, p: &Principal) -> usize {
+        let mut g = self.lock();
+        let now = now_ms();
+        let mut ended = vec![];
+        for t in g.tasks.values_mut().filter(|t| t.session == p.session && t.info.state == TaskState::Running) {
+            t.info.state = TaskState::Cancelled;
+            t.info.ended_at_ms = Some(now);
+            ended.push(t.info.id.clone());
+        }
+        if g.lease.as_ref().is_some_and(|l| ended.contains(&l.info.task)) {
+            g.lease = None;
+            Self::broadcast(&mut g, &json!({"v": SCHEMA_VERSION, "event": "lease", "data": null}));
+        }
+        drop(g);
+        if !ended.is_empty() {
+            self.audit.log("session.end", Some(&p.agent), None, "allowed", "cancelled", json!({"tasks": ended.len()}));
+        }
+        ended.len()
     }
 
     pub fn tasks_for(&self, p: &Principal) -> Vec<TaskInfo> {
