@@ -1,4 +1,6 @@
 //! End to end through the real binary: daemon (mock adapter), terminal control, CLI and MCP.
+//! Unix transport (Linux, macOS); the Windows named-pipe variant lives with the Windows port.
+#![cfg(unix)]
 
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};

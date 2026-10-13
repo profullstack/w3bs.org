@@ -1,21 +1,20 @@
-//! The local broker daemon: two Unix sockets, one JSON request per line.
+//! The local broker daemon: two local endpoints, one JSON request per line.
 //!
-//! `agent.sock` serves authenticated agents and has no human-only methods. `control.sock` serves
-//! the native control and the human CLI; requests that raise access are refused when they come
-//! from an agent's process tree. Both sockets are 0600 inside a 0700 runtime directory, and
-//! every peer must be the same uid.
+//! The agent endpoint serves authenticated agents and has no human-only methods. The control
+//! endpoint serves the native control and the human CLI; requests that raise access are refused
+//! when they come from an agent's process tree. Endpoints are private to the user (0600 sockets
+//! in a 0700 directory on Linux/macOS, a user-only named pipe on Windows), and every peer must be
+//! the same user.
 
 use crate::paths;
 use crate::peer;
+use crate::transport::{Duplex, Listener, PeerInfo};
 use adl_broker::{Broker, Peer, Principal, SessionEvent};
 use adl_schema::rpc::{Request, Response, AGENT_METHODS, CONTROL_METHODS};
 use adl_schema::*;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Read, Write};
-use std::os::unix::fs::PermissionsExt;
-use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
@@ -24,48 +23,53 @@ const MAX_LINE: u64 = 256 * 1024;
 
 static SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
+#[cfg(unix)]
 extern "C" fn on_signal(_: libc::c_int) {
     SHUTDOWN.store(true, Ordering::SeqCst);
 }
 
-fn bind(path: &Path) -> std::io::Result<UnixListener> {
-    if path.exists() {
-        if UnixStream::connect(path).is_ok() {
-            return Err(std::io::Error::new(std::io::ErrorKind::AddrInUse, format!("{} is already served by a running daemon", path.display())));
-        }
-        std::fs::remove_file(path)?;
-    }
-    let l = UnixListener::bind(path)?;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
-    Ok(l)
-}
-
-pub fn serve(broker: Arc<Broker>) -> std::io::Result<()> {
-    let dir = paths::runtime_dir();
-    std::fs::create_dir_all(&dir)?;
-    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))?;
-    let agent = bind(&paths::agent_socket())?;
-    let control = bind(&paths::control_socket())?;
+#[cfg(unix)]
+fn install_shutdown_handlers() {
     // SAFETY: installing a handler that only stores to an atomic.
     unsafe {
         libc::signal(libc::SIGINT, on_signal as *const () as libc::sighandler_t);
         libc::signal(libc::SIGTERM, on_signal as *const () as libc::sighandler_t);
         libc::signal(libc::SIGHUP, on_signal as *const () as libc::sighandler_t);
     }
+}
+
+#[cfg(windows)]
+fn install_shutdown_handlers() {
+    // Console control events (Ctrl+C, close, logoff, shutdown) are wired in the Windows port.
+}
+
+/// Ask the supervisor loop to disable and exit (used by platform shutdown hooks).
+#[allow(dead_code)]
+pub fn request_shutdown() {
+    SHUTDOWN.store(true, Ordering::SeqCst);
+}
+
+pub fn serve(broker: Arc<Broker>) -> std::io::Result<()> {
+    let (agent_ep, control_ep) = (paths::agent_socket(), paths::control_socket());
+    let agent = Listener::bind(&agent_ep)?;
+    let control = Listener::bind(&control_ep)?;
+    install_shutdown_handlers();
     eprintln!("w3bs-desktop: broker ready (adapter {}), state Disabled", broker.adapter_name());
-    eprintln!("  agents:  {}", paths::agent_socket().display());
-    eprintln!("  control: {}", paths::control_socket().display());
+    eprintln!("  agents:  {agent_ep}");
+    eprintln!("  control: {control_ep}");
 
     for (listener, kind) in [(agent, Kind::Agent), (control, Kind::Control)] {
         let b = broker.clone();
         std::thread::spawn(move || {
-            for conn in listener.incoming().flatten() {
+            loop {
+                let Ok((conn, peer)) = listener.accept() else { continue };
                 let b = b.clone();
                 std::thread::spawn(move || {
-                    if let Err(e) = handle(b, conn, kind)
-                        && e.kind() != std::io::ErrorKind::BrokenPipe {
-                            eprintln!("w3bs-desktop: connection error: {e}");
-                        }
+                    if let Err(e) = handle(b, conn, peer, kind)
+                        && e.kind() != std::io::ErrorKind::BrokenPipe
+                    {
+                        eprintln!("w3bs-desktop: connection error: {e}");
+                    }
                 });
             }
         });
@@ -78,8 +82,8 @@ pub fn serve(broker: Arc<Broker>) -> std::io::Result<()> {
     }
     let report = broker.disable("broker shutting down");
     eprintln!("w3bs-desktop: disabled on shutdown ({} tasks cancelled)", report.tasks_cancelled);
-    let _ = std::fs::remove_file(paths::agent_socket());
-    let _ = std::fs::remove_file(paths::control_socket());
+    Listener::remove(&agent_ep);
+    Listener::remove(&control_ep);
     Ok(())
 }
 
@@ -91,25 +95,24 @@ enum Kind {
 
 struct Conn {
     kind: Kind,
-    cred: Option<peer::Cred>,
+    cred: Option<PeerInfo>,
     principal: Option<Principal>,
     native_control: bool,
-    writer: Arc<Mutex<UnixStream>>,
+    writer: Arc<Mutex<Box<dyn Duplex>>>,
 }
 
-fn write_line(w: &Mutex<UnixStream>, line: &str) -> std::io::Result<()> {
+fn write_line(w: &Mutex<Box<dyn Duplex>>, line: &str) -> std::io::Result<()> {
     let mut s = w.lock().unwrap_or_else(|e| e.into_inner());
     s.write_all(line.as_bytes())?;
-    s.write_all(b"\n")
+    s.write_all(b"\n")?;
+    s.flush()
 }
 
-fn handle(broker: Arc<Broker>, stream: UnixStream, kind: Kind) -> std::io::Result<()> {
-    let cred = peer::peer_cred(&stream);
-    if let Some(c) = cred
-        && c.uid != peer::my_uid() {
-            return Ok(()); // other users never get an answer
-        }
-    let writer = Arc::new(Mutex::new(stream.try_clone()?));
+fn handle(broker: Arc<Broker>, stream: Box<dyn Duplex>, cred: Option<PeerInfo>, kind: Kind) -> std::io::Result<()> {
+    if cred.is_some_and(|c| !c.same_user) {
+        return Ok(()); // other users never get an answer
+    }
+    let writer = Arc::new(Mutex::new(stream.try_clone_box()?));
     let mut conn = Conn { kind, cred, principal: None, native_control: false, writer: writer.clone() };
     let mut reader = BufReader::new(stream);
     let result = (|| -> std::io::Result<()> {
@@ -144,6 +147,7 @@ fn handle(broker: Arc<Broker>, stream: UnixStream, kind: Kind) -> std::io::Resul
     }
     result
 }
+
 
 fn params<T: DeserializeOwned>(v: &Value) -> Result<T> {
     serde_json::from_value(if v.is_null() { json!({}) } else { v.clone() }).map_err(|e| AdlError::invalid(format!("invalid params: {e}")))
@@ -313,10 +317,11 @@ fn doctor(b: &Broker) -> Value {
     let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
     let mut checks = vec![];
     let mut check = |name: &str, ok: bool, detail: String| checks.push(json!({"check": name, "ok": ok, "detail": detail}));
-    check("runtime_dir_private", std::fs::metadata(paths::runtime_dir()).map(|m| m.permissions().mode() & 0o077 == 0).unwrap_or(false), paths::runtime_dir().display().to_string());
+    check("endpoints_private", endpoints_private(), paths::control_socket().to_string());
     check("session", !session.is_empty(), format!("XDG_SESSION_TYPE={session:?} XDG_CURRENT_DESKTOP={desktop:?}"));
     let input_ok = caps.iter().any(|c| c.capability == Capability::Pointer && c.availability == Availability::Available);
     check("pointer_backend", input_ok, b.adapter_name());
+    #[cfg(target_os = "linux")]
     if adl_linux::gnome::detect() {
         match adl_linux::gnome::extension_present() {
             Ok(owner) => check("gnome_shell_extension", true, format!("{} is loaded in gnome-shell ({owner})", adl_linux::gnome::EXTENSION_UUID)),
@@ -325,5 +330,17 @@ fn doctor(b: &Broker) -> Value {
     }
     check("native_control", true, "the tray, panel extension or `w3bs desktop control` must be running before enable".into());
     json!({"status": b.status(), "capabilities": caps, "checks": checks, "paths": {
-        "agent_socket": paths::agent_socket(), "control_socket": paths::control_socket(), "config": paths::config_dir(), "state": paths::state_dir()}})
+        "agent_socket": paths::agent_socket().to_string(), "control_socket": paths::control_socket().to_string(), "config": paths::config_dir(), "state": paths::state_dir()}})
+}
+
+#[cfg(unix)]
+fn endpoints_private() -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::metadata(paths::runtime_dir()).map(|m| m.permissions().mode() & 0o077 == 0).unwrap_or(false)
+}
+
+#[cfg(windows)]
+fn endpoints_private() -> bool {
+    // The pipe is created with a user-only DACL (Windows port).
+    true
 }
