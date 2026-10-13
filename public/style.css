@@ -1871,3 +1871,22 @@ textarea {
     top: 16px;
   }
 }
+
+.desktop-install-box {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  max-width: 760px;
+}
+.desktop-install-box .identity-line {
+  flex-wrap: wrap;
+  margin: 0;
+}
+.desktop-install-box code {
+  overflow-wrap: anywhere;
+  font-size: 1.05em;
+}
