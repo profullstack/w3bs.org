@@ -86,6 +86,7 @@ enum Cmd {
         retention_days: u64,
     },
     /// Terminal native control: shows state, enable codes and approvals; quitting disables access
+    #[command(long_about = "Terminal native control: the on/off switch for agent access, in a terminal.\n\nRun it, then type a command and press Enter:\n  enable            turn agent access on (your desktop may ask for permission the first time)\n  disable           turn it off\n  stop              cancel all agent activity but stay enabled\n  approvals         list requests waiting for you\n  approve <id>      allow one request; deny <id> refuses it\n  confirm           confirm an enable request started from another terminal\n  tasks, status     what agents are doing\n  quit              leave (this also turns agent access off)\n\nKeep it open while agents work. The tray icon or GNOME panel menu does the same thing.")]
     Control,
     /// Tray/menu-bar native control (StatusNotifierItem on Linux, a menu-bar item on macOS) with an emergency-stop shortcut; quitting disables access
     Tray {
