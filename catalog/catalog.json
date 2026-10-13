@@ -2251,5 +2251,40 @@
   "install": "curl -fsSL https://raw.githubusercontent.com/danielmiessler/fabric/main/scripts/installer/install.sh | bash",
   "evidence": "https://github.com/danielmiessler/Fabric README; gh release view; examples: https://github.com/danielmiessler/Fabric (README)",
   "publisher": "third-party"
+ },
+ {
+  "id": "w3bs.org/agentic-desktop-layer",
+  "name": "agentic-desktop-layer",
+  "commands": [
+   "w3bs-desktop"
+  ],
+  "examples": [
+   {
+    "run": "w3bs-desktop agents add claude-code --preset broad",
+    "does": "Register an agent and save its token"
+   },
+   {
+    "run": "w3bs-desktop setup claude-code --agent claude-code --http",
+    "does": "Print the claude mcp add line for the broker's local MCP endpoint"
+   },
+   {
+    "run": "w3bs-desktop control",
+    "does": "Terminal on/off switch: type enable to let agents use the desktop"
+   },
+   {
+    "run": "w3bs-desktop disable",
+    "does": "Stop all agent access at once"
+   }
+  ],
+  "description": "Lets Claude Code, OpenCode and Codex use your real desktop with mouse and keyboard on Linux, macOS and Windows, through a local broker and MCP server. Starts disabled; you turn it on and off from the tray, panel or menu bar.",
+  "homepage": "https://w3bs.org/desktop",
+  "repository": "https://github.com/profullstack/w3bs.org/tree/main/desktop",
+  "license": "Apache-2.0",
+  "agentic": true,
+  "latest_version": "0.2.1",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://w3bs.org/desktop/install.sh | sh",
+  "evidence": "w3bs.org/desktop/install.sh 200 (text/x-shellscript); GitHub release desktop-v0.2.1 with 5 archives + SHA256SUMS; installer verified on ubuntu:24.04, macos-latest and windows-latest CI",
+  "publisher": "profullstack"
  }
 ]
