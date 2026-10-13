@@ -6,6 +6,24 @@
    "moshcode",
    "moshscript"
   ],
+  "examples": [
+   {
+    "run": "moshcode engines",
+    "does": "List the coding agents moshcode can install and which are present"
+   },
+   {
+    "run": "moshcode install claude",
+    "does": "Install Claude Code as an engine"
+   },
+   {
+    "run": "moshcode start claude -d --name <session>",
+    "does": "Launch an engine as a background session that outlives the terminal"
+   },
+   {
+    "run": "moshscript <script.mosh>",
+    "does": "Run a moshscript file (alias for moshcode run)"
+   }
+  ],
   "description": "Wrapper CLI that installs and drives coding agents such as opencode, Claude Code and codex, with a small scripting toolkit called moshscript.",
   "homepage": "https://moshcode.sh",
   "repository": "https://github.com/moshcoder/moshcode",
@@ -14,7 +32,7 @@
   "latest_version": "0.115.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://moshcoding.com/install.sh | sh",
-  "evidence": "npm view moshcode; moshcoding.com/install.sh 200",
+  "evidence": "npm view moshcode; moshcoding.com/install.sh 200; examples: /home/anthony/src/moshcoder/moshcode/README.md; bin/moshscript.mjs",
   "publisher": "profullstack"
  },
  {
@@ -38,6 +56,24 @@
    "dl",
    "tts"
   ],
+  "examples": [
+   {
+    "run": "cli-tools config set perplexity",
+    "does": "Store an API key once (prompted, never echoed) for the commands that need one"
+   },
+   {
+    "run": "gh-prs --orgs <org>",
+    "does": "List open pull requests across a GitHub org, newest first"
+   },
+   {
+    "run": "ask-web \"<question>\" --recency month",
+    "does": "Answer a question from a live web search, with numbered sources"
+   },
+   {
+    "run": "vid info <file.mp4>",
+    "does": "Show a video's duration, streams and size"
+   }
+  ],
   "description": "A collection of TypeScript command-line tools for working across many repositories, searching the web, checking domains, handling media and provisioning servers.",
   "homepage": "https://github.com/profullstack/cli-tools",
   "repository": "https://github.com/profullstack/cli-tools",
@@ -46,7 +82,7 @@
   "latest_version": "0.68.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/cli-tools/master/install.sh | sh",
-  "evidence": "cli-tools README; raw install.sh 200; gh release v0.68.0",
+  "evidence": "cli-tools README; raw install.sh 200; gh release v0.68.0; examples: /home/anthony/src/profullstack/cli-tools/README.md (sections: API keys, gh-prs, ask-web, vid)",
   "publisher": "profullstack"
  },
  {
@@ -54,6 +90,24 @@
   "name": "myna",
   "commands": [
    "myna"
+  ],
+  "examples": [
+   {
+    "run": "myna login <network>",
+    "does": "Connect a social account, e.g. bluesky"
+   },
+   {
+    "run": "myna post all \"<text>\"",
+    "does": "Post the same text to every connected account"
+   },
+   {
+    "run": "myna schedule \"in 2h\" \"<text>\"",
+    "does": "Queue a post to go out later"
+   },
+   {
+    "run": "myna",
+    "does": "Open the TUI to write, schedule and review posts"
+   }
   ],
   "description": "Terminal social media manager that writes, schedules and posts to about 25 networks from one queue.",
   "homepage": "https://mynaposter.com",
@@ -63,7 +117,7 @@
   "latest_version": "0.44.2",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://mynaposter.com/install.sh | sh",
-  "evidence": "mynaposter/apps/cli/package.json bin myna; installer 200; gh release v0.44.2",
+  "evidence": "mynaposter/apps/cli/package.json bin myna; installer 200; gh release v0.44.2; examples: /home/anthony/src/profullstack/mynaposter/README.md",
   "publisher": "profullstack"
  },
  {
@@ -71,6 +125,24 @@
   "name": "sh1pt",
   "commands": [
    "sh1pt"
+  ],
+  "examples": [
+   {
+    "run": "sh1pt init",
+    "does": "Scaffold sh1pt.config.ts in the current project"
+   },
+   {
+    "run": "sh1pt build",
+    "does": "Build every enabled target locally"
+   },
+   {
+    "run": "sh1pt ship --dry-run",
+    "does": "Simulate publishing the built artifacts to their stores"
+   },
+   {
+    "run": "sh1pt ship status",
+    "does": "Show live, pending and in-review state per target"
+   }
   ],
   "description": "CLI that builds one codebase and ships it to app stores, package registries, CDNs and deploy targets, then promotes it.",
   "homepage": "https://sh1pt.com",
@@ -80,7 +152,7 @@
   "latest_version": "0.3.5",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://sh1pt.com/install.sh | sh",
-  "evidence": "npm view @profullstack/sh1pt; sh1pt.com/install.sh 200",
+  "evidence": "npm view @profullstack/sh1pt; sh1pt.com/install.sh 200; examples: https://github.com/profullstack/sh1pt (README 'CLI surface' + packages/cli/src/commands/{init,build,ship}.ts)",
   "publisher": "profullstack"
  },
  {
@@ -88,6 +160,24 @@
   "name": "logicsrc",
   "commands": [
    "logicsrc"
+  ],
+  "examples": [
+   {
+    "run": "logicsrc prd init",
+    "does": "Create a prd/ collection with the OpenPRD template and an index"
+   },
+   {
+    "run": "logicsrc prd new \"<Short imperative title>\"",
+    "does": "Create the next numbered product requirements doc"
+   },
+   {
+    "run": "logicsrc prd validate prd --strict",
+    "does": "Check every PRD's shape and lifecycle, warnings as errors"
+   },
+   {
+    "run": "logicsrc mcp",
+    "does": "Run the LogicSRC standards MCP server over stdio"
+   }
   ],
   "description": "CLI for LogicSRC, an open standards initiative for coordinating humans and AI agents.",
   "homepage": "https://logicsrc.com",
@@ -97,7 +187,7 @@
   "latest_version": "0.7.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://logicsrc.com/install.sh | sh",
-  "evidence": "logicsrc/packages/cli/package.json; logicsrc.com/install.sh 200",
+  "evidence": "logicsrc/packages/cli/package.json; logicsrc.com/install.sh 200; examples: /home/anthony/src/profullstack/logicsrc/README.md; packages/cli/src/prd.ts",
   "publisher": "profullstack"
  },
  {
@@ -105,6 +195,24 @@
   "name": "openmcp",
   "commands": [
    "openmcp"
+  ],
+  "examples": [
+   {
+    "run": "openmcp relays",
+    "does": "List the MCP relays the catalog knows about"
+   },
+   {
+    "run": "openmcp find \"<what you want to do>\"",
+    "does": "Search every relay's tools by description"
+   },
+   {
+    "run": "openmcp add <relay-url>",
+    "does": "Register an MCP relay by any URL on its origin"
+   },
+   {
+    "run": "openmcp serve --port 8790 --url <public-url> --admin-token <token>",
+    "does": "Run your own catalog on one SQLite file"
+   }
   ],
   "description": "Client and reference server for OpenMCP, an open catalog of MCP relays.",
   "homepage": "https://logicsrc.com/openmcp",
@@ -114,7 +222,7 @@
   "latest_version": "0.4.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://openmcp.logicsrc.com/install.sh | sh",
-  "evidence": "npm view @logicsrc/openmcp; installer 200",
+  "evidence": "npm view @logicsrc/openmcp; installer 200; examples: /home/anthony/src/logicsrc/openmcp/README.md (Use one, Run a catalog)",
   "publisher": "profullstack"
  },
  {
@@ -124,6 +232,24 @@
    "agenticjobs",
    "agenticjobs-mcp"
   ],
+  "examples": [
+   {
+    "run": "agenticjobs signup <email>",
+    "does": "Create an account; the emailed link also approves this terminal"
+   },
+   {
+    "run": "agenticjobs search \"<keyword>\" --remote",
+    "does": "Search remote job listings on the board"
+   },
+   {
+    "run": "agenticjobs apply <job-slug> --resume <resume.md> --draft",
+    "does": "Prepare an application as a draft without sending it"
+   },
+   {
+    "run": "claude mcp add jobs -- agenticjobs-mcp --server https://agenticjobs.work",
+    "does": "Add the job board as an MCP server in Claude Code"
+   }
+  ],
   "description": "Self-hosted job board for agents and people, with a CLI and an MCP server.",
   "homepage": "https://agenticjobs.work",
   "repository": "https://github.com/profullstack/agenticjobs",
@@ -132,7 +258,7 @@
   "latest_version": "0.22.4",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://agenticjobs.work/install.sh | sh",
-  "evidence": "npm view @profullstack/agenticjobs; installer 200",
+  "evidence": "npm view @profullstack/agenticjobs; installer 200; examples: /home/anthony/src/profullstack/agenticjobs/README.md; MCP line from src/views/docs.tsx + src/mcp/stdio.ts",
   "publisher": "profullstack"
  },
  {
@@ -142,6 +268,24 @@
    "hqterm",
    "hqsh"
   ],
+  "examples": [
+   {
+    "run": "hqterm",
+    "does": "Open the session manager with your SSH hosts and their sessions"
+   },
+   {
+    "run": "hqterm connect <host>",
+    "does": "Attach straight to a persistent session on a host"
+   },
+   {
+    "run": "hqterm doctor",
+    "does": "Report terminal capabilities and draw a test image"
+   },
+   {
+    "run": "hqsh <host> --session <name>",
+    "does": "Connect to or resume a named session with hqsh directly"
+   }
+  ],
   "description": "Persistent terminal sessions over SSH that survive disconnects and pass through images and other escape sequences.",
   "homepage": "https://hqterm.sh",
   "repository": "https://github.com/profullstack/hqterm",
@@ -150,7 +294,7 @@
   "latest_version": "0.4.1",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://hqterm.sh/install | sh",
-  "evidence": "hqterm.sh/install 200; gh release v0.4.1",
+  "evidence": "hqterm.sh/install 200; gh release v0.4.1; examples: https://github.com/profullstack/hqterm (README 'Use') + https://github.com/profullstack/hqsh README",
   "publisher": "profullstack"
  },
  {
@@ -158,6 +302,24 @@
   "name": "c0mpute",
   "commands": [
    "c0mpute"
+  ],
+  "examples": [
+   {
+    "run": "c0mpute doctor",
+    "does": "Run a full-stack health check of this machine"
+   },
+   {
+    "run": "c0mpute coinpay did create",
+    "does": "Create the CoinPay DID identity c0mpute uses"
+   },
+   {
+    "run": "c0mpute infernet chat --model qwen2.5:7b \"<prompt>\"",
+    "does": "Send a chat prompt to a model on the Infernet network"
+   },
+   {
+    "run": "c0mpute worker start --gpu",
+    "does": "Start a GPU worker that takes jobs from the network"
+   }
   ],
   "description": "CLI for a decentralized compute network that runs transcoding and GPU inference jobs and pays workers.",
   "homepage": "https://c0mpute.com",
@@ -167,7 +329,7 @@
   "latest_version": "0.2.28",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://c0mpute.com/install.sh | sh",
-  "evidence": "c0mpute Cargo.toml; c0mpute.com/install.sh 200",
+  "evidence": "c0mpute Cargo.toml; c0mpute.com/install.sh 200; examples: /home/anthony/src/profullstack/c0mpute/README.md",
   "publisher": "profullstack"
  },
  {
@@ -175,6 +337,24 @@
   "name": "infernet",
   "commands": [
    "infernet"
+  ],
+  "examples": [
+   {
+    "run": "infernet setup",
+    "does": "Install Ollama, pull a model, open the firewall and save config"
+   },
+   {
+    "run": "infernet chat \"<prompt>\"",
+    "does": "Run local inference, no control plane needed"
+   },
+   {
+    "run": "infernet model list",
+    "does": "See which models are pulled"
+   },
+   {
+    "run": "infernet tui",
+    "does": "Open the live node dashboard (q to quit)"
+   }
   ],
   "description": "GPU node CLI and daemon that registers a GPU server with the Infernet Protocol and serves inference jobs.",
   "homepage": "https://infernetprotocol.com",
@@ -184,7 +364,7 @@
   "latest_version": "0.1.59",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://c0mpute.com/plugins/infernet/install.sh | sh",
-  "evidence": "npm view @infernetprotocol/cli; installer 200",
+  "evidence": "npm view @infernetprotocol/cli; installer 200; examples: /home/anthony/src/InfernetProtocol/infernet-protocol/README.md (Quick start: Then:)",
   "publisher": "profullstack"
  },
  {
@@ -192,6 +372,24 @@
   "name": "diskpush",
   "commands": [
    "diskpush"
+  ],
+  "examples": [
+   {
+    "run": "diskpush connections add <name> <user@host> --path <remote-dir>",
+    "does": "Save a server as a named connection"
+   },
+   {
+    "run": "diskpush connections test <name>",
+    "does": "Check SSH, SFTP and remote rsync in one step"
+   },
+   {
+    "run": "diskpush <local-dir>/ <name>:<remote-dir>/ --dry-run",
+    "does": "Preview what a sync would change without doing it"
+   },
+   {
+    "run": "diskpush <local-dir>/ <name>:<remote-dir>/",
+    "does": "Sync a local folder to the server"
+   }
   ],
   "description": "Rsync-based CLI and desktop app that syncs only changed files to remote servers.",
   "homepage": "https://diskpush.com",
@@ -201,7 +399,7 @@
   "latest_version": "0.12.5",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://diskpush.com/install.sh | sh",
-  "evidence": "diskpush.com/install.sh 200; gh release v0.12.5",
+  "evidence": "diskpush.com/install.sh 200; gh release v0.12.5; examples: /home/anthony/src/profullstack/diskpush/README.md (Quick start)",
   "publisher": "profullstack"
  },
  {
@@ -209,6 +407,24 @@
   "name": "nixamp",
   "commands": [
    "nixamp"
+  ],
+  "examples": [
+   {
+    "run": "nixamp ~/Music",
+    "does": "Play a music folder in the terminal player"
+   },
+   {
+    "run": "nixamp <file>",
+    "does": "Play a single audio file"
+   },
+   {
+    "run": "nixamp login",
+    "does": "Sign in to nixamp.com via a browser provider or password"
+   },
+   {
+    "run": "nixamp party list",
+    "does": "List watch parties you could join right now"
+   }
   ],
   "description": "Winamp-style audio player and streaming client for the terminal.",
   "homepage": "https://nixamp.com",
@@ -218,7 +434,7 @@
   "latest_version": "0.28.44",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://nixamp.com/install.sh | sh",
-  "evidence": "npm view nixamp; nixamp.com/install.sh 200",
+  "evidence": "npm view nixamp; nixamp.com/install.sh 200; examples: https://github.com/profullstack/nixamp (README)",
   "publisher": "profullstack"
  },
  {
@@ -226,6 +442,24 @@
   "name": "threatcrush",
   "commands": [
    "threatcrush"
+  ],
+  "examples": [
+   {
+    "run": "threatcrush init",
+    "does": "Auto-detect services on this host and generate a config"
+   },
+   {
+    "run": "threatcrush monitor",
+    "does": "Watch nginx, auth and syslog for live attacks in the foreground"
+   },
+   {
+    "run": "threatcrush scan <path>",
+    "does": "Scan a codebase for vulnerabilities and leaked secrets"
+   },
+   {
+    "run": "threatcrush tui",
+    "does": "Open the interactive security dashboard"
+   }
   ],
   "description": "Security agent daemon that monitors, scans and protects servers in real time.",
   "homepage": "https://threatcrush.com",
@@ -235,7 +469,7 @@
   "latest_version": "0.13.28",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://threatcrush.com/install.sh | sh",
-  "evidence": "npm view @profullstack/threatcrush; installer 200",
+  "evidence": "npm view @profullstack/threatcrush; installer 200; examples: /home/anthony/src/profullstack/threatcrush/README.md",
   "publisher": "profullstack"
  },
  {
@@ -243,6 +477,24 @@
   "name": "coinpay",
   "commands": [
    "coinpay"
+  ],
+  "examples": [
+   {
+    "run": "coinpay login",
+    "does": "Sign in with OAuth in your browser (--device on a headless box)"
+   },
+   {
+    "run": "coinpay payment create --business-id <business-id> --amount <amount> --blockchain <chain>",
+    "does": "Create a crypto payment request and print its address"
+   },
+   {
+    "run": "coinpay payment get <payment-id>",
+    "does": "Show a payment's details and status"
+   },
+   {
+    "run": "coinpay payment list --business-id <business-id>",
+    "does": "List payments for one of your businesses"
+   }
   ],
   "description": "SDK and CLI for accepting crypto and card payments, with wallet and swap commands.",
   "homepage": "https://coinpayportal.com",
@@ -252,7 +504,7 @@
   "latest_version": "0.16.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://coinpayportal.com/install.sh | sh",
-  "evidence": "npm view @profullstack/coinpay; installer 200",
+  "evidence": "npm view @profullstack/coinpay; installer 200; examples: /home/anthony/src/profullstack/coinpayportal/packages/sdk/bin/coinpay.js (showHelp, handlePayment)",
   "publisher": "profullstack"
  },
  {
@@ -260,6 +512,24 @@
   "name": "ugig",
   "commands": [
    "ugig"
+  ],
+  "examples": [
+   {
+    "run": "ugig login",
+    "does": "Log in by approving this device in a browser"
+   },
+   {
+    "run": "ugig auth whoami",
+    "does": "Check which account the CLI is using"
+   },
+   {
+    "run": "ugig gigs list --search \"<keyword>\"",
+    "does": "Browse open gigs matching a keyword"
+   },
+   {
+    "run": "ugig apply <gig-id> --cover-letter \"<text>\"",
+    "does": "Apply to a gig with a cover letter"
+   }
   ],
   "description": "CLI for ugig.net, a marketplace for AI-assisted engineers and skilled workers.",
   "homepage": "https://ugig.net",
@@ -269,7 +539,7 @@
   "latest_version": "0.3.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://ugig.net/install.sh | bash",
-  "evidence": "ugig.net/cli/package.json; installer 200",
+  "evidence": "ugig.net/cli/package.json; installer 200; examples: /home/anthony/src/profullstack/ugig.net/src/app/docs/cli/page.tsx + cli/src/commands (login.ts, auth.ts, gigs.ts, applications.ts)",
   "publisher": "profullstack"
  },
  {
@@ -279,6 +549,24 @@
    "rssamplifier",
    "rssamp"
   ],
+  "examples": [
+   {
+    "run": "rssamp search \"<topic>\"",
+    "does": "Search posts across the open feed directory"
+   },
+   {
+    "run": "rssamp topic <topic>",
+    "does": "List the feeds filed under one subject"
+   },
+   {
+    "run": "rssamp submit <site-or-feed-url>",
+    "does": "Submit a blog or feed to the directory"
+   },
+   {
+    "run": "rssamp opml --topic <topic> > <topic>.opml",
+    "does": "Export a topic's feeds as an OPML file for your reader"
+   }
+  ],
   "description": "CLI for the rssamplifier.com feed directory that finds feeds by topic, searches, exports OPML and submits blogs.",
   "homepage": "https://rssamplifier.com",
   "repository": "https://github.com/profullstack/rssamplifier.com",
@@ -287,7 +575,7 @@
   "latest_version": "0.4.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://rssamplifier.com/install.sh | sh",
-  "evidence": "npm view @profullstack/rssamplifier; installer 200",
+  "evidence": "npm view @profullstack/rssamplifier; installer 200; examples: https://github.com/profullstack/rssamplifier.com (README 'CLI' + apps/cli/README.md, apps/cli/src/index.js)",
   "publisher": "profullstack"
  },
  {
@@ -295,6 +583,24 @@
   "name": "wx93",
   "commands": [
    "wx93"
+  ],
+  "examples": [
+   {
+    "run": "wx93 <url>",
+    "does": "Shorten a URL and print the short link (no account needed)"
+   },
+   {
+    "run": "wx93 login",
+    "does": "Sign in through your browser so links are saved to your account"
+   },
+   {
+    "run": "wx93 ls",
+    "does": "List your short links"
+   },
+   {
+    "run": "wx93 stats <code>",
+    "does": "Show clicks, referrers, countries and devices for a link"
+   }
   ],
   "description": "CLI and TUI for the wx93.me link shortener that creates short links, shows stats and prints QR codes.",
   "homepage": "https://wx93.me",
@@ -304,7 +610,7 @@
   "latest_version": "0.1.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://wx93.me/install | sh",
-  "evidence": "npm view @profullstack/wx93; wx93.me/install 200",
+  "evidence": "npm view @profullstack/wx93; wx93.me/install 200; examples: /home/anthony/src/profullstack/wx93.me/README.md; packages/cli/src/cli.js",
   "publisher": "profullstack"
  },
  {
@@ -314,6 +620,20 @@
    "tron",
    "tronbrowser"
   ],
+  "examples": [
+   {
+    "run": "tron <url>",
+    "does": "Open one or more URLs in TronBrowser"
+   },
+   {
+    "run": "tron --tor <url>",
+    "does": "Open through Tor in a separate wiped profile (needs the tor daemon)"
+   },
+   {
+    "run": "tron upgrade",
+    "does": "Update to the latest release, no-op if already current"
+   }
+  ],
   "description": "Privacy-focused Chromium-based browser with a tron command for launching, upgrading and removing it.",
   "homepage": "https://tronbrowser.dev",
   "repository": "https://github.com/profullstack/tronbrowser.dev",
@@ -322,7 +642,7 @@
   "latest_version": "3.16.1",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://tronbrowser.dev/install.sh | sh",
-  "evidence": "tronbrowser.dev/install.sh 200; homebrew-tap Formula/tronbrowser.rb",
+  "evidence": "tronbrowser.dev/install.sh 200; homebrew-tap Formula/tronbrowser.rb; examples: /home/anthony/src/profullstack/tronbrowser.dev/README.md (Install)",
   "publisher": "profullstack"
  },
  {
@@ -330,6 +650,24 @@
   "name": "opencontext",
   "commands": [
    "opencontext"
+  ],
+  "examples": [
+   {
+    "run": "opencontext init <dir>",
+    "does": "Create a context project that validates out of the box"
+   },
+   {
+    "run": "opencontext validate --strict",
+    "does": "Check schemas, references and permissions"
+   },
+   {
+    "run": "opencontext doctor",
+    "does": "Report context health and a score, flagging stale items"
+   },
+   {
+    "run": "opencontext resolve --role <role> --task \"<task>\" --explain",
+    "does": "Show the context a role gets for a task, and why"
+   }
   ],
   "description": "Reference implementation of the LogicSRC OpenContext standard for portable, permissioned agent context.",
   "homepage": "https://logicsrc.com/opencontext",
@@ -339,7 +677,7 @@
   "latest_version": "0.1.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://logicsrc.com/opencontext/install.sh | sh",
-  "evidence": "https://logicsrc.com/opencontext/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://logicsrc.com/opencontext/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/logicsrc/docs/opencontext.md; flags confirmed in packages/opencontext/src/commands.ts",
   "publisher": "profullstack"
  },
  {
@@ -347,6 +685,24 @@
   "name": "smshub",
   "commands": [
    "smshub-cli"
+  ],
+  "examples": [
+   {
+    "run": "smshub-cli login --key <api-key>",
+    "does": "Save your smshub.dev API key from Settings > API Keys"
+   },
+   {
+    "run": "smshub-cli rent --area <area-code>",
+    "does": "Rent a US number; prints a CoinPay link and waits for payment"
+   },
+   {
+    "run": "smshub-cli numbers",
+    "does": "List your numbers with their expiry dates"
+   },
+   {
+    "run": "smshub-cli otp <number> --wait 60",
+    "does": "Print the next verification code the number receives"
+   }
   ],
   "description": "CLI, TUI and MCP server for renting a phone number and receiving SMS verification codes.",
   "homepage": "https://smshub.dev",
@@ -356,7 +712,7 @@
   "latest_version": "1.4.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://smshub.dev/cli/install.sh | sh",
-  "evidence": "https://smshub.dev/cli/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://smshub.dev/cli/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: https://github.com/profullstack/smshub/blob/main/cli/README.md",
   "publisher": "profullstack"
  },
  {
@@ -364,6 +720,24 @@
   "name": "pairux",
   "commands": [
    "pairux"
+  ],
+  "examples": [
+   {
+    "run": "pairux",
+    "does": "Launch the PairUX desktop app"
+   },
+   {
+    "run": "pairux join <join-code> --name <name>",
+    "does": "Join a live session from the terminal as a labelled participant"
+   },
+   {
+    "run": "pairux say \"<message>\"",
+    "does": "Post a message in the session chat"
+   },
+   {
+    "run": "pairux leave",
+    "does": "Leave the session"
+   }
   ],
   "description": "Screen sharing app whose pairux command brings AI agents into a live PairUX session as participants.",
   "homepage": "https://pairux.com",
@@ -373,7 +747,7 @@
   "latest_version": null,
   "vendor": "Profullstack",
   "install": "curl -fsSL https://pairux.com/install.sh | sh",
-  "evidence": "https://pairux.com/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://pairux.com/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/pairux.com/README.md",
   "publisher": "profullstack"
  },
  {
@@ -381,6 +755,16 @@
   "name": "wx93-mcp",
   "commands": [
    "wx93-mcp"
+  ],
+  "examples": [
+   {
+    "run": "wx93-mcp",
+    "does": "Start the stdio MCP server (point your MCP client's command at it)"
+   },
+   {
+    "run": "WX93_API_KEY=<api-key> wx93-mcp",
+    "does": "Start it signed in to your wx93.me account via an API key"
+   }
   ],
   "description": "MCP server that lets MCP clients shorten URLs, list links and read click stats on wx93.me.",
   "homepage": "https://wx93.me/docs#mcp",
@@ -390,7 +774,7 @@
   "latest_version": "0.1.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://wx93.me/install-mcp | sh",
-  "evidence": "https://wx93.me/install-mcp 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://wx93.me/install-mcp 200, installed from a clean env (no Node) 2026-10-13; examples: https://github.com/profullstack/wx93.me/blob/main/packages/mcp/README.md",
   "publisher": "profullstack"
  },
  {
@@ -398,6 +782,24 @@
   "name": "x402-client",
   "commands": [
    "x402"
+  ],
+  "examples": [
+   {
+    "run": "x402 address",
+    "does": "Print the wallet address to fund (reads X402_PRIVATE_KEY)"
+   },
+   {
+    "run": "x402 fetch <url>",
+    "does": "Fetch a page, paying automatically if it answers 402"
+   },
+   {
+    "run": "x402 pass <url>",
+    "does": "Print a stored pass for a site, buying one if none is on file"
+   },
+   {
+    "run": "x402 passes",
+    "does": "List the passes on file"
+   }
   ],
   "description": "Library and CLI that pays HTTP 402 x402 payment requests with a local key.",
   "homepage": "https://github.com/profullstack/x402-client",
@@ -407,7 +809,7 @@
   "latest_version": "0.2.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/x402-client/main/install.sh | sh",
-  "evidence": "https://raw.githubusercontent.com/profullstack/x402-client/main/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://raw.githubusercontent.com/profullstack/x402-client/main/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/x402-client/README.md (The CLI)",
   "publisher": "profullstack"
  },
  {
@@ -415,6 +817,24 @@
   "name": "ai",
   "commands": [
    "ai"
+  ],
+  "examples": [
+   {
+    "run": "ai setup",
+    "does": "Set up your OpenAI and/or Anthropic API keys interactively"
+   },
+   {
+    "run": "ai",
+    "does": "Start an interactive chat that can read files and run commands"
+   },
+   {
+    "run": "ai ask \"<question>\"",
+    "does": "Ask a single question and print the answer"
+   },
+   {
+    "run": "ai config --show",
+    "does": "Show the current configuration"
+   }
   ],
   "description": "Simple CLI for interactive conversations with an AI model.",
   "homepage": "https://github.com/profullstack/ai",
@@ -424,7 +844,7 @@
   "latest_version": "1.1.1",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/ai/master/install.sh | sh",
-  "evidence": "https://raw.githubusercontent.com/profullstack/ai/master/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://raw.githubusercontent.com/profullstack/ai/master/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: https://github.com/profullstack/ai (README)",
   "publisher": "profullstack"
  },
  {
@@ -432,6 +852,24 @@
   "name": "summary-forge",
   "commands": [
    "summary"
+  ],
+  "examples": [
+   {
+    "run": "summary setup",
+    "does": "Enter API keys and settings interactively (OpenAI key required)"
+   },
+   {
+    "run": "summary file <path/to/book.pdf>",
+    "does": "Summarize a local PDF or EPUB"
+   },
+   {
+    "run": "summary url <url>",
+    "does": "Summarize a web page or article"
+   },
+   {
+    "run": "summary interactive",
+    "does": "Open the guided interactive mode"
+   }
   ],
   "description": "CLI that uses AI to write summaries of technical books.",
   "homepage": "https://github.com/profullstack/summary-forge-module",
@@ -441,7 +879,7 @@
   "latest_version": "1.10.2",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/summary-forge-module/master/install.sh | sh",
-  "evidence": "https://raw.githubusercontent.com/profullstack/summary-forge-module/master/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://raw.githubusercontent.com/profullstack/summary-forge-module/master/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/summary-forge-module/README.md",
   "publisher": "profullstack"
  },
  {
@@ -449,6 +887,24 @@
   "name": "hqtui",
   "commands": [
    "hqtui"
+  ],
+  "examples": [
+   {
+    "run": "hqtui",
+    "does": "Launch the interactive widget showcase"
+   },
+   {
+    "run": "hqtui doctor",
+    "does": "Report what this terminal supports"
+   },
+   {
+    "run": "hqtui themes",
+    "does": "Print every built-in theme name"
+   },
+   {
+    "run": "hqtui demo --theme <name>",
+    "does": "Run the showcase in a chosen theme, e.g. nord or dracula"
+   }
   ],
   "description": "TypeScript terminal UI library for building dashboards, with a demo CLI.",
   "homepage": "https://hqtui.com",
@@ -458,7 +914,7 @@
   "latest_version": "0.10.3",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://hqtui.com/install.sh | sh",
-  "evidence": "https://hqtui.com/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://hqtui.com/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/hqtui/packages/hqtui/src/cli.ts (help text)",
   "publisher": "profullstack"
  },
  {
@@ -466,6 +922,24 @@
   "name": "bl0ggers",
   "commands": [
    "bl0ggers"
+  ],
+  "examples": [
+   {
+    "run": "bl0ggers login",
+    "does": "Open the browser to pick a publication and connect it"
+   },
+   {
+    "run": "bl0ggers post --title \"<title>\" --file <post.md> --draft",
+    "does": "Upload a Markdown post as a draft"
+   },
+   {
+    "run": "bl0ggers posts",
+    "does": "List posts on the current publication"
+   },
+   {
+    "run": "bl0ggers publish <id|slug>",
+    "does": "Publish a draft post"
+   }
   ],
   "description": "CLI for posting blog posts, newsletter issues and podcast episodes to bl0ggers.com publications.",
   "homepage": "https://bl0ggers.com",
@@ -475,7 +949,7 @@
   "latest_version": "0.1.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://bl0ggers.com/install.sh | sh",
-  "evidence": "https://bl0ggers.com/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://bl0ggers.com/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: https://github.com/profullstack/bl0ggers/blob/main/packages/cli/README.md (read from origin; local checkout predates the CLI)",
   "publisher": "profullstack"
  },
  {
@@ -483,6 +957,24 @@
   "name": "crawlproof",
   "commands": [
    "crawlproof"
+  ],
+  "examples": [
+   {
+    "run": "crawlproof dashboard",
+    "does": "Open live ROI, traffic, ads, money and spend screens"
+   },
+   {
+    "run": "crawlproof stats <site>",
+    "does": "Print a site's sources, referrers and top pages"
+   },
+   {
+    "run": "crawlproof ad <url> --draft",
+    "does": "Read a page and draft an ad campaign for it"
+   },
+   {
+    "run": "crawlproof ads trends",
+    "does": "Show which topics are trending for ad targeting"
+   }
   ],
   "description": "Terminal dashboard showing CrawlProof traffic, ad delivery and CoinPay revenue for a fleet of sites.",
   "homepage": "https://crawlproof.com",
@@ -492,7 +984,7 @@
   "latest_version": "0.5.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://crawlproof.com/install.sh | sh",
-  "evidence": "https://crawlproof.com/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://crawlproof.com/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: https://github.com/profullstack/crawlproof.com (README 'CLI' + packages/cli/README.md, packages/cli/src/cli.ts)",
   "publisher": "profullstack"
  },
  {
@@ -502,6 +994,24 @@
    "qc",
    "qryptchat"
   ],
+  "examples": [
+   {
+    "run": "qc login",
+    "does": "Sign in through your browser (--oob to paste a code over SSH)"
+   },
+   {
+    "run": "qc",
+    "does": "Open the full-screen chat client"
+   },
+   {
+    "run": "qc chats",
+    "does": "List your chats"
+   },
+   {
+    "run": "qc send <chat> \"<text>\"",
+    "does": "Send a message to a chat"
+   }
+  ],
   "description": "End-to-end encrypted terminal chat client for qrypt.chat using ML-KEM-1024, with a scriptable CLI.",
   "homepage": "https://qrypt.chat",
   "repository": "https://github.com/profullstack/qryptchat-web",
@@ -510,7 +1020,7 @@
   "latest_version": "0.8.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://qrypt.chat/install.sh | sh",
-  "evidence": "https://qrypt.chat/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://qrypt.chat/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: https://github.com/profullstack/qryptchat-web (README + src/cli/commands.js usage text)",
   "publisher": "profullstack"
  },
  {
@@ -518,6 +1028,24 @@
   "name": "readm3",
   "commands": [
    "readm3"
+  ],
+  "examples": [
+   {
+    "run": "readm3",
+    "does": "Browse Markdown files under the current directory"
+   },
+   {
+    "run": "readm3 <dir>",
+    "does": "Browse Markdown in a given directory"
+   },
+   {
+    "run": "readm3 --print <file.md>",
+    "does": "Render a Markdown file to the terminal in color"
+   },
+   {
+    "run": "readm3 login",
+    "does": "Sign in to sync and save documents to your account"
+   }
   ],
   "description": "Terminal markdown reader and editor with sharing, version history, an API and an MCP server.",
   "homepage": "https://readm3.com",
@@ -527,7 +1055,7 @@
   "latest_version": "0.10.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://readm3.com/install.sh | sh",
-  "evidence": "https://readm3.com/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://readm3.com/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/readm3/README.md",
   "publisher": "profullstack"
  },
  {
@@ -535,6 +1063,24 @@
   "name": "hdtilt",
   "commands": [
    "hdtilt"
+  ],
+  "examples": [
+   {
+    "run": "hdtilt add <name> <m3u-url>",
+    "does": "Add an M3U playlist from a provider you already have"
+   },
+   {
+    "run": "hdtilt now",
+    "does": "Show what is on right now"
+   },
+   {
+    "run": "hdtilt tui",
+    "does": "Browse and play channels in the terminal (needs mpv or VLC)"
+   },
+   {
+    "run": "hdtilt serve",
+    "does": "Run the web app on http://127.0.0.1:8930"
+   }
   ],
   "description": "Open source IPTV player for M3U, Xtream Codes and XMLTV with web, CLI, TUI and MCP interfaces.",
   "homepage": "https://hdtilt.com",
@@ -544,7 +1090,7 @@
   "latest_version": "0.2.11",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://hdtilt.com/install.sh | sh",
-  "evidence": "https://hdtilt.com/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://hdtilt.com/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/hdtilt.com/README.md",
   "publisher": "profullstack"
  },
  {
@@ -552,6 +1098,24 @@
   "name": "g1tz",
   "commands": [
    "g1tz"
+  ],
+  "examples": [
+   {
+    "run": "g1tz",
+    "does": "Open the git TUI for the repository in the current directory"
+   },
+   {
+    "run": "g1tz <path-to-repo>",
+    "does": "Open a repository from any directory"
+   },
+   {
+    "run": "g1tz login",
+    "does": "Sign in with a code approved in the browser, for team features"
+   },
+   {
+    "run": "g1tz plan",
+    "does": "Show what your plan unlocks"
+   }
   ],
   "description": "Git TUI that shows the state of a repository instead of a menu of git commands.",
   "homepage": "https://github.com/profullstack/g1tz",
@@ -561,7 +1125,7 @@
   "latest_version": "0.2.2",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/g1tz/main/install.sh | sh",
-  "evidence": "https://raw.githubusercontent.com/profullstack/g1tz/main/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://raw.githubusercontent.com/profullstack/g1tz/main/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: https://github.com/profullstack/g1tz (README 'Quick start' and 'Teams')",
   "publisher": "profullstack"
  },
  {
@@ -569,6 +1133,16 @@
   "name": "r3q",
   "commands": [
    "r3q"
+  ],
+  "examples": [
+   {
+    "run": "mkdir -p ~/api",
+    "does": "Create a folder to hold your .http request files"
+   },
+   {
+    "run": "r3q ~/api",
+    "does": "Open the REST client TUI on that collection (press n for a new request)"
+   }
   ],
   "description": "Terminal REST client that stores requests as files you can commit.",
   "homepage": "https://github.com/profullstack/r3q",
@@ -578,7 +1152,7 @@
   "latest_version": "0.1.4",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/r3q/main/install.sh | sh",
-  "evidence": "https://raw.githubusercontent.com/profullstack/r3q/main/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://raw.githubusercontent.com/profullstack/r3q/main/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/r3q/README.md; bin/r3q.mjs",
   "publisher": "profullstack"
  },
  {
@@ -586,6 +1160,24 @@
   "name": "timer",
   "commands": [
    "timer"
+  ],
+  "examples": [
+   {
+    "run": "timer start <project> <task description>",
+    "does": "Start tracking time on a project; the rest of the line is the task"
+   },
+   {
+    "run": "timer status",
+    "does": "Show what is running and today's total"
+   },
+   {
+    "run": "timer stop",
+    "does": "Stop the running timer"
+   },
+   {
+    "run": "timer report --month --group project",
+    "does": "Total this month's time by project"
+   }
   ],
   "description": "Time tracker for the terminal and for agents that records hours against projects.",
   "homepage": "https://github.com/profullstack/timer",
@@ -595,7 +1187,7 @@
   "latest_version": "0.2.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/timer/main/install.sh | sh",
-  "evidence": "https://raw.githubusercontent.com/profullstack/timer/main/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://raw.githubusercontent.com/profullstack/timer/main/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/timer/README.md",
   "publisher": "profullstack"
  },
  {
@@ -603,6 +1195,24 @@
   "name": "billing",
   "commands": [
    "billing"
+  ],
+  "examples": [
+   {
+    "run": "billing init --name \"<company>\" --email <you@example.com> --terms 14",
+    "does": "Set up your business details and payment terms"
+   },
+   {
+    "run": "billing client add <client> --display \"<Client Name>\" --email <billing@client.com>",
+    "does": "Add a client to bill"
+   },
+   {
+    "run": "billing invoice new --client <client> --item \"<description>|<qty>|<price>\"",
+    "does": "Create an invoice with fixed line items"
+   },
+   {
+    "run": "billing invoice render <invoice-id> --format html --out <file.html>",
+    "does": "Render an invoice to an HTML file"
+   }
   ],
   "description": "Terminal tool for clients, rates and invoices that turns tracked hours into an invoice.",
   "homepage": "https://github.com/profullstack/billing",
@@ -612,7 +1222,7 @@
   "latest_version": "0.3.1",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/billing/main/install.sh | sh",
-  "evidence": "https://raw.githubusercontent.com/profullstack/billing/main/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://raw.githubusercontent.com/profullstack/billing/main/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/billing/README.md (The loop, Fixed line items)",
   "publisher": "profullstack"
  },
  {
@@ -620,6 +1230,24 @@
   "name": "proxy",
   "commands": [
    "proxy"
+  ],
+  "examples": [
+   {
+    "run": "proxy ip",
+    "does": "Show the exit IP and location you get through the proxy"
+   },
+   {
+    "run": "proxy <url>",
+    "does": "Fetch a URL through a US residential exit, body to stdout"
+   },
+   {
+    "run": "proxy -i -c <country> <url>",
+    "does": "Fetch with status and headers from a chosen country exit"
+   },
+   {
+    "run": "proxy serve --port 8888",
+    "does": "Run a local forward proxy that holds the credentials"
+   }
   ],
   "description": "Library, CLI and local forward proxy for making requests through residential proxy providers.",
   "homepage": "https://github.com/profullstack/proxy",
@@ -629,7 +1257,7 @@
   "latest_version": "0.2.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/proxy/main/install.sh | sh",
-  "evidence": "https://raw.githubusercontent.com/profullstack/proxy/main/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://raw.githubusercontent.com/profullstack/proxy/main/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: https://github.com/profullstack/proxy (README 'CLI' and 'proxy serve')",
   "publisher": "profullstack"
  },
  {
@@ -637,6 +1265,24 @@
   "name": "kali",
   "commands": [
    "kali"
+  ],
+  "examples": [
+   {
+    "run": "kali list",
+    "does": "List every known tool, grouped by category"
+   },
+   {
+    "run": "kali install all --dry-run",
+    "does": "Print the install commands without running them"
+   },
+   {
+    "run": "kali install <category>",
+    "does": "Install one category of tools, e.g. scanning"
+   },
+   {
+    "run": "kali check",
+    "does": "Show which tools are already installed, and where"
+   }
   ],
   "description": "Unofficial installer for common Kali-style web pentesting tools on Debian and Ubuntu.",
   "homepage": "https://github.com/profullstack/kali",
@@ -646,7 +1292,7 @@
   "latest_version": "0.1.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/kali/main/install.sh | sh",
-  "evidence": "https://raw.githubusercontent.com/profullstack/kali/main/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://raw.githubusercontent.com/profullstack/kali/main/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/kali/README.md",
   "publisher": "profullstack"
  },
  {
@@ -654,6 +1300,24 @@
   "name": "orgs",
   "commands": [
    "orgs"
+  ],
+  "examples": [
+   {
+    "run": "orgs migrate",
+    "does": "Create the orgs, teams, members and invites tables in Postgres"
+   },
+   {
+    "run": "orgs create \"<org name>\" --user <user-uuid>",
+    "does": "Create an organization owned by a user"
+   },
+   {
+    "run": "orgs member add <org-slug> <user-uuid> --role admin",
+    "does": "Add a user to an org with a role"
+   },
+   {
+    "run": "orgs invite <org-slug> <email> --role admin",
+    "does": "Invite someone by email; the token is printed once"
+   }
   ],
   "description": "Postgres library and CLI for organizations, teams, members, roles and invitations.",
   "homepage": "https://github.com/profullstack/orgs",
@@ -663,7 +1327,7 @@
   "latest_version": "0.2.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/orgs/master/install.sh | sh",
-  "evidence": "https://raw.githubusercontent.com/profullstack/orgs/master/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://raw.githubusercontent.com/profullstack/orgs/master/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/orgs/README.md (CLI) and src/cli.js",
   "publisher": "profullstack"
  },
  {
@@ -671,6 +1335,24 @@
   "name": "watchdog",
   "commands": [
    "watchdog-autoheal"
+  ],
+  "examples": [
+   {
+    "run": "watchdog-autoheal status",
+    "does": "List healthy and unhealthy containers, and those with no healthcheck"
+   },
+   {
+    "run": "watchdog-autoheal --dry-run",
+    "does": "Show what one pass would restart"
+   },
+   {
+    "run": "watchdog-autoheal",
+    "does": "Restart containers Docker marked unhealthy, once"
+   },
+   {
+    "run": "watchdog-autoheal watch --interval 30",
+    "does": "Keep checking every 30 seconds under a service manager"
+   }
   ],
   "description": "Detects when a dependency stops responding and restarts the process instead of letting it hang.",
   "homepage": "https://github.com/profullstack/watchdog",
@@ -680,7 +1362,7 @@
   "latest_version": "0.3.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/watchdog/main/install.sh | sh",
-  "evidence": "https://raw.githubusercontent.com/profullstack/watchdog/main/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://raw.githubusercontent.com/profullstack/watchdog/main/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/watchdog/README.md (watchdog-autoheal section)",
   "publisher": "profullstack"
  },
  {
@@ -688,6 +1370,24 @@
   "name": "encrypt",
   "commands": [
    "pfencrypt"
+  ],
+  "examples": [
+   {
+    "run": "pfencrypt keygen --out <name>",
+    "does": "Generate an ML-KEM-1024 key pair as <name>.pub and <name>.key"
+   },
+   {
+    "run": "pfencrypt encrypt --to <name>.pub <file> > <file>.enc",
+    "does": "Encrypt a file to a public key"
+   },
+   {
+    "run": "pfencrypt decrypt --key <name>.key <file>.enc",
+    "does": "Decrypt a file with your private key"
+   },
+   {
+    "run": "pfencrypt algorithms",
+    "does": "List the supported encryption algorithms"
+   }
   ],
   "description": "Quantum-resistant file and text encryption CLI using ML-KEM-1024 and ChaCha20-Poly1305.",
   "homepage": "https://github.com/profullstack/encrypt",
@@ -697,7 +1397,7 @@
   "latest_version": "0.1.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/encrypt/main/install.sh | sh",
-  "evidence": "https://raw.githubusercontent.com/profullstack/encrypt/main/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://raw.githubusercontent.com/profullstack/encrypt/main/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: https://github.com/profullstack/encrypt (README 'CLI' + src/cli.js)",
   "publisher": "profullstack"
  },
  {
@@ -705,6 +1405,24 @@
   "name": "scanner",
   "commands": [
    "scanner"
+  ],
+  "examples": [
+   {
+    "run": "scanner tools --check",
+    "does": "Check which underlying security tools are installed"
+   },
+   {
+    "run": "scanner scan <url>",
+    "does": "Run a security scan against a site you are authorized to test"
+   },
+   {
+    "run": "scanner history",
+    "does": "List past scans"
+   },
+   {
+    "run": "scanner report <scanId> --format html",
+    "does": "Export a scan's results as an HTML report"
+   }
   ],
   "description": "Web application security scanner CLI with OWASP-oriented checks.",
   "homepage": "https://github.com/profullstack/scanner",
@@ -714,7 +1432,7 @@
   "latest_version": "1.1.2",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/scanner/master/install.sh | sh",
-  "evidence": "https://raw.githubusercontent.com/profullstack/scanner/master/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://raw.githubusercontent.com/profullstack/scanner/master/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/scanner/README.md",
   "publisher": "profullstack"
  },
  {
@@ -725,6 +1443,24 @@
    "install-ffmpeg",
    "install-imagemagick"
   ],
+  "examples": [
+   {
+    "run": "install-ffmpeg",
+    "does": "Build FFmpeg from source with the flags transcoder needs"
+   },
+   {
+    "run": "transcoder <input.mp4> <output.mp4> --preset youtube-hd",
+    "does": "Transcode a video using a platform preset"
+   },
+   {
+    "run": "transcoder --thumbnails-only <input.mp4> --count 5",
+    "does": "Extract five thumbnails without transcoding"
+   },
+   {
+    "run": "transcoder --path <dir> --preset web --output-dir <out-dir>",
+    "does": "Batch-transcode every video in a directory"
+   }
+  ],
   "description": "FFmpeg-based CLI and module for transcoding video, audio and images with presets.",
   "homepage": "https://github.com/profullstack/transcoder",
   "repository": "https://github.com/profullstack/transcoder",
@@ -733,7 +1469,7 @@
   "latest_version": "1.9.14",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/transcoder/master/install.sh | sh",
-  "evidence": "https://raw.githubusercontent.com/profullstack/transcoder/master/install.sh 200, installed from a clean env (no Node) 2026-10-13",
+  "evidence": "https://raw.githubusercontent.com/profullstack/transcoder/master/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/transcoder/README.md and bin/transcoder.js (yargs options)",
   "publisher": "profullstack"
  },
  {
@@ -741,6 +1477,24 @@
   "name": "Claude Code",
   "commands": [
    "claude"
+  ],
+  "examples": [
+   {
+    "run": "claude auth login",
+    "does": "Sign in to your Anthropic account"
+   },
+   {
+    "run": "claude",
+    "does": "Start an interactive session in the current project"
+   },
+   {
+    "run": "claude -p \"<question>\"",
+    "does": "Ask one question, print the answer and exit"
+   },
+   {
+    "run": "claude -c",
+    "does": "Continue the most recent conversation in this directory"
+   }
   ],
   "description": "Agentic coding tool that runs in the terminal, reads and edits a codebase, runs commands and handles git workflows.",
   "homepage": "https://claude.com/product/claude-code",
@@ -750,7 +1504,7 @@
   "latest_version": "2.1.296",
   "vendor": "Anthropic",
   "install": "curl -fsSL https://claude.ai/install.sh | bash",
-  "evidence": "https://github.com/anthropics/claude-code README; npm view @anthropic-ai/claude-code",
+  "evidence": "https://github.com/anthropics/claude-code README; npm view @anthropic-ai/claude-code; examples: https://code.claude.com/docs/en/cli-reference",
   "publisher": "third-party"
  },
  {
@@ -758,6 +1512,20 @@
   "name": "OpenAI Codex CLI",
   "commands": [
    "codex"
+  ],
+  "examples": [
+   {
+    "run": "codex",
+    "does": "Start an interactive session; first run asks you to sign in with ChatGPT"
+   },
+   {
+    "run": "codex exec \"<task>\"",
+    "does": "Run a task non-interactively, for scripts and CI"
+   },
+   {
+    "run": "codex resume",
+    "does": "Resume a saved conversation"
+   }
   ],
   "description": "Lightweight coding agent from OpenAI that runs in the terminal.",
   "homepage": "https://developers.openai.com/codex/cli",
@@ -767,7 +1535,7 @@
   "latest_version": "0.162.1",
   "vendor": "OpenAI",
   "install": "curl -fsSL https://chatgpt.com/codex/install.sh | sh",
-  "evidence": "https://github.com/openai/codex README; npm view @openai/codex",
+  "evidence": "https://github.com/openai/codex README; npm view @openai/codex; examples: https://github.com/openai/codex (README) + https://learn.chatgpt.com/docs/codex/cli + https://learn.chatgpt.com/docs/non-interactive-mode",
   "publisher": "third-party"
  },
  {
@@ -775,6 +1543,24 @@
   "name": "GitHub Copilot CLI",
   "commands": [
    "copilot"
+  ],
+  "examples": [
+   {
+    "run": "copilot",
+    "does": "Start an interactive session in this folder; use /login if prompted"
+   },
+   {
+    "run": "copilot --continue",
+    "does": "Resume the most recently closed session"
+   },
+   {
+    "run": "copilot mcp add --transport http <name> <url>",
+    "does": "Add a remote HTTP MCP server"
+   },
+   {
+    "run": "copilot help",
+    "does": "Show command-line options and slash commands"
+   }
   ],
   "description": "Brings the GitHub Copilot coding agent to the terminal.",
   "homepage": "https://github.com/github/copilot-cli",
@@ -784,7 +1570,7 @@
   "latest_version": "1.0.96",
   "vendor": "GitHub",
   "install": "curl -fsSL https://gh.io/copilot-install | bash",
-  "evidence": "https://github.com/github/copilot-cli README; npm view @github/copilot",
+  "evidence": "https://github.com/github/copilot-cli README; npm view @github/copilot; examples: https://github.com/github/copilot-cli (README); https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli",
   "publisher": "third-party"
  },
  {
@@ -792,6 +1578,20 @@
   "name": "Aider",
   "commands": [
    "aider"
+  ],
+  "examples": [
+   {
+    "run": "aider --model sonnet",
+    "does": "Start aider in your repo using Claude Sonnet"
+   },
+   {
+    "run": "aider <file1> <file2>",
+    "does": "Start a chat with these files added so aider can edit them"
+   },
+   {
+    "run": "aider --model o3-mini",
+    "does": "Start aider with a different model"
+   }
   ],
   "description": "AI pair programming tool that edits code in a local git repository from the terminal.",
   "homepage": "https://aider.chat",
@@ -801,7 +1601,7 @@
   "latest_version": "0.86.2",
   "vendor": "Aider-AI",
   "install": "curl -LsSf https://aider.chat/install.sh | sh",
-  "evidence": "https://aider.chat/docs/install.html; https://pypi.org/pypi/aider-chat/json",
+  "evidence": "https://aider.chat/docs/install.html; https://pypi.org/pypi/aider-chat/json; examples: https://github.com/Aider-AI/aider/blob/main/aider/website/docs/usage.md",
   "publisher": "third-party"
  },
  {
@@ -809,6 +1609,24 @@
   "name": "OpenCode",
   "commands": [
    "opencode"
+  ],
+  "examples": [
+   {
+    "run": "opencode auth login",
+    "does": "Add an API key for a model provider"
+   },
+   {
+    "run": "opencode",
+    "does": "Open the terminal UI in the current project"
+   },
+   {
+    "run": "opencode run \"<prompt>\"",
+    "does": "Run one prompt non-interactively"
+   },
+   {
+    "run": "opencode models",
+    "does": "List available models as provider/model"
+   }
   ],
   "description": "Open source AI coding agent with a terminal UI that works with many model providers.",
   "homepage": "https://opencode.ai",
@@ -818,7 +1636,7 @@
   "latest_version": "2.0.27",
   "vendor": "Anomaly (formerly SST)",
   "install": "curl -fsSL https://opencode.ai/install | bash",
-  "evidence": "https://github.com/anomalyco/opencode README; npm view @opencode/cli",
+  "evidence": "https://github.com/anomalyco/opencode README; npm view @opencode/cli; examples: https://opencode.ai/docs/cli/",
   "publisher": "third-party"
  },
  {
@@ -826,6 +1644,20 @@
   "name": "goose",
   "commands": [
    "goose"
+  ],
+  "examples": [
+   {
+    "run": "goose configure",
+    "does": "Choose an LLM provider and set up its credentials"
+   },
+   {
+    "run": "goose session",
+    "does": "Start an interactive agent session"
+   },
+   {
+    "run": "goose session -r",
+    "does": "Resume your previous session"
+   }
   ],
   "description": "Open source, extensible AI agent that can install, execute, edit and test code with any LLM.",
   "homepage": "https://goose-docs.ai",
@@ -835,7 +1667,7 @@
   "latest_version": "1.54.0",
   "vendor": "AAIF (originally Block)",
   "install": "curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | bash",
-  "evidence": "https://github.com/aaif-goose/goose README; gh release view -R aaif-goose/goose",
+  "evidence": "https://github.com/aaif-goose/goose README; gh release view -R aaif-goose/goose; examples: https://goose-docs.ai/docs/quickstart",
   "publisher": "third-party"
  },
  {
@@ -843,6 +1675,24 @@
   "name": "Amp",
   "commands": [
    "amp"
+  ],
+  "examples": [
+   {
+    "run": "amp login",
+    "does": "Sign in and make the account active"
+   },
+   {
+    "run": "amp",
+    "does": "Start an interactive agent session"
+   },
+   {
+    "run": "amp -x \"<task>\"",
+    "does": "Run one task non-interactively and print the result"
+   },
+   {
+    "run": "amp update",
+    "does": "Update the Amp CLI"
+   }
   ],
   "description": "Agentic coding tool from Sourcegraph that runs in the terminal and in editors.",
   "homepage": "https://ampcode.com",
@@ -852,7 +1702,7 @@
   "latest_version": null,
   "vendor": "Amp (Sourcegraph)",
   "install": "curl -fsSL https://ampcode.com/install.sh | bash",
-  "evidence": "https://ampcode.com/docs/cli; npm view @sourcegraph/amp",
+  "evidence": "https://ampcode.com/docs/cli; npm view @sourcegraph/amp; examples: https://ampcode.com/docs/markdown/cli; https://ampcode.com/docs/markdown/cli/execute-mode",
   "publisher": "third-party"
  },
  {
@@ -860,6 +1710,24 @@
   "name": "Cursor CLI",
   "commands": [
    "agent"
+  ],
+  "examples": [
+   {
+    "run": "agent login",
+    "does": "Sign in to your Cursor account"
+   },
+   {
+    "run": "agent",
+    "does": "Start an interactive coding session in the current directory"
+   },
+   {
+    "run": "agent -p \"<task>\" --output-format text",
+    "does": "Run one prompt non-interactively, for scripts and CI"
+   },
+   {
+    "run": "agent resume",
+    "does": "Resume your latest conversation"
+   }
   ],
   "description": "Terminal version of the Cursor coding agent.",
   "homepage": "https://cursor.com/cli",
@@ -869,7 +1737,7 @@
   "latest_version": null,
   "vendor": "Anysphere (Cursor)",
   "install": "curl https://cursor.com/install -fsS | bash",
-  "evidence": "https://cursor.com/docs/cli/installation",
+  "evidence": "https://cursor.com/docs/cli/installation; examples: https://cursor.com/docs/cli/overview and https://cursor.com/docs/cli/reference/authentication",
   "publisher": "third-party"
  },
  {
@@ -877,6 +1745,20 @@
   "name": "Qwen Code",
   "commands": [
    "qwen"
+  ],
+  "examples": [
+   {
+    "run": "qwen",
+    "does": "Start a session in your project; run /auth inside to set a provider"
+   },
+   {
+    "run": "qwen -p \"<prompt>\"",
+    "does": "Run one prompt headless, for scripts and CI"
+   },
+   {
+    "run": "qwen serve --open",
+    "does": "Open the experimental web UI in your browser"
+   }
   ],
   "description": "Open source AI coding agent for the terminal, tuned for Qwen models.",
   "homepage": "https://qwenlm.github.io/qwen-code-docs/",
@@ -886,7 +1768,7 @@
   "latest_version": "0.25.1",
   "vendor": "Alibaba Qwen",
   "install": "curl -fsSL https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh | bash",
-  "evidence": "https://github.com/QwenLM/qwen-code README; npm view @qwen-code/qwen-code",
+  "evidence": "https://github.com/QwenLM/qwen-code README; npm view @qwen-code/qwen-code; examples: https://github.com/QwenLM/qwen-code/blob/main/README.md",
   "publisher": "third-party"
  },
  {
@@ -894,6 +1776,24 @@
   "name": "Kiro CLI",
   "commands": [
    "kiro-cli"
+  ],
+  "examples": [
+   {
+    "run": "kiro-cli login",
+    "does": "Sign in with the device flow or browser"
+   },
+   {
+    "run": "kiro-cli",
+    "does": "Start Kiro CLI in the current project"
+   },
+   {
+    "run": "kiro-cli chat --no-interactive \"<prompt>\"",
+    "does": "Run one prompt without the interactive UI"
+   },
+   {
+    "run": "kiro-cli whoami",
+    "does": "Show which account and auth method is active"
+   }
   ],
   "description": "Terminal agent from Kiro, the AWS agentic development environment.",
   "homepage": "https://kiro.dev/cli/",
@@ -903,7 +1803,7 @@
   "latest_version": null,
   "vendor": "Amazon (Kiro)",
   "install": "curl -fsSL https://cli.kiro.dev/install | bash",
-  "evidence": "https://kiro.dev/cli/; https://kiro.dev/docs/cli/",
+  "evidence": "https://kiro.dev/cli/; https://kiro.dev/docs/cli/; examples: https://kiro.dev/docs/cli/ + https://kiro.dev/docs/getting-started/authentication/",
   "publisher": "third-party"
  },
  {
@@ -913,6 +1813,20 @@
    "interpreter",
    "i"
   ],
+  "examples": [
+   {
+    "run": "interpreter",
+    "does": "Start an interactive coding session (or just type i)"
+   },
+   {
+    "run": "interpreter exec \"<task>\"",
+    "does": "Run one task non-interactively"
+   },
+   {
+    "run": "interpreter acp",
+    "does": "Run as an Agent Client Protocol agent for editors"
+   }
+  ],
   "description": "Coding agent built for low-cost and open models, now a Rust fork of OpenAI Codex.",
   "homepage": "https://www.openinterpreter.com",
   "repository": "https://github.com/openinterpreter/openinterpreter",
@@ -921,7 +1835,7 @@
   "latest_version": "0.0.56",
   "vendor": "Open Interpreter",
   "install": "curl -fsSL https://www.openinterpreter.com/install | sh",
-  "evidence": "https://github.com/openinterpreter/openinterpreter README; gh release view",
+  "evidence": "https://github.com/openinterpreter/openinterpreter README; gh release view; examples: https://github.com/openinterpreter/openinterpreter (README); https://www.openinterpreter.com/docs/terminal/cli-reference",
   "publisher": "third-party"
  },
  {
@@ -929,6 +1843,24 @@
   "name": "Continue CLI",
   "commands": [
    "cn"
+  ],
+  "examples": [
+   {
+    "run": "cn login",
+    "does": "Authenticate with Continue"
+   },
+   {
+    "run": "cn",
+    "does": "Start an interactive coding agent session"
+   },
+   {
+    "run": "cn -p \"<task>\"",
+    "does": "Run one prompt headless, without the TUI"
+   },
+   {
+    "run": "cn --resume",
+    "does": "Resume the last session in this terminal"
+   }
   ],
   "description": "Terminal version of the open source Continue coding agent.",
   "homepage": "https://continue.dev",
@@ -938,7 +1870,7 @@
   "latest_version": "1.5.47",
   "vendor": "Continue",
   "install": "curl -fsSL https://raw.githubusercontent.com/continuedev/continue/main/extensions/cli/scripts/install.sh | bash",
-  "evidence": "npm view @continuedev/cli",
+  "evidence": "npm view @continuedev/cli; examples: https://github.com/continuedev/continue/blob/main/extensions/cli/README.md",
   "publisher": "third-party"
  },
  {
@@ -946,6 +1878,20 @@
   "name": "Factory Droid",
   "commands": [
    "droid"
+  ],
+  "examples": [
+   {
+    "run": "droid",
+    "does": "Start Droid in your project; signs in through the browser if asked"
+   },
+   {
+    "run": "droid exec \"<task>\"",
+    "does": "Run one task non-interactively (read-only by default)"
+   },
+   {
+    "run": "droid exec \"<task>\" --auto low",
+    "does": "Run a task allowing low-risk file edits"
+   }
   ],
   "description": "Terminal coding agent from Factory.",
   "homepage": "https://factory.ai",
@@ -955,7 +1901,7 @@
   "latest_version": "0.239.1",
   "vendor": "Factory",
   "install": "curl -fsSL https://app.factory.ai/cli | sh",
-  "evidence": "https://docs.factory.com/cli/getting-started/quickstart.md; npm view droid",
+  "evidence": "https://docs.factory.com/cli/getting-started/quickstart.md; npm view droid; examples: https://docs.factory.com/cli/getting-started/quickstart; https://docs.factory.com/cli/droid-exec/overview",
   "publisher": "third-party"
  },
  {
@@ -963,6 +1909,24 @@
   "name": "Kimi Code CLI",
   "commands": [
    "kimi"
+  ],
+  "examples": [
+   {
+    "run": "kimi",
+    "does": "Open the interactive UI; run /login inside on first launch"
+   },
+   {
+    "run": "kimi -p \"<instruction>\"",
+    "does": "Run a single instruction without the interactive UI"
+   },
+   {
+    "run": "kimi -c",
+    "does": "Resume the previous session"
+   },
+   {
+    "run": "kimi acp",
+    "does": "Serve the Agent Client Protocol so Zed or JetBrains can drive it"
+   }
   ],
   "description": "Terminal AI coding agent that works with Kimi models and other compatible providers.",
   "homepage": "https://moonshotai.github.io/kimi-code/en/",
@@ -972,7 +1936,7 @@
   "latest_version": "2.1.1",
   "vendor": "Moonshot AI",
   "install": "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash",
-  "evidence": "https://github.com/MoonshotAI/kimi-code README",
+  "evidence": "https://github.com/MoonshotAI/kimi-code README; examples: https://github.com/MoonshotAI/kimi-code (README) + https://moonshotai.github.io/kimi-code/en/guides/getting-started",
   "publisher": "third-party"
  },
  {
@@ -980,6 +1944,24 @@
   "name": "Mistral Vibe",
   "commands": [
    "vibe"
+  ],
+  "examples": [
+   {
+    "run": "vibe --setup",
+    "does": "Configure your Mistral API key or sign in"
+   },
+   {
+    "run": "vibe",
+    "does": "Start an interactive session in the current project"
+   },
+   {
+    "run": "vibe \"<task>\"",
+    "does": "Start a session with an initial prompt"
+   },
+   {
+    "run": "vibe --continue",
+    "does": "Resume the most recent session"
+   }
   ],
   "description": "Minimal command line coding agent from Mistral AI.",
   "homepage": "https://github.com/mistralai/mistral-vibe",
@@ -989,7 +1971,7 @@
   "latest_version": "2.26.1",
   "vendor": "Mistral AI",
   "install": "curl -LsSf https://mistral.ai/vibe/install.sh | bash",
-  "evidence": "https://github.com/mistralai/mistral-vibe README; https://pypi.org/pypi/mistral-vibe/json",
+  "evidence": "https://github.com/mistralai/mistral-vibe README; https://pypi.org/pypi/mistral-vibe/json; examples: https://github.com/mistralai/mistral-vibe (README)",
   "publisher": "third-party"
  },
  {
@@ -997,6 +1979,24 @@
   "name": "OpenHands CLI",
   "commands": [
    "openhands"
+  ],
+  "examples": [
+   {
+    "run": "openhands",
+    "does": "Start the TUI; the first run walks you through LLM settings"
+   },
+   {
+    "run": "openhands --headless -t \"<task>\"",
+    "does": "Run one task without the UI, for CI and scripts"
+   },
+   {
+    "run": "openhands --resume --last",
+    "does": "Resume your most recent conversation"
+   },
+   {
+    "run": "openhands web",
+    "does": "Open the same TUI in a browser"
+   }
   ],
   "description": "Terminal client for the OpenHands AI software development agent.",
   "homepage": "https://docs.openhands.dev",
@@ -1006,7 +2006,7 @@
   "latest_version": "1.16.0",
   "vendor": "OpenHands (All Hands AI)",
   "install": "curl -fsSL https://install.openhands.dev/install.sh | sh",
-  "evidence": "https://github.com/OpenHands/OpenHands-CLI README; https://pypi.org/pypi/openhands/json",
+  "evidence": "https://github.com/OpenHands/OpenHands-CLI README; https://pypi.org/pypi/openhands/json; examples: https://github.com/OpenHands/OpenHands-CLI/blob/main/README.md",
   "publisher": "third-party"
  },
  {
@@ -1014,6 +2014,24 @@
   "name": "gptme",
   "commands": [
    "gptme"
+  ],
+  "examples": [
+   {
+    "run": "gptme",
+    "does": "Start an interactive chat with tool use"
+   },
+   {
+    "run": "gptme '<task>'",
+    "does": "Start a session with a prompt"
+   },
+   {
+    "run": "gptme -n '<task>'",
+    "does": "Run fully non-interactively, for scripts and CI"
+   },
+   {
+    "run": "gptme -r",
+    "does": "Resume the most recent conversation"
+   }
   ],
   "description": "Terminal agent with local tools that writes code, runs shell commands and browses the web.",
   "homepage": "https://gptme.org",
@@ -1023,7 +2041,7 @@
   "latest_version": "0.34.0",
   "vendor": "gptme (Erik Bjareholt)",
   "install": "curl -sSf https://gptme.ai/install.sh | sh",
-  "evidence": "https://github.com/gptme/gptme README; https://pypi.org/pypi/gptme/json",
+  "evidence": "https://github.com/gptme/gptme README; https://pypi.org/pypi/gptme/json; examples: https://github.com/gptme/gptme (README Quick Start / usage)",
   "publisher": "third-party"
  },
  {
@@ -1033,6 +2051,24 @@
    "kilo",
    "kilocode"
   ],
+  "examples": [
+   {
+    "run": "kilo",
+    "does": "Start the interactive terminal UI in the current directory"
+   },
+   {
+    "run": "kilo auth",
+    "does": "Manage provider credentials"
+   },
+   {
+    "run": "kilo run \"<task>\"",
+    "does": "Run a task with a message without opening the TUI"
+   },
+   {
+    "run": "kilo --continue",
+    "does": "Resume the most recent session in this workspace"
+   }
+  ],
   "description": "Terminal version of the open source Kilo Code agentic engineering platform.",
   "homepage": "https://kilo.ai",
   "repository": "https://github.com/Kilo-Org/kilocode",
@@ -1041,7 +2077,7 @@
   "latest_version": "7.8.8",
   "vendor": "Kilo Code",
   "install": "curl -fsSL https://kilo.ai/cli/install | bash",
-  "evidence": "https://github.com/Kilo-Org/kilocode README; npm view @kilocode/cli",
+  "evidence": "https://github.com/Kilo-Org/kilocode README; npm view @kilocode/cli; examples: https://github.com/Kilo-Org/kilocode (README) + https://kilo.ai/docs/cli",
   "publisher": "third-party"
  },
  {
@@ -1049,6 +2085,20 @@
   "name": "Junie CLI",
   "commands": [
    "junie"
+  ],
+  "examples": [
+   {
+    "run": "junie",
+    "does": "Start Junie in the current project; sign in via /account"
+   },
+   {
+    "run": "junie --plan",
+    "does": "Start directly in plan mode"
+   },
+   {
+    "run": "junie --auth=\"$JUNIE_API_KEY\" \"<task>\"",
+    "does": "Run a task headless with an API key, e.g. in CI"
+   }
   ],
   "description": "Terminal version of the JetBrains Junie coding agent.",
   "homepage": "https://junie.jetbrains.com",
@@ -1058,7 +2108,7 @@
   "latest_version": null,
   "vendor": "JetBrains",
   "install": "curl -fsSL https://junie.jetbrains.com/install.sh | bash",
-  "evidence": "https://junie.jetbrains.com/docs/junie-cli.html",
+  "evidence": "https://junie.jetbrains.com/docs/junie-cli.html; examples: https://junie.jetbrains.com/docs/junie-cli.html",
   "publisher": "third-party"
  },
  {
@@ -1066,6 +2116,24 @@
   "name": "Grok CLI",
   "commands": [
    "grok"
+  ],
+  "examples": [
+   {
+    "run": "grok",
+    "does": "Launch the interactive coding agent in the current directory"
+   },
+   {
+    "run": "grok -d <repo-path>",
+    "does": "Start the agent in a specific project directory"
+   },
+   {
+    "run": "grok --prompt \"<task>\"",
+    "does": "Run one prompt headless, then exit"
+   },
+   {
+    "run": "grok --session latest",
+    "does": "Continue your most recent saved session"
+   }
   ],
   "description": "Open source terminal coding agent for the xAI Grok API.",
   "homepage": "https://github.com/superagent-ai/grok-cli",
@@ -1075,7 +2143,7 @@
   "latest_version": "1.1.7",
   "vendor": "Superagent",
   "install": "curl -fsSL https://raw.githubusercontent.com/superagent-ai/grok-cli/main/install.sh | bash",
-  "evidence": "https://github.com/superagent-ai/grok-cli README; npm view grok-dev",
+  "evidence": "https://github.com/superagent-ai/grok-cli README; npm view grok-dev; examples: https://github.com/superagent-ai/grok-cli/blob/main/README.md",
   "publisher": "third-party"
  },
  {
@@ -1085,6 +2153,24 @@
    "plandex",
    "pdx"
   ],
+  "examples": [
+   {
+    "run": "plandex",
+    "does": "Start the Plandex REPL in your project (`pdx` for short)"
+   },
+   {
+    "run": "plandex load <path> -r",
+    "does": "Load files or a directory into the plan's context"
+   },
+   {
+    "run": "plandex tell \"<task>\"",
+    "does": "Describe the task so Plandex plans and writes the changes"
+   },
+   {
+    "run": "plandex apply",
+    "does": "Apply the pending changes to your files"
+   }
+  ],
   "description": "Open source terminal AI coding agent designed for large projects.",
   "homepage": "https://plandex.ai",
   "repository": "https://github.com/plandex-ai/plandex",
@@ -1093,7 +2179,7 @@
   "latest_version": "2.2.1",
   "vendor": "Plandex",
   "install": "curl -sL https://plandex.ai/install.sh | bash",
-  "evidence": "https://github.com/plandex-ai/plandex README; gh release view -R plandex-ai/plandex",
+  "evidence": "https://github.com/plandex-ai/plandex README; gh release view -R plandex-ai/plandex; examples: https://github.com/plandex-ai/plandex (README.md, docs/docs/quick-start.md, docs/docs/cli-reference.md)",
   "publisher": "third-party"
  },
  {
@@ -1101,6 +2187,24 @@
   "name": "Ollama",
   "commands": [
    "ollama"
+  ],
+  "examples": [
+   {
+    "run": "ollama run gemma4",
+    "does": "Download a model if needed and chat with it"
+   },
+   {
+    "run": "ollama pull <model>",
+    "does": "Download a model from the library without running it"
+   },
+   {
+    "run": "ollama ls",
+    "does": "List models downloaded on this machine"
+   },
+   {
+    "run": "ollama launch claude",
+    "does": "Launch Claude Code wired to a local Ollama model"
+   }
   ],
   "description": "Runs open-weight language models locally behind a CLI and a local HTTP API.",
   "homepage": "https://ollama.com",
@@ -1110,7 +2214,7 @@
   "latest_version": "0.40.3",
   "vendor": "Ollama",
   "install": "curl -fsSL https://ollama.com/install.sh | sh",
-  "evidence": "https://github.com/ollama/ollama README; gh release view -R ollama/ollama",
+  "evidence": "https://github.com/ollama/ollama README; gh release view -R ollama/ollama; examples: https://github.com/ollama/ollama (README + docs/cli.mdx)",
   "publisher": "third-party"
  },
  {
@@ -1118,6 +2222,24 @@
   "name": "Fabric",
   "commands": [
    "fabric"
+  ],
+  "examples": [
+   {
+    "run": "fabric --setup",
+    "does": "Configure AI providers, API keys and default model"
+   },
+   {
+    "run": "fabric --listpatterns",
+    "does": "List all available prompt patterns"
+   },
+   {
+    "run": "fabric -u <url> -p analyze_claims",
+    "does": "Fetch a web page and run a pattern on it"
+   },
+   {
+    "run": "fabric -y \"<youtube-url>\" --stream --pattern extract_wisdom",
+    "does": "Pull a YouTube transcript and extract key insights"
+   }
   ],
   "description": "Open source framework and CLI that applies a library of crowdsourced AI prompt patterns to text.",
   "homepage": "https://github.com/danielmiessler/Fabric",
@@ -1127,7 +2249,7 @@
   "latest_version": "1.4.518",
   "vendor": "Daniel Miessler",
   "install": "curl -fsSL https://raw.githubusercontent.com/danielmiessler/fabric/main/scripts/installer/install.sh | bash",
-  "evidence": "https://github.com/danielmiessler/Fabric README; gh release view",
+  "evidence": "https://github.com/danielmiessler/Fabric README; gh release view; examples: https://github.com/danielmiessler/Fabric (README)",
   "publisher": "third-party"
  }
 ]

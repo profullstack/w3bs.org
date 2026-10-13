@@ -175,6 +175,11 @@ test('package page, list, JSON API and SVG badge show the scan state', async () 
     // The page leads with the w3bs CLI; the publisher's curl is the secondary route.
     assert.match(page, new RegExp(`INSTALL</span><code>w3bs install ${ID}</code>`));
     assert.match(page, /Publisher's installer<\/dt><dd><code class="break">curl /);
+    // "What do I type?": step 1 is w3bs install, then the tool's own commands.
+    const usage = page.slice(page.indexOf('<h3>Get started</h3>'), page.indexOf('id="scan"'));
+    assert.match(usage, new RegExp(`<li><div><code>w3bs install ${ID}</code>`));
+    assert.ok((usage.match(/<li>/g) || []).length >= 3, usage);
+    assert.match(usage, /<code>moshcode --help<\/code>/);
     assert.match(page, /Malware indicator/);
     assert.match(page, /source\/src\/index\.js:7/);
     const badge = await get(`/api/packages/${ID}/badge.svg`);
