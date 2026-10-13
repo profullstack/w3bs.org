@@ -12,7 +12,7 @@ Page: https://w3bs.org/desktop · License: Apache-2.0
 |---|---|
 | M0: PRD, schemas, ADR, public page | Done |
 | M1: broker, input engine, mock adapter, native control, enable/disable, leases, cancellation, identity tests | Done (terminal native control; tray/panel extensions pending) |
-| M2: KDE Plasma + GNOME real input | KDE Plasma 6.7.5 (KWin Wayland, Fedora 44): real typing (incl. non-ASCII), pointer, clicks, portal screenshot, disable mid-typing and portal revocation pass on a headless test rig (`tests/rig/kde-portal.sh`, 15/15). GNOME not yet run. **Not certified**: window list/focus on KDE/GNOME still missing |
+| M2: KDE Plasma + GNOME real input | KDE Plasma 6.7.5 (KWin Wayland, Fedora 44): real typing (incl. non-ASCII), pointer, clicks, portal screenshot, disable mid-typing and portal revocation pass on a headless test rig (`tests/rig/kde-portal.sh`, 29/29). Window list, geometry, focus, stacking (occlusion) and activation on Plasma come from KWin scripts (`kwin.rs`), so targeted typing/clicks and restricted per-app grants work there; polkit-prompt interlock unit-tested only. GNOME not yet run (window data needs the unwritten Shell extension). **Not certified** |
 | Vela | Observation, focus, occlusion and lock/polkit interlocks (clean-room); input needs `VELA_DEBUG_INPUT=1` + the wlroots virtual-input backend (pending) |
 | Windows, macOS, other Linux desktops | Not started |
 
@@ -23,7 +23,7 @@ No platform is certified. There are no signed installers yet.
 ```
 crates/adl-schema    versioned schemas: states, errors, coordinate spaces, actions, results
 crates/adl-broker    authorization + task broker, input engine, leases, approvals, audit, mock adapter
-crates/adl-linux     Vela command-socket adapter, XDG portal adapter (KDE/GNOME), logind, keymaps
+crates/adl-linux     Vela command-socket adapter, XDG portal adapter (KDE/GNOME), KWin window observer, logind, keymaps
 crates/w3bs-desktop  `w3bs desktop` CLI, broker daemon, terminal native control, stdio MCP server
 packaging/           systemd user unit
 docs/                ADRs and the clean-room record
@@ -42,8 +42,8 @@ $B mouse click --agent claude-code --window w-editor --x 40 --y 40
 $B setup claude-code --agent claude-code # prints `claude mcp add ...`
 ```
 
-On a real session use `--adapter auto` (Vela if present, else portals). It refuses to fall back
-to the mock.
+On a real session use `--adapter auto` (Vela if present, else portals, plus the KWin window
+observer on Plasma). It refuses to fall back to the mock.
 
 ## Safety model, in one screen
 
@@ -76,5 +76,5 @@ to the mock.
 ## Tests
 
 ```bash
-cargo test --workspace   # 30 broker conformance + Vela fake-socket + end-to-end daemon/CLI/MCP
+cargo test --workspace   # broker conformance, Vela fake socket, KWin canned reports, end-to-end daemon/CLI/MCP
 ```

@@ -8,9 +8,9 @@
 //! - Consent: the portal shows its own dialog when the human enables; the restore token is kept so
 //!   later enables can skip it where the portal allows (persist mode 2 = until revoked).
 //!
-//! Window listing, focus and occlusion need desktop-specific help (a KWin script on Plasma, the
-//! W3BS Shell extension on GNOME). Until those land, Windows is reported unsupported, so targeted
-//! clicks and typing into a named window are refused rather than guessed.
+//! Window listing, focus and occlusion need desktop-specific help: on Plasma `kwin::WithKWin`
+//! wraps this adapter with KWin's window data; on GNOME the W3BS Shell extension does not exist
+//! yet, so there Windows is reported unsupported and targeted input is refused rather than guessed.
 //!
 //! Status: compiles and follows the portal spec; NOT certified on any desktop yet.
 
@@ -241,7 +241,7 @@ impl Adapter for PortalAdapter {
             input(DEVICE_POINTER, Capability::Pointer, &["absolute_motion", "relative_motion", "button.back", "button.forward", "scroll.horizontal"]),
             input(DEVICE_KEYBOARD, Capability::Keyboard, &["keysym_text"]),
             CapabilityReport { capability: Capability::ScreenCapture, availability: Availability::Degraded, backend: "linux-portal".into(), reason: "Screenshot portal capture, cropped per monitor; the screenshot's pixel scale is chosen by the compositor".into(), features: BTreeSet::new() },
-            un(Capability::Windows, "needs the KWin script (Plasma) or W3BS Shell extension (GNOME); not implemented yet, so targeted input is refused"),
+            un(Capability::Windows, "on Plasma the KWin observer supplies this (see kwin.rs); GNOME needs the W3BS Shell extension, not implemented yet, so targeted input is refused"),
             un(Capability::Accessibility, "AT-SPI adapter not implemented yet"),
         ]
     }

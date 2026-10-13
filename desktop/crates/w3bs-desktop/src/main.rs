@@ -40,26 +40,40 @@ struct Cli {
 
 #[derive(Clone, Copy, ValueEnum, PartialEq)]
 enum AdapterKind {
-    /// Vela if running, else the XDG portal backend (KDE Plasma, GNOME); never the mock
+    /// Vela if running, else the XDG portal backend (KDE Plasma, GNOME; plus KWin windows on Plasma); never the mock
     Auto,
     /// Vela compositor command socket (observation and interlocks; input needs VELA_DEBUG_INPUT)
     Vela,
-    /// XDG RemoteDesktop/ScreenCast/Screenshot portals (KDE Plasma, GNOME)
+    /// XDG RemoteDesktop/ScreenCast/Screenshot portals (KDE Plasma, GNOME); on Plasma windows come from KWin
     Portal,
     /// Deterministic fake desktop for tests and demos
     Mock,
 }
 
 fn make_adapter(kind: AdapterKind) -> Result<Arc<dyn Adapter>> {
+    use adl_linux::kwin::{KWinObserver, KWinScripts, WithKWin};
     use adl_linux::{portal::PortalAdapter, vela::VelaAdapter};
     let vela = || VelaAdapter::default_socket().map(VelaAdapter::new).ok_or_else(|| AdlError::new(ErrorCode::Blocked, "Vela command socket not found (needs XDG_RUNTIME_DIR and WAYLAND_DISPLAY)"));
-    let portal = || PortalAdapter::new(paths::config_dir().join("portal-restore-token"));
+    // On Plasma the portal backend gets its window list, focus and stacking from KWin.
+    let portal = || -> Arc<dyn Adapter> {
+        let p = PortalAdapter::new(paths::config_dir().join("portal-restore-token"));
+        if !KWinObserver::detect() {
+            return Arc::new(p);
+        }
+        match KWinScripts::connect() {
+            Ok(src) => Arc::new(WithKWin::new(p, KWinObserver::new(Box::new(src)))),
+            Err(e) => {
+                eprintln!("w3bs-desktop: KWin window observer unavailable ({}); targeted input will be refused", e.message);
+                Arc::new(p)
+            }
+        }
+    };
     Ok(match kind {
         AdapterKind::Mock => Arc::new(adl_broker::mock::MockDesktop::new()),
         AdapterKind::Vela => Arc::new(vela()?),
-        AdapterKind::Portal => Arc::new(portal()),
+        AdapterKind::Portal => portal(),
         AdapterKind::Auto if VelaAdapter::detect() => Arc::new(vela()?),
-        AdapterKind::Auto if PortalAdapter::detect() => Arc::new(portal()),
+        AdapterKind::Auto if PortalAdapter::detect() => portal(),
         AdapterKind::Auto => return Err(AdlError::new(ErrorCode::Blocked, "no supported desktop session found (need a Wayland/X11 session with D-Bus, or Vela); use --adapter mock for a demo")),
     })
 }
