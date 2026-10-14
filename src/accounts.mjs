@@ -25,7 +25,8 @@ const tables = (serial) => `
   CREATE TABLE IF NOT EXISTS oauth_codes (code_hash TEXT PRIMARY KEY, client_id TEXT NOT NULL, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, redirect_uri TEXT NOT NULL, challenge TEXT NOT NULL, scope TEXT NOT NULL, family TEXT NOT NULL, expires_at TEXT NOT NULL, used INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS oauth_tokens (token_hash TEXT PRIMARY KEY, kind TEXT NOT NULL, family TEXT NOT NULL, client_id TEXT NOT NULL, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, scope TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, used INTEGER NOT NULL, revoked INTEGER NOT NULL);
   CREATE INDEX IF NOT EXISTS oauth_tokens_family ON oauth_tokens(family);
-  CREATE INDEX IF NOT EXISTS oauth_tokens_user ON oauth_tokens(user_id);`;
+  CREATE INDEX IF NOT EXISTS oauth_tokens_user ON oauth_tokens(user_id);
+  CREATE TABLE IF NOT EXISTS oauth_devices (device_hash TEXT PRIMARY KEY, user_code TEXT NOT NULL UNIQUE, client_id TEXT NOT NULL, scope TEXT NOT NULL, status TEXT NOT NULL, user_id TEXT REFERENCES users(id) ON DELETE CASCADE, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, last_poll_at TEXT, poll_interval INTEGER NOT NULL);`;
 export const ACCOUNT_SCHEMA = {
   sqlite: `PRAGMA foreign_keys=ON;${tables('INTEGER PRIMARY KEY AUTOINCREMENT')}`,
   postgres: tables('BIGSERIAL PRIMARY KEY'),
@@ -40,9 +41,19 @@ export const TTL = {
   challenge: 5 * MINUTE,
   emailLink: 20 * MINUTE,
   code: 10 * MINUTE,
+  device: 10 * MINUTE,
   access: HOUR,
   refresh: 30 * DAY,
 };
+export const DEVICE_GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
+// RFC 8628 section 6.1: consonants only, so a code never spells a word, 20^8 combinations.
+const USER_CODE_ALPHABET = 'BCDFGHJKLMNPQRSTVWXZ';
+export const normalizeUserCode = (value) =>
+  String(value ?? '')
+    .toUpperCase()
+    .replace(/[^A-Z]/g, '')
+    .slice(0, 8);
+export const formatUserCode = (code) => `${code.slice(0, 4)}-${code.slice(4)}`;
 const LOCKOUT = { failures: 10, window: 15 * MINUTE };
 const LINKS_PER_HOUR = 5;
 export const SCOPES = ['profile'];
@@ -145,6 +156,7 @@ export function createAccounts(db, { origin }) {
     await db.run('DELETE FROM auth_challenges WHERE expires_at < ?', [now]);
     await db.run('DELETE FROM sessions WHERE expires_at < ?', [now]);
     await db.run('DELETE FROM oauth_codes WHERE expires_at < ?', [now]);
+    await db.run('DELETE FROM oauth_devices WHERE expires_at < ?', [now]);
     await db.run('DELETE FROM oauth_tokens WHERE expires_at < ?', [now]);
     await db.run('DELETE FROM email_links WHERE expires_at < ?', [later(-DAY)]);
   };
@@ -636,6 +648,92 @@ export function createAccounts(db, { origin }) {
       scope,
     };
   }
+  // Device authorization grant (RFC 8628) for `w3bs login` on a machine whose browser
+  // is somewhere else, e.g. over SSH: the CLI shows a code, the person enters it at
+  // /device while signed in, and the CLI polls the token endpoint until it is approved.
+  async function startDevice({ client_id, scope }) {
+    const app = await client(String(client_id ?? ''));
+    if (!app) throw new OAuthError('invalid_client', 'Unknown client_id.', 401);
+    const scopes = String(scope ?? 'profile')
+      .split(' ')
+      .filter(Boolean);
+    if (!scopes.length || scopes.some((item) => !SCOPES.includes(item)))
+      throw new OAuthError('invalid_scope', `Supported scopes: ${SCOPES.join(' ')}.`);
+    const deviceCode = token();
+    let userCode;
+    do {
+      const bytes = randomBytes(8);
+      userCode = [...bytes].map((byte) => USER_CODE_ALPHABET[byte % 20]).join('');
+    } while (await db.get('SELECT user_code FROM oauth_devices WHERE user_code = ?', [userCode]));
+    await db.run('INSERT INTO oauth_devices VALUES (?, ?, ?, ?, ?, NULL, ?, ?, NULL, 5)', [
+      sha256(deviceCode),
+      userCode,
+      app.id,
+      [...new Set(scopes)].join(' '),
+      'pending',
+      nowIso(),
+      later(TTL.device),
+    ]);
+    return { deviceCode, userCode, interval: 5, expiresIn: TTL.device / 1000 };
+  }
+  async function deviceRequest(value) {
+    const code = normalizeUserCode(value);
+    if (code.length !== 8) return undefined;
+    const row = await db.get(
+      "SELECT * FROM oauth_devices WHERE user_code = ? AND status = 'pending' AND expires_at > ?",
+      [code, nowIso()],
+    );
+    if (!row) return undefined;
+    return { userCode: row.user_code, client: await client(row.client_id), scope: row.scope };
+  }
+  async function decideDevice(userId, value, allow) {
+    const code = normalizeUserCode(value);
+    const row = await db.get(
+      "SELECT * FROM oauth_devices WHERE user_code = ? AND status = 'pending' AND expires_at > ?",
+      [code, nowIso()],
+    );
+    if (!row)
+      throw fail('INVALID_CODE', 'That code is wrong or has expired. Run w3bs login again.');
+    await db.run('UPDATE oauth_devices SET status = ?, user_id = ? WHERE device_hash = ?', [
+      allow ? 'approved' : 'denied',
+      userId,
+      row.device_hash,
+    ]);
+  }
+  async function pollDevice(tx, clientId, deviceCode) {
+    const row = await tx.get('SELECT * FROM oauth_devices WHERE device_hash = ?', [
+      sha256(String(deviceCode ?? '')),
+    ]);
+    if (!row || row.client_id !== clientId)
+      return { error: new OAuthError('invalid_grant', 'Unknown device_code.') };
+    if (row.expires_at < nowIso() || row.status === 'used')
+      return { error: new OAuthError('expired_token', 'The code expired. Run w3bs login again.') };
+    if (row.status === 'denied')
+      return { error: new OAuthError('access_denied', 'The sign-in was denied.') };
+    const now = Date.now();
+    // A poll within 2 s of the last one is too fast (the advertised interval is 5 s and
+    // grows by 5 on each slow_down; this only catches clients that ignore it entirely).
+    const tooSoon = row.last_poll_at && now - Date.parse(row.last_poll_at) < 2000;
+    const interval = Number(row.poll_interval) + (tooSoon ? 5 : 0);
+    await tx.run(
+      'UPDATE oauth_devices SET last_poll_at = ?, poll_interval = ? WHERE device_hash = ?',
+      [new Date(now).toISOString(), interval, row.device_hash],
+    );
+    if (tooSoon) return { error: new OAuthError('slow_down', 'Poll less often.') };
+    if (row.status === 'pending')
+      return { error: new OAuthError('authorization_pending', 'Waiting for approval.') };
+    await tx.run("UPDATE oauth_devices SET status = 'used' WHERE device_hash = ?", [
+      row.device_hash,
+    ]);
+    return {
+      tokens: await issueTokens(tx, {
+        family: token(16),
+        clientId,
+        userId: row.user_id,
+        scope: row.scope,
+      }),
+    };
+  }
   const revokeFamily = (tx, family) =>
     tx.run('UPDATE oauth_tokens SET revoked = 1 WHERE family = ?', [family]);
   async function exchange(body) {
@@ -721,8 +819,12 @@ export function createAccounts(db, { origin }) {
           }),
         };
       }
+      if (body.grant_type === DEVICE_GRANT) return pollDevice(tx, clientId, body.device_code);
       return {
-        error: new OAuthError('unsupported_grant_type', 'Use authorization_code or refresh_token.'),
+        error: new OAuthError(
+          'unsupported_grant_type',
+          'Use authorization_code, refresh_token or the device_code grant.',
+        ),
       };
     });
     if (outcome.error) throw outcome.error;
@@ -792,6 +894,9 @@ export function createAccounts(db, { origin }) {
     authorizationRequest,
     issueCode,
     exchange,
+    startDevice,
+    deviceRequest,
+    decideDevice,
     revokeToken,
     bearerUser,
     grants,

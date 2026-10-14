@@ -6,12 +6,19 @@ import { randomBytes } from 'node:crypto';
 import { createBridgeHost } from '@profullstack/bridges';
 import { createFormGuard } from '@profullstack/stack/email';
 import { W3bsError } from './core.mjs';
-import { CLI_CLIENT_ID, OAuthError, SCOPES, TTL } from './accounts.mjs';
+import {
+  CLI_CLIENT_ID,
+  DEVICE_GRANT,
+  OAuthError,
+  SCOPES,
+  TTL,
+  formatUserCode,
+} from './accounts.mjs';
 import { escapeHtml as e, pageShell } from './site.mjs';
 
 // Paths a third party may call cross-origin: no cookies are read on them.
 export const OPEN_CORS = [
-  /^\/oauth\/(token|revoke)$/,
+  /^\/oauth\/(token|revoke|device_authorization)$/,
   /^\/\.well-known\/oauth-authorization-server$/,
 ];
 export const bearerOf = (req) =>
@@ -232,7 +239,8 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
       revocation_endpoint: `${origin}/oauth/revoke`,
       userinfo_endpoint: `${origin}/api/me`,
       response_types_supported: ['code'],
-      grant_types_supported: ['authorization_code', 'refresh_token'],
+      device_authorization_endpoint: `${origin}/oauth/device_authorization`,
+      grant_types_supported: ['authorization_code', 'refresh_token', DEVICE_GRANT],
       code_challenge_methods_supported: ['S256'],
       token_endpoint_auth_methods_supported: ['none'],
       revocation_endpoint_auth_methods_supported: ['none'],
@@ -266,6 +274,75 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
       await accounts.revokeToken(req.body?.token, req.body?.client_id);
       res.json({});
     }),
+  );
+  app.post(
+    '/oauth/device_authorization',
+    ...oauthBody,
+    oauthJson(async (req, res) => {
+      const started = await accounts.startDevice(req.body ?? {});
+      const userCode = formatUserCode(started.userCode);
+      res.json({
+        device_code: started.deviceCode,
+        user_code: userCode,
+        verification_uri: `${origin}/device`,
+        verification_uri_complete: `${origin}/device?code=${userCode}`,
+        expires_in: started.expiresIn,
+        interval: started.interval,
+      });
+    }),
+  );
+  // The page a person opens to approve a device sign-in (RFC 8628).
+  const devicePage = (res, content, status = 200) =>
+    page(res, { title: 'Sign in a device', active: '/account', content }, status);
+  const deviceCard = (body) =>
+    `<section class="auth-card"><div class="eyebrow">SIGN IN WITH W3BS</div>${body}</section>`;
+  const codeForm = (message = '') =>
+    deviceCard(
+      `<h1>Enter the <em>code.</em></h1><p>Type the code your terminal shows after <code>w3bs login</code>.</p>${message ? `<p class="form-status">${e(message)}</p>` : ''}<form class="auth-form" method="get" action="/device"><label class="input-label" for="device-code">Code</label><input id="device-code" name="code" required maxlength="9" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH"><button class="button primary" type="submit">Continue</button></form>`,
+    );
+  app.get('/device', onMainHost, async (req, res) => {
+    const user = await currentUser(req);
+    if (!user) return res.redirect(302, `/login?next=${encodeURIComponent(req.originalUrl)}`);
+    if (!req.query.code) return devicePage(res, codeForm());
+    const request = await accounts.deviceRequest(req.query.code);
+    if (!request)
+      return devicePage(
+        res,
+        codeForm('That code is wrong or has expired. Check the terminal, or run w3bs login again.'),
+        400,
+      );
+    const cli = request.client.id === CLI_CLIENT_ID;
+    const code = formatUserCode(request.userCode);
+    devicePage(
+      res,
+      deviceCard(
+        `<h1>${cli ? 'Sign in the <em>w3bs CLI?</em>' : `Sign in to <em>${e(request.client.name)}?</em>`}</h1><p>A device showing the code <strong>${e(code)}</strong> is asking to act as you. Only continue if you just ran ${cli ? '<code>w3bs login</code>' : 'it'} and the code matches.</p><p class="auth-who">Signed in as <strong>@${e(user.username)}</strong> · <a href="/login?switch=1&amp;next=${encodeURIComponent(req.originalUrl)}">Not you?</a></p><form method="post" action="/device" class="auth-actions"><input type="hidden" name="code" value="${e(code)}"><button class="button primary" name="decision" value="allow" type="submit">Allow</button><button class="button" name="decision" value="deny" type="submit">Deny</button></form>`,
+      ),
+    );
+  });
+  app.post(
+    '/device',
+    onMainHost,
+    express.urlencoded({ extended: false, limit: '4kb' }),
+    async (req, res) => {
+      const user = await currentUser(req);
+      if (!user) return res.redirect(303, '/login?next=/device');
+      const allow = req.body?.decision === 'allow';
+      try {
+        await accounts.decideDevice(user.id, req.body?.code, allow);
+      } catch (error) {
+        if (!(error instanceof W3bsError)) throw error;
+        return devicePage(res, codeForm(error.message), 400);
+      }
+      devicePage(
+        res,
+        deviceCard(
+          allow
+            ? '<h1>Signed <em>in.</em></h1><p>Go back to your terminal; it finishes on its own within a few seconds.</p>'
+            : '<h1>Request <em>denied.</em></h1><p>The device was not signed in. You can close this tab.</p>',
+        ),
+      );
+    },
   );
   const redirectWith = (request, params) => {
     const url = new URL(request.redirectUri);
