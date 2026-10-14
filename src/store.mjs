@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { W3bsError, parseUri, validateManifest, verifyManifest, compareVersions } from './core.mjs';
 import { ACCOUNT_SCHEMA, createAccounts } from './accounts.mjs';
+import { FLEET_SCHEMA, createFleet } from './fleet.mjs';
 
 export const ROOT = fileURLToPath(new URL('../', import.meta.url));
 
@@ -34,6 +35,7 @@ async function openSqlite(path) {
   const db = new DatabaseSync(path);
   db.exec(SCHEMA.sqlite);
   db.exec(ACCOUNT_SCHEMA.sqlite);
+  db.exec(FLEET_SCHEMA.sqlite);
   const bind = (target) => ({
     all: async (sql, params = []) => target.prepare(sql).all(...params),
     get: async (sql, params = []) => target.prepare(sql).get(...params),
@@ -83,6 +85,7 @@ async function openPostgres(connectionString) {
   });
   await pool.query(SCHEMA.postgres);
   await pool.query(ACCOUNT_SCHEMA.postgres);
+  await pool.query(FLEET_SCHEMA.postgres);
   return {
     ...bind(pool),
     dialect: 'postgres',
@@ -362,6 +365,7 @@ export async function openStore({
     recordScan,
     latestScan,
     accounts,
+    fleet: createFleet(db),
     trust,
     dialect: db.dialect,
     close: () => db.close(),

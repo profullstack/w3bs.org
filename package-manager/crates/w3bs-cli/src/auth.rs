@@ -569,7 +569,6 @@ async fn finish_login(client: &reqwest::Client, origin: &str, ep: &Endpoints, mu
 
 /// A valid access token for `origin`, refreshing (and saving the rotated refresh token)
 /// when it is about to expire. Errors with NOT_SIGNED_IN when there is no session.
-#[allow(dead_code)] // the entry point for authenticated commands; none ship yet
 pub async fn access_token(origin: &str) -> Result<String> {
     let path = auth_path()?;
     let _guard = lock(&path)?;

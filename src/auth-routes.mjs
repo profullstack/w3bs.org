@@ -554,4 +554,12 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
       }<form class="auth-form inline" data-form="app"><label class="input-label" for="app-name">App name</label><input id="app-name" name="name" required minlength="2" maxlength="60"><label class="input-label" for="app-redirects">Redirect URIs, one per line</label><textarea id="app-redirects" name="redirectUris" rows="3" required placeholder="https://example.com/auth/w3bs/callback"></textarea><button class="button" type="submit">Register app</button><p class="form-status" role="status" aria-live="polite"></p></form></section></div><p class="auth-small"><button class="small-button" type="button" data-action="logout">Sign out</button></p>`,
     });
   });
+  // Account helpers for other signed-in surfaces (src/fleet-routes.mjs).
+  const accountUser = async (req) => {
+    const bearer = bearerOf(req);
+    if (bearer)
+      return bearer.startsWith('fm_') ? null : (await accounts.bearerUser(bearer)) || null;
+    return req.hostname === host ? currentUser(req) : null;
+  };
+  return { accounts, currentUser, accountUser, page, onMainHost };
 }

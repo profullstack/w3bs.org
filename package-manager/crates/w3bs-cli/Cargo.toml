@@ -23,6 +23,7 @@ sha2.workspace = true
 url.workspace = true
 aws-lc-rs.workspace = true
 fs4.workspace = true
+libc = "0.2"
 
 [dev-dependencies]
 w3bs-publish = { path = "../w3bs-publish" }
