@@ -262,21 +262,21 @@ const desktopSteps = [
     'Or press the emergency shortcut: Super+Alt+Escape on Linux (KDE shows Meta+Alt+Esc), Win+Alt+Esc on Windows, Control+Option+Command+Escape on macOS. You can also run <code>w3bs desktop disable</code> or lock the screen. Everything stops at once, held keys are released, and nothing turns back on by itself.',
   ],
 ];
-const desktopCommands = `w3bs-desktop status                 # Disabled / Enabled, who holds the input lease
-w3bs-desktop doctor                 # session, backend, permissions, extension checks
-w3bs-desktop control                # terminal control: enable, disable, approve, deny
-w3bs-desktop tray                   # tray control (started for you on login)
-w3bs-desktop disable                # stop everything now
-w3bs-desktop agents add|list|update|revoke|remove
-w3bs-desktop approvals list|approve|deny
-w3bs-desktop tasks list|inspect|cancel
-w3bs-desktop audit export|delete    # metadata only, kept 7 days
-w3bs-desktop layout|windows list|inspect --window ID      --agent NAME
-w3bs-desktop screen capture --display ID --output shot.png --agent NAME
-w3bs-desktop mouse move|click|drag|scroll ...              --agent NAME
-w3bs-desktop keyboard type --stdin|press|shortcut ...      --agent NAME
-w3bs-desktop mcp serve --stdio --agent NAME
-w3bs-desktop daemon --mcp-http 127.0.0.1:7801   # broker + MCP over HTTP (installers do this)`;
+const desktopCommands = `w3bs desktop status                 # Disabled / Enabled, who holds the input lease
+w3bs desktop doctor                 # session, backend, permissions, extension checks
+w3bs desktop control                # terminal control: enable, disable, approve, deny
+w3bs desktop tray                   # tray control (started for you on login)
+w3bs desktop disable                # stop everything now
+w3bs desktop agents add|list|update|revoke|remove
+w3bs desktop approvals list|approve|deny
+w3bs desktop tasks list|inspect|cancel
+w3bs desktop audit export|delete    # metadata only, kept 7 days
+w3bs desktop layout|windows list|inspect --window ID      --agent NAME
+w3bs desktop screen capture --display ID --output shot.png --agent NAME
+w3bs desktop mouse move|click|drag|scroll ...              --agent NAME
+w3bs desktop keyboard type --stdin|press|shortcut ...      --agent NAME
+w3bs desktop mcp serve --stdio --agent NAME
+w3bs desktop daemon --mcp-http 127.0.0.1:7801   # broker + MCP over HTTP (installers do this)`;
 const desktopUninstall = `# Linux
 systemctl --user disable --now w3bs-desktop
 rm ~/.local/bin/w3bs-desktop ~/.config/systemd/user/w3bs-desktop.service \\
@@ -309,7 +309,7 @@ ${e(DESKTOP_INSTALL)}</code></pre><div class="terminal-result"><button class="sm
   <section class="section"><div class="section-heading"><div><div class="eyebrow">PLATFORMS</div><h2>KDE and GNOME first.<br><em>Then everywhere.</em></h2></div><p>These are targets, not compatibility claims. A platform is certified only when the full mouse, keyboard and stop workflow passes on it.</p></div><div class="table-wrap"><table class="platform-table"><caption class="sr-only">Platform delivery order</caption><thead><tr><th scope="col">Priority</th><th scope="col">Platform</th><th scope="col">Human control</th><th scope="col">Status</th></tr></thead><tbody>${desktopPlatforms.map(([priority, platform, control, status]) => `<tr><td>${priority}</td><th scope="row">${platform}</th><td>${control}</td><td>${pill(status)}</td></tr>`).join('')}</tbody></table></div><p class="table-note">Wayland first on KDE and GNOME, with X11 tested where the desktop still supports it. Vela support is a clean-room adapter built from public interface facts. No Vela code is used.</p></section>
   <section class="section"><div class="section-heading"><div><div class="eyebrow">ARCHITECTURE</div><h2>One broker.<br>Thin adapters.</h2></div><p>The broker is platform-neutral and runs with your user's privileges. Desktop adapters only report what exists and emit events. Authorization, leases and cancellation stay in the broker, so a new platform cannot weaken them.</p></div><figure class="architecture"><pre aria-describedby="architecture-caption">${e(desktopArchitecture)}</pre><figcaption id="architecture-caption">Agents reach the broker over MCP, the CLI or a local API. The human's native control uses a separate channel that agents cannot call.</figcaption></figure></section>
   <section class="section"><div class="section-heading"><div><div class="eyebrow">PERMISSIONS</div><h2>Authority,<br><em>on purpose.</em></h2></div><p>Mouse, keyboard, screen capture, clipboard and account access are separate, visible grants per agent.</p></div><div class="principle-grid"><article><span class="card-index">RESTRICTED</span><h3>Named apps only.</h3><p>The agent may act only on the applications you granted. Input aimed anywhere else is denied. Keyboard input must name its target window, and focus is checked before every chunk of text.</p></article><article><span class="card-index">BROAD DESKTOP</span><h3>Whole desktop, with a warning.</h3><p>Visual and input control of everything on screen. In this mode business rules cannot always be enforced: a draft-only mail grant does not stop sending through a browser.</p></article><article><span class="card-index">APPROVALS</span><h3>Bound to one exact request.</h3><p>An approval covers one agent, task, target and argument digest, and it expires. Agents cannot enable the layer or approve their own access. Input pauses while an approval is on screen.</p></article></div><aside class="callout"><strong>What disabling cannot undo.</strong><p>Turning the switch off stops new work at once. It cannot take back input already delivered, unsend an email, or erase data an agent already received. It also does not control tools or credentials an agent holds outside this layer.</p></aside></section>
-  <section class="section"><div class="section-heading"><div><div class="eyebrow">COMMAND REFERENCE</div><h2>Everything else.</h2></div><p>Run <code>w3bs-desktop --help</code> for every option. Text to type always comes from a file or standard input, never from the command line, so it stays out of shell history.</p></div><figure class="architecture"><pre>${e(desktopCommands)}</pre></figure><details class="inspector-panel"><summary>Uninstall</summary><pre class="instructions">${e(desktopUninstall)}</pre></details></section>
+  <section class="section"><div class="section-heading"><div><div class="eyebrow">COMMAND REFERENCE</div><h2>Everything else.</h2></div><p>Run <code>w3bs desktop --help</code> for every option. Text to type always comes from a file or standard input, never from the command line, so it stays out of shell history.</p></div><figure class="architecture"><pre>${e(desktopCommands)}</pre></figure><details class="inspector-panel"><summary>Uninstall</summary><pre class="instructions">${e(desktopUninstall)}</pre></details></section>
   <section class="section prd-share" aria-labelledby="prd-title"><div class="section-heading"><div><div class="eyebrow">THE SPECIFICATION</div><h2 id="prd-title">Read the PRD.</h2></div><p>Version 0.2, October 12, 2026. An implementation specification, not a claim of released software. Source: <a class="inline-link" href="https://github.com/profullstack/w3bs.org/tree/main/desktop">github.com/profullstack/w3bs.org/desktop</a>.</p></div><div class="actions"><button type="button" class="button dark" data-copy-prd="${prdPath}">Copy Markdown</button><a class="button primary" href="${prdPath}" download="agentic-desktop-layer-prd.md">Download PRD <span aria-hidden="true">↓</span></a><a class="text-link" href="${prdPath}">Raw Markdown <span aria-hidden="true">↗</span></a></div><p class="copy-status" role="status" aria-live="polite" data-copy-status></p><div class="copy-fallback" data-copy-fallback hidden><label for="prd-fallback">Copying failed. The Markdown is below: select it all and copy it.</label><textarea id="prd-fallback" readonly rows="14" spellcheck="false"></textarea></div><details class="inspector-panel prd-full"><summary>Read the full PRD on this page</summary><article class="prose">${marked.parse(prd)}</article></details></section>`;
 }
 // "What do I type?": install with w3bs, then the tool's own first commands from the

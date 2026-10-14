@@ -16,7 +16,7 @@
 #      crashes) and the menu-bar control (org.w3bs.desktop.menubar, started at login; Quit
 #      keeps it quit), and starts both.
 #   It never enables agent access. The broker always starts Disabled; you enable it yourself
-#   from the tray, the menu bar, the GNOME panel, or `w3bs-desktop control`.
+#   from the tray, the menu bar, the GNOME panel, or `w3bs desktop control`.
 #
 # Environment: W3BS_DESKTOP_VERSION (default below), W3BS_BIN_DIR,
 #              W3BS_DESKTOP_NO_SERVICE=1 (install the files only, start nothing),
@@ -135,6 +135,8 @@ adl_main() {
   install -m 0755 "$tmp/x/bin/w3bs-desktop" "$bin/w3bs-desktop" 2>/dev/null || { cp "$tmp/x/bin/w3bs-desktop" "$bin/w3bs-desktop" && chmod 0755 "$bin/w3bs-desktop"; } || die "cannot install to $bin"
   cp -r "$tmp/x/share/." "$share/" 2>/dev/null || true
   cp "$tmp/x/LICENSE" "$tmp/x/README.md" "$share/" 2>/dev/null || true
+  # Hints use the w3bs front door when the w3bs CLI is installed, else the binary itself.
+  if command -v w3bs >/dev/null 2>&1; then cmd="w3bs desktop"; else cmd="w3bs-desktop"; fi
   say "Installed $bin/w3bs-desktop ($("$bin/w3bs-desktop" --version 2>/dev/null || echo "version unknown"))"
 
   if [ "${W3BS_DESKTOP_NO_SERVICE:-0}" != 1 ] && [ "$os" = apple-darwin ]; then
@@ -230,7 +232,7 @@ EOF
 
     case ":${XDG_CURRENT_DESKTOP:-}:" in
       *:GNOME:*)
-        "$bin/w3bs-desktop" setup gnome-extension >&2 || say "note: GNOME extension install failed; run: w3bs-desktop setup gnome-extension"
+        "$bin/w3bs-desktop" setup gnome-extension >&2 || say "note: GNOME extension install failed; run: $cmd setup gnome-extension"
         ;;
       *)
         autostart="${XDG_CONFIG_HOME:-$HOME/.config}/autostart"
@@ -264,15 +266,15 @@ EOF
     say "  - Accessibility: input, focus and inspect. Enabling is refused (Blocked) without it."
     say "  - Screen Recording (\"Screen & System Audio Recording\" on macOS 15+): screenshots and window titles."
     say "  Input Monitoring is not needed. The broker LaunchAgent is the process macOS asks about."
-    say "  Run  w3bs-desktop doctor --prompt  to raise the system prompts (or add w3bs-desktop with +,"
+    say "  Run  $cmd doctor --prompt  to raise the system prompts (or add w3bs-desktop with +,"
     say "  Shift+Command+G, $bin), then restart the broker so it picks them up:"
     say "    launchctl kickstart -k gui/$uid/org.w3bs.desktop.broker"
     say "  The binary is not code-signed, so after an upgrade macOS may ask again."
   fi
   say ""
   say "Next:"
-  say "  1. Register an agent:   w3bs-desktop agents add claude-code --preset broad"
-  say "  2. Connect it:          w3bs-desktop setup claude-code --agent claude-code --http   (prints the claude mcp add line)"
+  say "  1. Register an agent:   $cmd agents add claude-code --preset broad"
+  say "  2. Connect it:          $cmd setup claude-code --agent claude-code --http   (prints the claude mcp add line)"
   if [ "$os" = apple-darwin ]; then
     say "  3. Enable access from the menu bar (Agents: Disabled) when you want the agent to work; disable it the same way."
     say "     Emergency stop: Control+Option+Command+Escape."

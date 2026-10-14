@@ -42,7 +42,7 @@ and two LaunchAgents in your login session, and starts both:
   at login, restarted by launchd if it crashes (not after a clean exit). Log:
   `~/Library/Logs/w3bs-desktop/broker.log`.
 - `~/Library/LaunchAgents/org.w3bs.desktop.menubar.plist`: the menu-bar control
-  (`w3bs-desktop tray`), at login only; Quit keeps it quit (and disables access).
+  (`w3bs desktop tray`), at login only; Quit keeps it quit (and disables access).
 
 Then grant the permissions below to `~/.local/bin/w3bs-desktop` (see
 [macOS onboarding](#macos-onboarding)). Uninstall with
@@ -71,8 +71,8 @@ Options go through a script block:
 Then, on any system:
 
 ```bash
-w3bs-desktop agents add claude-code --preset broad
-w3bs-desktop setup claude-code --agent claude-code   # prints the `claude mcp add` line
+w3bs desktop agents add claude-code --preset broad
+w3bs desktop setup claude-code --agent claude-code   # prints the `claude mcp add` line
 ```
 
 Testing hooks (all installers): `W3BS_DESKTOP_VERSION`, `W3BS_DESKTOP_NO_SERVICE=1`, and
