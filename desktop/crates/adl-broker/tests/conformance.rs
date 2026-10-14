@@ -112,6 +112,35 @@ fn enable_requires_a_human_and_the_right_code() {
 }
 
 #[test]
+fn enabled_by_default_needs_no_native_control_or_code() {
+    let m = Arc::new(MockDesktop::new());
+    let b = Broker::new(m.clone(), AgentStore::memory(), Audit::memory(), Config { enabled_by_default: true, ..cfg() });
+    b.enable_unattended().unwrap();
+    assert_eq!(b.state(), GlobalState::Enabled);
+    assert!(m.session_open());
+    let (_, token) = b.add_agent(&human(), "ci", broad()).unwrap();
+    let a = b.authenticate(&token, None).unwrap();
+    b.task_begin(&a, "x").unwrap();
+    // Disable still works from anyone; re-enabling needs no code.
+    b.disable("test");
+    assert_eq!(b.state(), GlobalState::Disabled);
+    b.enable_unattended().unwrap();
+    assert_eq!(b.state(), GlobalState::Enabled);
+    // A native control detaching does not turn a non-desktop broker off.
+    let (tx, _rx) = mpsc::channel();
+    b.subscribe(tx, true);
+    b.detach_native_control();
+    assert_eq!(b.state(), GlobalState::Enabled);
+}
+
+#[test]
+fn enable_unattended_is_refused_on_a_desktop_broker() {
+    let h = harness();
+    assert_eq!(h.b.enable_unattended().unwrap_err().code, ErrorCode::Denied);
+    assert_eq!(h.b.state(), GlobalState::Disabled);
+}
+
+#[test]
 fn backend_failure_blocks_enable() {
     let h = harness();
     h.m.fail_begin("RemoteDesktop portal denied");

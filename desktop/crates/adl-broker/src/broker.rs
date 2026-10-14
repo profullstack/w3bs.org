@@ -30,6 +30,9 @@ pub struct Config {
     pub pace_ms: u64,
     /// Refuse to enable, and disable, when no native control (tray/panel/TUI) is attached.
     pub require_native_control: bool,
+    /// Non-desktop instances (containers, VMs, CI): no human sits at this screen, so agent access
+    /// starts Enabled and `enable` needs no confirmation code. Implies no native control.
+    pub enabled_by_default: bool,
     pub approval_ttl_ms: u64,
     pub capture_ttl_ms: u64,
     pub enable_challenge_ttl_ms: u64,
@@ -44,6 +47,7 @@ impl Default for Config {
         Self {
             pace_ms: 8,
             require_native_control: true,
+            enabled_by_default: false,
             approval_ttl_ms: 5 * 60_000,
             capture_ttl_ms: 60_000,
             enable_challenge_ttl_ms: 120_000,
@@ -216,7 +220,7 @@ impl Broker {
         let lost = {
             let mut g = self.lock();
             g.native_controls = g.native_controls.saturating_sub(1);
-            g.native_controls == 0 && self.cfg.require_native_control && matches!(g.state, GlobalState::Enabled | GlobalState::Enabling)
+            g.native_controls == 0 && self.cfg.require_native_control && !self.cfg.enabled_by_default && matches!(g.state, GlobalState::Enabled | GlobalState::Enabling)
         };
         if lost {
             self.disable("native control lost");
@@ -240,6 +244,40 @@ impl Broker {
             return Err(AdlError::denied(format!("{op} must come from the human, not from an agent's process tree")));
         }
         Ok(())
+    }
+
+    /// Enable without a confirmation code. Only for brokers started with `enabled_by_default`.
+    pub fn enable_unattended(&self) -> Result<Status> {
+        if !self.cfg.enabled_by_default {
+            return Err(AdlError::denied("this broker needs a human to enable it (start it with --enabled-by-default for non-desktop instances)"));
+        }
+        {
+            let mut g = self.lock();
+            match g.state {
+                GlobalState::Enabled => return Ok({ drop(g); self.status() }),
+                GlobalState::Stopping => return Err(AdlError::new(ErrorCode::Busy, "still stopping")),
+                _ => {}
+            }
+            self.set_state(&mut g, GlobalState::Enabling, None);
+        }
+        if let Err(e) = self.adapter.begin() {
+            let mut g = self.lock();
+            self.set_state(&mut g, GlobalState::Blocked, Some(e.message.clone()));
+            self.audit.log("enable", None, None, "blocked", "", json!({"reason": e.message, "unattended": true}));
+            return Err(e);
+        }
+        {
+            let mut g = self.lock();
+            g.challenge = None;
+            self.open.store(true, Ordering::SeqCst);
+            self.set_state(&mut g, GlobalState::Enabled, None);
+        }
+        self.audit.log("enable", None, None, "allowed", "enabled", json!({"unattended": true}));
+        Ok(self.status())
+    }
+
+    pub fn enabled_by_default(&self) -> bool {
+        self.cfg.enabled_by_default
     }
 
     /// Step 1 of enabling: check readiness and issue a confirmation code to the human.
