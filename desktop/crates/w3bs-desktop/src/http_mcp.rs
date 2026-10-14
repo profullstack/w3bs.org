@@ -1,6 +1,12 @@
 //! MCP over HTTP inside the broker daemon (`daemon --mcp-http 127.0.0.1:7801`), so agents connect
 //! to a long-running endpoint instead of spawning `mcp serve --stdio` per session.
 //!
+//! The same loopback listener serves the human control app under `/control` (see
+//! `control_web`). The two never share credentials: `/mcp` only takes agent bearer tokens and
+//! ignores cookies; `/control` refuses any `Authorization` header and only takes its own session
+//! cookie. When the daemon runs without `--mcp-http`, opening the control app starts this
+//! listener with `/mcp` switched off (404).
+//!
 //! Streamable HTTP transport, JSON responses only (no SSE stream): `POST /mcp` carries one
 //! JSON-RPC message, `DELETE /mcp` ends a session. PRD section 10 rules apply:
 //! - loopback only; a non-loopback address is refused at startup
@@ -43,11 +49,42 @@ pub fn parse_addr(s: &str) -> Result<SocketAddr, String> {
     Ok(addr)
 }
 
-/// Start the endpoint on its own threads. Returns once the socket is bound.
-pub fn spawn(addr: SocketAddr) -> std::io::Result<()> {
+/// The address the listener is bound to, and whether it serves `/mcp`.
+static LISTENING: Mutex<Option<(SocketAddr, bool)>> = Mutex::new(None);
+
+pub fn listening() -> Option<(SocketAddr, bool)> {
+    *LISTENING.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// The listener's address, starting it (control app only, no `/mcp`) on `default` when the
+/// daemon was started without `--mcp-http`.
+pub fn ensure_started(default: SocketAddr) -> std::io::Result<SocketAddr> {
+    // Hold the lock across bind so two concurrent callers cannot both start one.
+    let mut l = LISTENING.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((a, _)) = *l {
+        return Ok(a);
+    }
+    let a = bind_and_serve(default, false)?;
+    *l = Some((a, false));
+    Ok(a)
+}
+
+/// Start the endpoint on its own threads. Returns the bound address once the socket is bound.
+pub fn spawn(addr: SocketAddr, mcp: bool) -> std::io::Result<SocketAddr> {
+    let mut l = LISTENING.lock().unwrap_or_else(|e| e.into_inner());
+    let a = bind_and_serve(addr, mcp)?;
+    *l = Some((a, mcp));
+    Ok(a)
+}
+
+fn bind_and_serve(addr: SocketAddr, mcp: bool) -> std::io::Result<SocketAddr> {
     let listener = TcpListener::bind(addr)?;
+    let addr = listener.local_addr()?;
     let sessions: Sessions = Arc::new(Mutex::new(HashMap::new()));
-    eprintln!("  mcp:     http://{addr}/mcp (loopback, bearer token required)");
+    if mcp {
+        eprintln!("  mcp:     http://{addr}/mcp (loopback, bearer token required)");
+    }
+    eprintln!("  app:     http://{addr}/control (open it with `w3bs desktop control --open` or the tray)");
     {
         let sessions = sessions.clone();
         std::thread::spawn(move || loop {
@@ -68,21 +105,21 @@ pub fn spawn(addr: SocketAddr) -> std::io::Result<()> {
         for conn in listener.incoming().flatten() {
             let sessions = sessions.clone();
             std::thread::spawn(move || {
-                let _ = handle(conn, addr, sessions);
+                let _ = handle(conn, addr, mcp, sessions);
             });
         }
     });
-    Ok(())
+    Ok(addr)
 }
 
-struct Req {
-    method: String,
-    path: String,
-    headers: HashMap<String, String>,
-    body: Vec<u8>,
+pub(crate) struct Req {
+    pub method: String,
+    pub path: String,
+    pub headers: HashMap<String, String>,
+    pub body: Vec<u8>,
 }
 
-fn read_request(r: &mut BufReader<TcpStream>) -> std::io::Result<Option<Req>> {
+pub(crate) fn read_request(r: &mut BufReader<TcpStream>) -> std::io::Result<Option<Req>> {
     let mut head = Vec::new();
     loop {
         let mut line = Vec::new();
@@ -133,14 +170,24 @@ fn rpc_error(id: Value, code: i64, message: &str) -> Value {
     json!({"jsonrpc": "2.0", "id": id, "error": {"code": code, "message": message}})
 }
 
-fn handle(conn: TcpStream, addr: SocketAddr, sessions: Sessions) -> std::io::Result<()> {
+fn handle(conn: TcpStream, addr: SocketAddr, mcp: bool, sessions: Sessions) -> std::io::Result<()> {
     let peer = conn.peer_addr()?;
     conn.set_read_timeout(Some(Duration::from_secs(120)))?;
     let mut w = conn.try_clone()?;
     let mut r = BufReader::new(conn);
     while let Some(req) = read_request(&mut r)? {
         let keep = !req.headers.get("connection").is_some_and(|v| v.eq_ignore_ascii_case("close"));
-        serve(&req, &mut w, addr, peer, &sessions)?;
+        let route = req.path.split('?').next().unwrap_or_default();
+        if route == "/control" || route.starts_with("/control/") {
+            // The control app may take the connection over (its event stream).
+            if crate::control_web::serve(&req, &mut w, addr, peer)? == crate::control_web::Next::Close {
+                break;
+            }
+        } else if mcp {
+            serve(&req, &mut w, addr, peer, &sessions)?;
+        } else {
+            respond(&mut w, "404 Not Found", &[], Some(&json!({"error": "MCP over HTTP is off; start the daemon with --mcp-http"})))?;
+        }
         if !keep {
             break;
         }
@@ -148,7 +195,7 @@ fn handle(conn: TcpStream, addr: SocketAddr, sessions: Sessions) -> std::io::Res
     Ok(())
 }
 
-fn host_ok(host: Option<&String>, addr: SocketAddr) -> bool {
+pub(crate) fn host_ok(host: Option<&String>, addr: SocketAddr) -> bool {
     let port = addr.port();
     host.is_some_and(|h| [format!("127.0.0.1:{port}"), format!("localhost:{port}"), format!("[::1]:{port}")].iter().any(|ok| h.eq_ignore_ascii_case(ok)))
 }
@@ -226,7 +273,7 @@ fn serve(req: &Req, w: &mut TcpStream, addr: SocketAddr, peer: SocketAddr, sessi
 
 /// The pid owning the client end of a loopback TCP connection (Linux: /proc/net/tcp + fds).
 #[cfg(target_os = "linux")]
-fn client_pid(peer: SocketAddr, local: SocketAddr) -> Option<u32> {
+pub(crate) fn client_pid(peer: SocketAddr, local: SocketAddr) -> Option<u32> {
     use std::net::IpAddr;
     let (IpAddr::V4(pip), IpAddr::V4(lip)) = (peer.ip(), local.ip()) else { return None };
     let hex = |ip: std::net::Ipv4Addr, port: u16| format!("{:08X}:{:04X}", u32::from_le_bytes(ip.octets()), port);
@@ -250,7 +297,7 @@ fn client_pid(peer: SocketAddr, local: SocketAddr) -> Option<u32> {
 }
 
 #[cfg(not(target_os = "linux"))]
-fn client_pid(_peer: SocketAddr, _local: SocketAddr) -> Option<u32> {
+pub(crate) fn client_pid(_peer: SocketAddr, _local: SocketAddr) -> Option<u32> {
     // Not resolved on macOS/Windows yet: the session still authenticates by token, but the agent
     // app is not registered as an agent root (stdio MCP keeps that protection everywhere).
     None

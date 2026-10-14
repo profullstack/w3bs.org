@@ -452,6 +452,38 @@ for _ in range(30):
 sys.exit("still waiting for approval after 30 s")
 EOF
 
+cat > "$RIG/panel.py" <<'EOF'
+# panel.py URL ACTION: sign in to the control app with a one-time link the way a browser does
+# (303 + session cookie), read its state (CSRF token), then POST one action with Origin + CSRF.
+# Prints "<http status> <state after>". Also checks that the link is single use and that an
+# agent bearer token is refused.
+import http.client, json, sys, urllib.parse
+url, action = sys.argv[1], sys.argv[2]
+u = urllib.parse.urlsplit(url)
+def req(method, path, headers={}, body=None):
+    c = http.client.HTTPConnection(u.hostname, u.port, timeout=30)
+    c.request(method, path, body=body, headers=headers)
+    r = c.getresponse(); data = r.read(); c.close()
+    return r.status, r.getheader("Set-Cookie"), data
+st, cookie, _ = req("GET", u.path + "?" + u.query)
+assert st == 303 and cookie and "HttpOnly" in cookie and "SameSite=Strict" in cookie, (st, cookie)
+st2, again, _ = req("GET", u.path + "?" + u.query)
+assert again is None, "login link worked twice"
+cookie = cookie.split(";")[0]
+st, _, data = req("GET", "/control/api/state", {"Cookie": cookie})
+csrf = json.loads(data)["csrf"]
+st, _, data = req("GET", "/control/api/state", {"Authorization": "Bearer agent-token"})
+assert st == 403, ("agent bearer", st)
+origin = "http://%s:%d" % (u.hostname, u.port)
+st, _, data = req("POST", "/control/api/action", {"Cookie": cookie, "Origin": origin, "X-W3BS-CSRF": csrf, "Content-Type": "application/json"}, json.dumps({"action": action}))
+_, _, after = req("GET", "/control/api/state", {"Cookie": cookie})
+print(st, json.loads(after)["status"]["state"])
+EOF
+cat > "$RIG/opener.sh" <<'EOF'
+#!/bin/sh
+# Stands in for xdg-open: records the one-time control-app link the native control asked to open.
+printf '%s\n' "$1" > /root/panel.url
+EOF
 # The tray is the ONLY native control here: the terminal `control` is stopped and the broker
 # restarted. kded6 provides org.kde.StatusNotifierWatcher (on a real desktop plasmashell is the
 # host); KWin itself serves org.kde.kglobalaccel, the GlobalShortcuts portal's backend. Plasma asks
@@ -477,7 +509,7 @@ since() { tail -c +$((MARK + 1)) /root/t1.txt; }
 state() { w3bs-desktop --json status | grep -o '"state": "[a-z]*"' | head -1 | cut -d'"' -f4; }
 until_() { for i in $(seq 1 ${2:-25}); do eval "$1" && return 0; sleep 0.2; done; return 1; }
 tray_up() {
-  setsid w3bs-desktop tray >>$L/tray.log 2>&1 &
+  W3BS_DESKTOP_OPENER=/rig/opener.sh setsid w3bs-desktop tray >>$L/tray.log 2>&1 &
   TP=$!
   until_ 'M items 2>/dev/null | grep -q "StatusNotifierItem-$TP-"' 50
 }
@@ -486,6 +518,10 @@ M title | grep -q Disabled && ok "title: $(M title)" || bad "title: $(M title)"
 M labels > /root/menu0.txt
 grep -qx "Enable agent access" /root/menu0.txt && grep -qx "Stop all agent activity" /root/menu0.txt && grep -qx "Quit and disable" /root/menu0.txt \
   && ok "menu has Enable / Stop all / Quit and disable" || bad "menu: $(cat /root/menu0.txt)"
+[ "$(head -1 /root/menu0.txt)" = "Open control panel…" ] && ok "first menu item: Open control panel…" || bad "first item: $(head -1 /root/menu0.txt)"
+grep -qx "Agents" /root/menu0.txt && grep -qx "Recent activity" /root/menu0.txt && ok "menu has Agents and Recent activity submenus" || bad "submenus: $(cat /root/menu0.txt)"
+until_ 'M labels | grep -qx "tester (broad desktop)"' 50 && M labels | grep -qx "Revoke tester" \
+  && ok "Agents submenu lists the rig agent: tester (broad desktop), Revoke tester" || bad "agents submenu: $(M labels)"
 
 echo "== tray: enable from the menu"
 sleep 1
@@ -524,6 +560,21 @@ wait $APID && rc=0 || rc=$?
 sleep 0.5
 [ $rc = 0 ] && [ "$(since)" = "approved text" ] && ok "Approve clicked -> identical retry typed: $(since)" || bad "after approve rc=$rc $(cat /root/appr.out) / $(since)"
 ! M labels | grep -q "Approval:" && ok "approval gone from the menu" || bad "approval still listed: $(M labels)"
+
+echo "== tray: control app (Open control panel…)"
+w3bs-desktop agents add rv --preset observe >/dev/null 2>&1 || true
+until_ 'M labels | grep -qx "Revoke rv"' 50 && M click "Revoke rv" && until_ 'w3bs-desktop --json agents list | python3 -c "import json,sys; sys.exit(0 if any(a[\"name\"]==\"rv\" and a[\"revoked\"] for a in json.load(sys.stdin)) else 1)"' \
+  && ok "Agents > Revoke rv from the tray revoked it" || bad "tray revoke: $(w3bs-desktop agents list)"
+until_ 'M labels | grep -q -- "agents.revoke · rv · allowed"' 50 && ok "Recent activity shows it: $(M labels | grep -m1 -- 'agents.revoke')" || bad "activity submenu: $(M labels | tail -12)"
+rm -f /root/panel.url
+M click "Open control panel…"
+until_ '[ -s /root/panel.url ]' && grep -q '^http://127.0.0.1:7801/control/login?t=login_' /root/panel.url && ok "Open control panel… minted a one-time link: $(cut -c1-48 /root/panel.url)…" || bad "no link: $(cat /root/panel.url 2>&1) $(tail -3 $L/tray.log)"
+[ "$(state)" = enabled ] || bad "expected enabled before the control app disables: $(state)"
+R=$(python3 /rig/panel.py "$(cat /root/panel.url)" disable 2>&1)
+[ "$R" = "200 disabled" ] && [ "$(state)" = disabled ] && until_ 'M title | grep -q Disabled' \
+  && ok "control app: single-use link, agent bearer refused, Disable -> broker disabled, tray shows $(M title)" || bad "control app disable: $R state $(state)"
+tail -n 20 /root/w3bs/state/audit/* | grep -q '"reason":"disabled from the control app"' && ok "audited as disabled from the control app" || bad "audit: $(tail -n 3 /root/w3bs/state/audit/*)"
+M click "Enable agent access"; until_ '[ "$(state)" = enabled ]' || bad "re-enable after the control app: $(state)"
 
 echo "== tray: left click"
 M activate

@@ -245,6 +245,12 @@ check ((state) -eq 'enabled') "outside input while no agent holds the lease does
 $ctl.StandardInput.WriteLine('quit'); $ctl.StandardInput.Flush()
 $ctl.WaitForExit(5000) | Out-Null
 $trayErr = Join-Path $Work 'tray.err'
+# The tray opens the control app through W3BS_DESKTOP_OPENER instead of the browser here: the stand-in
+# records the one-time sign-in link so the check below can use it like a browser would.
+$panelUrl = Join-Path $Work 'panel.url'
+$opener = Join-Path $Work 'opener.cmd'
+Set-Content -Path $opener -Value "@echo %*> `"$panelUrl`"" -Encoding ascii
+$env:W3BS_DESKTOP_OPENER = $opener
 $tray = Start-Process -FilePath $Bin -ArgumentList 'tray' -RedirectStandardError $trayErr -RedirectStandardOutput (Join-Path $Work 'tray.out') -NoNewWindow -PassThru
 check (until { (Get-Content -Raw $trayErr -ErrorAction SilentlyContinue) -match 'notification icon added' } 35000) "tray: Shell_NotifyIcon(NIM_ADD) succeeded" (Get-Content -Raw $trayErr -ErrorAction SilentlyContinue)
 check (until { (Get-Content -Raw $trayErr) -match 'state Disabled' }) "tray: subscribed as native control, shows Disabled"
@@ -252,7 +258,7 @@ $th = [N]::FindWindow('W3bsDesktopTray', [NullString]::Value)
 check ($th -ne [IntPtr]::Zero) "tray window found (class W3bsDesktopTray)"
 $WM_COMMAND = 0x0111; $WM_TRAY = 0x8001; $WM_CANCELMODE = 0x001F
 [void][N]::PostMessage($th, $WM_TRAY, [IntPtr]::Zero, [IntPtr]0x007B)   # WM_CONTEXTMENU from the icon
-check (until { (Get-Content -Raw $trayErr) -match 'menu: Status: Disabled.*Enable agent access.*Stop all agent activity.*Quit and disable' }) "tray menu opens with status in words, Enable, Stop all, Quit and disable"
+check (until { (Get-Content -Raw $trayErr) -match 'menu: Open control panel.*Status: Disabled.*Enable agent access.*Stop all agent activity.*Quit and disable' }) "tray menu opens with Open control panel first, status in words, Enable, Stop all, Quit and disable"
 [void][N]::PostMessage($th, $WM_CANCELMODE, [IntPtr]::Zero, [IntPtr]::Zero)
 Start-Sleep -Milliseconds 300
 [N]::Chord([byte[]](0x1B))
@@ -260,6 +266,22 @@ Start-Sleep -Milliseconds 300
 [void][N]::PostMessage($th, $WM_COMMAND, [IntPtr]1, [IntPtr]::Zero)   # "Enable agent access"
 check (until { (state) -eq 'enabled' }) "tray Enable (menu command) enables: enable.request + enable.confirm"
 check ((W windows list --agent tester).code -eq 0) "agent works with the tray as the only native control"
+# "Open control panel…": a one-time link to the control app; signed in with it, Disable works.
+[void][N]::PostMessage($th, $WM_COMMAND, [IntPtr]6, [IntPtr]::Zero)
+$gotUrl = until { (Test-Path $panelUrl) -and ((Get-Content -Raw $panelUrl) -match 'login\?t=login_') }
+check $gotUrl "tray Open control panel: one-time link minted" (Get-Content -Raw $trayErr)
+if ($gotUrl) {
+    $url = (Get-Content -Raw $panelUrl).Trim().Trim('"')
+    $base = ([uri]$url).GetLeftPart([UriPartial]::Authority)
+    try {
+        $r = Invoke-WebRequest -Uri $url -SessionVariable web -MaximumRedirection 0 -SkipHttpErrorCheck
+        $st = Invoke-RestMethod -Uri "$base/control/api/state" -WebSession $web
+        $res = Invoke-WebRequest -Uri "$base/control/api/action" -Method Post -WebSession $web -ContentType 'application/json' -Headers @{ Origin = $base; 'X-W3BS-CSRF' = $st.csrf } -Body '{"action":"disable"}' -SkipHttpErrorCheck
+        check ($r.StatusCode -eq 303 -and $res.StatusCode -eq 200 -and (until { (state) -eq 'disabled' })) "control app: signed in with the link, Disable disabled access" "$($r.StatusCode) $($res.StatusCode) $($res.Content)"
+    } catch { bad "control app request failed: $_" }
+    [void][N]::PostMessage($th, $WM_COMMAND, [IntPtr]1, [IntPtr]::Zero)
+    until { (state) -eq 'enabled' } | Out-Null
+}
 [void][N]::PostMessage($th, $WM_TRAY, [IntPtr]::Zero, [IntPtr]0x0400)   # NIN_SELECT (left click)
 check (until { (state) -eq 'disabled' }) "tray left click while enabled disables"
 [void][N]::PostMessage($th, $WM_TRAY, [IntPtr]::Zero, [IntPtr]0x0400)

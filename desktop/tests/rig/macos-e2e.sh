@@ -119,6 +119,7 @@ else
         ok "menu-bar item exists and says 'Agents: Disabled' ($ITEM)"
         R=$(open_item "Enable agent access")
         note "menu: $R"
+        echo "$R" | grep -q "Open control panel" && ok "menu has Open control panel…" || bad "no Open control panel item: $R"
         sleep 1
         S=$(state)
         if [ "$S" = enabled ]; then

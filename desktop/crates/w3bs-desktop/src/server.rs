@@ -318,6 +318,26 @@ fn control(b: &Arc<Broker>, c: &mut Conn, req: &Request) -> Result<Value> {
         "approvals.decide" => to(b.decide_approval(&peer, &str_param(p, "approval")?, p.get("approve").and_then(Value::as_bool).unwrap_or(false))?),
         "audit.export" => to(b.audit.export()),
         "audit.delete" => Ok(json!({"files_deleted": b.audit.delete_all()})),
+        "audit.recent" => to(b.audit.recent(p.get("limit").and_then(Value::as_u64).unwrap_or(20).min(500) as usize)),
+        // A one-time sign-in link for the control app. The app can enable, approve and grant, so
+        // only the human may ask: the native control itself, or an interactive terminal outside
+        // any agent's process tree (the same bar as confirming an enable).
+        "control.login" => {
+            let via = p.get("via").and_then(Value::as_str).unwrap_or("control").chars().take(16).collect::<String>();
+            if peer.agent_descendant || !(peer.native_control || peer.interactive) {
+                b.audit.log("control.login", None, None, "denied", "", json!({"via": via, "pid": peer.pid, "why": if peer.agent_descendant { "agent process tree" } else { "not the native control or an interactive terminal" }}));
+                return Err(AdlError::denied("open the control app from the tray, panel or menu bar, or run `w3bs desktop control --open` in your own terminal"));
+            }
+            crate::control_web::issue_login(&via)
+        }
+        // The native control reports the emergency-stop shortcut the desktop bound, for the app.
+        "native.shortcut" => {
+            if !c.native_control {
+                return Err(AdlError::denied("only the subscribed native control reports its shortcut"));
+            }
+            crate::control_web::set_shortcut(&str_param(p, "description")?);
+            Ok(json!({"ok": true}))
+        }
         "session.event" => {
             // Only events that reduce access are accepted from the control socket.
             let e = match str_param(p, "event")?.as_str() {

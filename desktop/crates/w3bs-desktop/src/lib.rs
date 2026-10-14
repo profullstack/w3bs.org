@@ -7,6 +7,7 @@
 mod background;
 mod client;
 mod control;
+mod control_web;
 #[cfg(target_os = "linux")]
 mod gnome_ext;
 mod http_mcp;
@@ -36,6 +37,8 @@ use std::sync::Arc;
 const AFTER_HELP: &str = "\
 Agent access starts Disabled. A human enables it from the native control (tray, panel extension
 or `w3bs desktop control`); agents cannot enable themselves or approve their own requests.
+The control app (`w3bs desktop control --open`, or Open control panel in the tray) shows
+agents, tasks, approvals and activity in your browser at http://127.0.0.1:7801/control.
 Non-desktop instances (containers, VMs, CI) with nobody at the screen start the broker with
 `w3bs desktop daemon --enabled-by-default` instead: Enabled from startup, no native control.
 
@@ -98,8 +101,15 @@ enum Cmd {
         mcp_http: Option<String>,
     },
     /// Terminal native control: shows state, enable codes and approvals; quitting disables access
-    #[command(long_about = "Terminal native control: the on/off switch for agent access, in a terminal.\n\nRun it, then type a command and press Enter:\n  enable            turn agent access on (your desktop may ask for permission the first time)\n  disable           turn it off\n  stop              cancel all agent activity but stay enabled\n  approvals         list requests waiting for you\n  approve <id>      allow one request; deny <id> refuses it\n  confirm           confirm an enable request started from another terminal\n  tasks, status     what agents are doing\n  quit              leave (this also turns agent access off)\n\nKeep it open while agents work. The tray icon or GNOME panel menu does the same thing.")]
-    Control,
+    #[command(long_about = "Terminal native control: the on/off switch for agent access, in a terminal.\n\nRun it, then type a command and press Enter:\n  enable            turn agent access on (your desktop may ask for permission the first time)\n  disable           turn it off\n  stop              cancel all agent activity but stay enabled\n  approvals         list requests waiting for you\n  approve <id>      allow one request; deny <id> refuses it\n  confirm           confirm an enable request started from another terminal\n  tasks, status     what agents are doing\n  open              open the control app in your browser\n  quit              leave (this also turns agent access off)\n\nKeep it open while agents work. The tray icon or GNOME panel menu does the same thing.\n\nWith --open it does not start the terminal control: it opens the control app (agents, tasks,\napprovals, activity) in your browser with a one-time sign-in link and exits. Closing the app\ndoes not turn agent access off; its Quit and disable button does.")]
+    Control {
+        /// Open the control app in your browser (one-time sign-in link, valid 60 s) and exit
+        #[arg(long)]
+        open: bool,
+        /// With --open: print the sign-in link instead of starting a browser
+        #[arg(long, requires = "open")]
+        no_browser: bool,
+    },
     /// Tray/menu-bar native control (StatusNotifierItem on Linux, a menu-bar item on macOS) with an emergency-stop shortcut; quitting disables access
     Tray {
         /// Wait up to this many seconds for the broker to come up (login items start together)
@@ -553,6 +563,7 @@ fn run_with(cli: Cli) {
             let audit = Audit::open(paths::state_dir().join("audit"), retention_days);
             let cfg = Config { require_native_control: !no_native_control && !enabled_by_default, enabled_by_default, ..Config::default() };
             let broker = Arc::new(Broker::new(adapter, store, audit, cfg));
+            control_web::init(broker.clone());
             if enabled_by_default {
                 match broker.enable_unattended() {
                     Ok(_) => eprintln!("w3bs-desktop: agent access ENABLED by default (non-desktop instance)"),
@@ -561,7 +572,7 @@ fn run_with(cli: Cli) {
             }
             // A busy port must not take the broker down with it: stdio MCP and the controls still work.
             if let Some(addr) = mcp_addr
-                && let Err(e) = http_mcp::spawn(addr)
+                && let Err(e) = http_mcp::spawn(addr, true)
             {
                 eprintln!("w3bs-desktop: MCP HTTP endpoint {addr} not started ({e}); stdio MCP still works");
             }
@@ -573,7 +584,18 @@ fn run_with(cli: Cli) {
             platform::run_tray().map_err(|e| AdlError::new(ErrorCode::Blocked, e.to_string()))?;
             Ok(Value::Null)
         }
-        Cmd::Control => {
+        Cmd::Control { open: true, no_browser } => {
+            let v = control_client()?.call("control.login", json!({"via": "cli"}))?;
+            let url = v["url"].as_str().unwrap_or_default().to_string();
+            if no_browser {
+                return Ok(if j { v } else { json!(format!("{url}\n(one-time sign-in link, valid {} s)", v["expires_in_s"])) });
+            }
+            match control_web::open_url(&url) {
+                Ok(()) => Ok(if j { json!({"opened": v["app"]}) } else { json!(format!("Opened the control app ({}). Closing it does not turn agent access off.", v["app"].as_str().unwrap_or_default())) }),
+                Err(e) => Ok(json!(format!("{e}. Open this one-time link in your browser within {} s:\n{url}", v["expires_in_s"]))),
+            }
+        }
+        Cmd::Control { .. } => {
             control::run().map_err(|e| AdlError::new(ErrorCode::Blocked, e.to_string()))?;
             Ok(Value::Null)
         }

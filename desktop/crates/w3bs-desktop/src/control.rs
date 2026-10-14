@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, IsTerminal, Write};
 use std::sync::mpsc;
 
-const HELP: &str = "commands: enable | disable | stop | confirm | approve <id> | deny <id> | approvals | tasks | status | quit (quitting disables access)";
+const HELP: &str = "commands: enable | disable | stop | confirm | approve <id> | deny <id> | approvals | tasks | status | open (the control app) | quit (quitting disables access)";
 
 fn print_state(v: &Value) {
     let st = v["state"].as_str().unwrap_or("?");
@@ -122,6 +122,14 @@ pub fn run() -> std::io::Result<()> {
             "approvals" => call("approvals.list", json!({})),
             "tasks" => call("tasks.list", json!({})),
             "status" => call("status", json!({})),
+            // The control app in the browser, signed in with a one-time link from this control.
+            "open" => call("control.login", json!({"via": "terminal control"})).map(|v| {
+                let url = v["url"].as_str().unwrap_or_default().to_string();
+                match crate::control_web::open_url(&url) {
+                    Ok(()) => json!(format!("Opening the control app: {url}")),
+                    Err(e) => json!(format!("{e}; open this one-time link within {} s: {url}", v["expires_in_s"])),
+                }
+            }),
             "quit" | "exit" => break,
             _ => Err(HELP.into()),
         };

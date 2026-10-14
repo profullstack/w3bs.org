@@ -545,6 +545,33 @@ enable_ && [ $DIALOG = 0 ] || bad "re-enable after ActiveChanged: $(state)"
 EOF
 
 # ---------------------------------------------------------------- extension: top-bar native control
+cat > "$RIG/panel.py" <<'EOF'
+# panel.py URL ACTION: sign in to the control app with a one-time link the way a browser does
+# (303 + session cookie), read its state (CSRF token), then POST one action with Origin + CSRF.
+# Prints "<http status> <state after>". Also checks that the link is single use and that an
+# agent bearer token is refused.
+import http.client, json, sys, urllib.parse
+url, action = sys.argv[1], sys.argv[2]
+u = urllib.parse.urlsplit(url)
+def req(method, path, headers={}, body=None):
+    c = http.client.HTTPConnection(u.hostname, u.port, timeout=30)
+    c.request(method, path, body=body, headers=headers)
+    r = c.getresponse(); data = r.read(); c.close()
+    return r.status, r.getheader("Set-Cookie"), data
+st, cookie, _ = req("GET", u.path + "?" + u.query)
+assert st == 303 and cookie and "HttpOnly" in cookie and "SameSite=Strict" in cookie, (st, cookie)
+st2, again, _ = req("GET", u.path + "?" + u.query)
+assert again is None, "login link worked twice"
+cookie = cookie.split(";")[0]
+st, _, data = req("GET", "/control/api/state", {"Cookie": cookie})
+csrf = json.loads(data)["csrf"]
+st, _, data = req("GET", "/control/api/state", {"Authorization": "Bearer agent-token"})
+assert st == 403, ("agent bearer", st)
+origin = "http://%s:%d" % (u.hostname, u.port)
+st, _, data = req("POST", "/control/api/action", {"Cookie": cookie, "Origin": origin, "X-W3BS-CSRF": csrf, "Content-Type": "application/json"}, json.dumps({"action": action}))
+_, _, after = req("GET", "/control/api/state", {"Cookie": cookie})
+print(st, json.loads(after)["status"]["state"])
+EOF
 cat > "$RIG/ext-panel.sh" <<'EOF'
 echo "== GNOME Shell extension: top-bar native control (the only native control from here on)"
 P() { /rig/eval.sh "$I.$1"; }
@@ -594,6 +621,28 @@ wait $APID && rc=0 || rc=$?
 sleep 0.5
 [ $rc = 0 ] && [ "$(since)" = "approved text" ] && ok "Approve activated -> identical retry typed: $(since)" || bad "after approve rc=$rc $(cat /root/appr.out) / $(since)"
 until_ '[ "$(P _approvalItems.size)" = 0 ]' && ok "approval gone from the menu" || bad "approval still listed"
+
+echo "== top bar: Open control panel…, Agents, Recent activity"
+[ "$(P _openItem.label.text)" = "Open control panel…" ] && [ "$(/rig/eval.sh "$I.menu._getMenuItems()[0] === $I._openItem")" = true ] \
+  && ok "first menu item: Open control panel…" || bad "open item: $(P _openItem.label.text)"
+P 'menu.open(), 1' >/dev/null; sleep 1
+AGS=$(/rig/eval.sh "$I._agentsMenu.menu._getMenuItems().map(i => i.label.text).join('|')")
+echo "$AGS" | grep -q "tester (broad desktop)|    Revoke tester" && ok "Agents submenu lists the rig agent: $(echo "$AGS" | cut -c1-120)" || bad "agents submenu: $AGS"
+ACT=$(/rig/eval.sh "$I._activityMenu.menu._getMenuItems().map(i => i.label.text).join('|')")
+echo "$ACT" | grep -q "approvals.decide" && ok "Recent activity shows the approval: $(echo "$ACT" | cut -c1-120)" || bad "activity submenu: $ACT"
+P 'menu.close(), 1' >/dev/null
+L0=$(cat /root/w3bs/state/audit/* | grep -c '"via":"GNOME panel"' || true)
+P '_openItem.activate(null), 1' >/dev/null
+until_ '[ "$(cat /root/w3bs/state/audit/* | grep -c "\"via\":\"GNOME panel\"")" -gt "$L0" ]' && ok "Open control panel… minted a one-time link over the panel's native-control connection (audited control.login via GNOME panel)" || bad "panel open: $(P _noteItem.label.text)"
+# The same app, signed in from a person's terminal (a pty), disables access.
+command -v script >/dev/null || dnf -y install --setopt=install_weak_deps=False /usr/bin/script >$L/dnf-script.log 2>&1 || true
+U=$(script -qc "w3bs-desktop control --open --no-browser" /dev/null | grep -o 'http://[^ ]*login?t=[a-z0-9_]*' | tr -d '\r')
+R=$(python3 /rig/panel.py "$U" disable 2>&1)
+[ "$R" = "200 disabled" ] && until_ '[ "$(P _statusItem.label.text)" = "Status: Disabled" ]' \
+  && ok "control app (link from control --open in a terminal): single use, agent bearer refused, Disable -> broker disabled, panel 'Status: Disabled'" || bad "control app disable: $R / $(state)"
+set +e; U2=$(w3bs-desktop control --open --no-browser </dev/null 2>&1); rc=$?; set -e
+[ $rc = 4 ] && ok "control --open without a terminal is refused (exit 4)" || bad "non-interactive control --open rc=$rc $U2"
+panel_enable || bad "re-enable from the panel: $(state)"
 
 echo "== top bar: Disable, Quit and disable"
 P '_toggleItem.activate(null), 1' >/dev/null
