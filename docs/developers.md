@@ -88,6 +88,32 @@ node native/install-linux.mjs --install
 
 The second command explicitly registers `w3bs://` for your Linux user. Opening such a URI independently verifies its manifest, then opens the HTTPS inspection view in your default browser, which may be TronBrowser. It is a protocol handler with a browser-based inspection surface, not a Chromium engine modification or an independently maintained external implementation. macOS supports manual `--open`; automatic registration and Windows support remain future work.
 
+<span id="accounts"></span>
+
+## Accounts and Sign in with W3BS
+
+A W3BS account signs you in to w3bs.org, the `w3bs` CLI and apps that offer "Sign in with W3BS". Create one at `/signup`: pick a username, confirm your email from the link we send, then add a passkey (or keep the password you chose). Passkeys and username/password are the ways in; an emailed link is the fallback for a lost password or a device without your passkey.
+
+```sh
+w3bs login     # opens the browser, signs this computer in
+w3bs whoami    # alice (alice@example.com) on https://w3bs.org
+w3bs logout    # revokes the sign-in and forgets it
+```
+
+The CLI keeps its tokens in `~/.config/w3bs/auth.json` (mode 0600). Every signed-in app, the CLI included, is listed on `/account`, where you can sign it out.
+
+**For app developers.** w3bs.org is an OAuth 2.1 authorization server. Register an app on `/account` (a name and its redirect URIs) to get a `client_id`. Apps are public clients: no client secret, so the same flow works for web, mobile and native apps.
+
+- Metadata (RFC 8414): `/.well-known/oauth-authorization-server`
+- Authorization code with PKCE, `code_challenge_method=S256` only. `state` is echoed back, and `iss` is added (RFC 9207).
+- Redirect URIs match exactly. Use `https`, or `http://127.0.0.1/<path>` / `http://[::1]/<path>` for native apps, which then match any port (RFC 8252).
+- `POST /oauth/token` (form or JSON): `authorization_code` with `code`, `redirect_uri`, `client_id`, `code_verifier`; `refresh_token` with `refresh_token`, `client_id`. Access tokens last an hour. Refresh tokens last 30 days and rotate on every use; presenting a spent one revokes the whole sign-in.
+- `POST /oauth/revoke` (RFC 7009) with `token` and `client_id`.
+- `GET /api/me` with `Authorization: Bearer <access token>` returns `sub` (stable, never reuse email as the key), `username`, `email` and `email_verified`.
+- Scope: `profile`.
+
+First-party sites that share a secret with w3bs.org can use the silent `prompt=none` bridge from [@profullstack/bridges](https://www.npmjs.com/package/@profullstack/bridges) at `/api/v1/bridge/authorize` and `/api/v1/bridge/token`; clients are configured by the operator in `W3BS_BRIDGE_CLIENTS`.
+
 <span id="conformance"></span>
 
 ## Conformance

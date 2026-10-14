@@ -40,6 +40,10 @@ pub fn human(r: &OperationResult) {
         eprintln!("warning: {w}");
     }
     if let Some(e) = &r.error {
+        if e.code == "NOT_SIGNED_IN" {
+            eprintln!("{}", e.message);
+            return;
+        }
         eprintln!("error: {} ({})", e.message, e.code);
         if r.result == Overall::ApprovalRequired {
             eprintln!("hint: re-run interactively, or add --yes (and a pre-provisioned trust root for new repositories)");
@@ -47,6 +51,30 @@ pub fn human(r: &OperationResult) {
         return;
     }
     match r.operation.as_str() {
+        "login" | "whoami" => {
+            let u = &r.data["user"];
+            let who = match u["email"].as_str() {
+                Some(email) if !email.is_empty() => format!("{} ({email})", s(&u["username"])),
+                _ => s(&u["username"]),
+            };
+            if r.operation == "login" {
+                println!("Signed in to {} as {who}", s(&r.data["origin"]));
+            } else {
+                println!("{who} on {}", s(&r.data["origin"]));
+            }
+            return;
+        }
+        "logout" => {
+            if r.data["signedIn"] == true {
+                println!("Signed out of {}", s(&r.data["origin"]));
+                if r.data["revoked"] != true {
+                    eprintln!("warning: could not reach {} to revoke the session; the local credentials are deleted", s(&r.data["origin"]));
+                }
+            } else {
+                println!("Not signed in to {}", s(&r.data["origin"]));
+            }
+            return;
+        }
         "packages" => {
             let pkgs = r.data["packages"].as_array().cloned().unwrap_or_default();
             if pkgs.is_empty() {

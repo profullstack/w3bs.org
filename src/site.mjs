@@ -77,7 +77,7 @@ function header(active) {
     )
     .join(
       '',
-    )}</nav><a class="header-action" href="/developers">Start building <span aria-hidden="true">↗</span></a></header>`;
+    )}</nav><a class="header-account" href="/account" ${active === '/account' ? 'aria-current="page"' : ''}>Account</a><a class="header-action" href="/developers">Start building <span aria-hidden="true">↗</span></a></header>`;
 }
 function footer() {
   return `<footer><div><a class="wordmark" href="/mission">w3bs<span class="wordmark-dot">.</span></a><p>Human-friendly. Agent-native.<br>Device-friendly. Open by design.</p></div><div><span class="eyebrow">THE INITIATIVE</span><a href="/governance">Governance & participation</a><a href="/docs/founding-prd.md">Founding PRD · v2.0</a><a href="/docs/roadmap.md">Implementation status</a><a href="/desktop">Agentic Desktop Layer</a></div><div><span class="eyebrow">FOR IMPLEMENTERS</span><a href="/developers">Developer guide</a><a href="/.well-known/w3bs.json">Machine discovery ↗</a><a href="/api">API reference ↗</a></div><div class="footer-bottom"><span>Open standards for the Agentic Era.</span><span>Community drafts · No Recommendations issued</span></div></footer>`;
@@ -302,8 +302,13 @@ ${e(DESKTOP_INSTALL_WIN)}
 # Without the w3bs CLI (macOS and Linux)
 ${e(DESKTOP_INSTALL)}</code></pre><div class="terminal-result"><button class="small-button" type="button" data-copy="${e(DESKTOP_W3BS_BOTH)}">Copy macOS/Linux</button><button class="small-button" type="button" data-copy="${e(DESKTOP_INSTALL_WIN)}">Copy Windows</button><span class="terminal-label">AGENT ACCESS AFTER INSTALL</span><code>Disabled</code><span class="terminal-muted">You turn it on from the tray, panel or menu bar.</span></div></div></section>
   <section class="section" id="steps" aria-labelledby="steps-title"><div class="section-heading"><div><div class="eyebrow">HOW TO USE IT</div><h2 id="steps-title">Six steps.</h2></div><p>Commands are shown as <code>w3bs desktop …</code>. On Windows, or without the w3bs CLI, type <code>w3bs-desktop …</code> instead; it is the same program. If <code>w3bs</code> says <em>unrecognized subcommand 'desktop'</em>, your CLI is older than 0.1.2: run <code>w3bs self update</code>.</p></div><ol class="desktop-steps">${desktopSteps
-    .map(([title, cmd, text]) => `<li><h3>${title}</h3><div class="identity-line"><code>${e(cmd)}</code><button class="small-button" type="button" data-copy="${e(cmd)}">Copy</button></div><p>${text}</p></li>`)
-    .join('')}</ol><aside class="callout"><strong>Screenshots on Linux.</strong><p>Desktops ask before an app may take screenshots. Allow it in your privacy settings, or run <code>flatpak permission-set screenshot screenshot "" yes</code>. Without it, screenshot requests are refused instead of popping up a dialog in the middle of agent work.</p></aside></section>
+    .map(
+      ([title, cmd, text]) =>
+        `<li><h3>${title}</h3><div class="identity-line"><code>${e(cmd)}</code><button class="small-button" type="button" data-copy="${e(cmd)}">Copy</button></div><p>${text}</p></li>`,
+    )
+    .join(
+      '',
+    )}</ol><aside class="callout"><strong>Screenshots on Linux.</strong><p>Desktops ask before an app may take screenshots. Allow it in your privacy settings, or run <code>flatpak permission-set screenshot screenshot "" yes</code>. Without it, screenshot requests are refused instead of popping up a dialog in the middle of agent work.</p></aside></section>
   <section class="section desktop-demo" aria-labelledby="demo-title"><div class="section-heading"><div><div class="eyebrow">THE NATIVE CONTROL</div><h2 id="demo-title">One switch.<br>Always in reach.</h2></div><p>Access starts Disabled after install, login, restart or a crash. Enabling needs a human. Disabling works at any time and stops everything the layer mediates. Try the menu below. It is a simulation.</p></div>${demo}</section>
   <section class="section"><div class="section-heading"><div><div class="eyebrow">WHAT IT DOES</div><h2>Real input.<br>Real limits.</h2></div><p>Agents need an observe, act, observe loop. They also need a human who can see what is happening and stop it.</p></div><div class="principle-grid"><article><span class="card-index">01 / MOUSE AND KEYBOARD</span><h3>The core, not an add-on.</h3><p>OS-level pointer and keyboard input: move, click, drag, scroll, hover, type, shortcuts and explicit key and button holds. Every coordinate names its space, and stale screenshots are rejected.</p></article><article><span class="card-index">02 / YOUR AGENTS</span><h3>The tools you already use.</h3><p>Claude Code, OpenCode and Codex connect through a local stdio MCP server. The same capability model backs the CLI and the local API. No cloud service sits in the middle.</p></article><article><span class="card-index">03 / YOUR SWITCH</span><h3>Stop means stop.</h3><p>Disable closes the authorization gate first, revokes the input lease, cancels queued work, closes capture streams and releases any keys the layer is holding.</p></article></div></section>
   <section class="section"><div class="section-heading"><div><div class="eyebrow">PLATFORMS</div><h2>KDE and GNOME first.<br><em>Then everywhere.</em></h2></div><p>These are targets, not compatibility claims. A platform is certified only when the full mouse, keyboard and stop workflow passes on it.</p></div><div class="table-wrap"><table class="platform-table"><caption class="sr-only">Platform delivery order</caption><thead><tr><th scope="col">Priority</th><th scope="col">Platform</th><th scope="col">Human control</th><th scope="col">Status</th></tr></thead><tbody>${desktopPlatforms.map(([priority, platform, control, status]) => `<tr><td>${priority}</td><th scope="row">${platform}</th><td>${control}</td><td>${pill(status)}</td></tr>`).join('')}</tbody></table></div><p class="table-note">Wayland first on KDE and GNOME, with X11 tested where the desktop still supports it. Vela support is a clean-room adapter built from public interface facts. No Vela code is used.</p></section>
@@ -423,5 +428,16 @@ export async function renderPage({ path, host, query, store, origin }) {
     content = document(title, title);
     active = '/specs';
   } else throw new W3bsError('NOT_FOUND', 'Page not found.', 404);
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${e(title)} — W3BS</title><meta name="description" content="${e(description)}"><meta name="theme-color" content="#f6f4ed"><link rel="icon" type="image/svg+xml" href="/assets/mark.svg"><link rel="manifest" href="/manifest.webmanifest"><link rel="stylesheet" href="/assets/style.css"><script type="module" src="/assets/app.js"></script>${scripts}</head><body>${header(active)}<main id="main">${content}</main>${footer()}<div id="toast" class="toast" role="status" aria-live="polite" hidden></div></body></html>`;
+  return pageShell({ title, description, active, content, scripts });
+}
+export const escapeHtml = e;
+export function pageShell({
+  title,
+  description = 'Open standards for a Web where humans, agents and devices can discover, communicate and collaborate.',
+  active = '',
+  content,
+  scripts = '',
+  robots = '',
+}) {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${e(title)} — W3BS</title><meta name="description" content="${e(description)}">${robots ? `<meta name="robots" content="${e(robots)}">` : ''}<meta name="theme-color" content="#f6f4ed"><link rel="icon" type="image/svg+xml" href="/assets/mark.svg"><link rel="manifest" href="/manifest.webmanifest"><link rel="stylesheet" href="/assets/style.css"><script type="module" src="/assets/app.js"></script>${scripts}</head><body>${header(active)}<main id="main">${content}</main>${footer()}<div id="toast" class="toast" role="status" aria-live="polite" hidden></div></body></html>`;
 }

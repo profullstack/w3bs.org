@@ -11,12 +11,19 @@ import { dispatch, operations } from './operations.mjs';
 import { createMcp } from './mcp.mjs';
 import { renderPage, scanBadgeSvg } from './site.mjs';
 import { createScanner } from './scan.mjs';
+import { mountAccounts, OPEN_CORS, bearerOf } from './auth-routes.mjs';
+import { createMailer } from './mail.mjs';
 
 export function createApp({
   store,
   publishToken = process.env.W3BS_PUBLISH_TOKEN,
   publicOrigin = process.env.PUBLIC_ORIGIN || 'http://localhost:3000',
   allowedHosts = (process.env.ALLOWED_HOSTS || 'localhost,127.0.0.1').split(','),
+  mailer = createMailer(),
+  formGuard,
+  bridgeClients = process.env.W3BS_BRIDGE_CLIENTS
+    ? JSON.parse(process.env.W3BS_BRIDGE_CLIENTS)
+    : undefined,
 } = {}) {
   if (!store) throw new Error('createApp requires an opened store; use startServer or openStore.');
   const app = express();
@@ -37,6 +44,29 @@ export function createApp({
       req.method === 'GET' && req.path === '/healthz' && req.hostname === 'healthcheck.railway.app';
     if (!hosts.has(req.hostname.toLowerCase()) && !railwayHealth)
       return next(new W3bsError('INVALID_HOST', 'Unrecognized service host.', 403));
+    // OAuth token/revoke/metadata, and /api/me with a bearer token, are called by apps on
+    // other origins. They read no cookies, so any origin may call them.
+    if (
+      OPEN_CORS.some((pattern) => pattern.test(req.path)) ||
+      (req.path === '/api/me' && bearerOf(req))
+    ) {
+      res.set({
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+        'Access-Control-Max-Age': '600',
+      });
+      return req.method === 'OPTIONS' ? res.status(204).end() : next();
+    }
+    if (req.path === '/api/me' && req.method === 'OPTIONS')
+      return res
+        .status(204)
+        .set({
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Authorization',
+        })
+        .end();
     if (req.headers.origin) {
       try {
         const caller = new URL(req.headers.origin);
@@ -76,6 +106,11 @@ export function createApp({
       mcp: `${origin}/mcp`,
       schemas: [`${origin}/schemas/manifest.json`],
       trust: `${origin}/api/trust`,
+      accounts: {
+        signup: `${origin}/signup`,
+        oauth: `${origin}/.well-known/oauth-authorization-server`,
+        userinfo: `${origin}/api/me`,
+      },
       specs: `${origin}/specs`,
       surfaces: {
         web: `${origin}/mission`,
@@ -211,6 +246,7 @@ export function createApp({
       .set('Allow', 'POST')
       .json({ error: { code: 'METHOD_NOT_ALLOWED', message: 'Use Streamable HTTP POST.' } }),
   );
+  mountAccounts(app, { store, origin, mailer, formGuard, bridgeClients });
   app.use(
     '/assets',
     express.static(resolve(ROOT, 'public'), { maxAge: '1h', index: false, fallthrough: false }),
@@ -230,7 +266,7 @@ export function createApp({
     res
       .type('application/xml')
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/packages', '/specs', '/browse', '/prompts', '/desktop', '/governance', '/developers'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/packages', '/specs', '/browse', '/prompts', '/desktop', '/governance', '/developers', '/signup'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
       ),
   );
   app.get('/docs/:file', (req, res) => {
