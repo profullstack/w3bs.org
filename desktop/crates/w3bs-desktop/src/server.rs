@@ -279,6 +279,13 @@ fn control(b: &Arc<Broker>, c: &mut Conn, req: &Request) -> Result<Value> {
             }
             Ok(doctor(b, prompt))
         }
+        // A non-desktop broker enables straight away and answers with its status, not a challenge.
+        "enable.request" if b.enabled_by_default() => {
+            if peer.agent_descendant {
+                return Err(AdlError::denied("enable.request must come from the human, not from an agent's process tree"));
+            }
+            to(b.enable_unattended()?)
+        }
         "enable.request" => to(b.enable_request(&peer)?),
         "enable.confirm" => to(b.enable_confirm(&peer, &str_param(p, "code")?)?),
         "disable" => to(b.disable(&reason())),
@@ -384,7 +391,11 @@ fn doctor(b: &Broker, prompt: bool) -> Value {
             Err(e) => check("gnome_shell_extension", false, format!("{}; {}", e.message, if e.message.contains("setup gnome-extension") { "" } else { adl_linux::gnome::INSTALL_HINT })),
         }
     }
-    check("native_control", true, "the tray, panel extension or `w3bs desktop control` must be running before enable".into());
+    if b.enabled_by_default() {
+        check("native_control", true, "not required: started with --enabled-by-default (non-desktop instance)".into());
+    } else {
+        check("native_control", true, "the tray, panel extension or `w3bs desktop control` must be running before enable".into());
+    }
     json!({"status": b.status(), "capabilities": caps, "checks": checks, "paths": {
         "agent_socket": paths::agent_socket().to_string(), "control_socket": paths::control_socket().to_string(), "config": paths::config_dir(), "state": paths::state_dir()}})
 }

@@ -172,6 +172,11 @@ Mission Control / Launchpad are not detected as modal.
 
 - **Starts Disabled** after install, login, restart or crash. Only a human enables: the code goes
   to the native control, and control requests from an agent's process tree are refused.
+  The one exception is opt-in: `w3bs desktop daemon --enabled-by-default` (or
+  `W3BS_DESKTOP_ENABLED_BY_DEFAULT=1`) is for non-desktop instances (containers, VMs, CI) with
+  nobody at the screen. That broker starts Enabled, needs no native control, and `w3bs desktop
+  enable` skips the code; disable and the interlocks still work. Never use it on a person's own
+  desktop. `tests/rig/headless-kde.sh` proves it on KDE Plasma in Docker.
 - **Disable closes everything** the layer mediates: an atomic gate plus a revocation generation
   reject new work immediately, then leases, tasks, approvals, captures and streams are dropped and
   any synthetic held keys/buttons are released. Lock, suspend, logout, VT switch, portal revocation,

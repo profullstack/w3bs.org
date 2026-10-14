@@ -36,6 +36,8 @@ use std::sync::Arc;
 const AFTER_HELP: &str = "\
 Agent access starts Disabled. A human enables it from the native control (tray, panel extension
 or `w3bs desktop control`); agents cannot enable themselves or approve their own requests.
+Non-desktop instances (containers, VMs, CI) with nobody at the screen start the broker with
+`w3bs desktop daemon --enabled-by-default` instead: Enabled from startup, no native control.
 
 Exit codes: 0 ok, 1 operation failed or outcome unknown, 2 invalid request, 3 human approval
 required, 4 disabled or blocked, 5 busy (another agent holds the input lease).
@@ -82,6 +84,11 @@ enum Cmd {
         /// Allow enabling with no native control attached (headless test rigs only)
         #[arg(long, hide = true)]
         no_native_control: bool,
+        /// Non-desktop instances (containers, VMs, CI) with nobody at the screen: start with agent
+        /// access Enabled, need no tray/panel/control, and let `enable` skip the confirmation code.
+        /// Never use it on a person's own desktop.
+        #[arg(long, env = "W3BS_DESKTOP_ENABLED_BY_DEFAULT")]
+        enabled_by_default: bool,
         /// Audit metadata retention in days
         #[arg(long, default_value_t = 7)]
         retention_days: u64,
@@ -539,13 +546,19 @@ pub fn run_background() {
 fn run_with(cli: Cli) {
     let j = cli.json;
     let r: Result<Value> = (|| match cli.cmd {
-        Cmd::Daemon { adapter, no_native_control, retention_days, mcp_http } => {
+        Cmd::Daemon { adapter, no_native_control, enabled_by_default, retention_days, mcp_http } => {
             let mcp_addr = mcp_http.filter(|s| !s.is_empty()).map(|s| http_mcp::parse_addr(&s)).transpose().map_err(AdlError::invalid)?;
             let adapter = platform::make_adapter(adapter)?;
             let store = AgentStore::open(paths::config_dir().join("agents.json"))?;
             let audit = Audit::open(paths::state_dir().join("audit"), retention_days);
-            let cfg = Config { require_native_control: !no_native_control, ..Config::default() };
+            let cfg = Config { require_native_control: !no_native_control && !enabled_by_default, enabled_by_default, ..Config::default() };
             let broker = Arc::new(Broker::new(adapter, store, audit, cfg));
+            if enabled_by_default {
+                match broker.enable_unattended() {
+                    Ok(_) => eprintln!("w3bs-desktop: agent access ENABLED by default (non-desktop instance)"),
+                    Err(e) => eprintln!("w3bs-desktop: --enabled-by-default could not enable ({}); retry with `w3bs desktop enable`", e.message),
+                }
+            }
             // A busy port must not take the broker down with it: stdio MCP and the controls still work.
             if let Some(addr) = mcp_addr
                 && let Err(e) = http_mcp::spawn(addr)
@@ -571,6 +584,9 @@ fn run_with(cli: Cli) {
         Cmd::Enable => {
             let mut c = control_client()?;
             let ch = c.call("enable.request", json!({}))?;
+            if ch.get("state").is_some() {
+                return Ok(if j { ch } else { json!(status_line(&ch)) });
+            }
             if !std::io::stdin().is_terminal() {
                 return Ok(json!({"requested": ch, "next": "confirm in the native control"}));
             }
