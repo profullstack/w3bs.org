@@ -256,7 +256,7 @@ const desktopSteps = [
   [
     'Ask your agent to work',
     'claude "open the text editor and write a short note"',
-    'The agent checks the status, starts a task, looks at the windows and screen, then clicks and types into the window it named. Requests that need approval appear in the tray or panel menu and in the control app, with Approve and Deny. The tray's Agents and Recent activity submenus show who has access and what just happened.',
+    'The agent checks the status, starts a task, looks at the windows and screen, then clicks and types into the window it named. Requests that need approval appear in the tray or panel menu and in the control app, with Approve and Deny. The tray&rsquo;s Agents and Recent activity submenus show who has access and what just happened.',
   ],
   [
     'Turn it off',
