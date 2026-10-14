@@ -606,7 +606,7 @@ fn run_with(cli: Cli) {
                         return Ok(v);
                     }
                     let path = save_token(&name, token).map_err(|e| AdlError::internal(e.to_string()))?;
-                    Ok(json!({"agent": v["agent"], "token_file": path, "next": format!("w3bs desktop setup claude-code --agent {name}")}))
+                    Ok(json!({"agent": v["agent"], "token_file": path, "next": format!("w3bs desktop setup <claude-code|opencode|codex> --agent {name}")}))
                 }
                 AgentsCmd::List => c.call("agents.list", json!({})),
                 AgentsCmd::Update { agent, policy, apps } => {

@@ -214,6 +214,7 @@ public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wP
     Say 'Next:'
     Say '  1. Register an agent:   w3bs-desktop agents add claude-code --preset broad'
     Say '  2. Connect it:          w3bs-desktop setup claude-code --agent claude-code --http   (prints the claude mcp add line)'
+    Say '     OpenCode instead:    w3bs-desktop agents add opencode --preset broad; w3bs-desktop setup opencode --agent opencode --http   (prints the opencode.json mcp block)'
     Say '  3. Enable access from the tray icon when you want the agent to work; disable it the same way.'
     Say '     Emergency stop: Win+Alt+Esc. Quitting the tray disables access.'
     Say "Logs: $data\state\logs   Uninstall: & ([scriptblock]::Create((irm https://w3bs.org/desktop/install.ps1))) -Uninstall"
