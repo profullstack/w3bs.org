@@ -23,7 +23,8 @@ Apps:
              w3bs pkg --help          the whole package manager
   resources  w3bs resolve <w3bs://…>  resolve, inspect, verify and run signed W3BS resources
              w3bs resource --help     the whole resource client (search, publish, fork, sign…)
-  account    w3bs login               sign in to your W3BS account (opens the browser)
+  account    w3bs login               sign in to your W3BS account (opens the browser; works
+                                      over SSH: shows a code to enter at w3bs.org/device)
              w3bs whoami / logout     show or end this machine's session";
 
 const AFTER_HELP: &str = "\
@@ -444,11 +445,16 @@ enum Cmd {
     },
 
     // Your W3BS account.
-    /// Sign in to your W3BS account in the browser (OAuth 2.1 with PKCE)
+    /// Sign in to your W3BS account in the browser (OAuth 2.1 with PKCE). Works over SSH:
+    /// shows a code to enter at w3bs.org/device
     Login {
         /// Print the sign-in URL instead of opening a browser
         #[arg(long)]
         no_browser: bool,
+        /// Sign in with a code entered at w3bs.org/device on any browser (automatic over SSH
+        /// or without a display)
+        #[arg(long)]
+        device: bool,
         #[command(flatten)]
         a: Api,
     },
@@ -597,13 +603,13 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
         Err(Cmd::Resolve { uri, a }) => run_resource(ResCmd::Resolve { uri, a }).await,
         Err(Cmd::Verify { uri, a }) => run_resource(ResCmd::Verify { uri, a }).await,
         Err(Cmd::Inspect { uri, a }) => run_resource(ResCmd::Inspect { uri, a }).await,
-        Err(Cmd::Login { no_browser, a }) => {
+        Err(Cmd::Login { no_browser, device, a }) => {
             let progress = |m: &str| {
                 if (!out.quiet && !out.json) || out.verbose {
                     eprintln!("w3bs: {m}");
                 }
             };
-            ("login", account("login", &a, |o| async move { auth::login(&o, !no_browser, &progress).await }).await)
+            ("login", account("login", &a, |o| async move { auth::login(&o, !no_browser, device, &progress).await }).await)
         }
         Err(Cmd::Logout { a }) => ("logout", account("logout", &a, |o| async move { auth::logout(&o).await }).await),
         Err(Cmd::Whoami { a }) => ("whoami", account("whoami", &a, |o| async move { auth::whoami(&o).await }).await),

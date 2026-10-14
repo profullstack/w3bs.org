@@ -348,7 +348,11 @@ test('OAuth 2.1: PKCE code flow for the w3bs CLI, rotating refresh tokens, reuse
     const meta = await (await t.http('/.well-known/oauth-authorization-server')).json();
     assert.equal(meta.issuer, ORIGIN);
     assert.deepEqual(meta.code_challenge_methods_supported, ['S256']);
-    assert.deepEqual(meta.grant_types_supported, ['authorization_code', 'refresh_token']);
+    assert.deepEqual(meta.grant_types_supported, [
+      'authorization_code',
+      'refresh_token',
+      'urn:ietf:params:oauth:grant-type:device_code',
+    ]);
     const verifier = b64url(randomBytes(32));
     const challenge = b64url(sha(verifier));
     const redirect = 'http://127.0.0.1:49152/callback';
@@ -577,6 +581,86 @@ test('OAuth 2.1: bad requests never redirect to unregistered URIs; PKCE and scop
         )
       ).status,
       400,
+    );
+  } finally {
+    await t.close();
+  }
+});
+
+test('device flow (RFC 8628): w3bs login over SSH shows a code, approved at /device', async () => {
+  const t = await boot();
+  try {
+    const meta = await (await t.http('/.well-known/oauth-authorization-server')).json();
+    assert.equal(meta.device_authorization_endpoint, `${ORIGIN}/oauth/device_authorization`);
+    assert.ok(meta.grant_types_supported.includes('urn:ietf:params:oauth:grant-type:device_code'));
+    const start = await t.http('/oauth/device_authorization', {
+      form: { client_id: 'w3bs-cli', scope: 'profile' },
+      cookies: false,
+      headers: { Origin: 'https://elsewhere.example' },
+    });
+    assert.equal(start.status, 200);
+    const device = await start.json();
+    assert.match(device.user_code, /^[BCDFGHJKLMNPQRSTVWXZ]{4}-[BCDFGHJKLMNPQRSTVWXZ]{4}$/);
+    assert.equal(device.verification_uri, `${ORIGIN}/device`);
+    assert.equal(device.verification_uri_complete, `${ORIGIN}/device?code=${device.user_code}`);
+    const poll = () =>
+      t.http('/oauth/token', {
+        form: {
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+          device_code: device.device_code,
+          client_id: 'w3bs-cli',
+        },
+        cookies: false,
+      });
+    assert.equal((await (await poll()).json()).error, 'authorization_pending');
+    assert.equal((await (await poll()).json()).error, 'slow_down');
+    // Signed out, the page sends you to log in and back.
+    const out = await t.http(`/device?code=${device.user_code}`);
+    assert.equal(out.status, 302);
+    assert.match(out.headers.get('location'), /^\/login\?next=%2Fdevice/);
+    await t.signUp('margaret', 'margaret@example.com', 'margaret password');
+    assert.equal((await t.http('/device?code=WXYZ-BCDF')).status, 400);
+    // Codes are forgiving about case and the dash.
+    const lower = device.user_code.toLowerCase().replace('-', '');
+    const consent = await t.http(`/device?code=${lower}`);
+    assert.equal(consent.status, 200);
+    assert.match(await consent.text(), new RegExp(device.user_code));
+    const approved = await t.http('/device', {
+      form: { code: device.user_code, decision: 'allow' },
+    });
+    assert.match(await approved.text(), /Signed <em>in/);
+    await new Promise((resolve) => setTimeout(resolve, 2100));
+    const done = await poll();
+    assert.equal(done.status, 200);
+    const tokens = await done.json();
+    const me = await t.http('/api/me', {
+      cookies: false,
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+    assert.equal((await me.json()).username, 'margaret');
+    await new Promise((resolve) => setTimeout(resolve, 2100));
+    assert.equal((await (await poll()).json()).error, 'expired_token', 'a device code works once');
+    // Denied requests say so.
+    const second = await (
+      await t.http('/oauth/device_authorization', {
+        form: { client_id: 'w3bs-cli' },
+        cookies: false,
+      })
+    ).json();
+    await t.http('/device', { form: { code: second.user_code, decision: 'deny' } });
+    const deniedPoll = await t.http('/oauth/token', {
+      form: {
+        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+        device_code: second.device_code,
+        client_id: 'w3bs-cli',
+      },
+      cookies: false,
+    });
+    assert.equal((await deniedPoll.json()).error, 'access_denied');
+    assert.equal(
+      (await t.http('/oauth/device_authorization', { form: { client_id: 'nope' }, cookies: false }))
+        .status,
+      401,
     );
   } finally {
     await t.close();

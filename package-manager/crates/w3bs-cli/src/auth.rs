@@ -2,7 +2,9 @@
 //!
 //! The CLI is a public OAuth 2.1 client (`w3bs-cli`): authorization code with PKCE S256,
 //! redirected to a one-shot loopback listener (RFC 8252), refresh tokens rotated on every
-//! use. Credentials live in `$XDG_CONFIG_HOME/w3bs/auth.json` (0600), keyed by origin, so
+//! use. Where the browser cannot reach this machine's loopback (over SSH, on a headless
+//! box) it uses the device authorization grant (RFC 8628) instead: a short code entered at
+//! w3bs.org/device on any browser. Credentials live in `$XDG_CONFIG_HOME/w3bs/auth.json` (0600), keyed by origin, so
 //! one machine can be signed in to w3bs.org and a local registry at the same time.
 //! Later commands that call an authenticated API take a token from [`access_token`].
 
@@ -46,6 +48,8 @@ pub struct Endpoints {
     pub token: String,
     pub revocation: String,
     pub userinfo: String,
+    /// RFC 8628 device authorization endpoint, when the server offers one.
+    pub device: Option<String>,
 }
 
 fn http() -> reqwest::Client {
@@ -77,7 +81,8 @@ pub async fn discover(client: &reqwest::Client, origin: &str) -> Result<Endpoint
         }
         Ok(s.to_owned())
     };
-    Ok(Endpoints { authorization: field("authorization_endpoint")?, token: field("token_endpoint")?, revocation: field("revocation_endpoint")?, userinfo: field("userinfo_endpoint")? })
+    let device = if v["device_authorization_endpoint"].is_string() { Some(field("device_authorization_endpoint")?) } else { None };
+    Ok(Endpoints { authorization: field("authorization_endpoint")?, token: field("token_endpoint")?, revocation: field("revocation_endpoint")?, userinfo: field("userinfo_endpoint")?, device })
 }
 
 // ------------------------------------------------------------------ PKCE
@@ -270,7 +275,14 @@ async fn token_request(client: &reqwest::Client, ep: &Endpoints, pairs: &[(&str,
     if !status.is_success() {
         let error = v["error"].as_str().unwrap_or("server_error");
         let desc = v["error_description"].as_str().unwrap_or_default();
-        let code = if error == "invalid_grant" { "SESSION_EXPIRED" } else { "OAUTH_ERROR" };
+        let code = match error {
+            "invalid_grant" => "SESSION_EXPIRED",
+            "authorization_pending" => "AUTHORIZATION_PENDING",
+            "slow_down" => "SLOW_DOWN",
+            "access_denied" => return Err(Error::package("LOGIN_DENIED", "Sign-in was denied")),
+            "expired_token" => return Err(Error::package("LOGIN_EXPIRED", "The code expired; run w3bs login again")),
+            _ => "OAUTH_ERROR",
+        };
         return Err(Error::package(code, if desc.is_empty() { format!("{error} (HTTP {})", status.as_u16()) } else { format!("{error}: {desc}") }));
     }
     let field = |k: &str| v[k].as_str().map(str::to_owned).ok_or_else(|| Error::package("OAUTH_ERROR", format!("token response has no {k}")));
@@ -298,6 +310,95 @@ async fn userinfo(client: &reqwest::Client, ep: &Endpoints, access: &str) -> Res
         return Err(Error::package("USERINFO_FAILED", format!("{}: HTTP {}", ep.userinfo, res.status().as_u16())));
     }
     Ok(Userinfo::Ok(res.json().await.map_err(|e| net_err(&ep.userinfo, e))?))
+}
+
+// ------------------------------------------------------------------ device flow (RFC 8628)
+
+pub const DEVICE_GRANT: &str = "urn:ietf:params:oauth:grant-type:device_code";
+
+/// Whether to sign in with a device code instead of the loopback redirect: asked for, or
+/// the browser that opens the link is probably not on this machine (an SSH session, or a
+/// Linux/BSD box with no display). `env` reads an environment variable; `os` is
+/// `std::env::consts::OS`.
+pub fn want_device(explicit: bool, env: impl Fn(&str) -> Option<String>, os: &str) -> bool {
+    let set = |k: &str| env(k).is_some_and(|v| !v.is_empty());
+    if explicit || set("SSH_CONNECTION") || set("SSH_TTY") {
+        return true;
+    }
+    let unixy = matches!(os, "linux" | "freebsd" | "openbsd" | "netbsd" | "dragonfly");
+    unixy && !set("DISPLAY") && !set("WAYLAND_DISPLAY")
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceAuth {
+    pub device_code: String,
+    pub user_code: String,
+    pub verification_uri: String,
+    pub verification_uri_complete: Option<String>,
+    pub expires_in: u64,
+    pub interval: u64,
+}
+
+/// Parse a device authorization response. The verification URIs must sit on the origin,
+/// so a tampered response cannot send someone to a look-alike page to type the code.
+pub fn parse_device_auth(v: &Value, origin: &str) -> Result<DeviceAuth> {
+    let s = |k: &str| v[k].as_str().filter(|x| !x.is_empty()).map(str::to_owned).ok_or_else(|| Error::package("OAUTH_ERROR", format!("device authorization response has no {k}")));
+    let on_origin = |u: &str| url::Url::parse(u).map(|x| x.origin().ascii_serialization() == origin).unwrap_or(false);
+    let verification_uri = s("verification_uri")?;
+    if !on_origin(&verification_uri) {
+        return Err(Error::package("AUTH_UNSUPPORTED", format!("verification_uri {verification_uri} is not on {origin}")));
+    }
+    let complete = v["verification_uri_complete"].as_str().filter(|u| on_origin(u)).map(str::to_owned);
+    Ok(DeviceAuth {
+        device_code: s("device_code")?,
+        user_code: s("user_code")?,
+        verification_uri,
+        verification_uri_complete: complete,
+        expires_in: v["expires_in"].as_u64().unwrap_or(600),
+        interval: v["interval"].as_u64().unwrap_or(5).max(1),
+    })
+}
+
+/// One poll of the token endpoint while the user has not decided yet.
+#[derive(Debug, PartialEq)]
+pub enum Poll {
+    Pending,
+    SlowDown,
+    Done(Creds),
+}
+
+/// Poll until the user approves, denies, or the code expires. `poll` asks the token
+/// endpoint once; `sleep` waits that many seconds. Time is counted from the sleeps, so
+/// the loop is deterministic under test.
+pub async fn poll_device<P, PF, S, SF>(mut interval: u64, expires_in: u64, mut poll: P, mut sleep: S) -> Result<Creds>
+where
+    P: FnMut() -> PF,
+    PF: std::future::Future<Output = Result<Poll>>,
+    S: FnMut(u64) -> SF,
+    SF: std::future::Future<Output = ()>,
+{
+    let mut waited = 0;
+    loop {
+        if waited >= expires_in {
+            return Err(Error::package("LOGIN_EXPIRED", "The code expired; run w3bs login again"));
+        }
+        sleep(interval).await;
+        waited += interval;
+        match poll().await? {
+            Poll::Pending => {}
+            Poll::SlowDown => interval += 5,
+            Poll::Done(c) => return Ok(c),
+        }
+    }
+}
+
+async fn device_poll_once(client: &reqwest::Client, ep: &Endpoints, device_code: &str) -> Result<Poll> {
+    match token_request(client, ep, &[("grant_type", DEVICE_GRANT), ("device_code", device_code), ("client_id", CLIENT_ID)], "").await {
+        Ok(c) => Ok(Poll::Done(c)),
+        Err(e) if e.code == "AUTHORIZATION_PENDING" => Ok(Poll::Pending),
+        Err(e) if e.code == "SLOW_DOWN" => Ok(Poll::SlowDown),
+        Err(e) => Err(e),
+    }
 }
 
 // ------------------------------------------------------------------ credential store
@@ -378,9 +479,47 @@ fn not_signed_in(origin: &str) -> Error {
 
 // ------------------------------------------------------------------ commands
 
-pub async fn login(origin: &str, browser: bool, progress: &dyn Fn(&str)) -> Result<Value> {
+/// `browser`: open a browser where one can open. `device`: `--device` was passed.
+pub async fn login(origin: &str, browser: bool, device: bool, progress: &dyn Fn(&str)) -> Result<Value> {
     let client = http();
     let ep = discover(&client, origin).await?;
+    let use_device = want_device(device, |k| std::env::var(k).ok(), std::env::consts::OS);
+    let creds = match (&ep.device, use_device) {
+        (Some(_), true) => {
+            let over_ssh = std::env::var_os("SSH_CONNECTION").is_some() || std::env::var_os("SSH_TTY").is_some();
+            device_login(&client, origin, &ep, device && browser && !over_ssh).await?
+        }
+        (None, true) => {
+            eprintln!("w3bs: {origin} has no device sign-in; falling back to the browser redirect, which only works in a browser on this machine");
+            loopback_login(&client, origin, &ep, browser, progress).await?
+        }
+        _ => loopback_login(&client, origin, &ep, browser, progress).await?,
+    };
+    finish_login(&client, origin, &ep, creds).await
+}
+
+async fn device_login(client: &reqwest::Client, origin: &str, ep: &Endpoints, open: bool) -> Result<Creds> {
+    let url = ep.device.as_deref().expect("device endpoint");
+    let res = post_form(client, url, &[("client_id", CLIENT_ID), ("scope", SCOPE)]).await?;
+    let status = res.status();
+    let v: Value = res.json().await.unwrap_or(Value::Null);
+    if !status.is_success() {
+        let error = v["error"].as_str().unwrap_or("server_error");
+        return Err(Error::package("OAUTH_ERROR", format!("device authorization failed: {error} (HTTP {})", status.as_u16())));
+    }
+    let d = parse_device_auth(&v, origin)?;
+    eprintln!("To sign in, open {} and enter: {}", d.verification_uri, d.user_code);
+    if let Some(c) = &d.verification_uri_complete {
+        eprintln!("(or open {c})");
+    }
+    if let (true, Some(c)) = (open, &d.verification_uri_complete) {
+        open_browser(c);
+    }
+    eprintln!("Waiting for approval...");
+    poll_device(d.interval, d.expires_in, || device_poll_once(client, ep, &d.device_code), |s| tokio::time::sleep(Duration::from_secs(s))).await
+}
+
+async fn loopback_login(client: &reqwest::Client, origin: &str, ep: &Endpoints, browser: bool, progress: &dyn Fn(&str)) -> Result<Creds> {
     let listener = TcpListener::bind(("127.0.0.1", 0)).map_err(|e| Error::preflight("LOOPBACK", format!("cannot listen on 127.0.0.1: {e}")))?;
     let port = listener.local_addr().map_err(|e| Error::preflight("LOOPBACK", e.to_string()))?.port();
     let redirect_uri = format!("http://127.0.0.1:{port}/callback");
@@ -407,14 +546,17 @@ pub async fn login(origin: &str, browser: bool, progress: &dyn Fn(&str)) -> Resu
     let code = tokio::task::spawn_blocking(move || wait_for_callback(&listener, &st, LOGIN_TIMEOUT))
         .await
         .map_err(|e| Error::preflight("LOOPBACK", e.to_string()))??;
-    let mut creds = token_request(
-        &client,
-        &ep,
+    token_request(
+        client,
+        ep,
         &[("grant_type", "authorization_code"), ("code", &code), ("redirect_uri", &redirect_uri), ("client_id", CLIENT_ID), ("code_verifier", &verifier)],
         "",
     )
-    .await?;
-    let me = match userinfo(&client, &ep, &creds.access_token).await? {
+    .await
+}
+
+async fn finish_login(client: &reqwest::Client, origin: &str, ep: &Endpoints, mut creds: Creds) -> Result<Value> {
+    let me = match userinfo(client, ep, &creds.access_token).await? {
         Userinfo::Ok(v) => v,
         Userinfo::Unauthorized => return Err(Error::package("OAUTH_ERROR", "the new access token was refused by the userinfo endpoint")),
     };
@@ -606,6 +748,92 @@ mod tests {
         let client = std::thread::spawn(move || get(port, "/callback?code=c&state=other"));
         assert_eq!(wait_for_callback(&listener, "mine", Duration::from_secs(10)).unwrap_err().code, "STATE_MISMATCH");
         assert!(client.join().unwrap().starts_with("HTTP/1.1 400"));
+    }
+
+    fn env_of(pairs: &'static [(&'static str, &'static str)]) -> impl Fn(&str) -> Option<String> {
+        move |k| pairs.iter().find(|(n, _)| *n == k).map(|(_, v)| (*v).to_owned())
+    }
+
+    #[test]
+    fn device_flow_is_chosen_over_ssh_or_without_a_display() {
+        // A desktop session with a display: the loopback redirect works.
+        assert!(!want_device(false, env_of(&[("DISPLAY", ":0")]), "linux"));
+        assert!(!want_device(false, env_of(&[("WAYLAND_DISPLAY", "wayland-0")]), "linux"));
+        assert!(!want_device(false, env_of(&[]), "macos"));
+        assert!(!want_device(false, env_of(&[]), "windows"));
+        // Asked for, over SSH (even with X forwarding), or a headless Linux/BSD box.
+        assert!(want_device(true, env_of(&[("DISPLAY", ":0")]), "macos"));
+        assert!(want_device(false, env_of(&[("SSH_CONNECTION", "1.2.3.4 5 6.7.8.9 22"), ("DISPLAY", "localhost:10.0")]), "linux"));
+        assert!(want_device(false, env_of(&[("SSH_TTY", "/dev/pts/0")]), "macos"));
+        assert!(want_device(false, env_of(&[]), "linux"));
+        assert!(want_device(false, env_of(&[("DISPLAY", "")]), "freebsd"));
+    }
+
+    #[test]
+    fn parses_device_authorization_responses() {
+        let v = json!({
+            "device_code": "dc", "user_code": "ABCD-EFGH",
+            "verification_uri": "https://w3bs.org/device",
+            "verification_uri_complete": "https://w3bs.org/device?code=ABCD-EFGH",
+            "expires_in": 600, "interval": 5
+        });
+        let d = parse_device_auth(&v, "https://w3bs.org").unwrap();
+        assert_eq!(d.user_code, "ABCD-EFGH");
+        assert_eq!(d.verification_uri_complete.as_deref(), Some("https://w3bs.org/device?code=ABCD-EFGH"));
+        assert_eq!((d.expires_in, d.interval), (600, 5));
+        // Defaults, and a complete URI elsewhere is dropped rather than shown.
+        let v = json!({ "device_code": "dc", "user_code": "X", "verification_uri": "https://w3bs.org/device", "verification_uri_complete": "https://evil.example/device" });
+        let d = parse_device_auth(&v, "https://w3bs.org").unwrap();
+        assert_eq!((d.verification_uri_complete, d.expires_in, d.interval), (None, 600, 5));
+        // A verification page off the origin is refused outright.
+        let v = json!({ "device_code": "dc", "user_code": "X", "verification_uri": "https://w3bs.org.evil.example/device" });
+        assert_eq!(parse_device_auth(&v, "https://w3bs.org").unwrap_err().code, "AUTH_UNSUPPORTED");
+        assert_eq!(parse_device_auth(&json!({ "user_code": "X" }), "https://w3bs.org").unwrap_err().code, "OAUTH_ERROR");
+    }
+
+    fn creds() -> Creds {
+        Creds { access_token: "at".into(), refresh_token: "rt".into(), expires_at: 1, username: String::new() }
+    }
+
+    /// Run poll_device over a scripted sequence of poll results, recording each sleep.
+    async fn scripted(interval: u64, expires_in: u64, script: Vec<Result<Poll>>) -> (Result<Creds>, Vec<u64>) {
+        let script = std::cell::RefCell::new(script.into_iter());
+        let sleeps = std::cell::RefCell::new(Vec::new());
+        let out = poll_device(
+            interval,
+            expires_in,
+            || {
+                let next = script.borrow_mut().next().expect("polled more than scripted");
+                async move { next }
+            },
+            |s| {
+                sleeps.borrow_mut().push(s);
+                async {}
+            },
+        )
+        .await;
+        (out, sleeps.into_inner())
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn device_polling_waits_slows_down_and_finishes() {
+        let (out, sleeps) = scripted(5, 600, vec![Ok(Poll::Pending), Ok(Poll::SlowDown), Ok(Poll::Pending), Ok(Poll::Done(creds()))]).await;
+        assert_eq!(out.unwrap(), creds());
+        assert_eq!(sleeps, vec![5, 5, 10, 10], "slow_down adds 5 seconds to every later wait");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn device_polling_stops_on_denial_and_expiry() {
+        let denied = Err(Error::package("LOGIN_DENIED", "Sign-in was denied"));
+        let (out, _) = scripted(5, 600, vec![Ok(Poll::Pending), denied]).await;
+        assert_eq!(out.unwrap_err().code, "LOGIN_DENIED");
+        let expired = Err(Error::package("LOGIN_EXPIRED", "The code expired; run w3bs login again"));
+        let (out, _) = scripted(5, 600, vec![expired]).await;
+        assert_eq!(out.unwrap_err().code, "LOGIN_EXPIRED");
+        // The local clock runs out too, without another poll past expires_in.
+        let (out, sleeps) = scripted(5, 10, vec![Ok(Poll::Pending), Ok(Poll::Pending)]).await;
+        assert_eq!(out.unwrap_err().code, "LOGIN_EXPIRED");
+        assert_eq!(sleeps, vec![5, 5]);
     }
 
     #[test]

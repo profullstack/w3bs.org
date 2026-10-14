@@ -100,7 +100,7 @@ w3bs whoami    # alice (alice@example.com) on https://w3bs.org
 w3bs logout    # revokes the sign-in and forgets it
 ```
 
-The CLI keeps its tokens in `~/.config/w3bs/auth.json` (mode 0600). Every signed-in app, the CLI included, is listed on `/account`, where you can sign it out.
+Over SSH, or on a machine without a display, `w3bs login` shows a code instead of opening a browser: open `https://w3bs.org/device` on any device, sign in, and enter it (`w3bs login --device` forces this). The CLI keeps its tokens in `~/.config/w3bs/auth.json` (mode 0600). Every signed-in app, the CLI included, is listed on `/account`, where you can sign it out.
 
 **For app developers.** w3bs.org is an OAuth 2.1 authorization server. Register an app on `/account` (a name and its redirect URIs) to get a `client_id`. Apps are public clients: no client secret, so the same flow works for web, mobile and native apps.
 
@@ -108,6 +108,7 @@ The CLI keeps its tokens in `~/.config/w3bs/auth.json` (mode 0600). Every signed
 - Authorization code with PKCE, `code_challenge_method=S256` only. `state` is echoed back, and `iss` is added (RFC 9207).
 - Redirect URIs match exactly. Use `https`, or `http://127.0.0.1/<path>` / `http://[::1]/<path>` for native apps, which then match any port (RFC 8252).
 - `POST /oauth/token` (form or JSON): `authorization_code` with `code`, `redirect_uri`, `client_id`, `code_verifier`; `refresh_token` with `refresh_token`, `client_id`. Access tokens last an hour. Refresh tokens last 30 days and rotate on every use; presenting a spent one revokes the whole sign-in.
+- Device authorization grant (RFC 8628) for devices without a browser: `POST /oauth/device_authorization` with `client_id`, show the `user_code` and `verification_uri` (`/device`), then poll `/oauth/token` with `grant_type=urn:ietf:params:oauth:grant-type:device_code`, `device_code`, `client_id` every `interval` seconds.
 - `POST /oauth/revoke` (RFC 7009) with `token` and `client_id`.
 - `GET /api/me` with `Authorization: Bearer <access token>` returns `sub` (stable, never reuse email as the key), `username`, `email` and `email_verified`.
 - Scope: `profile`.
