@@ -1751,6 +1751,23 @@ textarea {
   }
 }
 
+.desktop-hero-video {
+  margin: 28px 0 0;
+  max-width: 960px;
+}
+.desktop-hero-video video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #000;
+}
+.desktop-hero-video figcaption {
+  margin-top: 8px;
+  font-size: 13px;
+}
 .desktop-install-box {
   display: grid;
   gap: 12px;
