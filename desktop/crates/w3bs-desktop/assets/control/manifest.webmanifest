@@ -1,0 +1,16 @@
+{
+  "id": "/control/",
+  "name": "W3BS Desktop Control",
+  "short_name": "Desktop Control",
+  "description": "Turn agent access to this desktop on and off, approve requests, and manage agents, tasks and activity.",
+  "start_url": "/control/",
+  "scope": "/control/",
+  "display": "standalone",
+  "background_color": "#f6f4ed",
+  "theme_color": "#f6f4ed",
+  "icons": [
+    { "src": "/control/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/control/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/control/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

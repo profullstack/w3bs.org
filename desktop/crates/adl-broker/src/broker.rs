@@ -216,6 +216,17 @@ impl Broker {
         }
     }
 
+    /// How many native controls (tray, panel extension, terminal control) are attached.
+    pub fn native_controls(&self) -> usize {
+        self.lock().native_controls
+    }
+
+    /// Whether enabling needs a native control attached (false for `--enabled-by-default` and
+    /// headless test brokers).
+    pub fn requires_native_control(&self) -> bool {
+        self.cfg.require_native_control && !self.cfg.enabled_by_default
+    }
+
     pub fn detach_native_control(&self) {
         let lost = {
             let mut g = self.lock();

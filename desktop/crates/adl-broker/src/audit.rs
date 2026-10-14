@@ -114,6 +114,30 @@ impl Audit {
         out
     }
 
+    /// The newest `n` records, oldest first, reading only as many day files as it takes.
+    pub fn recent(&self, n: usize) -> Vec<AuditRecord> {
+        if self.dir.is_none() {
+            let m = self.memory.lock().unwrap_or_else(|e| e.into_inner());
+            return m[m.len().saturating_sub(n)..].to_vec();
+        }
+        let mut out: Vec<AuditRecord> = vec![];
+        for (_, path) in self.day_files().into_iter().rev() {
+            if out.len() >= n {
+                break;
+            }
+            if let Ok(s) = std::fs::read_to_string(path) {
+                let mut day: Vec<AuditRecord> = s.lines().filter_map(|l| serde_json::from_str(l).ok()).collect();
+                day.append(&mut out);
+                out = day;
+            }
+        }
+        out[out.len().saturating_sub(n)..].to_vec()
+    }
+
+    pub fn retention_days(&self) -> u64 {
+        self.retention_days
+    }
+
     pub fn delete_all(&self) -> usize {
         if self.dir.is_none() {
             return std::mem::take(&mut *self.memory.lock().unwrap_or_else(|e| e.into_inner())).len();

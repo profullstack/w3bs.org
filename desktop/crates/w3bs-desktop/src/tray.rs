@@ -4,12 +4,16 @@
 //! It holds the native-control subscription. If the tray exits, crashes, or the desktop's tray
 //! host goes away, the broker sees the control vanish and disables access (PRD section 4).
 //! State is shown as text in the title and tooltip, never by icon colour alone.
+//!
+//! Its menu mirrors the control app (`/control`): "Open control panel…" signs the app in with a
+//! one-time link, the Agents submenu lists each agent with its mode and a Revoke item, and Recent
+//! activity shows the last audit entries (metadata only).
 
 use crate::paths;
 use adl_schema::rpc::{Request, Response};
 use adl_schema::SCHEMA_VERSION;
 use ksni::blocking::TrayMethods;
-use ksni::menu::{MenuItem, StandardItem};
+use ksni::menu::{MenuItem, StandardItem, SubMenu};
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
 use std::sync::mpsc;
@@ -22,6 +26,9 @@ enum Act {
     Stop,
     Emergency,
     Decide(String, bool),
+    OpenPanel,
+    Revoke(String, String),
+    Shortcut(String),
     Quit,
 }
 
@@ -32,6 +39,9 @@ impl From<crate::shortcut::Emergency> for Act {
     }
 }
 
+/// (id, name, mode label, capabilities) of an active agent.
+type AgentRow = (String, String, String, String);
+
 #[derive(Default)]
 struct View {
     state: String,
@@ -41,6 +51,9 @@ struct View {
     pending_code: Option<String>,
     note: Option<String>,
     shortcut: Option<String>,
+    agents: Vec<AgentRow>,
+    /// Last audit entries, newest first, already formatted
+    activity: Vec<String>,
 }
 
 struct DesktopTray {
@@ -55,6 +68,57 @@ fn item(label: impl Into<String>, icon: &str, tx: &mpsc::Sender<Act>, act: Act) 
 
 fn label(text: impl Into<String>) -> MenuItem<DesktopTray> {
     StandardItem { label: text.into(), enabled: false, ..Default::default() }.into()
+}
+
+/// dbusmenu treats `_` as a mnemonic marker; show names literally.
+fn lit(s: &str) -> String {
+    s.replace('_', "__")
+}
+
+fn submenu(text: impl Into<String>, icon: &str, items: Vec<MenuItem<DesktopTray>>) -> MenuItem<DesktopTray> {
+    SubMenu { label: text.into(), icon_name: icon.into(), submenu: items, ..Default::default() }.into()
+}
+
+/// The preset an agent's policy matches, as `w3bs desktop agents add --preset` names them.
+pub(crate) fn mode_label(policy: &Value) -> String {
+    let caps: Vec<&str> = policy["capabilities"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+    if caps.is_empty() {
+        return "no access".into();
+    }
+    if policy["mode"] == "restricted" {
+        let apps: Vec<&str> = policy["apps"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+        return format!("restricted: {}", if apps.is_empty() { "no apps".into() } else { apps.join(", ") });
+    }
+    if caps.contains(&"pointer") || caps.contains(&"keyboard") {
+        "broad desktop".into()
+    } else {
+        "observe".into()
+    }
+}
+
+/// Local wall-clock HH:MM:SS of a millisecond timestamp.
+pub(crate) fn clock(ms: u64) -> String {
+    let t = (ms / 1000) as libc::time_t;
+    // SAFETY: localtime_r writes into the provided struct.
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    if unsafe { libc::localtime_r(&t, &mut tm) }.is_null() {
+        return String::new();
+    }
+    format!("{:02}:{:02}:{:02}", tm.tm_hour, tm.tm_min, tm.tm_sec)
+}
+
+/// One read-only activity line from an audit record (metadata only, as the audit stores it).
+fn activity_line(r: &Value, names: &std::collections::HashMap<String, String>) -> String {
+    let who = r["agent"].as_str().map(|id| names.get(id).cloned().unwrap_or_else(|| id.to_string()));
+    let mut s = format!("{}  {}", clock(r["ts_ms"].as_u64().unwrap_or(0)), r["op"].as_str().unwrap_or("?"));
+    if let Some(w) = who {
+        s += &format!(" · {w}");
+    }
+    s += &format!(" · {}", r["decision"].as_str().unwrap_or(""));
+    if let Some(reason) = r["meta"]["reason"].as_str() {
+        s += &format!(" ({reason})");
+    }
+    s
 }
 
 impl DesktopTray {
@@ -113,7 +177,7 @@ impl ksni::Tray for DesktopTray {
     }
     fn menu(&self) -> Vec<MenuItem<Self>> {
         let tx = &self.tx;
-        let mut m = vec![label(format!("Status: {}", self.state_text()))];
+        let mut m = vec![item("Open control panel…", "preferences-system", tx, Act::OpenPanel), MenuItem::Separator, label(format!("Status: {}", self.state_text()))];
         if let Some((agent, task)) = &self.view.lease {
             m.push(label(format!("Active: {agent}, task {task}")));
         }
@@ -137,6 +201,21 @@ impl ksni::Tray for DesktopTray {
                 m.push(item("    Deny", "dialog-cancel", tx, Act::Decide(id.clone(), false)));
             }
         }
+        m.push(MenuItem::Separator);
+        let agents: Vec<MenuItem<Self>> = if self.view.agents.is_empty() {
+            vec![label("No agents registered")]
+        } else {
+            self.view
+                .agents
+                .iter()
+                .map(|(id, name, mode, caps)| {
+                    submenu(format!("{} ({})", lit(name), lit(mode)), "", vec![label(format!("Can use: {}", lit(caps))), item(format!("Revoke {}", lit(name)), "edit-delete", tx, Act::Revoke(id.clone(), name.clone()))])
+                })
+                .collect()
+        };
+        m.push(submenu("Agents", "system-users", agents));
+        let activity: Vec<MenuItem<Self>> = if self.view.activity.is_empty() { vec![label("No activity yet")] } else { self.view.activity.iter().map(|l| label(lit(l))).collect() };
+        m.push(submenu("Recent activity", "document-open-recent", activity));
         m.push(MenuItem::Separator);
         m.push(item("Stop all agent activity", "process-stop", tx, Act::Stop));
         m.push(item("Quit and disable", "application-exit", tx, Act::Quit));
@@ -241,12 +320,50 @@ pub fn run() -> std::io::Result<()> {
     };
     call("subscribe", json!({"native_control": true})).map_err(std::io::Error::other)?;
 
+    // Agents and recent activity change without broker events; refresh them on a second
+    // connection every few seconds (and right after this tray changes something).
+    let (poke_tx, poke_rx) = mpsc::channel::<()>();
+    {
+        let h = handle.clone();
+        std::thread::spawn(move || loop {
+            let snapshot = (|| -> Option<(Vec<AgentRow>, Vec<String>)> {
+                let mut c = crate::client::Client::connect(&paths::control_socket()).ok()?;
+                let list = c.call("agents.list", json!({})).ok()?;
+                let recent = c.call("audit.recent", json!({"limit": 5})).ok()?;
+                let all = list.as_array().cloned().unwrap_or_default();
+                let names: std::collections::HashMap<String, String> = all.iter().map(|a| (a["id"].as_str().unwrap_or("").to_string(), a["name"].as_str().unwrap_or("").to_string())).collect();
+                let agents = all
+                    .iter()
+                    .filter(|a| a["revoked"] != true)
+                    .map(|a| {
+                        let caps = a["policy"]["capabilities"].as_array().map(|c| c.iter().filter_map(Value::as_str).collect::<Vec<_>>().join(", ")).filter(|s| !s.is_empty()).unwrap_or_else(|| "nothing".into());
+                        (a["id"].as_str().unwrap_or("").to_string(), a["name"].as_str().unwrap_or("").to_string(), mode_label(&a["policy"]), caps)
+                    })
+                    .collect();
+                let activity = recent.as_array().map(|r| r.iter().rev().map(|e| activity_line(e, &names)).collect()).unwrap_or_default();
+                Some((agents, activity))
+            })();
+            if let Some((agents, activity)) = snapshot {
+                h.update(|t| {
+                    if t.view.agents != agents || t.view.activity != activity {
+                        t.view.agents = agents;
+                        t.view.activity = activity;
+                    }
+                });
+            }
+            let _ = poke_rx.recv_timeout(std::time::Duration::from_secs(3));
+        });
+    }
+
     // Off the action loop: binding can wait on the desktop's confirmation dialog (KDE shows one),
     // and a menu click made meanwhile must act now, not minutes later when the dialog closes.
     {
         let (h, tx) = (handle.clone(), act_tx.clone());
-        std::thread::spawn(move || match crate::shortcut::register(tx) {
-            Ok(desc) => drop(h.update(|t| t.view.shortcut = Some(desc))),
+        std::thread::spawn(move || match crate::shortcut::register(tx.clone()) {
+            Ok(desc) => {
+                h.update(|t| t.view.shortcut = Some(desc.clone()));
+                let _ = tx.send(Act::Shortcut(desc));
+            }
             Err(e) => eprintln!("w3bs-desktop tray: emergency-stop shortcut unavailable ({e}); use the tray menu"),
         });
     }
@@ -266,6 +383,14 @@ pub fn run() -> std::io::Result<()> {
             // The broker's own emergency-stop event: disables, and is audited as such.
             Act::Emergency => call("session.event", json!({"event": "emergency_stop"})),
             Act::Decide(id, ok) => call("approvals.decide", json!({"approval": id, "approve": ok})),
+            // A one-time sign-in link minted on this (the native control's) connection.
+            Act::OpenPanel => call("control.login", json!({"via": "tray"})).and_then(|v| {
+                let url = v["url"].as_str().unwrap_or_default();
+                crate::control_web::open_url(url).map(|_| Value::Null).map_err(|e| format!("{e}; run `w3bs desktop control --open`"))
+            }),
+            Act::Revoke(id, _name) => call("agents.revoke", json!({"agent": id})),
+            // Tell the broker which shortcut the desktop bound, so the control app can show it.
+            Act::Shortcut(desc) => call("native.shortcut", json!({"description": desc})),
             Act::Quit => {
                 let _ = call("disable", json!({"reason": "tray closed"}));
                 handle.shutdown().wait();
@@ -274,6 +399,7 @@ pub fn run() -> std::io::Result<()> {
         };
         let note = r.err().map(|e| format!("Last action failed: {e}"));
         handle.update(|t| t.view.note = note);
+        let _ = poke_tx.send(());
     }
     Ok(())
 }

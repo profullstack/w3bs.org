@@ -107,7 +107,7 @@ crates/adl-broker    authorization + task broker, input engine, leases, approval
 crates/adl-macos     macOS adapter: CGEvent input, CGWindowList, Accessibility, capture, session polling, TCC checks, hot key
 crates/adl-windows   Windows adapter: SendInput, UI Automation, GDI capture, DWM windows, session events, hotkey
 crates/adl-linux     Vela command-socket adapter, XDG portal adapter (KDE/GNOME), KWin and GNOME Shell window observers, logind, keymaps
-crates/w3bs-desktop  `w3bs desktop` CLI, broker daemon, terminal and tray native controls, stdio MCP server
+crates/w3bs-desktop  `w3bs desktop` CLI, broker daemon, terminal and tray native controls, MCP (stdio, HTTP), control app (assets/control)
 gnome-extension/     GNOME Shell extension: top-bar native control + window data (org.w3bs.Desktop.Shell)
 packaging/           install.sh (Linux, macOS), install.ps1 (Windows), package.sh (release archives), systemd user unit
 docs/                ADRs and the clean-room record
@@ -140,6 +140,55 @@ $B doctor                  # gnome_shell_extension: ok once it is loaded
 
 Without it the portal backend still types and clicks, but window listing is unsupported and
 targeted input is refused.
+
+## Control app
+
+A local, installable web app with everything the tray has and more: status (Disabled, Enabling,
+Enabled, Stopping, Blocked, as an icon and a word), the active agent, task and input lease,
+Enable/Disable, Stop all agent activity, Quit and disable, the emergency shortcut, approvals with
+Approve/Deny, agents and permissions (preset, mode, capabilities, apps; change the preset and apps,
+revoke), tasks (cancel), recent activity (audit metadata only; export, delete) and the settings
+the broker actually has (shortcut, audit retention, MCP endpoint).
+
+Open it from the tray, the GNOME panel or the macOS menu bar (**Open control panel…**, the first
+menu item), with `open` in `w3bs desktop control`, or from your own terminal:
+
+```bash
+w3bs desktop control --open              # opens http://127.0.0.1:7801/control in your browser
+w3bs desktop control --open --no-browser # prints the one-time link instead
+```
+
+The broker serves it on the same loopback listener as MCP over HTTP (`daemon --mcp-http`); if the
+daemon runs without it, opening the app starts the listener on 127.0.0.1:7801 with `/mcp` off
+(`W3BS_DESKTOP_CONTROL_ADDR` moves it). Install it from the browser's menu to keep it in your app
+launcher: the service worker caches only the app shell, never data.
+
+It can grant agents the mouse and keyboard, so it is guarded like a native control:
+
+- **Sign-in only from the human side.** Each opening mints a one-time link
+  (`/control/login?t=…`, 60 seconds, single use) over the control socket, which only the native
+  control or an interactive terminal outside any agent's process tree may do. The link is swapped
+  for an HttpOnly, SameSite=Strict session cookie scoped to `/control` and removed from the URL.
+  An installed app whose session has expired asks you to open it from the tray or the terminal
+  again.
+- **Never with an agent token.** Any request carrying `Authorization` is refused (403) on every
+  `/control` route, and on Linux a browser started from an agent's process tree is refused; the
+  control cookie is never sent to, or accepted by, `/mcp`.
+- **Loopback and same-origin only.** `Host` must be this listener's loopback address and port
+  (DNS rebinding); state-changing requests need `Origin` equal to that origin, a JSON body and the
+  session's CSRF token. The page loads nothing from anywhere else (CSP `default-src 'self'`).
+- **Same rules as the other controls.** Enabling still needs a tray, panel or terminal control
+  running, and a terminal's enable request is confirmed in the app as in the tray. Every action
+  is audited (`control.login`, `control.session`, and the broker's own records with reasons such
+  as "disabled from the control app").
+- **Closing the app never disables access**, unlike quitting the tray or the terminal control:
+  the app is not the switch that guards the session, the tray or panel is. Use Disable, **Quit and
+  disable** (disables and signs the app out) or the emergency shortcut.
+
+The tray menu mirrors the app: **Open control panel…** on top, an **Agents** submenu (each agent
+with its mode, and Revoke) and **Recent activity** (the last five audit entries, read-only), next
+to the existing items; left click still only disables. The GNOME panel has the same three items;
+the Windows tray and the macOS menu bar have **Open control panel…** (no submenus there yet).
 
 ## macOS onboarding
 
@@ -202,7 +251,9 @@ Mission Control / Launchpad are not detected as modal.
   (owner and only ACE = the current user's SID, first instance owned by the broker, remote clients
   rejected, clients refuse a pipe another user owns). Tokens live under `%LOCALAPPDATA%\w3bs\desktop`,
   whose inherited ACL grants the user, SYSTEM and Administrators. Schemas in `crates/adl-schema`.
-- MCP: `w3bs desktop mcp serve --stdio --agent NAME`. No HTTP transport is offered.
+- MCP: `w3bs desktop mcp serve --stdio --agent NAME`, or Streamable HTTP from the broker itself
+  with `w3bs desktop daemon --mcp-http 127.0.0.1:7801` (`POST /mcp`, agent bearer token).
+- Control app: `http://127.0.0.1:7801/control` on the same listener, for the human (see above).
 
 ## Tests
 

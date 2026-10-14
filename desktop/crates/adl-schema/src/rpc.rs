@@ -55,5 +55,5 @@ pub const CONTROL_METHODS: &[&str] = &[
     "status", "capabilities", "doctor", "enable.request", "enable.confirm", "disable", "stop", "takeover",
     "agents.add", "agents.list", "agents.update", "agents.revoke", "agents.remove", "tasks.list",
     "tasks.inspect", "tasks.cancel", "approvals.list", "approvals.decide", "audit.export", "audit.delete",
-    "session.event", "subscribe",
+    "audit.recent", "session.event", "subscribe", "control.login", "native.shortcut",
 ];

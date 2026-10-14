@@ -61,6 +61,8 @@ mod menubar {
         Emergency,
         Decide(String, bool),
         Permissions,
+        OpenPanel,
+        Shortcut(String),
         Quit,
     }
 
@@ -224,6 +226,8 @@ mod menubar {
             menu.setAutoenablesItems(false);
             let mut acts = vec![];
             let sep = |m: &NSMenu| m.addItem(&NSMenuItem::separatorItem(mtm));
+            self.add(&menu, &mut acts, "Open control panel…", Some(Act::OpenPanel));
+            sep(&menu);
             self.add(&menu, &mut acts, &format!("Agent access: {}", v.state_text()), None);
             if let Some((agent, task)) = &v.lease {
                 self.add(&menu, &mut acts, &format!("Active: {agent}, task {task}"), None);
@@ -343,6 +347,11 @@ mod menubar {
                         let checks: Vec<String> = d["checks"].as_array().into_iter().flatten().filter(|c| c["check"].as_str().is_some_and(|n| n.starts_with("macos_") && n != "macos_input_monitoring")).map(|c| format!("{}: {}", c["check"].as_str().unwrap_or("").trim_start_matches("macos_"), if c["ok"] == true { "ok" } else { "missing" })).collect();
                         json!(checks.join(", "))
                     }),
+                    // The control app, signed in with a one-time link minted on this connection.
+                    Act::OpenPanel => call("control.login", json!({"via": "menu bar"})).and_then(|v| {
+                        crate::control_web::open_url(v["url"].as_str().unwrap_or_default()).map(|_| Value::Null).map_err(|e| format!("{e}; run `w3bs desktop control --open`"))
+                    }),
+                    Act::Shortcut(desc) => call("native.shortcut", json!({"description": desc})),
                     Act::Quit => {
                         let _ = call("disable", json!({"reason": "menu-bar control closed"}));
                         std::process::exit(0);
@@ -364,7 +373,10 @@ mod menubar {
         let shortcut = {
             let tx = act_tx.clone();
             match adl_macos::hotkey::register_emergency_stop(Box::new(move || drop(tx.send(Act::Emergency)))) {
-                Ok(desc) => Some(desc.to_string()),
+                Ok(desc) => {
+                    let _ = act_tx.send(Act::Shortcut(desc.to_string()));
+                    Some(desc.to_string())
+                }
                 Err(e) => {
                     eprintln!("w3bs-desktop menu bar: emergency-stop hot key unavailable ({e}); use the menu");
                     None

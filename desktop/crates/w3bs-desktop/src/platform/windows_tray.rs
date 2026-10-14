@@ -42,6 +42,7 @@ pub const ID_CONFIRM: usize = 2;
 pub const ID_DISABLE: usize = 3;
 pub const ID_STOP: usize = 4;
 pub const ID_QUIT: usize = 5;
+pub const ID_OPEN_PANEL: usize = 6;
 /// Approval i: approve = ID_APPROVAL + 2i, deny = ID_APPROVAL + 2i + 1.
 pub const ID_APPROVAL: usize = 100;
 
@@ -53,6 +54,8 @@ enum Act {
     Stop,
     Emergency,
     Decide(String, bool),
+    OpenPanel,
+    Shortcut(String),
     Quit,
 }
 
@@ -209,7 +212,7 @@ fn remove_icon(hwnd: HWND) {
 /// Menu entries: (id or 0 for a disabled label / usize::MAX for a separator, text).
 fn menu_items() -> Vec<(usize, String)> {
     let mut v = view();
-    let mut m = vec![(0, format!("Status: {}", v.state_text()))];
+    let mut m = vec![(ID_OPEN_PANEL, "Open control panel…".to_string()), (usize::MAX, String::new()), (0, format!("Status: {}", v.state_text()))];
     if let Some((agent, task)) = &v.lease {
         m.push((0, format!("Active: {agent}, task {task}")));
     }
@@ -277,6 +280,7 @@ fn command(id: usize) {
         ID_DISABLE => Some(Act::Disable("disabled from the tray")),
         ID_STOP => Some(Act::Stop),
         ID_QUIT => Some(Act::Quit),
+        ID_OPEN_PANEL => Some(Act::OpenPanel),
         n if n >= ID_APPROVAL => {
             let i = (n - ID_APPROVAL) / 2;
             view().menu_approvals.get(i).cloned().map(|a| Act::Decide(a, (n - ID_APPROVAL).is_multiple_of(2)))
@@ -498,6 +502,11 @@ pub fn run() -> std::io::Result<()> {
                 Act::Stop => call("stop", json!({"reason": "stopped from the tray"})),
                 Act::Emergency => call("session.event", json!({"event": "emergency_stop"})),
                 Act::Decide(id, ok) => call("approvals.decide", json!({"approval": id, "approve": ok})),
+                // The control app, signed in with a one-time link minted on this connection.
+                Act::OpenPanel => call("control.login", json!({"via": "tray"})).and_then(|v| {
+                    crate::control_web::open_url(v["url"].as_str().unwrap_or_default()).map(|_| Value::Null).map_err(|e| format!("{e}; run `w3bs-desktop control --open`"))
+                }),
+                Act::Shortcut(desc) => call("native.shortcut", json!({"description": desc})),
                 Act::Quit => {
                     let _ = call("disable", json!({"reason": "tray closed"}));
                     post(WM_CLOSE);
@@ -548,6 +557,7 @@ pub fn run() -> std::io::Result<()> {
             Some(desc) => {
                 ctx().own_hotkey.store(true, Ordering::SeqCst);
                 view().shortcut = Some(desc.to_string());
+                let _ = act_tx.send(Act::Shortcut(desc.to_string()));
                 eprintln!("w3bs-desktop tray: emergency stop {desc} registered");
             }
             None => eprintln!("w3bs-desktop tray: no emergency-stop chord available; use the menu"),

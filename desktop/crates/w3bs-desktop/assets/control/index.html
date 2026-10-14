@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#f6f4ed">
+<meta name="referrer" content="no-referrer">
+<title>Desktop Control</title>
+<link rel="manifest" href="/control/manifest.webmanifest">
+<link rel="icon" href="/control/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/control/icon-192.png">
+<link rel="stylesheet" href="/control/app.css">
+<script type="module" src="/control/app.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="brand" href="/control/" aria-label="W3BS Desktop Control home">
+    <img src="/control/icon.svg" alt="" width="30" height="30">
+    <span class="wordmark">w3bs<span class="wordmark-dot">.</span></span>
+  </a>
+  <span class="eyebrow header-title">AGENTIC DESKTOP LAYER · CONTROL</span>
+  <span class="link-state" id="link-state" role="status" aria-live="polite"><span class="link-dot" aria-hidden="true"></span><span data-link-text>Connecting</span></span>
+</header>
+
+<main id="app" hidden>
+  <section class="panel status-panel" id="status" aria-labelledby="state-title">
+    <div class="eyebrow">AGENT ACCESS</div>
+    <h1 id="state-title"><span class="state-icon" data-state-icon aria-hidden="true">–</span> <span data-state-text>Disabled</span></h1>
+    <p class="state-detail" data-state-detail></p>
+    <dl class="facts">
+      <div><dt>Active agent</dt><dd data-active>None</dd></div>
+      <div><dt>Input lease</dt><dd data-lease>Free</dd></div>
+    </dl>
+    <div class="banner" data-pending hidden>
+      <p><strong>Enable requested.</strong> <span data-pending-text></span></p>
+      <div class="banner-actions"><button type="button" class="button primary" data-act="confirm_enable">Confirm and enable</button><span class="muted">Ignore it to refuse.</span></div>
+    </div>
+    <div class="big-actions">
+      <button type="button" class="button primary big" data-toggle>Enable agent access</button>
+      <button type="button" class="button outline" data-act="stop">Stop all agent activity</button>
+      <button type="button" class="button outline danger" data-act="quit" data-confirm="Disable agent access and sign this app out?">Quit and disable</button>
+    </div>
+    <p class="shortcut" data-shortcut></p>
+    <p class="hint" data-hint hidden></p>
+    <p class="notice" role="status" aria-live="polite" data-notice></p>
+  </section>
+
+  <section class="panel" id="approvals" aria-labelledby="approvals-title">
+    <div class="panel-head"><h2 id="approvals-title">Approvals</h2><span class="pill" data-approvals-count>0 waiting</span></div>
+    <p class="panel-note">Each approval covers one exact request and expires. Agent input pauses while one waits.</p>
+    <ul class="rows" data-approvals></ul>
+  </section>
+
+  <section class="panel" id="agents" aria-labelledby="agents-title">
+    <div class="panel-head"><h2 id="agents-title">Agents &amp; permissions</h2><span class="pill" data-agents-count>0</span></div>
+    <p class="panel-note">Add agents with <code>w3bs desktop agents add NAME</code>. Changing access cancels the agent's running tasks.</p>
+    <ul class="rows" data-agents></ul>
+  </section>
+
+  <section class="panel" id="tasks" aria-labelledby="tasks-title">
+    <div class="panel-head"><h2 id="tasks-title">Tasks</h2><span class="pill" data-tasks-count>0 running</span></div>
+    <ul class="rows" data-tasks></ul>
+  </section>
+
+  <section class="panel" id="activity" aria-labelledby="activity-title">
+    <div class="panel-head"><h2 id="activity-title">Activity</h2><span class="pill" data-retention>kept 7 days</span></div>
+    <p class="panel-note">Metadata only: who, what, the decision and the outcome. Never screenshots, typed text or message bodies.</p>
+    <table class="activity">
+      <caption class="sr-only">Recent audit records, newest first</caption>
+      <thead><tr><th scope="col">Time</th><th scope="col">Event</th><th scope="col">Agent</th><th scope="col">Decision</th><th scope="col">Detail</th></tr></thead>
+      <tbody data-activity></tbody>
+    </table>
+    <div class="row-actions"><a class="button outline small" href="/control/api/audit/export" download>Export JSON</a><button type="button" class="button outline danger small" data-act="audit_delete" data-confirm="Delete the whole local audit log?">Delete audit log</button></div>
+  </section>
+
+  <section class="panel" id="settings" aria-labelledby="settings-title">
+    <div class="panel-head"><h2 id="settings-title">Settings</h2></div>
+    <dl class="settings" data-settings></dl>
+  </section>
+</main>
+
+<main id="gate" class="gate" hidden>
+  <div class="eyebrow" data-gate-eyebrow>SIGNED OUT</div>
+  <h1 data-gate-title>Open it from <em>your</em> desktop.</h1>
+  <p data-gate-text>This control app signs in with a one-time link from the tray, so a web page or an agent cannot open it for you.</p>
+  <ol class="gate-steps">
+    <li>Click the Agentic Desktop Layer icon in your tray, GNOME panel or menu bar and choose <strong>Open control panel…</strong></li>
+    <li>Or run <code>w3bs desktop control --open</code> in your own terminal.</li>
+  </ol>
+  <p class="muted">Agent access is unchanged. Closing this app never turns it on or off.</p>
+</main>
+
+<footer class="footer">
+  <span>Closing this window does not turn agent access off. Use <strong>Disable</strong> or <strong>Quit and disable</strong>, or press the emergency shortcut.</span>
+  <span class="eyebrow">LOCAL ONLY · LOOPBACK · NOTHING LEAVES THIS COMPUTER</span>
+</footer>
+</body>
+</html>

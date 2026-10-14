@@ -4,8 +4,10 @@
 // (`w3bs desktop daemon`); this extension never injects input.
 //
 // 1. Native control (PRD section 4). A top-bar indicator that shows the layer's state as an icon
-//    AND a text label, with a menu: status, Enable/Disable agent access, pending approvals with
-//    Approve/Deny, Stop all agent activity, Quit and disable. It holds a native-control
+//    AND a text label, with a menu: Open control panel… (the control app at
+//    http://127.0.0.1:7801/control, signed in with a one-time link this control mints), status,
+//    Enable/Disable agent access, pending approvals with Approve/Deny, an Agents submenu (mode,
+//    Revoke), Recent activity (read-only audit metadata), Stop all agent activity, Quit and disable. It holds a native-control
 //    subscription on $XDG_RUNTIME_DIR/w3bs-desktop/control.sock (newline-delimited JSON). When
 //    the extension is disabled or unloaded (logout, lock screen, `gnome-extensions disable`,
 //    a shell crash) that connection closes, the broker sees its native control go away, and
@@ -575,6 +577,16 @@ class ControlLink {
 
 // ------------------------------------------------------------------ top-bar indicator
 
+// The preset an agent's policy matches, as `w3bs desktop agents add --preset` names them.
+function modeLabel(p) {
+    const caps = p?.capabilities ?? [];
+    if (!caps.length)
+        return 'no access';
+    if (p.mode === 'restricted')
+        return `restricted: ${(p.apps ?? []).join(', ') || 'no apps'}`;
+    return caps.includes('pointer') || caps.includes('keyboard') ? 'broad desktop' : 'observe';
+}
+
 const STATE_TEXT = {
     enabled: 'Enabled',
     disabled: 'Disabled',
@@ -605,6 +617,8 @@ class AdlIndicator extends PanelMenu.Button {
             this.menu.addMenuItem(it);
             return it;
         };
+        this._openItem = this._action('Open control panel…', () => this._openPanel());
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         this._statusItem = info('adl-menu-status');
         this._leaseItem = info();
         this._noteItem = info('adl-menu-note');
@@ -614,6 +628,15 @@ class AdlIndicator extends PanelMenu.Button {
         this._approvalSection = new PopupMenu.PopupMenuSection();
         this.menu.addMenuItem(this._approvalSection);
         this._approvalItems = new Map();
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        this._agentsMenu = new PopupMenu.PopupSubMenuMenuItem('Agents');
+        this.menu.addMenuItem(this._agentsMenu);
+        this._activityMenu = new PopupMenu.PopupSubMenuMenuItem('Recent activity');
+        this.menu.addMenuItem(this._activityMenu);
+        this.menu.connect('open-state-changed', (_m, open) => {
+            if (open)
+                this._refreshLists();
+        });
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         this._stopItem = this._action('Stop all agent activity', () => this._run('stop', {reason: 'stopped from the GNOME top bar'}));
         this._quitItem = this._action('Quit and disable', () => this._run('disable', {reason: 'quit from the GNOME top bar'}));
@@ -737,6 +760,55 @@ class AdlIndicator extends PanelMenu.Button {
         }
     }
 
+    // The control app, signed in with a one-time link minted on the native-control connection.
+    async _openPanel() {
+        try {
+            const r = await this._ext.link.call('control.login', {via: 'GNOME panel'});
+            Gio.AppInfo.launch_default_for_uri(r.url, null);
+            this._note(null);
+        } catch (e) {
+            this._note(`Could not open the control panel: ${e.message}`);
+        }
+    }
+
+    // Agents and recent activity have no broker events; read them each time the menu opens.
+    async _refreshLists() {
+        if (!this._view.up)
+            return;
+        let agents, recent;
+        try {
+            [agents, recent] = await Promise.all([oneShot('agents.list', {}), oneShot('audit.recent', {limit: 5})]);
+        } catch (_e) {
+            return;
+        }
+        for (const a of agents ?? [])
+            this._names.set(a.id, a.name);
+        const am = this._agentsMenu.menu;
+        am.removeAll();
+        const active = (agents ?? []).filter(a => !a.revoked);
+        if (!active.length)
+            am.addMenuItem(new PopupMenu.PopupMenuItem('No agents registered', {reactive: false, can_focus: false}));
+        for (const a of active) {
+            am.addMenuItem(new PopupMenu.PopupMenuItem(`${a.name} (${modeLabel(a.policy)})`, {reactive: false, can_focus: false}));
+            this._action(`    Revoke ${a.name}`, () => this._run('agents.revoke', {agent: a.id}), am);
+        }
+        const rm = this._activityMenu.menu;
+        rm.removeAll();
+        const rows = [...(recent ?? [])].reverse();
+        if (!rows.length)
+            rm.addMenuItem(new PopupMenu.PopupMenuItem('No activity yet', {reactive: false, can_focus: false}));
+        for (const r of rows) {
+            const t = GLib.DateTime.new_from_unix_local(Math.floor((r.ts_ms ?? 0) / 1000)).format('%H:%M:%S');
+            let line = `${t}  ${r.op}`;
+            if (r.agent)
+                line += ` · ${this._name(r.agent)}`;
+            line += ` · ${r.decision}`;
+            if (r.meta?.reason)
+                line += ` (${r.meta.reason})`;
+            rm.addMenuItem(new PopupMenu.PopupMenuItem(line, {reactive: false, can_focus: false}));
+        }
+    }
+
     _decide(id, approve) {
         this._run('approvals.decide', {approval: id, approve});
     }
@@ -799,6 +871,9 @@ class AdlIndicator extends PanelMenu.Button {
         this._confirmItem.visible = v.up && !!v.code;
         this._confirmItem.label.text = v.code ? `Confirm the enable request from a terminal (code ${v.code})` : '';
         this._stopItem.visible = v.up;
+        this._openItem.visible = v.up;
+        this._agentsMenu.visible = v.up;
+        this._activityMenu.visible = v.up;
         this._quitItem.visible = v.up;
 
         // Rebuild the approvals only when the set changes, so keyboard focus is not lost.

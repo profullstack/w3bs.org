@@ -189,9 +189,13 @@ fn daemon_control_cli_and_mcp() {
 
 /// One HTTP/1.1 request to the broker's MCP endpoint; returns (status, headers, body).
 fn http(port: u16, method: &str, headers: &[(&str, &str)], body: &str) -> (u16, String, String) {
+    http_at(port, method, "/mcp", headers, body)
+}
+
+fn http_at(port: u16, method: &str, path: &str, headers: &[(&str, &str)], body: &str) -> (u16, String, String) {
     use std::io::Read;
     let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
-    let mut req = format!("{method} /mcp HTTP/1.1\r\nConnection: close\r\nContent-Length: {}\r\n", body.len());
+    let mut req = format!("{method} {path} HTTP/1.1\r\nConnection: close\r\nContent-Length: {}\r\n", body.len());
     if !headers.iter().any(|(k, _)| k.eq_ignore_ascii_case("host")) {
         req.push_str(&format!("Host: 127.0.0.1:{port}\r\n"));
     }
@@ -275,4 +279,99 @@ fn mcp_over_http_in_the_daemon() {
     assert!(body.contains("disabled"), "{body}");
     assert_eq!(http(port, "DELETE", &[("Authorization", &bearer), ("Mcp-Session-Id", &sid)], "").0, 204);
     assert_eq!(call(r#"{"jsonrpc":"2.0","id":7,"method":"tools/list"}"#).0, 404);
+}
+
+/// The control app through the real daemon: a one-time link from the terminal control, a
+/// session cookie, enable/disable and an agent grant from the app, and the rules around it.
+#[test]
+fn control_app_in_the_daemon() {
+    let env = Env { dir: tempfile::tempdir().unwrap() };
+    let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+    let addr = format!("127.0.0.1:{port}");
+    // No --mcp-http: the control app starts the loopback listener itself, without /mcp.
+    let _daemon = Kill(env.cmd().args(["daemon", "--adapter", "mock"]).env("W3BS_DESKTOP_CONTROL_ADDR", &addr).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().unwrap());
+    wait_for(&env.dir.path().join("run/control.sock"));
+    let (code, _) = env.json(&["agents", "add", "helper", "--preset", "observe"]);
+    assert_eq!(code, 0);
+
+    // Not from a terminal (stdin is /dev/null here) and not the native control: refused.
+    let (code, v) = env.json(&["control", "--open", "--no-browser"]);
+    assert_eq!((code, v["error"]["code"].as_str()), (4, Some("denied")), "{v}");
+
+    // The terminal native control mints the link over its own connection.
+    let mut ctl = env.cmd().arg("control").env("W3BS_DESKTOP_OPENER", "true").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().unwrap();
+    let mut ctl_in = ctl.stdin.take().unwrap();
+    let ctl_out = BufReader::new(ctl.stdout.take().unwrap());
+    let ctl = Kill(ctl);
+    let (tx, rx) = std::sync::mpsc::channel::<String>();
+    std::thread::spawn(move || {
+        for l in ctl_out.lines().map_while(Result::ok) {
+            if let Some(u) = l.split("Opening the control app: ").nth(1) {
+                let _ = tx.send(u.trim().to_string());
+            }
+        }
+    });
+    std::thread::sleep(Duration::from_millis(200));
+    writeln!(ctl_in, "open").unwrap();
+    let url = rx.recv_timeout(Duration::from_secs(10)).expect("terminal control printed the link");
+    let prefix = format!("http://{addr}/control/login?t=");
+    assert!(url.starts_with(&prefix), "{url}");
+    let path = &url[format!("http://{addr}").len()..];
+    // /mcp is off on this listener.
+    assert_eq!(http(port, "POST", &[("Authorization", "Bearer x")], "{}").0, 404);
+
+    let (code, head, _) = http_at(port, "GET", path, &[], "");
+    assert_eq!(code, 303, "{head}");
+    let cookie = header(&head, "set-cookie").unwrap().split(';').next().unwrap().to_string();
+    let (code, head, _) = http_at(port, "GET", path, &[], "");
+    assert_eq!(code, 303);
+    assert!(header(&head, "set-cookie").is_none(), "link works once");
+    let (code, _, body) = http_at(port, "GET", "/control/api/state", &[("Cookie", &cookie)], "");
+    assert_eq!(code, 200, "{body}");
+    let st: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(st["status"]["state"], "disabled");
+    assert_eq!(st["settings"]["native_controls"], 1);
+    let csrf = st["csrf"].as_str().unwrap().to_string();
+    let origin = format!("http://{addr}");
+    let act = |body: &str| http_at(port, "POST", "/control/api/action", &[("Cookie", &cookie), ("Origin", &origin), ("X-W3BS-CSRF", &csrf), ("Content-Type", "application/json")], body);
+
+    // Enable from the app (the terminal control is the attached native control).
+    let (code, _, body) = act(r#"{"action":"enable"}"#);
+    assert_eq!(code, 200, "{body}");
+    wait_state(&env, "enabled");
+    // Grant change, same operation as `agents update --policy broad`.
+    let (code, _, body) = act(r#"{"action":"agent_update","agent":"helper","preset":"broad","apps":[]}"#);
+    assert_eq!(code, 200, "{body}");
+    let (_, list) = env.json(&["agents", "list"]);
+    let helper = list.as_array().unwrap().iter().find(|a| a["name"] == "helper").unwrap().clone();
+    assert_eq!(helper["policy"]["mode"], "broad_desktop", "{helper}");
+    assert!(helper["policy"]["capabilities"].as_array().unwrap().iter().any(|c| c == "pointer"));
+    let (code, _, _) = act(r#"{"action":"agent_update","agent":"helper","preset":"restricted","apps":[]}"#);
+    assert_eq!(code, 400, "restricted needs an app");
+
+    // Closing the app (dropping its event stream) does not disable access.
+    {
+        let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+        write!(s, "GET /control/api/events HTTP/1.1\r\nHost: {addr}\r\nCookie: {cookie}\r\n\r\n").unwrap();
+        let mut first = [0u8; 12];
+        std::io::Read::read_exact(&mut s, &mut first).unwrap();
+        assert_eq!(&first, b"HTTP/1.1 200");
+    }
+    std::thread::sleep(Duration::from_millis(300));
+    let (_, v) = env.json(&["status"]);
+    assert_eq!(v["state"], "enabled", "closing the app must not disable");
+
+    // Quit and disable: disables and signs the app out.
+    let (code, head, body) = act(r#"{"action":"quit"}"#);
+    assert_eq!(code, 200, "{body}");
+    assert!(header(&head, "set-cookie").unwrap().contains("Max-Age=0"));
+    wait_state(&env, "disabled");
+    assert_eq!(http_at(port, "GET", "/control/api/state", &[("Cookie", &cookie)], "").0, 401);
+
+    let (_, audit) = env.json(&["audit", "export"]);
+    let s = audit.to_string();
+    for want in ["control.login", "terminal control", "signed_in", "quit from the control app", "agents.update"] {
+        assert!(s.contains(want), "audit lacks {want}: {s}");
+    }
+    drop(ctl);
 }
