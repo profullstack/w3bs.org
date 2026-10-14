@@ -1918,7 +1918,7 @@ textarea {
   gap: 8px;
   margin: 18px 0;
 }
-.auth-form input:not([type='hidden']),
+.auth-form input:not([type='hidden']):not([type='checkbox']),
 .auth-form textarea {
   width: 100%;
   box-sizing: border-box;
@@ -2038,5 +2038,119 @@ main > .auth-small:last-child {
   }
   .account-grid {
     grid-template-columns: 1fr;
+  }
+}
+/* Fleet: /fleet machine cards. */
+.fleet-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.fleet-card h3 {
+  margin: 0;
+}
+.fleet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.fleet-head .muted {
+  font-size: 13px;
+}
+.fleet-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+  vertical-align: middle;
+}
+.fleet-dot.on {
+  background: var(--green);
+}
+.fleet-meters {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.fleet-meter {
+  display: grid;
+  grid-template-columns: 64px 1fr 44px;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 13px;
+}
+.fleet-meter-detail {
+  grid-column: 2 / 4;
+  font-size: 12px;
+}
+.fleet-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--sage);
+  overflow: hidden;
+}
+.fleet-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--green);
+}
+.fleet-fill.hot {
+  background: var(--orange);
+}
+.fleet-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 14px;
+  font-size: 13px;
+  margin: 0 0 14px;
+}
+.fleet-facts dt {
+  color: var(--muted);
+}
+.fleet-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.fleet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fleet-remove {
+  margin-left: auto;
+}
+.fleet-note {
+  font-size: 13px;
+}
+.fleet-history {
+  margin-top: 12px;
+  font-size: 13px;
+}
+.fleet-history ul {
+  list-style: none;
+  padding: 0;
+}
+.fleet-history li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.fleet-add {
+  margin-bottom: 24px;
+}
+.fleet-command pre {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+@media (max-width: 720px) {
+  .header nav {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 2px 18px;
   }
 }

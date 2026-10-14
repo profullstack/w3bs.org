@@ -69,6 +69,7 @@ function header(active) {
     ['/browse', 'Browse'],
     ['/prompts', 'Prompts'],
     ['/desktop', 'Desktop'],
+    ['/fleet', 'Fleet'],
     ['/bbs', 'Community'],
     ['/governance', 'Participate'],
   ]

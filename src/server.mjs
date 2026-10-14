@@ -12,6 +12,7 @@ import { createMcp } from './mcp.mjs';
 import { renderPage, scanBadgeSvg } from './site.mjs';
 import { createScanner } from './scan.mjs';
 import { mountAccounts, OPEN_CORS, bearerOf } from './auth-routes.mjs';
+import { mountFleet } from './fleet-routes.mjs';
 import { createMailer } from './mail.mjs';
 
 export function createApp({
@@ -246,7 +247,8 @@ export function createApp({
       .set('Allow', 'POST')
       .json({ error: { code: 'METHOD_NOT_ALLOWED', message: 'Use Streamable HTTP POST.' } }),
   );
-  mountAccounts(app, { store, origin, mailer, formGuard, bridgeClients });
+  const helpers = mountAccounts(app, { store, origin, mailer, formGuard, bridgeClients });
+  mountFleet(app, { store, origin, helpers });
   app.use(
     '/assets',
     express.static(resolve(ROOT, 'public'), { maxAge: '1h', index: false, fallthrough: false }),

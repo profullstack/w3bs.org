@@ -75,6 +75,72 @@ pub fn human(r: &OperationResult) {
             }
             return;
         }
+        "fleet.join" => {
+            let d = &r.data;
+            println!("Joined {} to your fleet on {}. It reports every {}s; see {}/fleet", s(&d["name"]), s(&d["origin"]), s(&d["interval"]), s(&d["origin"]));
+            match d["service"].as_str() {
+                Some("system") => println!("Agent: system service w3bs-fleet.service"),
+                Some("user") => println!("Agent: user service w3bs-fleet.service (systemctl --user status w3bs-fleet)"),
+                _ => {}
+            }
+            println!("Remote actions: {}", if d["allow_actions"] == true { "allowed (refresh, update, restart-desktop)" } else { "not allowed" });
+            for n in d["notes"].as_array().into_iter().flatten() {
+                eprintln!("note: {}", s(n));
+            }
+            return;
+        }
+        "fleet.status" => {
+            let d = &r.data;
+            println!("{} ({}) on {}", s(&d["name"]), s(&d["machine_id"]), s(&d["origin"]));
+            println!("Remote actions: {}", if d["allow_actions"] == true { "allowed" } else { "not allowed" });
+            println!("Agent service: {}", if d["service"].is_null() { "not installed".to_owned() } else { s(&d["service"]) });
+            println!("Reports: {}", serde_json::to_string_pretty(&d["info"]).unwrap_or_default());
+            return;
+        }
+        "fleet.ls" => {
+            let list = r.data["machines"].as_array().cloned().unwrap_or_default();
+            if list.is_empty() {
+                println!("No machines yet. Add one on {}/fleet, then run `w3bs fleet join <token>` on it.", s(&r.data["origin"]));
+                return;
+            }
+            let pct = |part: &Value, total: &Value| match (part.as_f64(), total.as_f64()) {
+                (Some(a), Some(t)) if t > 0.0 => format!("{:.0}%", 100.0 * (1.0 - a / t)),
+                _ => "-".into(),
+            };
+            let rows = list
+                .iter()
+                .map(|m| {
+                    let i = &m["info"];
+                    vec![
+                        s(&m["name"]),
+                        if m["online"] == true { "yes".into() } else { "no".into() },
+                        m["last_seen_at"].as_str().map(crate::fleet::ago).unwrap_or_else(|| "never".into()),
+                        s(&i["os"]),
+                        i["load"].get(0).and_then(|v| v.as_f64()).map(|v| format!("{v:.2}")).unwrap_or_else(|| "-".into()),
+                        pct(&i["mem"]["available"], &i["mem"]["total"]),
+                        pct(&i["disk"]["available"], &i["disk"]["total"]),
+                        s(&m["id"]),
+                    ]
+                })
+                .collect();
+            table(&["NAME", "ONLINE", "LAST SEEN", "OS", "LOAD", "MEM%", "DISK%", "ID"], rows);
+            return;
+        }
+        "fleet.run" => {
+            println!("Queued {} on {} ({})", s(&r.data["action"]["action"]), s(&r.data["machine"]), s(&r.data["action"]["id"]));
+            return;
+        }
+        "fleet.rm" => {
+            println!("Removed {} from your fleet", s(&r.data["machine"]));
+            return;
+        }
+        "fleet.leave" => {
+            println!("{} left the fleet on {}", s(&r.data["name"]), s(&r.data["origin"]));
+            if r.data["server"] != true {
+                eprintln!("warning: could not reach {}; remove the machine on {}/fleet too", s(&r.data["origin"]), s(&r.data["origin"]));
+            }
+            return;
+        }
         "packages" => {
             let pkgs = r.data["packages"].as_array().cloned().unwrap_or_default();
             if pkgs.is_empty() {

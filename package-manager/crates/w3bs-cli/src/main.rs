@@ -2,6 +2,7 @@
 //! manager is the first app, W3BS resources (the w3bs:// registry) the second.
 
 mod auth;
+mod fleet;
 mod render;
 
 use clap::{Args, Parser, Subcommand};
@@ -25,7 +26,11 @@ Apps:
              w3bs resource --help     the whole resource client (search, publish, fork, sign…)
   account    w3bs login               sign in to your W3BS account (opens the browser; works
                                       over SSH: shows a code to enter at w3bs.org/device)
-             w3bs whoami / logout     show or end this machine's session";
+             w3bs whoami / logout     show or end this machine's session
+  fleet      w3bs fleet join <token>  add this machine to your fleet on w3bs.org/fleet
+             w3bs fleet ls            your machines, online state and health
+             w3bs fleet run <m> <a>   queue refresh, update or restart-desktop on a machine
+             w3bs fleet --help        status, agent, leave, rm";
 
 const AFTER_HELP: &str = "\
 Every command takes --json for one versioned result object on stdout.
@@ -355,6 +360,62 @@ enum ResCmd {
 }
 
 #[derive(Subcommand, Clone)]
+enum FleetCmd {
+    /// Add this machine to your fleet with a one-time token from w3bs.org/fleet, and start
+    /// its agent as a systemd service
+    Join {
+        /// The join token shown on w3bs.org/fleet (fj_…)
+        token: String,
+        /// Name shown on w3bs.org/fleet (default: the hostname)
+        #[arg(long)]
+        name: Option<String>,
+        /// Do not install the systemd service; run `w3bs fleet agent` yourself
+        #[arg(long)]
+        no_service: bool,
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Run the agent in the foreground: report health every 30s and run queued actions
+    /// (refresh, update, restart-desktop) when this machine allows actions
+    Agent {
+        #[arg(long, hide = true, value_name = "PATH")]
+        config: Option<PathBuf>,
+    },
+    /// This machine's fleet membership and the health it reports
+    Status {
+        #[arg(long, hide = true, value_name = "PATH")]
+        config: Option<PathBuf>,
+    },
+    /// List your machines (uses your `w3bs login`)
+    #[command(visible_alias = "list")]
+    Ls {
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Queue an action on a machine: refresh, update or restart-desktop
+    Run {
+        /// Machine name or id from `w3bs fleet ls`
+        machine: String,
+        /// refresh | update | restart-desktop
+        action: String,
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Take this machine out of the fleet and remove its agent service
+    Leave {
+        #[arg(long, hide = true, value_name = "PATH")]
+        config: Option<PathBuf>,
+    },
+    /// Remove a machine from your fleet (its agent stops on its next report)
+    Rm {
+        /// Machine name or id from `w3bs fleet ls`
+        machine: String,
+        #[command(flatten)]
+        a: Api,
+    },
+}
+
+#[derive(Subcommand, Clone)]
 enum SelfCmd {
     /// Update the w3bs CLI through its own signed repository
     Update {
@@ -468,6 +529,11 @@ enum Cmd {
         #[command(flatten)]
         a: Api,
     },
+
+    // Your fleet.
+    /// Your machines on w3bs.org/fleet: join this one, run its agent, list and act on all
+    #[command(subcommand)]
+    Fleet(FleetCmd),
 
     // The CLI itself.
     /// Check this machine's W3BS state, trust and environment
@@ -613,6 +679,7 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
         }
         Err(Cmd::Logout { a }) => ("logout", account("logout", &a, |o| async move { auth::logout(&o).await }).await),
         Err(Cmd::Whoami { a }) => ("whoami", account("whoami", &a, |o| async move { auth::whoami(&o).await }).await),
+        Err(Cmd::Fleet(f)) => run_fleet(f).await,
         Err(Cmd::SelfCmd(s)) => {
             let (layout, mk) = match engine_factory(&out) {
                 Ok(x) => x,
@@ -627,6 +694,30 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
         }
         Err(Cmd::External(_)) => unreachable!("external commands exec before the runtime starts"),
         Err(_) => unreachable!("every command is dispatched"),
+    }
+}
+
+async fn run_fleet(cmd: FleetCmd) -> (&'static str, w3bs_core::Result<OperationResult>) {
+    let local = |op: &'static str, r: w3bs_core::Result<Value>| {
+        (
+            op,
+            r.map(|data| {
+                let mut res = OperationResult::new(op);
+                res.data = data;
+                res
+            }),
+        )
+    };
+    match cmd {
+        FleetCmd::Join { token, name, no_service, a } => {
+            ("fleet.join", account("fleet.join", &a, |o| async move { fleet::join(&o, &token, name.as_deref(), no_service).await }).await)
+        }
+        FleetCmd::Agent { config } => local("fleet.agent", fleet::agent(config.as_deref()).await),
+        FleetCmd::Status { config } => local("fleet.status", fleet::status(config.as_deref())),
+        FleetCmd::Leave { config } => local("fleet.leave", fleet::leave(config.as_deref()).await),
+        FleetCmd::Ls { a } => ("fleet.ls", account("fleet.ls", &a, |o| async move { fleet::ls(&o).await }).await),
+        FleetCmd::Run { machine, action, a } => ("fleet.run", account("fleet.run", &a, |o| async move { fleet::run_action(&o, &machine, &action).await }).await),
+        FleetCmd::Rm { machine, a } => ("fleet.rm", account("fleet.rm", &a, |o| async move { fleet::rm(&o, &machine).await }).await),
     }
 }
 

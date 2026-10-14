@@ -2064,13 +2064,14 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "w3bs-cli"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "aws-lc-rs",
  "clap",
  "flate2",
  "fs4",
  "hex",
+ "libc",
  "reqwest",
  "semver",
  "serde_json",
@@ -2086,7 +2087,7 @@ dependencies = [
 
 [[package]]
 name = "w3bs-core"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "async-trait",
  "aws-lc-rs",
@@ -2116,7 +2117,7 @@ dependencies = [
 
 [[package]]
 name = "w3bs-publish"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "aws-lc-rs",
@@ -2135,7 +2136,7 @@ dependencies = [
 
 [[package]]
 name = "w3bs-schema"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "hex",
  "semver",
