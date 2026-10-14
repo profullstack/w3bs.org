@@ -275,6 +275,7 @@ EOF
   say "Next:"
   say "  1. Register an agent:   $cmd agents add claude-code --preset broad"
   say "  2. Connect it:          $cmd setup claude-code --agent claude-code --http   (prints the claude mcp add line)"
+  say "     OpenCode instead:    $cmd agents add opencode --preset broad && $cmd setup opencode --agent opencode --http   (prints the opencode.json mcp block)"
   if [ "$os" = apple-darwin ]; then
     say "  3. Enable access from the menu bar (Agents: Disabled) when you want the agent to work; disable it the same way."
     say "     Emergency stop: Control+Option+Command+Escape."

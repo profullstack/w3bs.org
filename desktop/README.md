@@ -75,6 +75,25 @@ w3bs desktop agents add claude-code --preset broad
 w3bs desktop setup claude-code --agent claude-code   # prints the `claude mcp add` line
 ```
 
+OpenCode: register an agent for it and merge the printed `mcp` block into
+`~/.config/opencode/opencode.json` (or a project `opencode.json`). Add `--http` to point it at the
+broker's MCP endpoint instead of spawning a stdio server; the bearer token is read from the token
+file with OpenCode's `{file:...}` substitution, so it never lands in the config.
+
+```bash
+w3bs desktop agents add opencode --preset broad
+w3bs desktop setup opencode --agent opencode          # {"mcp": {"w3bs-desktop": {"type": "local", ...}}}
+w3bs desktop setup opencode --agent opencode --http   # {"mcp": {"w3bs-desktop": {"type": "remote", ...}}}
+```
+
+Tools appear in OpenCode as `w3bs-desktop_desktop_*`. Screenshots come back as image content, so
+the model must take image input: for a custom provider, declare it on the model or OpenCode drops
+the image and tells the model it cannot see it:
+
+```json
+"models": { "<model>": { "tool_call": true, "modalities": { "input": ["text", "image"], "output": ["text"] } } }
+```
+
 Testing hooks (all installers): `W3BS_DESKTOP_VERSION`, `W3BS_DESKTOP_NO_SERVICE=1`, and
 `W3BS_DESKTOP_ARCHIVE` (a local archive) with `W3BS_DESKTOP_SHA256` (its checksum, required).
 The `installer-macos` and `installer-windows` CI jobs install a freshly packaged build this way
