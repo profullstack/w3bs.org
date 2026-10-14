@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { W3bsError, parseUri, validateManifest, verifyManifest, compareVersions } from './core.mjs';
+import { ACCOUNT_SCHEMA, createAccounts } from './accounts.mjs';
 
 export const ROOT = fileURLToPath(new URL('../', import.meta.url));
 
@@ -32,6 +33,7 @@ async function openSqlite(path) {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
   db.exec(SCHEMA.sqlite);
+  db.exec(ACCOUNT_SCHEMA.sqlite);
   const bind = (target) => ({
     all: async (sql, params = []) => target.prepare(sql).all(...params),
     get: async (sql, params = []) => target.prepare(sql).get(...params),
@@ -80,6 +82,7 @@ async function openPostgres(connectionString) {
     },
   });
   await pool.query(SCHEMA.postgres);
+  await pool.query(ACCOUNT_SCHEMA.postgres);
   return {
     ...bind(pool),
     dialect: 'postgres',
@@ -333,6 +336,10 @@ export async function openStore({
     };
   }
   await syncPackages();
+  // Accounts and OAuth (src/accounts.mjs) share this database. Passkeys are bound to
+  // the public origin, which the HTTP app knows, so it asks for them by origin.
+  await createAccounts(db, { origin: 'http://localhost' }).seedClients();
+  const accounts = (origin) => createAccounts(db, { origin });
   if (seed) {
     for (const filename of readdirSync(resolve(ROOT, 'fixtures/resources'))
       .filter((name) => name.endsWith('.json'))
@@ -354,6 +361,7 @@ export async function openStore({
     syncPackages,
     recordScan,
     latestScan,
+    accounts,
     trust,
     dialect: db.dialect,
     close: () => db.close(),

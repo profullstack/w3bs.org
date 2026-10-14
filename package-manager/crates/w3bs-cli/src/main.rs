@@ -1,6 +1,7 @@
 //! `w3bs`: the W3BS command line. One binary for every W3BS surface; the package
 //! manager is the first app, W3BS resources (the w3bs:// registry) the second.
 
+mod auth;
 mod render;
 
 use clap::{Args, Parser, Subcommand};
@@ -21,7 +22,9 @@ Apps:
              w3bs install <pkg>       install, then `w3bs update` keeps everything current
              w3bs pkg --help          the whole package manager
   resources  w3bs resolve <w3bs://…>  resolve, inspect, verify and run signed W3BS resources
-             w3bs resource --help     the whole resource client (search, publish, fork, sign…)";
+             w3bs resource --help     the whole resource client (search, publish, fork, sign…)
+  account    w3bs login               sign in to your W3BS account (opens the browser)
+             w3bs whoami / logout     show or end this machine's session";
 
 const AFTER_HELP: &str = "\
 Every command takes --json for one versioned result object on stdout.
@@ -440,6 +443,26 @@ enum Cmd {
         a: Api,
     },
 
+    // Your W3BS account.
+    /// Sign in to your W3BS account in the browser (OAuth 2.1 with PKCE)
+    Login {
+        /// Print the sign-in URL instead of opening a browser
+        #[arg(long)]
+        no_browser: bool,
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Sign out on this machine and revoke its session
+    Logout {
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Show the W3BS account this machine is signed in to
+    Whoami {
+        #[command(flatten)]
+        a: Api,
+    },
+
     // The CLI itself.
     /// Check this machine's W3BS state, trust and environment
     Doctor,
@@ -574,6 +597,16 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
         Err(Cmd::Resolve { uri, a }) => run_resource(ResCmd::Resolve { uri, a }).await,
         Err(Cmd::Verify { uri, a }) => run_resource(ResCmd::Verify { uri, a }).await,
         Err(Cmd::Inspect { uri, a }) => run_resource(ResCmd::Inspect { uri, a }).await,
+        Err(Cmd::Login { no_browser, a }) => {
+            let progress = |m: &str| {
+                if (!out.quiet && !out.json) || out.verbose {
+                    eprintln!("w3bs: {m}");
+                }
+            };
+            ("login", account("login", &a, |o| async move { auth::login(&o, !no_browser, &progress).await }).await)
+        }
+        Err(Cmd::Logout { a }) => ("logout", account("logout", &a, |o| async move { auth::logout(&o).await }).await),
+        Err(Cmd::Whoami { a }) => ("whoami", account("whoami", &a, |o| async move { auth::whoami(&o).await }).await),
         Err(Cmd::SelfCmd(s)) => {
             let (layout, mk) = match engine_factory(&out) {
                 Ok(x) => x,
@@ -589,6 +622,19 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
         Err(Cmd::External(_)) => unreachable!("external commands exec before the runtime starts"),
         Err(_) => unreachable!("every command is dispatched"),
     }
+}
+
+/// Run an account command against the resolved origin and wrap its data.
+async fn account<F, Fut>(op: &str, a: &Api, f: F) -> w3bs_core::Result<OperationResult>
+where
+    F: FnOnce(String) -> Fut,
+    Fut: std::future::Future<Output = w3bs_core::Result<Value>>,
+{
+    let origin = auth::origin(a.api.as_deref())?;
+    let data = f(origin).await?;
+    let mut res = OperationResult::new(op);
+    res.data = data;
+    Ok(res)
 }
 
 type Factory = Box<dyn Fn(&Mutate) -> Engine>;

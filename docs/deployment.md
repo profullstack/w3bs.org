@@ -14,6 +14,12 @@ The service is deployment-ready source. Production launch requires publishing th
 | `W3BS_DATA_DIR`      | Only used without `DATABASE_URL`: SQLite directory for local development                                                 |
 | `W3BS_PUBLISH_TOKEN` | Random administrative secret, at least 32 characters; absent means read-only                                             |
 | `W3BS_TRUST_FILE`    | Optional path to a mounted operator-managed trust file; otherwise bundled example public keys                            |
+| `RESEND_API_KEY`     | Sends account email (signup and sign-in links). w3bs.org is a Resend domain; without it production sends nothing        |
+| `W3BS_MAIL_FROM`     | `W3BS <noreply@w3bs.org>`                                                                                                |
+| `W3BS_FORM_SECRET`   | Stable random secret for the signup/email-link form tokens (@profullstack/form-guard)                                    |
+| `W3BS_BRIDGE_CLIENTS`| Optional JSON of @profullstack/bridges clients: `{"<id>":{"secret":"…","redirectUris":["https://…"]}}`                   |
+
+Account secrets live in the logicsrc team vault `profullstack w3bs-org--prod` and in dev2's `~/www/w3bs.org/app.env`. Accounts, passkeys, sessions and OAuth tokens share the registry database; their tables are created on first start.
 
 Never deploy `.local/keys` or upload publisher private keys. The container needs public keys and pre-signed examples only. Store any administrative token in the provider's secret manager. Back up the PostgreSQL database and trust configuration. The schema is created on first start; the ten bundled examples are seeded once and never re-inserted.
 
