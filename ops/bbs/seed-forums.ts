@@ -61,12 +61,13 @@ const TREE: Category[] = [
 ];
 
 const SETTINGS: Record<string, unknown> = {
-  'board.name': 'W3BS Community',
-  'board.tagline': 'Open standards for the agentic web, discussed by the people building it.',
+  // paper renders the name as the wordmark: [mark] w3bs. with the dot in the accent.
+  'board.name': 'w3bs',
+  // paper shows the tagline as the front page headline.
+  'board.tagline': 'The community board.',
   'board.description':
     'The W3BS community forums: desktop agents, the w3bs CLI and packages, MCP and agent tooling, and the open W3BS spec drafts for humans, agents and devices.',
-  // `paper` is the w3bs.org look (paper/ink, Georgia headlines). Until the board
-  // runs a tsbb release that has it, tsbb falls back to its default skin.
+  // `paper` (tsbb >= 0.13.0) is the w3bs.org look: paper/ink, Georgia headlines, light only.
   'board.skin': 'paper',
   'board.accent': '#d95231',
   'board.logoUrl': 'https://w3bs.org/assets/mark.svg',
@@ -76,15 +77,17 @@ const SETTINGS: Record<string, unknown> = {
   'board.showPlatform': false,
   // w3bs.org has no dark mode, so neither does its forum by default.
   'board.theme': 'light',
-  // The site's own header navigation, with the board's items where Community sits.
+  // The site's own header navigation; `Community | {forums}` is the board itself and
+  // a line ending `| button` is the outlined header action, as on w3bs.org.
   'board.navLinks': [
     'Packages | https://w3bs.org/packages',
     'Standards | https://w3bs.org/specs',
     'Browse | https://w3bs.org/browse',
     'Prompts | https://w3bs.org/prompts',
     'Desktop | https://w3bs.org/desktop',
-    '{forums}',
+    'Community | {forums}',
     'Participate | https://w3bs.org/governance',
+    'Start building ↗ | https://w3bs.org/developers | button',
   ].join('\n'),
 };
 
