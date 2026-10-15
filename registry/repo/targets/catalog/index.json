@@ -338,7 +338,7 @@
         "url": "https://logicsrc.com/opencontext/install.sh",
         "shell": "sh"
       },
-      "homepage": "https://logicsrc.com/opencontext",
+      "homepage": "https://github.com/profullstack/logicsrc/tree/master/packages/opencontext",
       "repository": "https://github.com/profullstack/logicsrc",
       "vendor": "Profullstack",
       "license": "MIT",
@@ -1163,6 +1163,23 @@
       "repository": "https://github.com/profullstack/w3bs.org/tree/main/desktop",
       "vendor": "Profullstack",
       "license": "Apache-2.0",
+      "agentic": true
+    },
+    {
+      "id": "w3bs.org/w3bs-training",
+      "name": "w3bs-training",
+      "description": "Review, curate and version demonstrations of your desktop work, then let an authorized agent retrieve approved examples over MCP. Local first and encrypted at rest; push reviewed tasks to your own workspace at w3bs.org/training/app when you want them on another device or for a hosted agent.",
+      "commands": [
+        "w3bs-training"
+      ],
+      "install": {
+        "url": "https://w3bs.org/training/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://w3bs.org/training",
+      "repository": "https://github.com/profullstack/w3bs.org/tree/main/training",
+      "vendor": "Profullstack",
+      "license": "MIT",
       "agentic": true
     },
     {
