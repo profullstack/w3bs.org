@@ -2,6 +2,8 @@
 // textContent: imported and captured text is data and never becomes markup.
 const API = '/api/v1/training';
 const main = document.getElementById('main');
+// Set from /status: true on w3bs.org/training/app (server-managed key), false for the local app.
+let HOSTED = false;
 const PURPOSES = [
   'human_review',
   'private_retrieval',
@@ -973,11 +975,13 @@ const views = {
           )
         : h('p', { class: 'muted' }, 'Release a dataset version first.'),
       h('h2', {}, 'Connect an agent'),
-      h(
-        'pre',
-        {},
-        'claude mcp add w3bs-training -- w3bs training mcp serve --stdio --consumer claude-code\nw3bs training setup codex --consumer codex\nw3bs training setup opencode --consumer opencode',
-      ),
+      HOSTED
+        ? await agentTokens()
+        : h(
+            'pre',
+            {},
+            'claude mcp add w3bs-training -- w3bs training mcp serve --stdio --consumer claude-code\nw3bs training setup codex --consumer codex\nw3bs training setup opencode --consumer opencode',
+          ),
       h(
         'p',
         { class: 'muted' },
@@ -1120,7 +1124,10 @@ const views = {
     return [
       h('h1', {}, 'Settings'),
       kv([
-        ['Store', status.home],
+        [
+          'Store',
+          HOSTED ? 'w3bs.org, your account only (PostgreSQL, one schema per account)' : status.home,
+        ],
         ['Key store', status.key_store],
         ['Schema', `W3BS Demonstration Dataset Format ${status.schema_version} (community draft)`],
         ['Cloud inference', 'off: budget $0'],
@@ -1155,6 +1162,102 @@ const views = {
   },
 };
 
+// Hosted only: MCP over HTTP with per-agent tokens, made and revoked here.
+async function agentTokens() {
+  const tokens = await api('/agent-tokens');
+  const name = h('input', { 'aria-label': 'Agent name for the token', placeholder: 'claude-code' });
+  const shown = h('div');
+  return h(
+    'div',
+    {},
+    h(
+      'p',
+      { class: 'muted' },
+      'An agent connects to this workspace over MCP with its own token. It sees only what you grant it above, and nothing else in your account.',
+    ),
+    h(
+      'div',
+      { class: 'row' },
+      h('label', {}, h('span', {}, 'Agent name'), name),
+      h(
+        'button',
+        {
+          class: 'primary',
+          onclick: run(async () => {
+            const r = await api('/agent-tokens', {
+              method: 'POST',
+              body: { consumer: name.value },
+            });
+            shown.replaceChildren(
+              h(
+                'div',
+                { class: 'notice' },
+                h('strong', {}, 'Copy this now; it is shown once.'),
+                h('pre', {}, r.claude_code),
+                h('p', { class: 'muted' }, `MCP endpoint: ${r.mcp_url}. ${r.note}`),
+              ),
+            );
+          }),
+        },
+        'Create agent token',
+      ),
+    ),
+    shown,
+    tokens.length
+      ? h(
+          'div',
+          { class: 'scroll' },
+          h(
+            'table',
+            {},
+            h(
+              'thead',
+              {},
+              h(
+                'tr',
+                {},
+                ['Agent', 'Created', 'Last used', ''].map((t) => h('th', {}, t)),
+              ),
+            ),
+            h(
+              'tbody',
+              {},
+              tokens.map((t) =>
+                h(
+                  'tr',
+                  {},
+                  h('td', {}, t.consumer),
+                  h('td', {}, when(t.created_at)),
+                  h(
+                    'td',
+                    {},
+                    t.revoked_at ? `revoked ${when(t.revoked_at)}` : when(t.last_used_at),
+                  ),
+                  h(
+                    'td',
+                    {},
+                    t.revoked_at
+                      ? ''
+                      : h(
+                          'button',
+                          {
+                            onclick: run(async () => {
+                              await api(`/agent-tokens/${t.id}`, { method: 'DELETE' });
+                              render();
+                            }),
+                          },
+                          'Revoke',
+                        ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        )
+      : null,
+  );
+}
+
 function versionCard(id, v) {
   const boxes = PURPOSES.map((p) =>
     h(
@@ -1174,10 +1277,18 @@ function versionCard(id, v) {
     { 'aria-label': 'Export format' },
     ['bundle', 'jsonl', 'next-action'].map((f) => h('option', { value: f }, f)),
   );
-  const out = h('input', {
-    'aria-label': 'Export path',
-    placeholder: '/home/me/exports/release-v1',
-  });
+  // An export is for one approved purpose; the service refuses any other.
+  const exportPurpose = h(
+    'select',
+    { 'aria-label': 'Export purpose' },
+    v.purposes.map((p) => h('option', { value: p }, p.replace('_', ' '))),
+  );
+  const out = HOSTED
+    ? null
+    : h('input', {
+        'aria-label': 'Export path',
+        placeholder: '/home/me/exports/release-v1',
+      });
   return h(
     'div',
     { class: 'card' },
@@ -1236,7 +1347,8 @@ function versionCard(id, v) {
             'div',
             { class: 'row' },
             h('label', {}, h('span', {}, 'Format'), format),
-            h('label', {}, h('span', {}, 'Export to'), out),
+            h('label', {}, h('span', {}, 'For'), exportPurpose),
+            out ? h('label', {}, h('span', {}, 'Export to'), out) : null,
             h(
               'button',
               {
@@ -1247,19 +1359,42 @@ function versionCard(id, v) {
                     )
                   )
                     return;
-                  const r = await api('/exports', {
-                    method: 'POST',
-                    body: {
-                      dataset_id: id,
-                      version: v.version,
-                      format: format.value,
-                      out: out.value,
-                    },
-                  });
+                  const body = {
+                    dataset_id: id,
+                    version: v.version,
+                    format: format.value,
+                    purpose: exportPurpose.value,
+                    ...(out ? { out: out.value } : {}),
+                  };
+                  if (HOSTED) {
+                    // The server answers with the zip; save it from the browser.
+                    const response = await fetch(`${API}/exports`, {
+                      method: 'POST',
+                      credentials: 'same-origin',
+                      headers: { 'x-w3bs-training': '1', 'content-type': 'application/json' },
+                      body: JSON.stringify(body),
+                    });
+                    if (!response.ok)
+                      throw new Error(
+                        (await response.json()).error?.message || response.statusText,
+                      );
+                    const name =
+                      /filename="([^"]+)"/.exec(
+                        response.headers.get('content-disposition') || '',
+                      )?.[1] || 'export.zip';
+                    const url = URL.createObjectURL(await response.blob());
+                    const link = h('a', { href: url, download: name });
+                    document.body.append(link);
+                    link.click();
+                    link.remove();
+                    setTimeout(() => URL.revokeObjectURL(url), 60000);
+                    return toast(`Downloaded ${name}`);
+                  }
+                  const r = await api('/exports', { method: 'POST', body });
                   toast(`Exported to ${r.destination}`);
                 }),
               },
-              'Export',
+              HOSTED ? 'Download' : 'Export',
             ),
           ),
           h(
@@ -1336,4 +1471,9 @@ document.addEventListener('keydown', (event) => {
 
 window.addEventListener('hashchange', render);
 new EventSource(`${API}/events`).addEventListener('change', () => refreshStatus());
-render();
+api('/status')
+  .then((s) => {
+    HOSTED = s.key_store === 'server-managed';
+  })
+  .catch(() => {})
+  .finally(render);

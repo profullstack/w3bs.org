@@ -111,7 +111,8 @@ function osKeyStore(account, directory) {
         encoding: 'utf8',
         windowsHide: true,
       });
-    const prelude = 'Add-Type -AssemblyName System.Security; $b = [Convert]::FromBase64String([Console]::In.ReadToEnd().Trim());';
+    const prelude =
+      'Add-Type -AssemblyName System.Security; $b = [Convert]::FromBase64String([Console]::In.ReadToEnd().Trim());';
     return {
       name: 'windows-dpapi',
       get() {

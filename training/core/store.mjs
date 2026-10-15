@@ -1,9 +1,8 @@
-// Local Training store: one SQLite file plus sealed artifact files.
+// Training tables. The local store is one SQLite file plus sealed artifact files; the hosted
+// store (w3bs.org/training) is the same tables in PostgreSQL, one schema per workspace.
 //
 // Records are kept as validated JSON bodies with the columns needed for
 // authorization joins, review queues, retention and deletion lineage.
-// The hosted backend (Postgres, M2) implements the same tables.
-import { chmodSync, existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
@@ -83,50 +82,31 @@ CREATE TABLE IF NOT EXISTS tombstones (
 CREATE TABLE IF NOT EXISTS audit (
   sequence INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, actor TEXT NOT NULL, operation TEXT NOT NULL,
   subject TEXT, detail TEXT);
+CREATE TABLE IF NOT EXISTS agent_tokens (
+  token_hash TEXT PRIMARY KEY, consumer TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL,
+  last_used_at TEXT, revoked_at TEXT);
+CREATE TABLE IF NOT EXISTS blobs (key TEXT PRIMARY KEY, bytes INTEGER NOT NULL, data BLOB NOT NULL);
 CREATE VIRTUAL TABLE IF NOT EXISTS episode_fts USING fts5(episode_id UNINDEXED, goal, family, steps, apps);
 `;
 
+// The same tables for PostgreSQL (w3bs.org/training), one schema per workspace. Full-text search
+// is a generated tsvector instead of FTS5.
+export const TRAINING_SCHEMA_PG = TRAINING_SCHEMA.replace(/^\s*PRAGMA[^\n]*\n/m, '')
+  .replaceAll('INTEGER PRIMARY KEY AUTOINCREMENT', 'BIGSERIAL PRIMARY KEY')
+  .replace('data BLOB NOT NULL', 'data BYTEA NOT NULL')
+  .replace(
+    /CREATE VIRTUAL TABLE[^\n]*\n/,
+    `CREATE TABLE IF NOT EXISTS episode_fts (
+  episode_id TEXT PRIMARY KEY, goal TEXT, family TEXT, steps TEXT, apps TEXT,
+  doc tsvector GENERATED ALWAYS AS (to_tsvector('simple', coalesce(goal, '') || ' ' || coalesce(family, '') || ' ' || coalesce(steps, '') || ' ' || coalesce(apps, ''))) STORED);
+CREATE INDEX IF NOT EXISTS episode_fts_doc ON episode_fts USING gin (doc);
+`,
+  );
+
 export function defaultHome(env = process.env) {
   if (env.W3BS_TRAINING_HOME) return resolve(env.W3BS_TRAINING_HOME);
-  if (process.platform === 'win32' && env.LOCALAPPDATA) return resolve(env.LOCALAPPDATA, 'w3bs', 'training');
+  if (process.platform === 'win32' && env.LOCALAPPDATA)
+    return resolve(env.LOCALAPPDATA, 'w3bs', 'training');
   const data = env.XDG_DATA_HOME || resolve(homedir(), '.local/share');
   return resolve(data, 'w3bs/training');
-}
-
-export async function openTrainingDb(directory) {
-  const { DatabaseSync } = await import('node:sqlite');
-  mkdirSync(resolve(directory, 'artifacts'), { recursive: true, mode: 0o700 });
-  mkdirSync(resolve(directory, 'quarantine'), { recursive: true, mode: 0o700 });
-  const path = resolve(directory, 'training.sqlite');
-  const fresh = !existsSync(path);
-  const db = new DatabaseSync(path);
-  if (fresh) chmodSync(path, 0o600);
-  db.exec(TRAINING_SCHEMA);
-  const all = (sql, params = []) => db.prepare(sql).all(...params);
-  const get = (sql, params = []) => db.prepare(sql).get(...params);
-  const run = (sql, params = []) => db.prepare(sql).run(...params);
-  let depth = 0;
-  return {
-    all,
-    get,
-    run,
-    path,
-    // Nested calls join the outer transaction.
-    transaction(fn) {
-      if (depth > 0) return fn();
-      db.exec('BEGIN IMMEDIATE');
-      depth += 1;
-      try {
-        const result = fn();
-        db.exec('COMMIT');
-        return result;
-      } catch (error) {
-        db.exec('ROLLBACK');
-        throw error;
-      } finally {
-        depth -= 1;
-      }
-    },
-    close: () => db.close(),
-  };
 }

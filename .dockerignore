@@ -10,6 +10,6 @@
 !catalog/**
 !registry/**
 !desktop/packaging/**
-!training/packaging/**
+!training/**
 !bunfig.toml
 !scripts/scan-packages.mjs

@@ -74,6 +74,18 @@ w3bs-training versions release DATASET_ID 1
 Approval names purposes one by one. `private_retrieval` does not imply
 `model_training` or `public_distribution`.
 
+## 3b. Or review on w3bs.org
+
+```sh
+w3bs login                              # once
+w3bs-training push --all-reviewed       # or name episode ids
+```
+
+Your tasks appear in the inbox at https://w3bs.org/training/app/ (labels are
+re-proposed there, so you confirm them once more). Under Consumers, create an
+agent token: it prints a `claude mcp add --transport http ...` line for MCP over
+HTTP, no local process needed.
+
 ## 4. Connect an agent
 
 ```sh

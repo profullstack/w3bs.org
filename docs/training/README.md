@@ -11,8 +11,11 @@ import, review, datasets, retrieval over MCP, exports, deletion, a local web
 app and a terminal review. Recording is the Agentic Desktop Layer's
 `w3bs desktop training` (tray: **Start training…**): focused-window frames of
 approved applications only, `visual-review` profile, verified on a KDE Plasma
-rig; no input events or text are captured (see the capability matrix). There is no hosted app at w3bs.org/training yet (M2), and no
-model-training adapter (M4). See the [capability matrix](capability-matrix.md).
+rig; no input events or text are captured (see the capability matrix). The
+hosted workspace is at [w3bs.org/training/app](https://w3bs.org/training/app/):
+the same app with your W3BS account, `w3bs training push` to send reviewed
+tasks there, and MCP over HTTP with per-agent tokens. There is no
+model-training adapter yet (M4). See the [capability matrix](capability-matrix.md).
 
 ## Install
 

@@ -51,7 +51,10 @@ window with no trace of the unapproved app, and the host's W3BS Training importe
 | Model training adapters                                                                           | none; `jobs submit` returns `TRAIN_ADAPTER_UNAVAILABLE`             |
 | Optional model labelling (Anthropic SDK adapter)                                                  | not started; cloud budget is $0                                     |
 | Embeddings                                                                                        | not started                                                         |
-| Hosted app at w3bs.org/training, sync, team review                                                | not started (M2)                                                    |
+| Hosted app at w3bs.org/training/app (account sign-in, PostgreSQL per-account schema)              | shipped                                                             |
+| `w3bs training push` (local -> hosted, `w3bs login` session)                                      | shipped; pull and two-way sync not started                          |
+| MCP over HTTP for hosted workspaces (per-agent `trn_` tokens)                                     | shipped                                                             |
+| Team workspaces and shared review                                                                 | not started                                                         |
 | Packaged `w3bs-training` binary (Linux x64/arm64, macOS, Windows) with curl/PowerShell installers | shipped; Linux installer verified in a clean Ubuntu 24.04 container |
 | Electron desktop app                                                                              | not started                                                         |
 | NicheDB exchange                                                                                  | not started                                                         |

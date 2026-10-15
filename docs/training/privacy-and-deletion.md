@@ -1,5 +1,20 @@
 # Privacy, deletion, cost and recovery
 
+## On w3bs.org (hosted workspaces)
+
+Nothing reaches w3bs.org unless you send it: `w3bs training push` (it asks you
+to confirm in your terminal) or an upload in the hosted app. There it lives in
+your account's own PostgreSQL schema. Frames are encrypted with a key derived
+for your workspace from a server key kept in the W3BS vault, so **the server can
+decrypt them**; this is hosted processing, not end-to-end encryption. Keep on
+your own machine anything you would not hand to a server.
+
+The hosted app loads no analytics or third-party scripts. Exports come back as
+a download; nothing is written to the server's disk. Deleting in the hosted app
+removes the data from the live database at once; the server's database backups
+can hold it until they expire (the deletion report says so). Deleting locally
+does not delete what you pushed, and the reverse.
+
 ## What is kept, and where
 
 Everything lives in `~/.local/share/w3bs/training` (or `W3BS_TRAINING_HOME`):

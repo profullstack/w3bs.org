@@ -33,6 +33,8 @@ const help = `W3BS Training ${VERSION}: review, curate and consume demonstration
   w3bs training jobs adapters | submit --plan-file plan.json | cancel JOB_ID
   w3bs training forget --last 10m | --from ISO [--to ISO]
   w3bs training deletions REQUEST_ID | audit
+  w3bs training push EPISODE_ID... | --all-reviewed [--api https://w3bs.org]
+                                                       send episodes to your w3bs.org workspace
   w3bs training mcp serve --stdio --consumer NAME
   w3bs training setup claude-code|codex|opencode --consumer NAME
 
@@ -127,6 +129,8 @@ const { values, positionals } = (() => {
         to: { type: 'string' },
         'goal-family': { type: 'string' },
         filename: { type: 'string' },
+        'all-reviewed': { type: 'boolean' },
+        api: { type: 'string' },
       },
     });
   } catch (error) {
@@ -456,6 +460,27 @@ try {
             `Delete everything captured between ${from.toISOString()} and ${to.toISOString()}.`,
           ),
         ),
+      );
+      break;
+    }
+    case 'push': {
+      // Copies leave this computer: the person confirms, and the server can decrypt them.
+      const origin = new URL(values.api ?? process.env.W3BS_API ?? 'https://w3bs.org').origin;
+      const ids = values['all-reviewed']
+        ? (await service.listEpisodes({ state: 'reviewed', limit: 1000 })).map((e) => e.episode_id)
+        : [sub, ...rest].filter(Boolean);
+      if (!ids.length) fail('MISSING_ARGUMENT', 'Name episodes to push, or pass --all-reviewed.');
+      const { accessToken, pushBundle } = await import('../core/remote.mjs');
+      const token = await accessToken(origin);
+      const actor = await humanActor(
+        `Send ${ids.length} episode(s), frames included, to your workspace at ${origin}.\nThe server can decrypt what you send; deleting it here does not delete it there.`,
+      );
+      const bundle = await service.bundleEpisodes(ids, actor);
+      out(
+        await pushBundle(origin, bundle, {
+          token,
+          filename: `push-${Date.now()}.w3bs-training.zip`,
+        }),
       );
       break;
     }

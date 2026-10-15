@@ -6,15 +6,7 @@
 // session and an interactive confirmed terminal are human. Human-only
 // operations throw HUMAN_APPROVAL_REQUIRED for anything else.
 import canonicalize from 'canonicalize';
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, extname, resolve } from 'node:path';
 import { W3bsError } from '../../src/core.mjs';
 import {
@@ -31,10 +23,11 @@ import {
 import { decrypt, encrypt, keyProvider } from './crypto.mjs';
 import { newId, sha256, stageBundle, stageEvents, stageVideo } from './ingest.mjs';
 import { scrubRecord } from './privacy.mjs';
-import { defaultHome, openTrainingDb } from './store.mjs';
+import { defaultHome } from './store.mjs';
+import { fsBlobs, openSqliteDb } from './db.mjs';
 import { writeZip } from './zip.mjs';
 
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.0';
 const DAY = 86400000;
 const RETRIEVAL_PURPOSES = ['private_retrieval', 'external_retrieval'];
 // Purposes that send data beyond the person's own private use need declared rights.
@@ -55,6 +48,17 @@ const error = (code, message, status = 400, details) => {
   return e;
 };
 const parse = (row, key = 'body') => (row ? JSON.parse(row[key]) : null);
+// Sequential on purpose: inside a Postgres transaction every query shares one client.
+const mapSeries = async (list, fn) => {
+  const out = [];
+  for (const [i, item] of list.entries()) out.push(await fn(item, i));
+  return out;
+};
+const filterSeries = async (list, fn) => {
+  const out = [];
+  for (const item of list) if (await fn(item)) out.push(item);
+  return out;
+};
 const normGoal = (goal) =>
   String(goal ?? '')
     .toLowerCase()
@@ -111,42 +115,60 @@ export function computeSplits(episodes, seed) {
   return { strategy: 'family-holdout+near-duplicate-grouping/v1', seed, ...out };
 }
 
+// Local by default: a SQLite file and sealed artifact files under `home`. The hosted app
+// (training/hosted.mjs) passes its own `db`, `blobs`, `keys` and `config` per workspace.
 export async function openTraining({
-  home = defaultHome(),
+  home,
   env = process.env,
   now = () => new Date(),
   workspace = 'local',
+  db,
+  blobs,
+  keys,
+  config: configStore,
+  backupsNote = 'The local store keeps no backups. Copies made by your own backup tools are outside W3BS.',
 } = {}) {
-  mkdirSync(home, { recursive: true, mode: 0o700 });
-  const db = await openTrainingDb(home);
-  const keys = keyProvider(home, workspace, env);
+  if (!db) {
+    home ??= defaultHome(env);
+    mkdirSync(home, { recursive: true, mode: 0o700 });
+    db = await openSqliteDb(resolve(home, 'training.sqlite'));
+    blobs ??= fsBlobs(home);
+    keys ??= keyProvider(home, workspace, env);
+  }
+  if (!blobs || !keys) throw new Error('openTraining needs blobs and keys with a custom db');
   const iso = () => now().toISOString();
-  const configPath = resolve(home, 'config.json');
-  const config = () => {
-    if (!existsSync(configPath)) return DEFAULT_CONFIG;
-    const stored = JSON.parse(readFileSync(configPath, 'utf8'));
+  const configPath = home && resolve(home, 'config.json');
+  const config = async () => {
+    const stored = configStore
+      ? await configStore()
+      : configPath && existsSync(configPath)
+        ? JSON.parse(readFileSync(configPath, 'utf8'))
+        : {};
     return {
       ...DEFAULT_CONFIG,
       ...stored,
       retention: { ...DEFAULT_CONFIG.retention, ...stored.retention },
     };
   };
-  const meta = (key, fallback) =>
-    db.get('SELECT value FROM meta WHERE key = ?', [key])?.value ?? fallback;
-  const setMeta = (key, value) =>
-    db.run(
+  const meta = async (key, fallback) =>
+    (await db.get('SELECT value FROM meta WHERE key = ?', [key]))?.value ?? fallback;
+  const setMeta = async (key, value) =>
+    await db.run(
       'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
       [key, value],
     );
   const who = (actor) => `${actor.kind}:${actor.id}`;
-  const audit = (actor, operation, subject, detail) =>
-    db.run('INSERT INTO audit (at, actor, operation, subject, detail) VALUES (?, ?, ?, ?, ?)', [
-      iso(),
-      who(actor),
-      operation,
-      subject ?? null,
-      detail === undefined ? null : JSON.stringify(detail),
-    ]);
+  const audit = async (actor, operation, subject, detail) =>
+    await db.run(
+      'INSERT INTO audit (at, actor, operation, subject, detail) VALUES (?, ?, ?, ?, ?)',
+      [
+        iso(),
+        who(actor),
+        operation,
+        subject ?? null,
+        detail === undefined ? null : JSON.stringify(detail),
+      ],
+    );
   const requireHuman = (actor, operation) => {
     if (actor?.kind !== 'human')
       throw error(
@@ -156,44 +178,49 @@ export async function openTraining({
       );
   };
 
-  // Artifacts are sealed with AAD = artifact id so files cannot be swapped.
-  const artifactPath = (id) => resolve(home, 'artifacts', `${id}.bin`);
-  const putArtifact = (id, data) =>
-    writeFileSync(artifactPath(id), encrypt(keys.key(), data, id), { mode: 0o600 });
-  const readArtifact = (id) => decrypt(keys.key(), readFileSync(artifactPath(id)), id);
-  const quarantineDir = (id) => resolve(home, 'quarantine', id);
+  // Artifacts are sealed with AAD = artifact id so blobs cannot be swapped.
+  const artifactKey = (id) => `artifacts/${id}.bin`;
+  const putArtifact = async (id, data) => blobs.put(artifactKey(id), encrypt(keys.key(), data, id));
+  const readArtifact = async (id) => {
+    const sealed = await blobs.get(artifactKey(id));
+    if (!sealed) throw error('NOT_FOUND', `Artifact ${id} is gone.`, 404);
+    return decrypt(keys.key(), sealed, id);
+  };
+  const quarantineKey = (id, file) => `quarantine/${id}/${file}`;
 
   const wallFor = (session, ns) => {
     const anchor = Date.parse(session.clock.wall_clock_anchor);
     const delta = (BigInt(ns) - BigInt(session.clock.monotonic_anchor_ns)) / 1000000n;
     return new Date(anchor + Number(delta)).toISOString();
   };
-  const sessionOf = (id) => parse(db.get('SELECT body FROM sessions WHERE session_id = ?', [id]));
-  const episodeRow = (id) => {
-    const row = db.get('SELECT * FROM episodes WHERE episode_id = ?', [id]);
+  const sessionOf = async (id) =>
+    parse(await db.get('SELECT body FROM sessions WHERE session_id = ?', [id]));
+  const episodeRow = async (id) => {
+    const row = await db.get('SELECT * FROM episodes WHERE episode_id = ?', [id]);
     if (!row) throw error('NOT_FOUND', `Episode ${id} was not found.`, 404);
     return { ...row, body: JSON.parse(row.body), rights: JSON.parse(row.rights) };
   };
-  const stepsOf = (episode) =>
+  const stepsOf = async (episode) =>
     episode.steps.length
-      ? db
-          .all(
+      ? (
+          await db.all(
             `SELECT body FROM steps WHERE step_id IN (${episode.steps.map(() => '?').join(',')})`,
             episode.steps,
           )
+        )
           .map((r) => JSON.parse(r.body))
           .sort((a, b) => episode.steps.indexOf(a.step_id) - episode.steps.indexOf(b.step_id))
       : [];
-  const openWarnings = (id) =>
-    db.all(
+  const openWarnings = async (id) =>
+    await db.all(
       'SELECT warning_id, kind, path, blocking FROM warnings WHERE episode_id = ? AND resolved_at IS NULL',
       [id],
     );
 
-  const indexEpisode = (episode) => {
-    const steps = stepsOf(episode);
-    db.run('DELETE FROM episode_fts WHERE episode_id = ?', [episode.episode_id]);
-    db.run(
+  const indexEpisode = async (episode) => {
+    const steps = await stepsOf(episode);
+    await db.run('DELETE FROM episode_fts WHERE episode_id = ?', [episode.episode_id]);
+    await db.run(
       'INSERT INTO episode_fts (episode_id, goal, family, steps, apps) VALUES (?, ?, ?, ?, ?)',
       [
         episode.episode_id,
@@ -209,11 +236,11 @@ export async function openTraining({
     );
   };
 
-  const episodeBounds = (episode) => {
+  const episodeBounds = async (episode) => {
     let from = null;
     let to = null;
     for (const seg of episode.segments) {
-      const session = sessionOf(seg.session_id);
+      const session = await sessionOf(seg.session_id);
       if (!session) continue;
       const a = wallFor(session, seg.from_ns);
       const b = wallFor(session, seg.to_ns);
@@ -223,10 +250,10 @@ export async function openTraining({
     return { from: from ?? iso(), to: to ?? iso() };
   };
 
-  const insertEpisode = (episode, { importId = null, rights, state = 'review_required' }) => {
+  const insertEpisode = async (episode, { importId = null, rights, state = 'review_required' }) => {
     const parsed = Episode.parse(episode);
-    const bounds = episodeBounds(parsed);
-    db.run(
+    const bounds = await episodeBounds(parsed);
+    await db.run(
       `INSERT INTO episodes (episode_id, import_id, state, profile, family, captured_from, captured_to, rights, created_at, updated_at, body)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -243,18 +270,18 @@ export async function openTraining({
         JSON.stringify(parsed),
       ],
     );
-    indexEpisode(parsed);
+    await indexEpisode(parsed);
     return parsed;
   };
 
-  const addRevision = (
+  const addRevision = async (
     subject,
     field_path,
     value,
     { source, status, author, evidence = [], confidence },
   ) => {
-    const previous = db.get(
-      'SELECT revision_id FROM labels WHERE subject_id = ? AND field_path = ? ORDER BY created_at DESC, rowid DESC LIMIT 1',
+    const previous = await db.get(
+      'SELECT revision_id FROM labels WHERE subject_id = ? AND field_path = ? ORDER BY created_at DESC, revision_id DESC LIMIT 1',
       [subject.id, field_path],
     );
     const revision = LabelRevision.parse({
@@ -271,7 +298,7 @@ export async function openTraining({
       created_at: iso(),
       ...(previous ? { supersedes: previous.revision_id } : {}),
     });
-    db.run(
+    await db.run(
       'INSERT INTO labels (revision_id, subject_kind, subject_id, field_path, status, source, created_at, body) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         revision.revision_id,
@@ -288,7 +315,7 @@ export async function openTraining({
   };
 
   // Writes an updated episode body under a revision precondition.
-  const saveEpisode = (row, body, { expectedRevision, state } = {}) => {
+  const saveEpisode = async (row, body, { expectedRevision, state } = {}) => {
     if (expectedRevision !== undefined && expectedRevision !== row.revision)
       throw error(
         'REVISION_CONFLICT',
@@ -296,8 +323,8 @@ export async function openTraining({
         409,
       );
     const parsed = Episode.parse(body);
-    const nextState = state ?? reviewState(parsed, row.episode_id);
-    const result = db.run(
+    const nextState = state ?? (await reviewState(parsed, row.episode_id));
+    const result = await db.run(
       'UPDATE episodes SET body = ?, family = ?, state = ?, updated_at = ?, revision = revision + 1 WHERE episode_id = ? AND revision = ?',
       [
         JSON.stringify(parsed),
@@ -310,11 +337,11 @@ export async function openTraining({
     );
     if (result.changes !== 1)
       throw error('REVISION_CONFLICT', `Episode ${row.episode_id} changed concurrently.`, 409);
-    indexEpisode(parsed);
+    await indexEpisode(parsed);
     return parsed;
   };
-  const reviewState = (episode, id) => {
-    const blocking = openWarnings(id).some((w) => w.blocking);
+  const reviewState = async (episode, id) => {
+    const blocking = (await openWarnings(id)).some((w) => w.blocking);
     return episode.goal.status === 'confirmed' &&
       episode.outcome.status === 'confirmed' &&
       !blocking
@@ -325,7 +352,7 @@ export async function openTraining({
   // ---------------------------------------------------------------- deletion
   // Removes episodes and everything only they reference, then reports the
   // lineage: dataset versions that listed them and exports that left W3BS.
-  const purge = (episodeIds, requestId) => {
+  const purge = async (episodeIds, requestId) => {
     const removed = {
       episodes: 0,
       steps: 0,
@@ -336,20 +363,22 @@ export async function openTraining({
       index_rows: 0,
       sessions: 0,
     };
-    const ids = [...new Set(episodeIds)].filter((id) =>
+    const ids = await filterSeries([...new Set(episodeIds)], (id) =>
       db.get('SELECT 1 FROM episodes WHERE episode_id = ?', [id]),
     );
     if (!ids.length) return { removed, versions: [], exports: [], files: [] };
-    const bodies = ids.map((id) => episodeRow(id).body);
+    const bodies = await mapSeries(ids, async (id) => (await episodeRow(id)).body);
     const sessions = new Set(bodies.flatMap((e) => e.segments.map((s) => s.session_id)));
     const doomedSteps = new Set(bodies.flatMap((e) => e.steps));
     const marks = (sql, params) => db.all(sql, params);
     const placeholders = (list) => list.map(() => '?').join(',');
-    const versions = marks(
+    const versions = await marks(
       `SELECT DISTINCT dataset_id, version FROM version_episodes WHERE episode_id IN (${placeholders(ids)})`,
       ids,
     );
-    const exports = marks('SELECT export_id, destination, created_at, episodes FROM exports', [])
+    const exports = (
+      await marks('SELECT export_id, destination, created_at, episodes FROM exports', [])
+    )
       .filter((x) => JSON.parse(x.episodes).some((id) => ids.includes(id)))
       .map((x) => ({
         export_id: x.export_id,
@@ -358,49 +387,57 @@ export async function openTraining({
       }));
     const files = [];
     for (const id of ids) {
-      removed.labels += db.run('DELETE FROM labels WHERE subject_id = ?', [id]).changes;
-      removed.warnings += db.run('DELETE FROM warnings WHERE episode_id = ?', [id]).changes;
-      removed.index_rows += db.run('DELETE FROM episode_fts WHERE episode_id = ?', [id]).changes;
-      db.run('DELETE FROM dataset_members WHERE episode_id = ?', [id]);
+      removed.labels += (await db.run('DELETE FROM labels WHERE subject_id = ?', [id])).changes;
+      removed.warnings += (await db.run('DELETE FROM warnings WHERE episode_id = ?', [id])).changes;
+      removed.index_rows += (
+        await db.run('DELETE FROM episode_fts WHERE episode_id = ?', [id])
+      ).changes;
+      await db.run('DELETE FROM dataset_members WHERE episode_id = ?', [id]);
       // Version snapshots hold episode bodies; deleted data must not survive there.
-      db.run('DELETE FROM version_episodes WHERE episode_id = ?', [id]);
-      db.run('DELETE FROM episodes WHERE episode_id = ?', [id]);
-      db.run(
-        'INSERT OR REPLACE INTO tombstones (subject_id, kind, deleted_at, request_id) VALUES (?, ?, ?, ?)',
+      await db.run('DELETE FROM version_episodes WHERE episode_id = ?', [id]);
+      await db.run('DELETE FROM episodes WHERE episode_id = ?', [id]);
+      await db.run(
+        'INSERT INTO tombstones (subject_id, kind, deleted_at, request_id) VALUES (?, ?, ?, ?) ON CONFLICT (subject_id) DO UPDATE SET kind = excluded.kind, deleted_at = excluded.deleted_at, request_id = excluded.request_id',
         [id, 'episode', iso(), requestId],
       );
       removed.episodes += 1;
     }
     // Steps owned by deleted episodes, unless another episode still uses them.
-    const survivors = db.all('SELECT body FROM episodes').map((r) => JSON.parse(r.body));
+    const survivors = (await db.all('SELECT body FROM episodes')).map((r) => JSON.parse(r.body));
     const kept = new Set(survivors.flatMap((e) => e.steps));
     for (const step of doomedSteps) {
       if (kept.has(step)) continue;
-      removed.labels += db.run('DELETE FROM labels WHERE subject_id = ?', [step]).changes;
-      removed.steps += db.run('DELETE FROM steps WHERE step_id = ?', [step]).changes;
+      removed.labels += (await db.run('DELETE FROM labels WHERE subject_id = ?', [step])).changes;
+      removed.steps += (await db.run('DELETE FROM steps WHERE step_id = ?', [step])).changes;
     }
     // Sessions no surviving episode references go entirely, with their frames.
     const liveSessions = new Set(survivors.flatMap((e) => e.segments.map((s) => s.session_id)));
     for (const session of sessions) {
       if (liveSessions.has(session)) continue;
-      for (const a of db.all('SELECT artifact_id FROM artifacts WHERE session_id = ?', [session])) {
-        files.push(artifactPath(a.artifact_id));
-        db.run(
-          'INSERT OR REPLACE INTO tombstones (subject_id, kind, deleted_at, request_id) VALUES (?, ?, ?, ?)',
+      for (const a of await db.all('SELECT artifact_id FROM artifacts WHERE session_id = ?', [
+        session,
+      ])) {
+        files.push(artifactKey(a.artifact_id));
+        await db.run(
+          'INSERT INTO tombstones (subject_id, kind, deleted_at, request_id) VALUES (?, ?, ?, ?) ON CONFLICT (subject_id) DO UPDATE SET kind = excluded.kind, deleted_at = excluded.deleted_at, request_id = excluded.request_id',
           [a.artifact_id, 'artifact', iso(), requestId],
         );
       }
-      removed.artifacts += db.run('DELETE FROM artifacts WHERE session_id = ?', [session]).changes;
-      removed.observations += db.run('DELETE FROM observations WHERE session_id = ?', [
-        session,
-      ]).changes;
-      removed.steps += db.run('DELETE FROM steps WHERE session_id = ?', [session]).changes;
-      removed.sessions += db.run('DELETE FROM sessions WHERE session_id = ?', [session]).changes;
+      removed.artifacts += (
+        await db.run('DELETE FROM artifacts WHERE session_id = ?', [session])
+      ).changes;
+      removed.observations += (
+        await db.run('DELETE FROM observations WHERE session_id = ?', [session])
+      ).changes;
+      removed.steps += (await db.run('DELETE FROM steps WHERE session_id = ?', [session])).changes;
+      removed.sessions += (
+        await db.run('DELETE FROM sessions WHERE session_id = ?', [session])
+      ).changes;
     }
     return { removed, versions, exports, files };
   };
-  const finishDeletion = (actor, scope, result) => {
-    for (const file of result.files) rmSync(file, { force: true });
+  const finishDeletion = async (actor, scope, result) => {
+    for (const key of result.files) await blobs.del(key);
     const report = {
       removed: result.removed,
       active_store: 'removed',
@@ -409,57 +446,56 @@ export async function openTraining({
         ...x,
         note: 'An exported copy is outside W3BS. It cannot be recalled or erased from here.',
       })),
-      backups:
-        'The local store keeps no backups. Copies made by your own backup tools are outside W3BS.',
+      backups: backupsNote,
       external_providers: [],
       model_weights:
         'No training jobs have run from this store. Completed external training cannot be unlearned.',
     };
-    db.run(
+    await db.run(
       'INSERT INTO deletion_requests (request_id, created_at, actor, scope, report) VALUES (?, ?, ?, ?, ?)',
       [result.requestId, iso(), who(actor), JSON.stringify(scope), JSON.stringify(report)],
     );
-    audit(actor, 'delete', result.requestId, { scope, removed: result.removed });
+    await audit(actor, 'delete', result.requestId, { scope, removed: result.removed });
     return { request_id: result.requestId, ...report };
   };
 
   // --------------------------------------------------------------- retention
-  const gc = () => {
-    const cfg = config().retention;
+  const gc = async () => {
+    const cfg = (await config()).retention;
     const nowMs = now().getTime();
     const before = (days) => new Date(nowMs - days * DAY).toISOString();
-    const stale = db.all(
+    const stale = await db.all(
       "SELECT episode_id FROM episodes WHERE pinned = 0 AND ((state = 'review_required' AND created_at < ?) OR (state = 'reviewed' AND updated_at < ?))",
       [before(cfg.unreviewed_days), before(cfg.approved_days)],
     );
     let result = { removed: { episodes: 0 } };
     if (stale.length) {
       const requestId = newId('del');
-      result = db.transaction(() => ({
-        ...purge(
+      result = await db.transaction(async () => ({
+        ...(await purge(
           stale.map((r) => r.episode_id),
           requestId,
-        ),
+        )),
         requestId,
       }));
-      finishDeletion({ kind: 'system', id: 'retention' }, { retention: true }, result);
+      await finishDeletion({ kind: 'system', id: 'retention' }, { retention: true }, result);
     }
-    db.run('DELETE FROM audit WHERE at < ?', [before(cfg.audit_days)]);
+    await db.run('DELETE FROM audit WHERE at < ?', [before(cfg.audit_days)]);
     let quarantined = 0;
-    for (const row of db.all(
+    for (const row of await db.all(
       "SELECT import_id FROM imports WHERE status IN ('received', 'previewed') AND received_at < ?",
       [before(cfg.quarantine_days)],
     )) {
-      rmSync(quarantineDir(row.import_id), { recursive: true, force: true });
-      db.run("UPDATE imports SET status = 'expired' WHERE import_id = ?", [row.import_id]);
+      await blobs.delPrefix(`quarantine/${row.import_id}`);
+      await db.run("UPDATE imports SET status = 'expired' WHERE import_id = ?", [row.import_id]);
       quarantined += 1;
     }
     return { expired_episodes: result.removed.episodes, expired_imports: quarantined };
   };
 
   // Retrieval authorisation: which released episodes may this consumer see?
-  const authorizedEpisodes = (consumer, datasetId) =>
-    db.all(
+  const authorizedEpisodes = async (consumer, datasetId) =>
+    await db.all(
       `SELECT DISTINCT ve.episode_id, ve.dataset_id, ve.version, ve.body, dv.digest, g.purpose
          FROM grants g
          JOIN dataset_versions dv ON dv.dataset_id = g.dataset_id AND dv.version = g.version AND dv.state = 'released'
@@ -471,13 +507,13 @@ export async function openTraining({
       datasetId ? [consumer, iso(), datasetId] : [consumer, iso()],
     );
 
-  const admission = (row, purpose) => {
+  const admission = async (row, purpose) => {
     const reasons = [];
     const e = row.body;
     if (row.state === 'discarded') reasons.push('discarded');
     if (e.goal.status !== 'confirmed') reasons.push('goal not confirmed by a person');
     if (e.outcome.status !== 'confirmed') reasons.push('outcome not confirmed by a person');
-    if (purpose !== 'human_review' && openWarnings(row.episode_id).some((w) => w.blocking))
+    if (purpose !== 'human_review' && (await openWarnings(row.episode_id)).some((w) => w.blocking))
       reasons.push('open privacy warnings');
     if (RIGHTS_REQUIRED.has(purpose)) {
       if (row.rights.source_rights === 'unknown') reasons.push('source rights unknown');
@@ -494,7 +530,7 @@ export async function openTraining({
   };
 
   // Per-profile eligibility of each step for action supervision.
-  const stepSupervision = (step) => {
+  const stepSupervision = async (step) => {
     const reasons = [];
     if (step.alignment.status !== 'verified') reasons.push('before/after alignment not verified');
     if (step.action.origin !== 'human') reasons.push(`actor origin ${step.action.origin}`);
@@ -506,7 +542,9 @@ export async function openTraining({
     if (!step.observation_before) reasons.push('no pre-action observation');
     else {
       const obs = parse(
-        db.get('SELECT body FROM observations WHERE observation_id = ?', [step.observation_before]),
+        await db.get('SELECT body FROM observations WHERE observation_id = ?', [
+          step.observation_before,
+        ]),
       );
       if (!obs?.pre_action_verified) reasons.push('pre-action frame not verified');
     }
@@ -519,16 +557,18 @@ export async function openTraining({
     return reasons;
   };
 
-  const readiness = (rows) => {
+  const readiness = async (rows) => {
     const purposes = {};
     for (const purpose of PURPOSES)
-      purposes[purpose] = rows.filter((r) => admission(r, purpose).length === 0).length;
+      purposes[purpose] = (
+        await filterSeries(rows, async (r) => (await admission(r, purpose)).length === 0)
+      ).length;
     let steps = 0;
     let supervised = 0;
     for (const r of rows) {
-      for (const s of stepsOf(r.body)) {
+      for (const s of await stepsOf(r.body)) {
         steps += 1;
-        if (!stepSupervision(s).length) supervised += 1;
+        if (!(await stepSupervision(s)).length) supervised += 1;
       }
     }
     return {
@@ -547,35 +587,71 @@ export async function openTraining({
     };
   };
 
-  const versionRow = (datasetId, version) => {
-    const row = db.get('SELECT * FROM dataset_versions WHERE dataset_id = ? AND version = ?', [
-      datasetId,
-      Number(version),
-    ]);
+  const versionRow = async (datasetId, version) => {
+    const row = await db.get(
+      'SELECT * FROM dataset_versions WHERE dataset_id = ? AND version = ?',
+      [datasetId, Number(version)],
+    );
     if (!row) throw error('NOT_FOUND', `Dataset ${datasetId} has no version ${version}.`, 404);
     return { ...row, body: JSON.parse(row.body) };
   };
-  const datasetRow = (id) => {
-    const row = db.get('SELECT * FROM datasets WHERE dataset_id = ?', [id]);
+  const datasetRow = async (id) => {
+    const row = await db.get('SELECT * FROM datasets WHERE dataset_id = ?', [id]);
     if (!row) throw error('NOT_FOUND', `Dataset ${id} was not found.`, 404);
     return { ...row, metadata: JSON.parse(row.metadata) };
   };
   // Episodes of a version with their snapshot bodies; deleted ones are gone.
-  const versionRows = (datasetId, version) =>
-    db
-      .all(
-        'SELECT episode_id, body FROM version_episodes WHERE dataset_id = ? AND version = ? ORDER BY episode_id',
-        [datasetId, version],
-      )
-      .filter((r) => db.get('SELECT 1 FROM episodes WHERE episode_id = ?', [r.episode_id]))
-      .map((r) => ({ ...episodeRow(r.episode_id), body: JSON.parse(r.body) }));
-  const approvedPurposes = (datasetId, version) =>
-    db
-      .all('SELECT purpose FROM version_purposes WHERE dataset_id = ? AND version = ?', [
+  const versionRows = async (datasetId, version) => {
+    const rows = await db.all(
+      'SELECT episode_id, body FROM version_episodes WHERE dataset_id = ? AND version = ? ORDER BY episode_id',
+      [datasetId, version],
+    );
+    const live = await filterSeries(rows, (r) =>
+      db.get('SELECT 1 FROM episodes WHERE episode_id = ?', [r.episode_id]),
+    );
+    return mapSeries(live, async (r) => ({
+      ...(await episodeRow(r.episode_id)),
+      body: JSON.parse(r.body),
+    }));
+  };
+  const approvedPurposes = async (datasetId, version) =>
+    (
+      await db.all('SELECT purpose FROM version_purposes WHERE dataset_id = ? AND version = ?', [
         datasetId,
         version,
       ])
-      .map((r) => r.purpose);
+    ).map((r) => r.purpose);
+
+  // Sessions, observations and steps behind a set of episode rows (for bundles).
+  const collectRows = async (rows) => {
+    const sessions = new Map();
+    const observations = new Map();
+    const steps = [];
+    for (const r of rows) {
+      for (const seg of r.body.segments)
+        sessions.set(seg.session_id, await sessionOf(seg.session_id));
+      steps.push(...(await stepsOf(r.body)));
+    }
+    for (const sid of sessions.keys())
+      for (const x of await db.all('SELECT body FROM observations WHERE session_id = ?', [sid])) {
+        const o = JSON.parse(x.body);
+        observations.set(o.observation_id, o);
+      }
+    return {
+      sessions: [...sessions.values()].filter(Boolean),
+      observations: [...observations.values()],
+      steps,
+    };
+  };
+  const artifactRecords = async (observations) => {
+    const out = [];
+    for (const o of observations) {
+      if (!o.artifact_id) continue;
+      const row = await db.get('SELECT body FROM artifacts WHERE artifact_id = ?', [o.artifact_id]);
+      if (row) out.push(parse(row));
+    }
+    return out;
+  };
 
   // Semantic step summary for retrieval and workflows: no coordinates, no text values.
   const describeStep = (s, n) => ({
@@ -604,36 +680,35 @@ export async function openTraining({
     gc,
 
     async status() {
-      const count = (sql, params = []) => db.get(sql, params).n;
+      const count = async (sql, params = []) => Number((await db.get(sql, params)).n);
       const byState = Object.fromEntries(
-        db
-          .all('SELECT state, COUNT(*) AS n FROM episodes GROUP BY state')
-          .map((r) => [r.state, r.n]),
+        (await db.all('SELECT state, COUNT(*) AS n FROM episodes GROUP BY state')).map((r) => [
+          r.state,
+          Number(r.n),
+        ]),
       );
-      let bytes = 0;
-      for (const name of readdirSync(resolve(home, 'artifacts')))
-        bytes += statSync(resolve(home, 'artifacts', name)).size;
+      const bytes = await blobs.totalBytes('artifacts');
       return {
         version: VERSION,
         schema_version: SCHEMA_VERSION,
-        home,
+        home: home ?? null,
         key_store: keys.mode,
-        agent_access: meta('agent_access', 'on'),
+        agent_access: await meta('agent_access', 'on'),
         episodes: byState,
         pending_review: byState.review_required ?? 0,
-        review_budget: config().review_budget,
-        datasets: count('SELECT COUNT(*) AS n FROM datasets'),
-        released_versions: count(
+        review_budget: (await config()).review_budget,
+        datasets: await count('SELECT COUNT(*) AS n FROM datasets'),
+        released_versions: await count(
           "SELECT COUNT(*) AS n FROM dataset_versions WHERE state = 'released'",
         ),
-        active_grants: count(
+        active_grants: await count(
           'SELECT COUNT(*) AS n FROM grants WHERE revoked_at IS NULL AND expires_at > ?',
           [iso()],
         ),
-        pending_approvals: count(
+        pending_approvals: await count(
           "SELECT COUNT(*) AS n FROM approval_requests WHERE status = 'pending'",
         ),
-        runs_to_review: count(
+        runs_to_review: await count(
           "SELECT COUNT(*) AS n FROM runs WHERE review_state = 'review_required'",
         ),
         artifact_bytes: bytes,
@@ -652,16 +727,15 @@ export async function openTraining({
       const buffer = data ?? readFileSync(path);
       const importId = newId('imp');
       keys.key(); // fail before receiving anything when no protected key exists
-      db.run(
+      await db.run(
         'INSERT INTO imports (import_id, status, kind, filename, received_at, actor) VALUES (?, ?, ?, ?, ?, ?)',
         [importId, 'received', 'unknown', name.slice(0, 200), iso(), who(actor)],
       );
-      const dir = quarantineDir(importId);
-      mkdirSync(dir, { recursive: true, mode: 0o700 });
-      writeFileSync(resolve(dir, 'raw.bin'), encrypt(keys.key(), buffer, `${importId}:raw`), {
-        mode: 0o600,
-      });
-      db.run("UPDATE imports SET status = 'quarantined' WHERE import_id = ?", [importId]);
+      await blobs.put(
+        quarantineKey(importId, 'raw.bin'),
+        encrypt(keys.key(), buffer, `${importId}:raw`),
+      );
+      await db.run("UPDATE imports SET status = 'quarantined' WHERE import_id = ?", [importId]);
       let stage;
       const ext = extname(name).toLowerCase();
       try {
@@ -682,12 +756,12 @@ export async function openTraining({
             415,
           );
       } catch (cause) {
-        rmSync(dir, { recursive: true, force: true });
-        db.run("UPDATE imports SET status = 'rejected', error = ? WHERE import_id = ?", [
+        await blobs.delPrefix(`quarantine/${importId}`);
+        await db.run("UPDATE imports SET status = 'rejected', error = ? WHERE import_id = ?", [
           JSON.stringify({ code: cause.code, message: cause.message, details: cause.details }),
           importId,
         ]);
-        audit(actor, 'import.rejected', importId, { code: cause.code });
+        await audit(actor, 'import.rejected', importId, { code: cause.code });
         throw cause;
       }
       if (rights) stage.rights = Rights.parse(rights);
@@ -699,23 +773,21 @@ export async function openTraining({
           data: a.data.toString('base64'),
         })),
       };
-      writeFileSync(
-        resolve(dir, 'stage.bin'),
+      await blobs.put(
+        quarantineKey(importId, 'stage.bin'),
         encrypt(keys.key(), Buffer.from(JSON.stringify(serialisable)), `${importId}:stage`),
-        { mode: 0o600 },
       );
-      rmSync(resolve(dir, 'raw.bin'), { force: true });
-      db.run("UPDATE imports SET status = 'previewed', kind = ?, preview = ? WHERE import_id = ?", [
-        stage.kind,
-        JSON.stringify(stage.preview),
-        importId,
-      ]);
-      audit(actor, 'import.previewed', importId, stage.preview.counts);
+      await blobs.del(quarantineKey(importId, 'raw.bin'));
+      await db.run(
+        "UPDATE imports SET status = 'previewed', kind = ?, preview = ? WHERE import_id = ?",
+        [stage.kind, JSON.stringify(stage.preview), importId],
+      );
+      await audit(actor, 'import.previewed', importId, stage.preview.counts);
       return { import_id: importId, status: 'previewed', preview: stage.preview };
     },
 
     async getImport(importId) {
-      const row = db.get('SELECT * FROM imports WHERE import_id = ?', [importId]);
+      const row = await db.get('SELECT * FROM imports WHERE import_id = ?', [importId]);
       if (!row) throw error('NOT_FOUND', `Import ${importId} was not found.`, 404);
       return {
         ...row,
@@ -725,7 +797,7 @@ export async function openTraining({
     },
 
     async listImports() {
-      return db.all(
+      return await db.all(
         'SELECT import_id, status, kind, filename, received_at, committed_at FROM imports ORDER BY received_at DESC LIMIT 100',
       );
     },
@@ -733,36 +805,35 @@ export async function openTraining({
     // Publishes a previewed stage in one transaction. Artifacts are sealed to
     // disk first and removed again if the metadata commit fails.
     async commitImport(importId, actor) {
-      const row = db.get('SELECT * FROM imports WHERE import_id = ?', [importId]);
+      const row = await db.get('SELECT * FROM imports WHERE import_id = ?', [importId]);
       if (!row) throw error('NOT_FOUND', `Import ${importId} was not found.`, 404);
       if (row.status === 'committed')
         return { import_id: importId, status: 'committed', idempotent: true };
       if (row.status !== 'previewed')
         throw error('IMPORT_NOT_READY', `Import ${importId} is ${row.status}.`, 409);
-      const dir = quarantineDir(importId);
+      const sealedStage = await blobs.get(quarantineKey(importId, 'stage.bin'));
+      if (!sealedStage) throw error('IMPORT_NOT_READY', `Import ${importId} has expired.`, 409);
       const stage = JSON.parse(
-        decrypt(keys.key(), readFileSync(resolve(dir, 'stage.bin')), `${importId}:stage`).toString(
-          'utf8',
-        ),
+        decrypt(keys.key(), sealedStage, `${importId}:stage`).toString('utf8'),
       );
       const written = [];
       try {
         for (const a of stage.artifacts) {
           if (
-            existsSync(artifactPath(a.record.artifact_id)) ||
-            db.get('SELECT 1 FROM tombstones WHERE subject_id = ?', [a.record.artifact_id])
+            (await blobs.has(artifactKey(a.record.artifact_id))) ||
+            (await db.get('SELECT 1 FROM tombstones WHERE subject_id = ?', [a.record.artifact_id]))
           )
             throw error(
               'IMPORT_CONFLICT',
               `Artifact ${a.record.artifact_id} already exists or was deleted. Was this bundle imported before?`,
               409,
             );
-          putArtifact(a.record.artifact_id, Buffer.from(a.data, 'base64'));
-          written.push(artifactPath(a.record.artifact_id));
+          await putArtifact(a.record.artifact_id, Buffer.from(a.data, 'base64'));
+          written.push(artifactKey(a.record.artifact_id));
         }
-        const result = db.transaction(() => {
+        const result = await db.transaction(async () => {
           for (const s of stage.sessions)
-            db.run(
+            await db.run(
               'INSERT INTO sessions (session_id, import_id, started_at, profile, body) VALUES (?, ?, ?, ?, ?)',
               [s.session_id, importId, s.started_at, s.capture_profile, JSON.stringify(s)],
             );
@@ -771,7 +842,7 @@ export async function openTraining({
           for (const o of stage.observations) {
             const at = wallFor(sessions.get(o.session_id), o.monotonic_ns);
             observationTime.set(o.observation_id, at);
-            db.run(
+            await db.run(
               'INSERT INTO observations (observation_id, session_id, monotonic_ns, captured_at, artifact_id, body) VALUES (?, ?, ?, ?, ?, ?)',
               [
                 o.observation_id,
@@ -785,7 +856,7 @@ export async function openTraining({
           }
           for (const a of stage.artifacts) {
             const owner = stage.observations.find((o) => o.artifact_id === a.record.artifact_id);
-            db.run(
+            await db.run(
               'INSERT INTO artifacts (artifact_id, session_id, media_type, bytes, captured_at, body) VALUES (?, ?, ?, ?, ?, ?)',
               [
                 a.record.artifact_id,
@@ -798,7 +869,7 @@ export async function openTraining({
             );
           }
           for (const s of stage.steps)
-            db.run(
+            await db.run(
               'INSERT INTO steps (step_id, session_id, sequence, monotonic_ns, captured_at, body) VALUES (?, ?, ?, ?, ?, ?)',
               [
                 s.step_id,
@@ -810,7 +881,7 @@ export async function openTraining({
               ],
             );
           for (const e of stage.episodes) {
-            if (db.get('SELECT 1 FROM tombstones WHERE subject_id = ?', [e.episode_id]))
+            if (await db.get('SELECT 1 FROM tombstones WHERE subject_id = ?', [e.episode_id]))
               throw error(
                 'IMPORT_CONFLICT',
                 `Episode ${e.episode_id} was deleted here; a deletion tombstone blocks re-import.`,
@@ -822,15 +893,15 @@ export async function openTraining({
               goal: { ...e.goal, status: e.goal.status === 'rejected' ? 'rejected' : 'proposed' },
               outcome: { ...e.outcome, status: 'proposed' },
             };
-            insertEpisode(body, { importId, rights: stage.rights });
-            addRevision({ kind: 'episode', id: e.episode_id }, 'goal', body.goal.value, {
+            await insertEpisode(body, { importId, rights: stage.rights });
+            await addRevision({ kind: 'episode', id: e.episode_id }, 'goal', body.goal.value, {
               source: e.goal.source,
               status: 'proposed',
               author: { kind: 'import', id: importId },
             });
           }
           for (const l of stage.labels)
-            db.run(
+            await db.run(
               'INSERT INTO labels (revision_id, subject_kind, subject_id, field_path, status, source, created_at, body) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
               [
                 l.revision_id,
@@ -844,28 +915,26 @@ export async function openTraining({
               ],
             );
           for (const w of stage.warnings)
-            db.run('INSERT INTO warnings (episode_id, kind, path, blocking) VALUES (?, ?, ?, ?)', [
-              w.episode_id,
-              w.kind,
-              w.path,
-              w.blocking ? 1 : 0,
-            ]);
-          db.run("UPDATE imports SET status = 'committed', committed_at = ? WHERE import_id = ?", [
-            iso(),
-            importId,
-          ]);
-          audit(actor, 'import.committed', importId, { episodes: stage.episodes.length });
+            await db.run(
+              'INSERT INTO warnings (episode_id, kind, path, blocking) VALUES (?, ?, ?, ?)',
+              [w.episode_id, w.kind, w.path, w.blocking ? 1 : 0],
+            );
+          await db.run(
+            "UPDATE imports SET status = 'committed', committed_at = ? WHERE import_id = ?",
+            [iso(), importId],
+          );
+          await audit(actor, 'import.committed', importId, { episodes: stage.episodes.length });
           return {
             import_id: importId,
             status: 'committed',
             episodes: stage.episodes.map((e) => e.episode_id),
           };
         });
-        rmSync(dir, { recursive: true, force: true });
+        await blobs.delPrefix(`quarantine/${importId}`);
         return result;
       } catch (cause) {
-        for (const file of written) rmSync(file, { force: true });
-        if (/UNIQUE constraint/.test(cause.message))
+        for (const key of written) await blobs.del(key);
+        if (/UNIQUE constraint|duplicate key value/.test(cause.message))
           throw error(
             'IMPORT_CONFLICT',
             'These records already exist in this store. Was this bundle imported before?',
@@ -877,19 +946,21 @@ export async function openTraining({
 
     // ---------------------------------------------------------------- review
     async inbox({ limit, all = false } = {}) {
-      const budget = all ? 500 : Math.min(limit ?? config().review_budget, 100);
-      const rows = db
-        .all("SELECT * FROM episodes WHERE state = 'review_required'")
-        .map((r) => ({ ...r, body: JSON.parse(r.body) }));
-      const reviewedFamilies = new Set(
-        db
-          .all("SELECT family FROM episodes WHERE state = 'reviewed' AND family IS NOT NULL")
-          .map((r) => r.family),
+      const budget = all ? 500 : Math.min(limit ?? (await config()).review_budget, 100);
+      const rows = (await db.all("SELECT * FROM episodes WHERE state = 'review_required'")).map(
+        (r) => ({ ...r, body: JSON.parse(r.body) }),
       );
-      const cards = rows.map((row) => {
+      const reviewedFamilies = new Set(
+        (
+          await db.all(
+            "SELECT family FROM episodes WHERE state = 'reviewed' AND family IS NOT NULL",
+          )
+        ).map((r) => r.family),
+      );
+      const cards = await mapSeries(rows, async (row) => {
         const e = row.body;
-        const warnings = openWarnings(row.episode_id);
-        const steps = stepsOf(e);
+        const warnings = await openWarnings(row.episode_id);
+        const steps = await stepsOf(e);
         const uncertain = steps.filter(
           (s) => s.alignment.status !== 'verified' || s.action.status !== 'confirmed',
         ).length;
@@ -937,10 +1008,10 @@ export async function openTraining({
       cards.sort(
         (a, b) => b.priority - a.priority || a.captured_from.localeCompare(b.captured_from),
       );
-      const runs = db.all(
+      const runs = await db.all(
         "SELECT run_id, consumer, outcome, created_at FROM runs WHERE review_state = 'review_required' ORDER BY created_at DESC LIMIT 20",
       );
-      const approvals = db.all(
+      const approvals = await db.all(
         "SELECT request_id, requested_by, kind, created_at FROM approval_requests WHERE status = 'pending' ORDER BY created_at",
       );
       return {
@@ -953,18 +1024,19 @@ export async function openTraining({
     },
 
     async getEpisode(id) {
-      const row = episodeRow(id);
-      const steps = stepsOf(row.body);
+      const row = await episodeRow(id);
+      const steps = await stepsOf(row.body);
       const sessions = [...new Set(row.body.segments.map((s) => s.session_id))];
       const referenced = new Set(
         steps.flatMap((s) => [s.observation_before, s.observation_after]).filter(Boolean),
       );
       const observations = sessions.length
-        ? db
-            .all(
+        ? (
+            await db.all(
               `SELECT body FROM observations WHERE session_id IN (${sessions.map(() => '?').join(',')}) ORDER BY monotonic_ns`,
               sessions,
             )
+          )
             .map((r) => JSON.parse(r.body))
             .filter(
               (o) =>
@@ -987,40 +1059,40 @@ export async function openTraining({
         captured_to: row.captured_to,
         steps,
         observations,
-        gaps: sessions.flatMap((id) => sessionOf(id)?.gaps ?? []),
-        labels: db
-          .all('SELECT body FROM labels WHERE subject_id = ? ORDER BY created_at', [id])
-          .map((r) => JSON.parse(r.body)),
-        warnings: db.all(
+        gaps: (await mapSeries(sessions, async (sid) => (await sessionOf(sid))?.gaps ?? [])).flat(),
+        labels: (
+          await db.all('SELECT body FROM labels WHERE subject_id = ? ORDER BY created_at', [id])
+        ).map((r) => JSON.parse(r.body)),
+        warnings: await db.all(
           'SELECT warning_id, kind, path, blocking, resolved_at, resolved_by FROM warnings WHERE episode_id = ?',
           [id],
         ),
-        datasets: db
-          .all('SELECT dataset_id FROM dataset_members WHERE episode_id = ?', [id])
-          .map((r) => r.dataset_id),
+        datasets: (
+          await db.all('SELECT dataset_id FROM dataset_members WHERE episode_id = ?', [id])
+        ).map((r) => r.dataset_id),
       };
     },
 
     async listEpisodes({ state, limit = 100 } = {}) {
-      return db
-        .all(
+      return (
+        await db.all(
           `SELECT episode_id, state, profile, family, captured_from, revision, body FROM episodes ${state ? 'WHERE state = ?' : ''} ORDER BY captured_from DESC LIMIT ?`,
           state ? [state, Math.min(limit, 1000)] : [Math.min(limit, 1000)],
         )
-        .map((r) => {
-          const e = JSON.parse(r.body);
-          return {
-            episode_id: r.episode_id,
-            state: r.state,
-            profile: r.profile,
-            family: r.family,
-            captured_from: r.captured_from,
-            revision: r.revision,
-            goal: e.goal.value,
-            outcome: e.outcome.value,
-            steps: e.steps.length,
-          };
-        });
+      ).map((r) => {
+        const e = JSON.parse(r.body);
+        return {
+          episode_id: r.episode_id,
+          state: r.state,
+          profile: r.profile,
+          family: r.family,
+          captured_from: r.captured_from,
+          revision: r.revision,
+          goal: e.goal.value,
+          outcome: e.outcome.value,
+          steps: e.steps.length,
+        };
+      });
     },
 
     // decision: complete | partial | failed | interrupted | unknown | rename |
@@ -1039,12 +1111,15 @@ export async function openTraining({
       } = input;
       if (decision === 'discard') {
         const requestId = newId('del');
-        const result = db.transaction(() => ({ ...purge([id], requestId), requestId }));
+        const result = await db.transaction(async () => ({
+          ...(await purge([id], requestId)),
+          requestId,
+        }));
         if (!result.removed.episodes) throw error('NOT_FOUND', `Episode ${id} was not found.`, 404);
-        return { discarded: id, deletion: finishDeletion(actor, { discard: id }, result) };
+        return { discarded: id, deletion: await finishDeletion(actor, { discard: id }, result) };
       }
-      return db.transaction(() => {
-        const row = episodeRow(id);
+      return await db.transaction(async () => {
+        const row = await episodeRow(id);
         const body = structuredClone(row.body);
         const author = { kind: 'human', id: actor.id };
         const outcomes = {
@@ -1062,7 +1137,7 @@ export async function openTraining({
             status: 'confirmed',
             evidence_type: evidence_type ?? 'human_assertion',
           };
-          addRevision({ kind: 'episode', id }, 'outcome', outcomes[decision], {
+          await addRevision({ kind: 'episode', id }, 'outcome', outcomes[decision], {
             source: 'human',
             status: 'confirmed',
             author,
@@ -1071,7 +1146,7 @@ export async function openTraining({
           if (!goal || typeof goal !== 'string')
             throw error('INVALID_INPUT', 'rename needs a goal.');
         } else if (decision === 'clear_privacy') {
-          db.run(
+          await db.run(
             'UPDATE warnings SET resolved_at = ?, resolved_by = ? WHERE episode_id = ? AND resolved_at IS NULL',
             [iso(), actor.id, id],
           );
@@ -1083,7 +1158,7 @@ export async function openTraining({
         } else if (decision === 'family') {
           body.workflow_family = String(family ?? '').slice(0, 200) || undefined;
         } else if (decision === 'pin' || decision === 'unpin') {
-          db.run('UPDATE episodes SET pinned = ? WHERE episode_id = ?', [
+          await db.run('UPDATE episodes SET pinned = ? WHERE episode_id = ?', [
             decision === 'pin' ? 1 : 0,
             id,
           ]);
@@ -1094,7 +1169,7 @@ export async function openTraining({
           if (findings.some((f) => f.blocking))
             throw error('PRIVACY_BLOCKED', 'The goal looks like it contains a secret.', 422);
           body.goal = { ...body.goal, value, source: 'human', status: 'confirmed' };
-          addRevision({ kind: 'episode', id }, 'goal', value, {
+          await addRevision({ kind: 'episode', id }, 'goal', value, {
             source: 'human',
             status: 'confirmed',
             author,
@@ -1103,15 +1178,15 @@ export async function openTraining({
         if (explanation !== undefined) {
           // A person's own words; never generated.
           body.explanation = { text: String(explanation).slice(0, 8000), author: 'human' };
-          addRevision({ kind: 'episode', id }, 'explanation', body.explanation.text, {
+          await addRevision({ kind: 'episode', id }, 'explanation', body.explanation.text, {
             source: 'human',
             status: 'confirmed',
             author,
           });
         }
-        const saved = saveEpisode(row, body, { expectedRevision: expected_revision });
-        audit(actor, `review.${decision}`, id);
-        const after = episodeRow(id);
+        const saved = await saveEpisode(row, body, { expectedRevision: expected_revision });
+        await audit(actor, `review.${decision}`, id);
+        const after = await episodeRow(id);
         return {
           episode_id: id,
           state: after.state,
@@ -1125,15 +1200,15 @@ export async function openTraining({
     // Splits an episode before `at_step`. Raw observations are untouched.
     async split(id, { at_step, expected_revision }, actor) {
       requireHuman(actor, 'Splitting an episode');
-      return db.transaction(() => {
-        const row = episodeRow(id);
+      return await db.transaction(async () => {
+        const row = await episodeRow(id);
         const index = row.body.steps.indexOf(at_step);
         if (index <= 0)
           throw error(
             'INVALID_INPUT',
             'at_step must be a step of this episode other than the first.',
           );
-        const steps = stepsOf(row.body);
+        const steps = await stepsOf(row.body);
         const first = steps.slice(0, index);
         const second = steps.slice(index);
         const segmentsFor = (list) => {
@@ -1164,8 +1239,11 @@ export async function openTraining({
             evidence_type: 'none',
           },
         };
-        saveEpisode(row, a, { expectedRevision: expected_revision, state: 'review_required' });
-        const b = insertEpisode(
+        await saveEpisode(row, a, {
+          expectedRevision: expected_revision,
+          state: 'review_required',
+        });
+        const b = await insertEpisode(
           {
             ...row.body,
             episode_id: newId('ep'),
@@ -1177,14 +1255,12 @@ export async function openTraining({
           },
           { importId: row.import_id, rights: row.rights },
         );
-        for (const w of openWarnings(id))
-          db.run('INSERT INTO warnings (episode_id, kind, path, blocking) VALUES (?, ?, ?, ?)', [
-            b.episode_id,
-            w.kind,
-            w.path,
-            w.blocking,
-          ]);
-        audit(actor, 'review.split', id, { new_episode: b.episode_id });
+        for (const w of await openWarnings(id))
+          await db.run(
+            'INSERT INTO warnings (episode_id, kind, path, blocking) VALUES (?, ?, ?, ?)',
+            [b.episode_id, w.kind, w.path, w.blocking],
+          );
+        await audit(actor, 'review.split', id, { new_episode: b.episode_id });
         return { episodes: [id, b.episode_id] };
       });
     },
@@ -1194,11 +1270,11 @@ export async function openTraining({
       requireHuman(actor, 'Merging episodes');
       if (!Array.isArray(ids) || ids.length < 2)
         throw error('INVALID_INPUT', 'merge needs at least two episodes.');
-      return db.transaction(() => {
-        const rows = ids
-          .map(episodeRow)
-          .sort((x, y) => x.captured_from.localeCompare(y.captured_from));
-        const allSteps = rows.flatMap((r) => stepsOf(r.body));
+      return await db.transaction(async () => {
+        const rows = (await mapSeries(ids, (x) => episodeRow(x))).sort((x, y) =>
+          x.captured_from.localeCompare(y.captured_from),
+        );
+        const allSteps = (await mapSeries(rows, (r) => stepsOf(r.body))).flat();
         const rights = rows.reduce(
           (acc, r) => ({
             ...acc,
@@ -1208,7 +1284,7 @@ export async function openTraining({
           }),
           rows[0].rights,
         );
-        const merged = insertEpisode(
+        const merged = await insertEpisode(
           {
             ...rows[0].body,
             episode_id: newId('ep'),
@@ -1225,19 +1301,17 @@ export async function openTraining({
           { importId: rows[0].import_id, rights },
         );
         for (const r of rows) {
-          for (const w of openWarnings(r.episode_id))
-            db.run('INSERT INTO warnings (episode_id, kind, path, blocking) VALUES (?, ?, ?, ?)', [
-              merged.episode_id,
-              w.kind,
-              w.path,
-              w.blocking,
-            ]);
-          db.run('DELETE FROM warnings WHERE episode_id = ?', [r.episode_id]);
-          db.run('DELETE FROM episode_fts WHERE episode_id = ?', [r.episode_id]);
-          db.run('DELETE FROM dataset_members WHERE episode_id = ?', [r.episode_id]);
-          db.run('DELETE FROM episodes WHERE episode_id = ?', [r.episode_id]);
+          for (const w of await openWarnings(r.episode_id))
+            await db.run(
+              'INSERT INTO warnings (episode_id, kind, path, blocking) VALUES (?, ?, ?, ?)',
+              [merged.episode_id, w.kind, w.path, w.blocking],
+            );
+          await db.run('DELETE FROM warnings WHERE episode_id = ?', [r.episode_id]);
+          await db.run('DELETE FROM episode_fts WHERE episode_id = ?', [r.episode_id]);
+          await db.run('DELETE FROM dataset_members WHERE episode_id = ?', [r.episode_id]);
+          await db.run('DELETE FROM episodes WHERE episode_id = ?', [r.episode_id]);
         }
-        audit(actor, 'review.merge', merged.episode_id, { from: ids });
+        await audit(actor, 'review.merge', merged.episode_id, { from: ids });
         return { episode_id: merged.episode_id, merged_from: ids };
       });
     },
@@ -1252,12 +1326,12 @@ export async function openTraining({
       // An agent may only label episodes it is already allowed to retrieve.
       if (
         actor.kind !== 'human' &&
-        (meta('agent_access', 'on') === 'off' ||
-          !authorizedEpisodes(actor.id).some((e) => e.episode_id === episode_id))
+        ((await meta('agent_access', 'on')) === 'off' ||
+          !(await authorizedEpisodes(actor.id)).some((e) => e.episode_id === episode_id))
       )
         throw error('SCOPE_DENIED', `Episode ${episode_id} is not available to ${actor.id}.`, 403);
-      return db.transaction(() => {
-        const row = episodeRow(episode_id);
+      return await db.transaction(async () => {
+        const row = await episodeRow(episode_id);
         const source = actor.kind === 'human' ? 'human' : 'model_inference';
         const author = {
           kind: actor.kind === 'human' ? 'human' : 'model',
@@ -1271,13 +1345,18 @@ export async function openTraining({
             'The proposed value looks like it contains a secret.',
             422,
           );
-        const revision = addRevision({ kind: 'episode', id: episode_id }, field, clean.value, {
-          source,
-          status: 'proposed',
-          author,
-          evidence,
-          confidence,
-        });
+        const revision = await addRevision(
+          { kind: 'episode', id: episode_id },
+          field,
+          clean.value,
+          {
+            source,
+            status: 'proposed',
+            author,
+            evidence,
+            confidence,
+          },
+        );
         const body = structuredClone(row.body);
         let applied = false;
         if (field === 'workflow_family' && !body.workflow_family) {
@@ -1294,8 +1373,8 @@ export async function openTraining({
           };
           applied = true;
         }
-        if (applied) saveEpisode(row, body);
-        audit(actor, 'label.propose', episode_id, { field });
+        if (applied) await saveEpisode(row, body);
+        await audit(actor, 'label.propose', episode_id, { field });
         return {
           revision_id: revision.revision_id,
           status: 'proposed',
@@ -1309,36 +1388,45 @@ export async function openTraining({
       if (!name || typeof name !== 'string')
         throw error('INVALID_INPUT', 'A dataset needs a name.');
       const id = newId('ds');
-      db.run(
+      await db.run(
         'INSERT INTO datasets (dataset_id, name, metadata, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
         [id, name.slice(0, 200), JSON.stringify(metadata), iso(), iso()],
       );
-      audit(actor, 'dataset.create', id);
+      await audit(actor, 'dataset.create', id);
       return { dataset_id: id, name };
     },
 
     async listDatasets() {
-      return db
-        .all(
-          'SELECT dataset_id, name, created_at, updated_at FROM datasets ORDER BY created_at DESC',
-        )
-        .map((d) => ({
-          ...d,
-          episodes: db.get('SELECT COUNT(*) AS n FROM dataset_members WHERE dataset_id = ?', [
-            d.dataset_id,
-          ]).n,
-          versions: db.all(
-            'SELECT version, state FROM dataset_versions WHERE dataset_id = ? ORDER BY version',
-            [d.dataset_id],
-          ),
-        }));
+      const rows = await db.all(
+        'SELECT dataset_id, name, created_at, updated_at FROM datasets ORDER BY created_at DESC',
+      );
+      return mapSeries(rows, async (d) => ({
+        ...d,
+        episodes: Number(
+          (
+            await db.get('SELECT COUNT(*) AS n FROM dataset_members WHERE dataset_id = ?', [
+              d.dataset_id,
+            ])
+          ).n,
+        ),
+        versions: await db.all(
+          'SELECT version, state FROM dataset_versions WHERE dataset_id = ? ORDER BY version',
+          [d.dataset_id],
+        ),
+      }));
     },
 
     async inspectDataset(id) {
-      const d = datasetRow(id);
-      const members = db
-        .all('SELECT episode_id FROM dataset_members WHERE dataset_id = ?', [id])
-        .map((r) => episodeRow(r.episode_id));
+      const d = await datasetRow(id);
+      const memberIds = await db.all(
+        'SELECT episode_id FROM dataset_members WHERE dataset_id = ?',
+        [id],
+      );
+      const members = await mapSeries(memberIds, (r) => episodeRow(r.episode_id));
+      const versions = await db.all(
+        'SELECT version, state, digest, created_at, released_at, revoked_at FROM dataset_versions WHERE dataset_id = ? ORDER BY version',
+        [id],
+      );
       return {
         dataset_id: id,
         name: d.name,
@@ -1349,96 +1437,104 @@ export async function openTraining({
           goal: r.body.goal.value,
           outcome: r.body.outcome.value,
         })),
-        readiness: readiness(members),
-        versions: db
-          .all(
-            'SELECT version, state, digest, created_at, released_at, revoked_at FROM dataset_versions WHERE dataset_id = ? ORDER BY version',
-            [id],
-          )
-          .map((v) => ({ ...v, purposes: approvedPurposes(id, v.version) })),
+        readiness: await readiness(members),
+        versions: await mapSeries(versions, async (v) => ({
+          ...v,
+          purposes: await approvedPurposes(id, v.version),
+        })),
       };
     },
 
     async updateDataset(id, { name, metadata }, actor) {
-      const d = datasetRow(id);
-      db.run('UPDATE datasets SET name = ?, metadata = ?, updated_at = ? WHERE dataset_id = ?', [
-        name ? String(name).slice(0, 200) : d.name,
-        JSON.stringify(metadata ?? d.metadata),
-        iso(),
-        id,
-      ]);
-      audit(actor, 'dataset.update', id);
+      const d = await datasetRow(id);
+      await db.run(
+        'UPDATE datasets SET name = ?, metadata = ?, updated_at = ? WHERE dataset_id = ?',
+        [
+          name ? String(name).slice(0, 200) : d.name,
+          JSON.stringify(metadata ?? d.metadata),
+          iso(),
+          id,
+        ],
+      );
+      await audit(actor, 'dataset.update', id);
       return service.inspectDataset(id);
     },
 
     async addEpisodes(id, episodeIds, actor) {
-      datasetRow(id);
+      await datasetRow(id);
       for (const e of episodeIds) {
-        episodeRow(e);
-        db.run(
-          'INSERT OR IGNORE INTO dataset_members (dataset_id, episode_id, added_at) VALUES (?, ?, ?)',
+        await episodeRow(e);
+        await db.run(
+          'INSERT INTO dataset_members (dataset_id, episode_id, added_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING',
           [id, e, iso()],
         );
       }
-      audit(actor, 'dataset.add', id, { episodes: episodeIds.length });
+      await audit(actor, 'dataset.add', id, { episodes: episodeIds.length });
       return service.inspectDataset(id);
     },
 
     async removeEpisodes(id, episodeIds, actor) {
-      datasetRow(id);
+      await datasetRow(id);
       for (const e of episodeIds)
-        db.run('DELETE FROM dataset_members WHERE dataset_id = ? AND episode_id = ?', [id, e]);
-      audit(actor, 'dataset.remove', id, { episodes: episodeIds.length });
+        await db.run('DELETE FROM dataset_members WHERE dataset_id = ? AND episode_id = ?', [
+          id,
+          e,
+        ]);
+      await audit(actor, 'dataset.remove', id, { episodes: episodeIds.length });
       return service.inspectDataset(id);
     },
 
     // Deletes the collection, its versions and grants. Episodes stay.
     async deleteDataset(id, { confirm = false } = {}, actor) {
-      const d = datasetRow(id);
+      const d = await datasetRow(id);
       const plan = {
         dataset_id: id,
         name: d.name,
-        versions: db.all('SELECT version, state FROM dataset_versions WHERE dataset_id = ?', [id]),
-        grants_revoked: db.get(
-          'SELECT COUNT(*) AS n FROM grants WHERE dataset_id = ? AND revoked_at IS NULL',
-          [id],
+        versions: await db.all('SELECT version, state FROM dataset_versions WHERE dataset_id = ?', [
+          id,
+        ]),
+        grants_revoked: (
+          await db.get(
+            'SELECT COUNT(*) AS n FROM grants WHERE dataset_id = ? AND revoked_at IS NULL',
+            [id],
+          )
         ).n,
-        exports_outside_w3bs: db.all(
+        exports_outside_w3bs: await db.all(
           'SELECT export_id, destination FROM exports WHERE dataset_id = ?',
           [id],
         ),
-        episodes_kept: db.get('SELECT COUNT(*) AS n FROM dataset_members WHERE dataset_id = ?', [
-          id,
-        ]).n,
+        episodes_kept: (
+          await db.get('SELECT COUNT(*) AS n FROM dataset_members WHERE dataset_id = ?', [id])
+        ).n,
         note: 'Episodes are not deleted. Exported copies cannot be recalled.',
       };
       if (!confirm) return { dry_run: true, ...plan };
       requireHuman(actor, 'Deleting a dataset');
-      db.transaction(() => {
-        db.run('UPDATE grants SET revoked_at = ? WHERE dataset_id = ? AND revoked_at IS NULL', [
-          iso(),
-          id,
-        ]);
-        db.run('DELETE FROM datasets WHERE dataset_id = ?', [id]);
-        audit(actor, 'dataset.delete', id);
+      await db.transaction(async () => {
+        await db.run(
+          'UPDATE grants SET revoked_at = ? WHERE dataset_id = ? AND revoked_at IS NULL',
+          [iso(), id],
+        );
+        await db.run('DELETE FROM datasets WHERE dataset_id = ?', [id]);
+        await audit(actor, 'dataset.delete', id);
       });
       return { deleted: true, ...plan };
     },
 
     // Freezes current reviewed members into an immutable version.
     async createVersion(id, { episodes, seed } = {}, actor) {
-      datasetRow(id);
-      return db.transaction(() => {
+      await datasetRow(id);
+      return await db.transaction(async () => {
         const candidates =
           episodes ??
-          db
-            .all('SELECT episode_id FROM dataset_members WHERE dataset_id = ?', [id])
-            .map((r) => r.episode_id);
+          (await db.all('SELECT episode_id FROM dataset_members WHERE dataset_id = ?', [id])).map(
+            (r) => r.episode_id,
+          );
         const rows = [];
         const excluded = [];
         for (const e of candidates) {
-          const row = db.get('SELECT 1 FROM episodes WHERE episode_id = ?', [e])
-            ? episodeRow(e)
+          const row = (await db.get('SELECT 1 FROM episodes WHERE episode_id = ?', [e]))
+            ? await episodeRow(e)
             : null;
           if (!row) excluded.push({ episode_id: e, reason: 'not found' });
           else if (row.state !== 'reviewed')
@@ -1453,19 +1549,24 @@ export async function openTraining({
             excluded,
           );
         const version =
-          (db.get('SELECT MAX(version) AS v FROM dataset_versions WHERE dataset_id = ?', [id]).v ??
-            0) + 1;
+          ((
+            await db.get('SELECT MAX(version) AS v FROM dataset_versions WHERE dataset_id = ?', [
+              id,
+            ])
+          ).v ?? 0) + 1;
         const splitSeed = seed ?? `${id}:${version}`;
         const splits = computeSplits(
           rows.map((r) => ({ ...r.body, workflow_family: r.body.workflow_family })),
           splitSeed,
         );
-        const revisions = rows
-          .flatMap((r) =>
-            db
-              .all('SELECT revision_id FROM labels WHERE subject_id = ?', [r.episode_id])
-              .map((x) => x.revision_id),
+        const revisions = (
+          await mapSeries(rows, async (r) =>
+            (
+              await db.all('SELECT revision_id FROM labels WHERE subject_id = ?', [r.episode_id])
+            ).map((x) => x.revision_id),
           )
+        )
+          .flat()
           .sort();
         const core = {
           schema_version: SCHEMA_VERSION,
@@ -1488,7 +1589,7 @@ export async function openTraining({
           }),
         );
         const body = DatasetVersion.parse({ ...core, digest });
-        db.run(
+        await db.run(
           'INSERT INTO dataset_versions (dataset_id, version, state, digest, created_at, body) VALUES (?, ?, ?, ?, ?, ?)',
           [id, version, 'draft', digest, body.created_at, JSON.stringify(body)],
         );
@@ -1496,11 +1597,11 @@ export async function openTraining({
         for (const [name, list] of Object.entries(splits))
           if (Array.isArray(list)) for (const e of list) splitOf.set(e, name);
         for (const r of rows)
-          db.run(
+          await db.run(
             'INSERT INTO version_episodes (dataset_id, version, episode_id, split, body) VALUES (?, ?, ?, ?, ?)',
             [id, version, r.episode_id, splitOf.get(r.episode_id), JSON.stringify(r.body)],
           );
-        audit(actor, 'version.create', `${id}@${version}`, { episodes: rows.length });
+        await audit(actor, 'version.create', `${id}@${version}`, { episodes: rows.length });
         return {
           dataset_id: id,
           version,
@@ -1508,7 +1609,7 @@ export async function openTraining({
           state: 'draft',
           episodes: rows.length,
           excluded,
-          readiness: readiness(rows),
+          readiness: await readiness(rows),
           splits: Object.fromEntries(
             Object.entries(splits)
               .filter(([, v]) => Array.isArray(v))
@@ -1519,13 +1620,13 @@ export async function openTraining({
     },
 
     async getVersion(id, version) {
-      const v = versionRow(id, version);
+      const v = await versionRow(id, version);
       return {
         ...v.body,
         state: v.state,
         released_at: v.released_at,
         revoked_at: v.revoked_at,
-        purposes: approvedPurposes(id, v.version),
+        purposes: await approvedPurposes(id, v.version),
       };
     },
 
@@ -1533,17 +1634,17 @@ export async function openTraining({
     // version must be admissible for it.
     async approve(id, version, purposes, actor) {
       requireHuman(actor, 'Approving a dataset version for a purpose');
-      const v = versionRow(id, version);
+      const v = await versionRow(id, version);
       if (v.state === 'revoked')
         throw error('DATASET_REVOKED', `${id}@${version} is revoked.`, 409);
       for (const p of purposes)
         if (!PURPOSES.includes(p))
           throw error('INVALID_INPUT', `Unknown purpose ${p}. Use one of ${PURPOSES.join(', ')}.`);
-      const rows = versionRows(id, v.version);
+      const rows = await versionRows(id, v.version);
       const blockers = [];
       for (const p of purposes)
         for (const r of rows) {
-          const reasons = admission(r, p);
+          const reasons = await admission(r, p);
           if (reasons.length) blockers.push({ purpose: p, episode_id: r.episode_id, reasons });
         }
       if (blockers.length)
@@ -1553,51 +1654,55 @@ export async function openTraining({
           409,
           blockers,
         );
-      db.transaction(() => {
+      await db.transaction(async () => {
         for (const p of purposes)
-          db.run(
-            'INSERT OR REPLACE INTO version_purposes (dataset_id, version, purpose, approved_by, approved_at, admitted) VALUES (?, ?, ?, ?, ?, ?)',
+          await db.run(
+            'INSERT INTO version_purposes (dataset_id, version, purpose, approved_by, approved_at, admitted) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (dataset_id, version, purpose) DO UPDATE SET approved_by = excluded.approved_by, approved_at = excluded.approved_at, admitted = excluded.admitted',
             [id, v.version, p, actor.id, iso(), rows.length],
           );
-        audit(actor, 'version.approve', `${id}@${version}`, { purposes });
+        await audit(actor, 'version.approve', `${id}@${version}`, { purposes });
       });
-      return { dataset_id: id, version: v.version, purposes: approvedPurposes(id, v.version) };
+      return {
+        dataset_id: id,
+        version: v.version,
+        purposes: await approvedPurposes(id, v.version),
+      };
     },
 
     async release(id, version, actor) {
       requireHuman(actor, 'Releasing a dataset version');
-      const v = versionRow(id, version);
+      const v = await versionRow(id, version);
       if (v.state !== 'draft') throw error('INVALID_STATE', `${id}@${version} is ${v.state}.`, 409);
-      if (!approvedPurposes(id, v.version).length)
+      if (!(await approvedPurposes(id, v.version)).length)
         throw error('APPROVAL_REQUIRED', 'Approve at least one purpose before release.', 409);
-      db.run(
+      await db.run(
         "UPDATE dataset_versions SET state = 'released', released_at = ? WHERE dataset_id = ? AND version = ?",
         [iso(), id, v.version],
       );
-      audit(actor, 'version.release', `${id}@${version}`);
+      await audit(actor, 'version.release', `${id}@${version}`);
       return service.getVersion(id, version);
     },
 
     // Revocation removes future access; it does not recall exported copies.
     async revoke(id, version, actor) {
       requireHuman(actor, 'Revoking a dataset version');
-      const v = versionRow(id, version);
-      db.transaction(() => {
-        db.run(
+      const v = await versionRow(id, version);
+      await db.transaction(async () => {
+        await db.run(
           "UPDATE dataset_versions SET state = 'revoked', revoked_at = ? WHERE dataset_id = ? AND version = ?",
           [iso(), id, v.version],
         );
-        db.run(
+        await db.run(
           'UPDATE grants SET revoked_at = ? WHERE dataset_id = ? AND version = ? AND revoked_at IS NULL',
           [iso(), id, v.version],
         );
-        audit(actor, 'version.revoke', `${id}@${version}`);
+        await audit(actor, 'version.revoke', `${id}@${version}`);
       });
       return {
         dataset_id: id,
         version: v.version,
         state: 'revoked',
-        exports_outside_w3bs: db.all(
+        exports_outside_w3bs: await db.all(
           'SELECT export_id, destination FROM exports WHERE dataset_id = ? AND version = ?',
           [id, v.version],
         ),
@@ -1617,10 +1722,10 @@ export async function openTraining({
         );
       if (!RETRIEVAL_PURPOSES.includes(purpose))
         throw error('INVALID_INPUT', `purpose must be ${RETRIEVAL_PURPOSES.join(' or ')}.`);
-      const v = versionRow(dataset_id, version);
+      const v = await versionRow(dataset_id, version);
       if (v.state !== 'released')
         throw error('DATASET_NOT_RELEASED', `${dataset_id}@${version} is ${v.state}.`, 409);
-      if (!approvedPurposes(dataset_id, v.version).includes(purpose))
+      if (!(await approvedPurposes(dataset_id, v.version)).includes(purpose))
         throw error(
           'APPROVAL_REQUIRED',
           `${dataset_id}@${version} is not approved for ${purpose}.`,
@@ -1630,11 +1735,16 @@ export async function openTraining({
       const expires = new Date(
         now().getTime() + Math.min(Math.max(1, days), 365) * DAY,
       ).toISOString();
-      db.run(
+      await db.run(
         'INSERT INTO grants (grant_id, consumer, dataset_id, version, purpose, created_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [grantId, consumer, dataset_id, v.version, purpose, actor.id, iso(), expires],
       );
-      audit(actor, 'grant.create', grantId, { consumer, dataset_id, version: v.version, purpose });
+      await audit(actor, 'grant.create', grantId, {
+        consumer,
+        dataset_id,
+        version: v.version,
+        purpose,
+      });
       return {
         grant_id: grantId,
         consumer,
@@ -1646,13 +1756,13 @@ export async function openTraining({
     },
 
     async listGrants() {
-      return db.all('SELECT * FROM grants ORDER BY created_at DESC');
+      return await db.all('SELECT * FROM grants ORDER BY created_at DESC');
     },
 
     // What a consumer may retrieve from: metadata only, never episode content.
     async consumerDatasets(consumer) {
-      if (meta('agent_access', 'on') === 'off') return [];
-      return db.all(
+      if ((await meta('agent_access', 'on')) === 'off') return [];
+      return await db.all(
         `SELECT g.dataset_id, d.name, g.version, g.purpose, g.expires_at, dv.digest,
                 (SELECT COUNT(*) FROM version_episodes ve WHERE ve.dataset_id = g.dataset_id AND ve.version = g.version) AS episodes
            FROM grants g
@@ -1665,20 +1775,22 @@ export async function openTraining({
 
     async revokeGrant(grantId, actor) {
       requireHuman(actor, 'Revoking a grant');
-      const changed = db.run(
-        'UPDATE grants SET revoked_at = ? WHERE grant_id = ? AND revoked_at IS NULL',
-        [iso(), grantId],
+      const changed = (
+        await db.run('UPDATE grants SET revoked_at = ? WHERE grant_id = ? AND revoked_at IS NULL', [
+          iso(),
+          grantId,
+        ])
       ).changes;
       if (!changed) throw error('NOT_FOUND', `No active grant ${grantId}.`, 404);
-      audit(actor, 'grant.revoke', grantId);
+      await audit(actor, 'grant.revoke', grantId);
       return { grant_id: grantId, revoked: true };
     },
 
     // Workspace switch for every agent's retrieval at once.
     async setAgentAccess(on, actor) {
       requireHuman(actor, 'Changing agent access');
-      setMeta('agent_access', on ? 'on' : 'off');
-      audit(actor, 'access.set', null, { on });
+      await setMeta('agent_access', on ? 'on' : 'off');
+      await audit(actor, 'access.set', null, { on });
       return { agent_access: on ? 'on' : 'off' };
     },
 
@@ -1690,13 +1802,13 @@ export async function openTraining({
     ) {
       const name = actor.kind === 'agent' ? actor.id : consumer;
       if (!name) throw error('INVALID_INPUT', 'consumer is required.');
-      if (meta('agent_access', 'on') === 'off')
+      if ((await meta('agent_access', 'on')) === 'off')
         throw error(
           'SCOPE_DENIED',
           'Agent access to demonstrations is switched off in W3BS Training.',
           403,
         );
-      const allowed = authorizedEpisodes(name, dataset_id);
+      const allowed = await authorizedEpisodes(name, dataset_id);
       if (!allowed.length)
         throw error('SCOPE_DENIED', `No active retrieval grant for consumer ${name}.`, 403);
       const source = new Map(allowed.map((a) => [a.episode_id, a]));
@@ -1707,20 +1819,25 @@ export async function openTraining({
       const holders = ids.map(() => '?').join(',');
       let ranked;
       if (words.length) {
-        const match = words.map((w) => `"${w}"`).join(' OR ');
-        ranked = db
-          .all(
-            `SELECT episode_id, bm25(episode_fts) AS score FROM episode_fts WHERE episode_fts MATCH ? AND episode_id IN (${holders}) ORDER BY score LIMIT 50`,
-            [match, ...ids],
-          )
-          .map((r) => r.episode_id);
+        // Words are letters and digits only, so both query languages take them safely.
+        const rows =
+          db.dialect === 'postgres'
+            ? await db.all(
+                `SELECT episode_id FROM episode_fts WHERE doc @@ to_tsquery('simple', ?) AND episode_id IN (${holders}) ORDER BY ts_rank(doc, to_tsquery('simple', ?)) DESC LIMIT 50`,
+                [words.join(' | '), ...ids, words.join(' | ')],
+              )
+            : await db.all(
+                `SELECT episode_id, bm25(episode_fts) AS score FROM episode_fts WHERE episode_fts MATCH ? AND episode_id IN (${holders}) ORDER BY score LIMIT 50`,
+                [words.map((w) => `"${w}"`).join(' OR '), ...ids],
+              );
+        ranked = rows.map((r) => r.episode_id);
       } else
-        ranked = db
-          .all(
+        ranked = (
+          await db.all(
             `SELECT episode_id FROM episodes WHERE episode_id IN (${holders}) ORDER BY captured_from DESC LIMIT 50`,
             ids,
           )
-          .map((r) => r.episode_id);
+        ).map((r) => r.episode_id);
       const appFilter =
         Array.isArray(apps) && apps.length
           ? new Set(apps.map((a) => String(a).toLowerCase()))
@@ -1731,16 +1848,19 @@ export async function openTraining({
       for (const id of ranked) {
         if (out.length >= Math.min(max_episodes, 10)) break;
         // Serve the released snapshot, not later edits to the live episode.
-        const row = { ...episodeRow(id), body: JSON.parse(source.get(id).body) };
-        const steps = stepsOf(row.body);
+        const row = { ...(await episodeRow(id)), body: JSON.parse(source.get(id).body) };
+        const steps = await stepsOf(row.body);
         if (
           appFilter &&
           !steps.some((s) => appFilter.has(String(s.action.target?.app ?? '').toLowerCase()))
         )
           continue;
-        const sessionGaps = [...new Set(row.body.segments.map((s) => s.session_id))].flatMap(
-          (sid) => sessionOf(sid)?.gaps ?? [],
-        );
+        const sessionGaps = (
+          await mapSeries(
+            [...new Set(row.body.segments.map((s) => s.session_id))],
+            async (sid) => (await sessionOf(sid))?.gaps ?? [],
+          )
+        ).flat();
         const item = {
           episode_id: id,
           source: {
@@ -1793,11 +1913,11 @@ export async function openTraining({
         outcome: 'unknown',
         created_at: iso(),
       });
-      db.run(
+      await db.run(
         'INSERT INTO runs (run_id, consumer, kind, outcome, review_state, created_at, body) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [runId, name, 'retrieval', 'unknown', 'recorded', run.created_at, JSON.stringify(run)],
       );
-      audit(actor, 'retrieve', runId, { consumer: name, returned: out.length });
+      await audit(actor, 'retrieve', runId, { consumer: name, returned: out.length });
       return {
         retrieval_id: runId,
         notice:
@@ -1833,7 +1953,7 @@ export async function openTraining({
       // Failures and unknowns go to a person; nothing self-approves.
       const reviewState =
         run.outcome === 'success' && !run.unsafe_attempts ? 'recorded' : 'review_required';
-      db.run(
+      await db.run(
         'INSERT INTO runs (run_id, consumer, kind, outcome, review_state, created_at, body) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [
           run.run_id,
@@ -1845,27 +1965,26 @@ export async function openTraining({
           JSON.stringify(run),
         ],
       );
-      audit(actor, 'run.report', run.run_id, { outcome: run.outcome });
+      await audit(actor, 'run.report', run.run_id, { outcome: run.outcome });
       return { run_id: run.run_id, review_state: reviewState };
     },
 
     async listRuns({ consumer, limit = 100 } = {}) {
-      return db
-        .all(
+      return (
+        await db.all(
           `SELECT body, review_state FROM runs ${consumer ? 'WHERE consumer = ?' : ''} ORDER BY created_at DESC LIMIT ?`,
           consumer ? [consumer, limit] : [limit],
         )
-        .map((r) => ({ ...JSON.parse(r.body), review_state: r.review_state }));
+      ).map((r) => ({ ...JSON.parse(r.body), review_state: r.review_state }));
     },
 
     async reviewRun(runId, { decision }, actor) {
       requireHuman(actor, 'Reviewing a run');
       if (!['acknowledged', 'needs_dataset_fix'].includes(decision))
         throw error('INVALID_INPUT', 'decision must be acknowledged or needs_dataset_fix.');
-      const changed = db.run('UPDATE runs SET review_state = ? WHERE run_id = ?', [
-        decision,
-        runId,
-      ]).changes;
+      const changed = (
+        await db.run('UPDATE runs SET review_state = ? WHERE run_id = ?', [decision, runId])
+      ).changes;
       if (!changed) throw error('NOT_FOUND', `Run ${runId} was not found.`, 404);
       return { run_id: runId, review_state: decision };
     },
@@ -1927,9 +2046,9 @@ export async function openTraining({
     },
 
     // ---------------------------------------------------------------- export
-    async export(id, version, { format = 'bundle', purpose, out }, actor) {
+    async export(id, version, { format = 'bundle', purpose, out, download = false }, actor) {
       requireHuman(actor, 'Exporting a dataset');
-      const v = versionRow(id, version);
+      const v = await versionRow(id, version);
       if (v.state !== 'released')
         throw error(
           'DATASET_NOT_RELEASED',
@@ -1937,61 +2056,33 @@ export async function openTraining({
           409,
         );
       const wanted = purpose ?? (format === 'bundle' ? 'human_review' : 'model_training');
-      if (!approvedPurposes(id, v.version).includes(wanted))
+      if (!(await approvedPurposes(id, v.version)).includes(wanted))
         throw error('APPROVAL_REQUIRED', `${id}@${version} is not approved for ${wanted}.`, 409);
-      if (!out) throw error('INVALID_INPUT', '--out is required.');
-      const rows = versionRows(id, v.version);
+      if (!out && !download) throw error('INVALID_INPUT', '--out is required.');
+      const rows = await versionRows(id, v.version);
       const missing = v.body.episodes.length - rows.length;
       const splitOf = new Map(
-        db
-          .all(
+        (
+          await db.all(
             'SELECT episode_id, split FROM version_episodes WHERE dataset_id = ? AND version = ?',
             [id, v.version],
           )
-          .map((r) => [r.episode_id, r.split]),
+        ).map((r) => [r.episode_id, r.split]),
       );
       const files = new Map();
       const excluded = [];
       const jsonl = (list) =>
         list.map((x) => JSON.stringify(x)).join('\n') + (list.length ? '\n' : '');
-      const collect = () => {
-        const sessions = new Map();
-        const observations = new Map();
-        const steps = [];
-        for (const r of rows) {
-          for (const seg of r.body.segments)
-            sessions.set(seg.session_id, sessionOf(seg.session_id));
-          steps.push(...stepsOf(r.body));
-        }
-        for (const s of sessions.keys())
-          for (const o of db
-            .all('SELECT body FROM observations WHERE session_id = ?', [s])
-            .map((x) => JSON.parse(x.body)))
-            observations.set(o.observation_id, o);
-        return {
-          sessions: [...sessions.values()].filter(Boolean),
-          observations: [...observations.values()],
-          steps,
-        };
-      };
-      const artifactsFor = (observations) =>
-        observations
-          .filter(
-            (o) =>
-              o.artifact_id &&
-              db.get('SELECT 1 FROM artifacts WHERE artifact_id = ?', [o.artifact_id]),
-          )
-          .map((o) =>
-            parse(db.get('SELECT body FROM artifacts WHERE artifact_id = ?', [o.artifact_id])),
-          );
       if (format === 'bundle' || format === 'jsonl') {
-        const { sessions, observations, steps } = collect();
-        const artifacts = artifactsFor(observations);
-        const labels = rows.flatMap((r) =>
-          db
-            .all('SELECT body FROM labels WHERE subject_id = ?', [r.episode_id])
-            .map((x) => JSON.parse(x.body)),
-        );
+        const { sessions, observations, steps } = await collectRows(rows);
+        const artifacts = await artifactRecords(observations);
+        const labels = (
+          await mapSeries(rows, async (r) =>
+            (await db.all('SELECT body FROM labels WHERE subject_id = ?', [r.episode_id])).map(
+              (x) => JSON.parse(x.body),
+            ),
+          )
+        ).flat();
         if (format === 'bundle') {
           files.set('sessions.jsonl', jsonl(sessions));
           files.set('episodes.jsonl', jsonl(rows.map((r) => r.body)));
@@ -2002,7 +2093,7 @@ export async function openTraining({
           for (const a of artifacts)
             files.set(
               a.path.replace(/^artifacts\/.*\./, `artifacts/${a.artifact_id}.`),
-              readArtifact(a.artifact_id),
+              await readArtifact(a.artifact_id),
             );
           // Paths are rewritten to the artifact id so names never collide.
           files.set(
@@ -2018,10 +2109,10 @@ export async function openTraining({
           files.set(
             'episodes.jsonl',
             jsonl(
-              rows.map((r) => ({
+              await mapSeries(rows, async (r) => ({
                 episode: r.body,
                 split: splitOf.get(r.episode_id),
-                steps: stepsOf(r.body),
+                steps: await stepsOf(r.body),
                 labels: labels.filter((l) => l.subject.id === r.episode_id),
               })),
             ),
@@ -2040,32 +2131,34 @@ export async function openTraining({
             });
             continue;
           }
-          const steps = stepsOf(r.body);
-          steps.forEach((s, i) => {
-            const reasons = stepSupervision(s);
+          const steps = await stepsOf(r.body);
+          for (const [i, s] of steps.entries()) {
+            const reasons = await stepSupervision(s);
             if (reasons.length) {
               excluded.push({
                 episode_id: r.episode_id,
                 step_id: s.step_id,
                 reason: reasons.join('; '),
               });
-              return;
+              continue;
             }
             const before = parse(
-              db.get('SELECT body FROM observations WHERE observation_id = ?', [
+              await db.get('SELECT body FROM observations WHERE observation_id = ?', [
                 s.observation_before,
               ]),
             );
             let image = null;
             if (
               before.artifact_id &&
-              db.get('SELECT 1 FROM artifacts WHERE artifact_id = ?', [before.artifact_id])
+              (await db.get('SELECT 1 FROM artifacts WHERE artifact_id = ?', [before.artifact_id]))
             ) {
               const art = parse(
-                db.get('SELECT body FROM artifacts WHERE artifact_id = ?', [before.artifact_id]),
+                await db.get('SELECT body FROM artifacts WHERE artifact_id = ?', [
+                  before.artifact_id,
+                ]),
               );
               image = `images/${before.observation_id}.${art.path.split('.').pop()}`;
-              files.set(image, readArtifact(before.artifact_id));
+              files.set(image, await readArtifact(before.artifact_id));
             }
             examples.push({
               example_id: `${r.episode_id}:${s.step_id}`,
@@ -2089,7 +2182,7 @@ export async function openTraining({
                 ),
               },
             });
-          });
+          }
         }
         files.set('examples.jsonl', jsonl(examples));
         files.set('excluded.jsonl', jsonl(excluded));
@@ -2115,7 +2208,13 @@ export async function openTraining({
       files.set('rights.json', JSON.stringify(rows[0]?.rights ?? {}, null, 2));
       files.set(
         'DATASET.md',
-        datasetCard(datasetRow(id), v, rows, approvedPurposes(id, v.version), excluded),
+        await datasetCard(
+          await datasetRow(id),
+          v,
+          rows,
+          await approvedPurposes(id, v.version),
+          excluded,
+        ),
       );
       const manifest = {
         format: FORMAT_NAME,
@@ -2152,7 +2251,7 @@ export async function openTraining({
           dataset_id: id,
           version: v.version,
           digest: v.digest,
-          purposes: approvedPurposes(id, v.version),
+          purposes: await approvedPurposes(id, v.version),
         },
       };
       if (format === 'bundle') files.delete('transformation.json');
@@ -2165,7 +2264,12 @@ export async function openTraining({
       );
       files.set('checksums.json', JSON.stringify(checksums, null, 2));
       let destination;
-      if (format === 'bundle') {
+      let data = null;
+      if (download) {
+        // Hosted: the caller gets one zip back; nothing is written on the server.
+        data = writeZip([...files]);
+        destination = `download:${id}-v${v.version}-${format}.w3bs-training.zip`;
+      } else if (format === 'bundle') {
         destination = resolve(out.endsWith('.zip') ? out : `${out}.w3bs-training.zip`);
         if (existsSync(destination))
           throw error('EXPORT_EXISTS', `${destination} already exists.`, 409);
@@ -2179,7 +2283,7 @@ export async function openTraining({
           writeFileSync(resolve(destination, name), content, { mode: 0o600 });
       }
       const exportId = newId('exp');
-      db.run(
+      await db.run(
         'INSERT INTO exports (export_id, dataset_id, version, format, purpose, destination, created_by, created_at, episodes, body) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           exportId,
@@ -2194,7 +2298,7 @@ export async function openTraining({
           JSON.stringify(transformation),
         ],
       );
-      audit(actor, 'export', exportId, { format, destination });
+      await audit(actor, 'export', exportId, { format, destination });
       return {
         export_id: exportId,
         destination,
@@ -2202,6 +2306,7 @@ export async function openTraining({
         purpose: wanted,
         files: files.size,
         excluded: excluded.length,
+        ...(data ? { filename: destination.slice('download:'.length), data } : {}),
         warning:
           'This copy now lives outside W3BS. Disabling the desktop layer, revoking the version or deleting episodes cannot recall it or reverse anything trained from it.',
       };
@@ -2223,7 +2328,7 @@ export async function openTraining({
     // ------------------------------------------------------------- workflows
     async deriveWorkflow(episodeId, actor) {
       requireHuman(actor, 'Creating a workflow');
-      const row = episodeRow(episodeId);
+      const row = await episodeRow(episodeId);
       if (row.state !== 'reviewed' || row.body.outcome.value !== 'success')
         throw error('INVALID_STATE', 'A workflow needs a reviewed, successful episode.', 409);
       const id = newId('wf');
@@ -2232,7 +2337,7 @@ export async function openTraining({
         purpose: row.body.goal.value,
         parameters: row.body.parameters,
         prerequisites: row.body.prerequisites,
-        steps: stepsOf(row.body).map((s, i) => describeStep(s, i + 1)),
+        steps: (await stepsOf(row.body)).map((s, i) => describeStep(s, i + 1)),
         expected_result: row.body.outcome.evidence_type,
         stop_conditions: [
           'a target cannot be found on the current screen',
@@ -2244,17 +2349,17 @@ export async function openTraining({
         status: 'untested',
         note: 'A workflow is untested until a separate evaluation run passes. It grants no permission to act.',
       };
-      db.run(
+      await db.run(
         'INSERT INTO workflows (workflow_id, status, created_at, sources, body) VALUES (?, ?, ?, ?, ?)',
         [id, 'untested', iso(), JSON.stringify([episodeId]), JSON.stringify(body)],
       );
-      audit(actor, 'workflow.derive', id, { from: episodeId });
+      await audit(actor, 'workflow.derive', id, { from: episodeId });
       return body;
     },
     async listWorkflows() {
-      return db
-        .all('SELECT body FROM workflows ORDER BY created_at DESC')
-        .map((r) => JSON.parse(r.body));
+      return (await db.all('SELECT body FROM workflows ORDER BY created_at DESC')).map((r) =>
+        JSON.parse(r.body),
+      );
     },
 
     // ------------------------------------------------------------- approvals
@@ -2271,7 +2376,7 @@ export async function openTraining({
       if (!allowed.includes(kind))
         throw error('INVALID_INPUT', `kind must be one of ${allowed.join(', ')}.`);
       const id = newId('apr');
-      db.run(
+      await db.run(
         'INSERT INTO approval_requests (request_id, requested_by, kind, payload, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
         [
           id,
@@ -2282,7 +2387,7 @@ export async function openTraining({
           iso(),
         ],
       );
-      audit(actor, 'approval.request', id, { kind });
+      await audit(actor, 'approval.request', id, { kind });
       return {
         request_id: id,
         status: 'pending',
@@ -2290,20 +2395,22 @@ export async function openTraining({
       };
     },
     async listApprovals() {
-      return db
-        .all('SELECT * FROM approval_requests ORDER BY created_at DESC LIMIT 200')
-        .map((r) => ({ ...r, payload: JSON.parse(r.payload) }));
+      return (
+        await db.all('SELECT * FROM approval_requests ORDER BY created_at DESC LIMIT 200')
+      ).map((r) => ({ ...r, payload: JSON.parse(r.payload) }));
     },
     // Records the decision only. The person then performs the operation
     // themselves, so an agent's payload is never executed on approval.
     async decideApproval(id, approve, actor) {
       requireHuman(actor, 'Deciding an approval request');
-      const changed = db.run(
-        "UPDATE approval_requests SET status = ?, decided_at = ?, decided_by = ? WHERE request_id = ? AND status = 'pending'",
-        [approve ? 'approved' : 'denied', iso(), actor.id, id],
+      const changed = (
+        await db.run(
+          "UPDATE approval_requests SET status = ?, decided_at = ?, decided_by = ? WHERE request_id = ? AND status = 'pending'",
+          [approve ? 'approved' : 'denied', iso(), actor.id, id],
+        )
       ).changes;
       if (!changed) throw error('NOT_FOUND', `No pending request ${id}.`, 404);
-      audit(actor, 'approval.decide', id, { approve });
+      await audit(actor, 'approval.decide', id, { approve });
       return { request_id: id, status: approve ? 'approved' : 'denied' };
     },
 
@@ -2311,8 +2418,11 @@ export async function openTraining({
     async deleteEpisodes(ids, actor) {
       requireHuman(actor, 'Deleting episodes');
       const requestId = newId('del');
-      const result = db.transaction(() => ({ ...purge(ids, requestId), requestId }));
-      return finishDeletion(actor, { episodes: ids }, result);
+      const result = await db.transaction(async () => ({
+        ...(await purge(ids, requestId)),
+        requestId,
+      }));
+      return await finishDeletion(actor, { episodes: ids }, result);
     },
 
     // Deletes by capture time, not by what is visible: every episode that
@@ -2323,48 +2433,46 @@ export async function openTraining({
       const start = new Date(from).toISOString();
       const end = (to ? new Date(to) : now()).toISOString();
       const requestId = newId('del');
-      const result = db.transaction(() => {
-        const episodes = db
-          .all('SELECT episode_id FROM episodes WHERE captured_from <= ? AND captured_to >= ?', [
-            end,
-            start,
-          ])
-          .map((r) => r.episode_id);
-        const res = purge(episodes, requestId);
-        for (const a of db.all(
+      const result = await db.transaction(async () => {
+        const episodes = (
+          await db.all(
+            'SELECT episode_id FROM episodes WHERE captured_from <= ? AND captured_to >= ?',
+            [end, start],
+          )
+        ).map((r) => r.episode_id);
+        const res = await purge(episodes, requestId);
+        for (const a of await db.all(
           'SELECT artifact_id FROM artifacts WHERE captured_at BETWEEN ? AND ?',
           [start, end],
         )) {
-          res.files.push(artifactPath(a.artifact_id));
-          res.removed.artifacts += db.run('DELETE FROM artifacts WHERE artifact_id = ?', [
-            a.artifact_id,
-          ]).changes;
+          res.files.push(artifactKey(a.artifact_id));
+          res.removed.artifacts += (
+            await db.run('DELETE FROM artifacts WHERE artifact_id = ?', [a.artifact_id])
+          ).changes;
         }
-        res.removed.observations += db.run(
-          'DELETE FROM observations WHERE captured_at BETWEEN ? AND ?',
-          [start, end],
+        res.removed.observations += (
+          await db.run('DELETE FROM observations WHERE captured_at BETWEEN ? AND ?', [start, end])
         ).changes;
-        res.removed.steps += db.run('DELETE FROM steps WHERE captured_at BETWEEN ? AND ?', [
-          start,
-          end,
-        ]).changes;
+        res.removed.steps += (
+          await db.run('DELETE FROM steps WHERE captured_at BETWEEN ? AND ?', [start, end])
+        ).changes;
         let imports = 0;
-        for (const i of db.all(
+        for (const i of await db.all(
           "SELECT import_id FROM imports WHERE status IN ('received', 'quarantined', 'previewed') AND received_at BETWEEN ? AND ?",
           [start, end],
         )) {
-          rmSync(quarantineDir(i.import_id), { recursive: true, force: true });
-          db.run("UPDATE imports SET status = 'deleted' WHERE import_id = ?", [i.import_id]);
+          await blobs.delPrefix(`quarantine/${i.import_id}`);
+          await db.run("UPDATE imports SET status = 'deleted' WHERE import_id = ?", [i.import_id]);
           imports += 1;
         }
         res.removed.uncommitted_imports = imports;
         return { ...res, requestId };
       });
-      return finishDeletion(actor, { from: start, to: end }, result);
+      return await finishDeletion(actor, { from: start, to: end }, result);
     },
 
     async getDeletion(id) {
-      const row = db.get('SELECT * FROM deletion_requests WHERE request_id = ?', [id]);
+      const row = await db.get('SELECT * FROM deletion_requests WHERE request_id = ?', [id]);
       if (!row) throw error('NOT_FOUND', `Deletion request ${id} was not found.`, 404);
       return {
         request_id: id,
@@ -2378,28 +2486,150 @@ export async function openTraining({
     // Human-only artifact read for the local review UI.
     async artifact(id, actor) {
       requireHuman(actor, 'Viewing captured frames');
-      const row = db.get('SELECT media_type FROM artifacts WHERE artifact_id = ?', [id]);
+      const row = await db.get('SELECT media_type FROM artifacts WHERE artifact_id = ?', [id]);
       if (!row) throw error('NOT_FOUND', `Artifact ${id} was not found.`, 404);
-      return { media_type: row.media_type, data: readArtifact(id) };
+      return { media_type: row.media_type, data: await readArtifact(id) };
+    },
+
+    // --------------------------------------------------------- agent tokens
+    // Bearer tokens for agents that reach a hosted workspace over MCP. The token itself is made
+    // and shown once by the host; only its hash is stored here.
+    async addAgentToken({ consumer, tokenHash }, actor) {
+      requireHuman(actor, 'Creating an agent token');
+      if (!/^[A-Za-z0-9._-]{1,80}$/.test(consumer ?? ''))
+        throw error(
+          'INVALID_INPUT',
+          'consumer must be 1-80 letters, digits, dot, dash or underscore.',
+        );
+      await db.run(
+        'INSERT INTO agent_tokens (token_hash, consumer, created_by, created_at) VALUES (?, ?, ?, ?)',
+        [tokenHash, consumer, actor.id, iso()],
+      );
+      await audit(actor, 'agent_token.create', consumer);
+      return { id: tokenHash.slice(0, 12), consumer };
+    },
+    async agentTokenConsumer(tokenHash) {
+      const row = await db.get(
+        'SELECT consumer FROM agent_tokens WHERE token_hash = ? AND revoked_at IS NULL',
+        [tokenHash],
+      );
+      if (!row) return null;
+      await db.run('UPDATE agent_tokens SET last_used_at = ? WHERE token_hash = ?', [
+        iso(),
+        tokenHash,
+      ]);
+      return row.consumer;
+    },
+    async listAgentTokens() {
+      return (
+        await db.all(
+          'SELECT token_hash, consumer, created_at, last_used_at, revoked_at FROM agent_tokens ORDER BY created_at DESC',
+        )
+      ).map(({ token_hash, ...rest }) => ({ id: token_hash.slice(0, 12), ...rest }));
+    },
+    async revokeAgentToken(id, actor) {
+      requireHuman(actor, 'Revoking an agent token');
+      if (!/^[0-9a-f]{12}$/.test(id ?? '')) throw error('INVALID_INPUT', 'Unknown token id.');
+      const { changes } = await db.run(
+        'UPDATE agent_tokens SET revoked_at = ? WHERE token_hash LIKE ? AND revoked_at IS NULL',
+        [iso(), `${id}%`],
+      );
+      if (!changes) throw error('NOT_FOUND', `No active token ${id}.`, 404);
+      await audit(actor, 'agent_token.revoke', id);
+      return { id, revoked: true };
+    },
+
+    // A native bundle of chosen episodes, for `w3bs training push` to another store. Labels go
+    // with it; the receiving store re-proposes them, as every import does.
+    async bundleEpisodes(ids, actor) {
+      requireHuman(actor, 'Sending episodes to another store');
+      const rows = await mapSeries([...new Set(ids)], (id) => episodeRow(id));
+      if (!rows.length) throw error('INVALID_INPUT', 'Choose at least one episode.');
+      const { sessions, observations, steps } = await collectRows(rows);
+      const artifacts = (await artifactRecords(observations)).map((a) => ({
+        ...a,
+        path: `artifacts/${a.artifact_id}.${a.path.split('.').pop()}`,
+      }));
+      const labels = (
+        await mapSeries(rows, async (r) =>
+          (await db.all('SELECT body FROM labels WHERE subject_id = ?', [r.episode_id])).map((x) =>
+            JSON.parse(x.body),
+          ),
+        )
+      ).flat();
+      const jsonl = (list) =>
+        list.map((x) => JSON.stringify(x)).join('\n') + (list.length ? '\n' : '');
+      const files = new Map([
+        ['sessions.jsonl', jsonl(sessions)],
+        ['episodes.jsonl', jsonl(rows.map((r) => r.body))],
+        ['observations.jsonl', jsonl(observations)],
+        ['actions.jsonl', jsonl(steps)],
+        ['labels.jsonl', jsonl(labels)],
+        ['artifacts.jsonl', jsonl(artifacts)],
+        ['rights.json', JSON.stringify(rows[0].rights)],
+      ]);
+      for (const a of artifacts) files.set(a.path, await readArtifact(a.artifact_id));
+      const profiles = new Set(rows.map((r) => r.body.capture_profile));
+      files.set(
+        'manifest.json',
+        JSON.stringify({
+          format: FORMAT_NAME,
+          schema_version: SCHEMA_VERSION,
+          bundle_id: newId('bun'),
+          created_at: iso(),
+          producer: { name: 'w3bs-training', version: VERSION },
+          capture_profile: profiles.size === 1 ? [...profiles][0] : 'visual-review',
+          counts: {
+            sessions: sessions.length,
+            episodes: rows.length,
+            observations: observations.length,
+            actions: steps.length,
+            labels: labels.length,
+            artifacts: artifacts.length,
+          },
+          privacy: { text_values_included: false, redaction_applied: true },
+        }),
+      );
+      files.set(
+        'checksums.json',
+        JSON.stringify(
+          Object.fromEntries(
+            [...files].map(([n, c]) => [n, sha256(Buffer.isBuffer(c) ? c : Buffer.from(c))]),
+          ),
+        ),
+      );
+      await audit(actor, 'bundle', null, { episodes: rows.length });
+      return writeZip([...files]);
     },
 
     async auditLog({ limit = 200 } = {}) {
-      return db.all('SELECT * FROM audit ORDER BY sequence DESC LIMIT ?', [Math.min(limit, 2000)]);
+      return await db.all('SELECT * FROM audit ORDER BY sequence DESC LIMIT ?', [
+        Math.min(limit, 2000),
+      ]);
     },
   };
 
-  function datasetCard(dataset, v, rows, purposes, excluded) {
-    const warnings = db
-      .all(
+  async function datasetCard(dataset, v, rows, purposes, excluded) {
+    const warnings = (
+      await db.all(
         `SELECT DISTINCT kind FROM warnings WHERE episode_id IN (${rows.map(() => '?').join(',') || "''"})`,
         rows.map((r) => r.episode_id),
       )
-      .map((r) => r.kind);
+    ).map((r) => r.kind);
     const rights = rows.map((r) => r.rights.source_rights);
     const profiles = [...new Set(rows.map((r) => r.body.capture_profile))];
-    const runs = db.get(
-      "SELECT COUNT(*) AS n FROM runs WHERE kind IN ('execution', 'evaluation')",
-    ).n;
+    const runs = Number(
+      (await db.get("SELECT COUNT(*) AS n FROM runs WHERE kind IN ('execution', 'evaluation')")).n,
+    );
+    const reviewers = [
+      ...new Set(
+        (
+          await db.all(
+            "SELECT DISTINCT body FROM labels WHERE status = 'confirmed' AND source = 'human'",
+          )
+        ).map((r) => JSON.parse(r.body).author.id),
+      ),
+    ];
     return `# ${dataset.name}
 
 Dataset ${v.dataset_id} version ${v.version}, digest \`${v.digest}\`.
@@ -2411,7 +2641,7 @@ Approved purposes: ${purposes.join(', ') || 'none'}. No other use is approved.
 
 ## Creator and contributors
 
-Created by ${v.body.created_by}. Reviewers: ${[...new Set(db.all("SELECT DISTINCT body FROM labels WHERE status = 'confirmed' AND source = 'human'").map((r) => JSON.parse(r.body).author.id))].join(', ') || 'none recorded'}.
+Created by ${v.body.created_by}. Reviewers: ${reviewers.join(', ') || 'none recorded'}.
 
 ## Source rights
 
@@ -2442,6 +2672,6 @@ This copy is outside W3BS. Revoking the version or deleting episodes in W3BS doe
 `;
   }
 
-  gc();
+  await gc();
   return service;
 }
