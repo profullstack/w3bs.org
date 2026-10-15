@@ -1,0 +1,284 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "step_id": {
+      "type": "string",
+      "pattern": "^step_[A-Za-z0-9_-]{1,64}$"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^ses_[A-Za-z0-9_-]{1,64}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "observation_before": {
+      "type": "string",
+      "pattern": "^obs_[A-Za-z0-9_-]{1,64}$"
+    },
+    "observation_after": {
+      "type": "string",
+      "pattern": "^obs_[A-Za-z0-9_-]{1,64}$"
+    },
+    "action": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "click",
+            "double_click",
+            "right_click",
+            "drag",
+            "hover",
+            "scroll",
+            "key_shortcut",
+            "text_edit",
+            "focus",
+            "navigate",
+            "wait",
+            "other"
+          ]
+        },
+        "origin": {
+          "type": "string",
+          "enum": [
+            "human",
+            "agent",
+            "system",
+            "mixed",
+            "unknown"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "human",
+            "device_event",
+            "application_event",
+            "deterministic_rule",
+            "model_inference",
+            "imported"
+          ]
+        },
+        "status": {
+          "default": "confirmed",
+          "type": "string",
+          "enum": [
+            "proposed",
+            "confirmed",
+            "rejected"
+          ]
+        },
+        "target": {
+          "type": "object",
+          "properties": {
+            "app": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "window": {
+              "type": "string",
+              "maxLength": 400
+            },
+            "role": {
+              "type": "string",
+              "maxLength": 80
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 400
+            },
+            "identifiers": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "additionalProperties": {
+                "type": "string",
+                "maxLength": 400
+              }
+            },
+            "bounds": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                },
+                "width": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "height": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "x",
+                "y",
+                "width",
+                "height"
+              ],
+              "additionalProperties": false
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "accessibility",
+                "browser_metadata",
+                "window_manager",
+                "visual_inference",
+                "imported",
+                "unknown"
+              ]
+            }
+          },
+          "required": [
+            "source"
+          ],
+          "additionalProperties": false
+        },
+        "coordinate_space": {
+          "default": "none",
+          "type": "string",
+          "enum": [
+            "display",
+            "window",
+            "none"
+          ]
+        },
+        "arguments": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "path": {
+              "maxItems": 2000,
+              "type": "array",
+              "items": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              }
+            },
+            "button": {
+              "type": "string",
+              "enum": [
+                "left",
+                "middle",
+                "right"
+              ]
+            },
+            "keys": {
+              "maxItems": 8,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 40
+              }
+            },
+            "delta_x": {
+              "type": "number"
+            },
+            "delta_y": {
+              "type": "number"
+            },
+            "text": {
+              "type": "string",
+              "maxLength": 4000
+            },
+            "text_placeholder": {
+              "type": "string",
+              "maxLength": 80
+            },
+            "url": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          },
+          "additionalProperties": false
+        },
+        "monotonic_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,24})$"
+        }
+      },
+      "required": [
+        "type",
+        "origin",
+        "source",
+        "monotonic_ns"
+      ],
+      "additionalProperties": false
+    },
+    "alignment": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "verified",
+            "uncertain",
+            "missing"
+          ]
+        },
+        "evidence": {
+          "default": [],
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 80
+          }
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "raw_event_refs": {
+      "default": [],
+      "maxItems": 16,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 80
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "step_id",
+    "session_id",
+    "sequence",
+    "action",
+    "alignment"
+  ],
+  "additionalProperties": false,
+  "$id": "https://w3bs.org/schemas/training/0.1/action.json",
+  "title": "W3BS Demonstration Dataset 0.1: action"
+}

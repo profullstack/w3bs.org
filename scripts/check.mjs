@@ -8,7 +8,20 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 // the flag and executes the file), so use its transpiler, which throws on a
 // syntax error.
 const transpiler = new Bun.Transpiler({ loader: 'js' });
-for (const directory of ['src', 'native', 'scripts', 'test', 'public']) {
+for (const directory of [
+  'src',
+  'native',
+  'scripts',
+  'test',
+  'public',
+  'training',
+  'training/bin',
+  'training/core',
+  'training/schema',
+  'training/fixtures',
+  'training/ui',
+  'training/ui/public',
+]) {
   for (const entry of readdirSync(resolve(root, directory))) {
     if (/\.(mjs|js)$/.test(entry)) {
       const path = resolve(root, directory, entry);

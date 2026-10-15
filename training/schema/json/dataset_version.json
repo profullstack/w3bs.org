@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^ds_[A-Za-z0-9_-]{1,64}$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    },
+    "created_by": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "episodes": {
+      "maxItems": 100000,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^ep_[A-Za-z0-9_-]{1,64}$"
+      }
+    },
+    "label_revisions": {
+      "maxItems": 1000000,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^rev_[A-Za-z0-9_-]{1,64}$"
+      }
+    },
+    "transformations": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 200
+      }
+    },
+    "splits": {
+      "type": "object",
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "seed": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "train": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^ep_[A-Za-z0-9_-]{1,64}$"
+          }
+        },
+        "validation": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^ep_[A-Za-z0-9_-]{1,64}$"
+          }
+        },
+        "test_known_workflows": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^ep_[A-Za-z0-9_-]{1,64}$"
+          }
+        },
+        "test_heldout_families": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^ep_[A-Za-z0-9_-]{1,64}$"
+          }
+        }
+      },
+      "required": [
+        "strategy",
+        "seed",
+        "train",
+        "validation",
+        "test_known_workflows",
+        "test_heldout_families"
+      ],
+      "additionalProperties": false
+    },
+    "purposes": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "human_review",
+          "private_retrieval",
+          "external_retrieval",
+          "model_training",
+          "evaluation",
+          "public_distribution"
+        ]
+      }
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "version",
+    "created_at",
+    "created_by",
+    "episodes",
+    "label_revisions",
+    "splits",
+    "digest"
+  ],
+  "additionalProperties": false,
+  "$id": "https://w3bs.org/schemas/training/0.1/dataset_version.json",
+  "title": "W3BS Demonstration Dataset 0.1: dataset_version"
+}

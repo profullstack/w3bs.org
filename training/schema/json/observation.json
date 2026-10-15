@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "observation_id": {
+      "type": "string",
+      "pattern": "^obs_[A-Za-z0-9_-]{1,64}$"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^ses_[A-Za-z0-9_-]{1,64}$"
+    },
+    "monotonic_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,24})$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "keyframe",
+        "crop",
+        "semantic",
+        "video_segment"
+      ]
+    },
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^art_[A-Za-z0-9_-]{1,64}$"
+    },
+    "duration_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,24})$"
+    },
+    "semantic": {
+      "type": "object",
+      "properties": {
+        "app": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "window": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "focused": {
+          "type": "object",
+          "properties": {
+            "app": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "window": {
+              "type": "string",
+              "maxLength": 400
+            },
+            "role": {
+              "type": "string",
+              "maxLength": 80
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 400
+            },
+            "identifiers": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "additionalProperties": {
+                "type": "string",
+                "maxLength": 400
+              }
+            },
+            "bounds": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                },
+                "width": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "height": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "x",
+                "y",
+                "width",
+                "height"
+              ],
+              "additionalProperties": false
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "accessibility",
+                "browser_metadata",
+                "window_manager",
+                "visual_inference",
+                "imported",
+                "unknown"
+              ]
+            }
+          },
+          "required": [
+            "source"
+          ],
+          "additionalProperties": false
+        },
+        "url_origin": {
+          "type": "string",
+          "maxLength": 300
+        }
+      },
+      "additionalProperties": false
+    },
+    "display": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "scale": {
+          "default": 1,
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "additionalProperties": false
+    },
+    "pre_action_verified": {
+      "default": false,
+      "type": "boolean"
+    },
+    "visibility": {
+      "default": {
+        "masked_regions": [],
+        "restricted": false
+      },
+      "type": "object",
+      "properties": {
+        "masked_regions": {
+          "default": [],
+          "maxItems": 256,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              },
+              "width": {
+                "type": "number"
+              },
+              "height": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "x",
+              "y",
+              "width",
+              "height"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "restricted": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "observation_id",
+    "session_id",
+    "monotonic_ns",
+    "kind"
+  ],
+  "additionalProperties": false,
+  "$id": "https://w3bs.org/schemas/training/0.1/observation.json",
+  "title": "W3BS Demonstration Dataset 0.1: observation"
+}

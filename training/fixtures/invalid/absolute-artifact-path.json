@@ -1,0 +1,12 @@
+{
+  "record": "artifact",
+  "why": "No absolute private paths.",
+  "value": {
+    "schema_version": "0.1",
+    "artifact_id": "art_a0",
+    "path": "/home/me/screen.png",
+    "media_type": "image/png",
+    "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+    "bytes": 70
+  }
+}

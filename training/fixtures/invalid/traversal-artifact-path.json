@@ -1,0 +1,12 @@
+{
+  "record": "artifact",
+  "why": "No parent segments.",
+  "value": {
+    "schema_version": "0.1",
+    "artifact_id": "art_a0",
+    "path": "artifacts/../../.ssh/id_rsa",
+    "media_type": "image/png",
+    "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+    "bytes": 70
+  }
+}

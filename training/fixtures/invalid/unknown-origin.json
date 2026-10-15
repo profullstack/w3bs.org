@@ -1,0 +1,39 @@
+{
+  "record": "action",
+  "why": "Actor origin is a closed set.",
+  "value": {
+    "schema_version": "0.1",
+    "step_id": "step_a0",
+    "session_id": "ses_a1",
+    "sequence": 0,
+    "observation_before": "obs_a0",
+    "observation_after": "obs_a1",
+    "action": {
+      "type": "click",
+      "origin": "robot",
+      "source": "device_event",
+      "status": "confirmed",
+      "target": {
+        "app": "Firefox",
+        "role": "link",
+        "name": "Releases",
+        "source": "accessibility"
+      },
+      "coordinate_space": "display",
+      "arguments": {
+        "x": 120,
+        "y": 300,
+        "button": "left"
+      },
+      "monotonic_ns": "1000000000"
+    },
+    "alignment": {
+      "status": "verified",
+      "evidence": [
+        "event_0",
+        "obs_a0",
+        "obs_a1"
+      ]
+    }
+  }
+}
