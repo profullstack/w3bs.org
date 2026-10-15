@@ -344,7 +344,91 @@ for tmpl in sorted((ROOT / "bskyweb/templates").glob("*.html")):
     text = text.replace('content="Bluesky Social"', 'content="W3BS Social"').replace('color="#1185fe"', 'color="#d95231"')
     tmpl.write_text(text)
 
-# 6. Icons and the default social card.
+# 6. No "Bluesky" anywhere a person can see it.
+# The pre-JS splash (an inline butterfly in base.html) becomes the orbit mark.
+MARK_SVG = (BRAND.parent.parent.parent / "public/mark.svg").read_text().strip()
+base = ROOT / "bskyweb/templates/base.html"
+html = base.read_text()
+splash = re.compile(r"<!-- Bluesky SVG -->\s*<svg[^>]*viewBox=\"0 0 64 57\".*?</svg>", re.S)
+if not splash.search(html):
+    sys.exit("bskyweb/templates/base.html: splash SVG not found; upstream changed")
+html = splash.sub("<!-- W3BS mark -->\n    " + MARK_SVG, html, count=1)
+html = re.sub(
+    r'<p lang="en">Learn more about Bluesky at .*?</p>',
+    '<p lang="en">Learn more at <a href="https://w3bs.org/social">w3bs.org/social</a>.</p>',
+    html,
+    flags=re.S,
+)
+base.write_text(html)
+
+# The word itself, in UI strings and every locale's catalog (msgid and msgstr change
+# together, so `intl:build` keeps each translation). Whole word only: identifiers like
+# isBlueskyOwned stay as they are; no code uses a bare `Bluesky` identifier.
+WORD_RE = re.compile(r"(?<![A-Za-z0-9_$])Bluesky(?![A-Za-z0-9_$])")
+targets = [*ROOT.glob("src/**/*.ts"), *ROOT.glob("src/**/*.tsx"), *ROOT.glob("src/locale/locales/*/messages.po"), *ROOT.glob("bskyweb/templates/*.html")]
+changed = 0
+for f in targets:
+    text = f.read_text()
+    new = WORD_RE.sub("W3BS Social", text.replace("Bluesky Social", "W3BS Social"))
+    if new != text:
+        f.write_text(new)
+        changed += 1
+if changed < 50:
+    sys.exit(f"only {changed} files mentioned Bluesky; upstream changed")
+
+# Policy, help and blog links go to our page.
+LINKS = [
+    (r"https://bsky\.social/about/support/(tos|privacy-policy|community-guidelines[A-Za-z0-9#-]*|copyright|find-friends-privacy-policy)", "https://w3bs.org/social#policy"),
+    (r"https://bsky\.social/about/(support|faq|join|blog)[A-Za-z0-9/_.-]*", "https://w3bs.org/social"),
+    (r"https://blueskyweb\.zendesk\.com/hc/[A-Za-z0-9/_.-]*", "https://w3bs.org/social#policy"),
+]
+for f in [*ROOT.glob("src/**/*.ts"), *ROOT.glob("src/**/*.tsx")]:
+    text = f.read_text()
+    new = text
+    for pat, url in LINKS:
+        new = re.sub(pat, url, new)
+    if new != text:
+        f.write_text(new)
+patch(
+    "src/lib/constants.ts",
+    "export const HELP_DESK_URL = `https://w3bs.org/social#policy${HELP_DESK_LANG}`",
+    "export const HELP_DESK_URL = 'https://w3bs.org/social'",
+)
+patch(
+    "src/lib/constants.ts",
+    "const BASE_FEEDBACK_FORM_URL = `${HELP_DESK_URL}/requests/new`",
+    "const BASE_FEEDBACK_FORM_URL = 'mailto:hello@w3bs.org?subject=W3BS%20Social%20support'",
+)
+patch("src/lib/constants.ts", "  let str = BASE_FEEDBACK_FORM_URL\n  if (email) {", "  let str = BASE_FEEDBACK_FORM_URL\n  if (email && !str.startsWith('mailto:')) {")
+
+# Shared links point at social.w3bs.org, and outbound links are not sent through
+# Bluesky's go.bsky.app redirector.
+patch("src/lib/strings/url-helpers.ts", "    const urlp = new URL('https://bsky.app')", f"    const urlp = new URL('{PDS}')")
+patch(
+    "src/lib/strings/url-helpers.ts",
+    "  return `https://go.bsky.app/redirect?u=${encodeURIComponent(url)}`",
+    "  return url",
+)
+
+# The few places that name bsky.app as the place to go.
+M = "src/screens/Moderation/index.tsx"
+patch(M, "void Linking.openURL('https://bsky.app/')", f"void Linking.openURL('{PDS}/')")
+patch(M, "                        bsky.app\n                      </InlineLinkText>", "                        social.w3bs.org\n                      </InlineLinkText>")
+patch("src/lib/constants.ts", "export const BSKY_DOWNLOAD_URL = 'https://bsky.app/download'", f"export const BSKY_DOWNLOAD_URL = '{PDS}'")
+for f in [*ROOT.glob("src/**/*.tsx"), *ROOT.glob("src/locale/locales/*/messages.po")]:
+    text = f.read_text()
+    new = text.replace("<0>bsky.app</0>", "<0>social.w3bs.org</0>").replace("https://bsky.app/download", PDS)
+    if new != text:
+        f.write_text(new)
+# Page metadata: no @bluesky card attribution, no Bluesky iOS app banner, no status page.
+for tmpl in sorted((ROOT / "bskyweb/templates").glob("*.html")):
+    text = tmpl.read_text()
+    text = re.sub(r'\s*<meta name="twitter:site" content="@bluesky" />', "", text)
+    text = re.sub(r'\s*<meta name="apple-itunes-app"[^>]*>', "", text)
+    text = re.sub(r'\s*Our <a href="https://bluesky\.statuspage\.io/">Status Page</a> might have more context\.', "", text)
+    tmpl.write_text(text)
+
+# 7. Icons and the default social card.
 for f in BRAND.iterdir():
     shutil.copy(f, ROOT / "bskyweb/static" / f.name)
 
