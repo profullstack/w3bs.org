@@ -2303,6 +2303,10 @@
     "does": "Review recorded tasks in the local app (one-time link)"
    },
    {
+    "run": "w3bs-training push --all-reviewed",
+    "does": "Send reviewed tasks to your workspace at w3bs.org/training/app (uses your w3bs login)"
+   },
+   {
     "run": "w3bs-training import demo.w3bs-training.zip",
     "does": "Import a demonstration bundle, JSON/JSONL events with a mapping, or a video"
    },
@@ -2315,15 +2319,15 @@
     "does": "Delete everything captured in the last ten minutes"
    }
   ],
-  "description": "Review, curate and version demonstrations of your desktop work, then let an authorized agent retrieve approved examples over MCP. Local-first, encrypted at rest, nothing leaves the machine unless you export it. Records come from the Agentic Desktop Layer tray (Start training…) or imported bundles.",
-  "homepage": "https://github.com/profullstack/w3bs.org/tree/main/docs/training",
+  "description": "Review, curate and version demonstrations of your desktop work, then let an authorized agent retrieve approved examples over MCP. Local first and encrypted at rest; push reviewed tasks to your own workspace at w3bs.org/training/app when you want them on another device or for a hosted agent.",
+  "homepage": "https://w3bs.org/training",
   "repository": "https://github.com/profullstack/w3bs.org/tree/main/training",
   "license": "MIT",
   "agentic": true,
-  "latest_version": "0.1.0",
+  "latest_version": "0.2.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://w3bs.org/training/install.sh | sh",
-  "evidence": "w3bs.org/training/install.sh 200 (text/x-shellscript); GitHub release training-v0.1.0 with 5 archives + SHA256SUMS; installed from w3bs.org in a clean ubuntu:24.04 container and imported a recorder bundle; desktop recorder handoff verified in the same container",
+  "evidence": "w3bs.org/training/install.sh 200 (text/x-shellscript); GitHub release training-v0.2.0 with 5 archives + SHA256SUMS; installed from w3bs.org in a clean ubuntu:24.04 container; hosted workspace answers an authenticated w3bs login session",
   "publisher": "profullstack"
  },
  {
