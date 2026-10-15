@@ -13,6 +13,7 @@ import { renderPage, scanBadgeSvg } from './site.mjs';
 import { createScanner } from './scan.mjs';
 import { mountAccounts, OPEN_CORS, bearerOf } from './auth-routes.mjs';
 import { mountFleet } from './fleet-routes.mjs';
+import { mountSocial, socialConfig } from './social-routes.mjs';
 import { createMailer } from './mail.mjs';
 
 export function createApp({
@@ -25,6 +26,8 @@ export function createApp({
   bridgeClients = process.env.W3BS_BRIDGE_CLIENTS
     ? JSON.parse(process.env.W3BS_BRIDGE_CLIENTS)
     : undefined,
+  social = socialConfig(),
+  socialFetch = fetch,
 } = {}) {
   if (!store) throw new Error('createApp requires an opened store; use startServer or openStore.');
   const app = express();
@@ -250,6 +253,7 @@ export function createApp({
   const helpers = mountAccounts(app, { store, origin, mailer, formGuard, bridgeClients });
   // WebSocket upgrades (fleet screens) skip Express; startServer hands them to this.
   app.locals.fleet = mountFleet(app, { store, origin, helpers });
+  mountSocial(app, { store, helpers, config: social, fetchImpl: socialFetch });
   app.use(
     '/assets',
     express.static(resolve(ROOT, 'public'), { maxAge: '1h', index: false, fallthrough: false }),
@@ -269,7 +273,7 @@ export function createApp({
     res
       .type('application/xml')
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/packages', '/specs', '/browse', '/prompts', '/desktop', '/governance', '/developers', '/signup'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/packages', '/specs', '/browse', '/prompts', '/desktop', '/social', '/governance', '/developers', '/signup'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
       ),
   );
   app.get('/docs/:file', (req, res) => {

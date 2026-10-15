@@ -1,0 +1,32 @@
+# w3bs.org/social: the AT Protocol PDS at social.w3bs.org (handles *.social.w3bs.org).
+# Official image, no build. Secrets in app.env (vault profullstack w3bs-org-social--prod).
+# nginx on the host terminates TLS (w3bs.org vhost "proxies") and proxies to 127.0.0.1:${APP_PORT}.
+# Admin: docker exec w3bsorg-social-pds-1 goat pds admin ... or pdsadmin via the XRPC admin API.
+services:
+  pds:
+    image: ghcr.io/bluesky-social/pds:0.4.5037
+    restart: unless-stopped
+    mem_limit: 1g
+    memswap_limit: 1g
+    env_file: app.env
+    environment:
+      PDS_PORT: "3000"
+      NODE_ENV: production
+    ports:
+      - "127.0.0.1:${APP_PORT}:3000"
+    volumes:
+      - ./volumes/pds:/pds
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "3" }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/xrpc/_health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.200.142.0/24
