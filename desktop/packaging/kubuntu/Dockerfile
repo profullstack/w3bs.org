@@ -35,8 +35,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       kwin-wayland plasma-desktop plasma-workspace konsole breeze breeze-cursor-theme libkscreen-bin \
       xdg-desktop-portal xdg-desktop-portal-kde pipewire wireplumber dbus-daemon flatpak \
       libegl-mesa0 libgl1-mesa-dri libpipewire-0.3-0t64 libjpeg-turbo8 libpixman-1-0 libpam0g \
-      fonts-noto-core ca-certificates curl tini procps \
+      fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji ca-certificates curl gnupg tini procps \
     && rm -rf /var/lib/apt/lists/*
+# A browser for agents: Google Chrome from Google's signed repository (Ubuntu's Chromium is a snap,
+# and snaps do not run in a container).
+RUN install -d -m 0755 /etc/apt/keyrings \
+    && curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg \
+    && echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] https://dl.google.com/linux/chrome/deb/ stable main" \
+       > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update && apt-get install -y --no-install-recommends google-chrome-stable \
+    && rm -rf /var/lib/apt/lists/*
+COPY browser.sh /usr/local/bin/w3bs-browser
 # KWin asks for real-time scheduling, which a container's capability set does not grant.
 RUN setcap -r /usr/bin/kwin_wayland 2>/dev/null || true
 COPY --from=w0vncserver /usr/local/bin/w0vncserver /usr/local/bin/w0vncserver
@@ -48,6 +57,6 @@ RUN arch="$(uname -m)" \
     && tar xzf "$file" ./bin/w3bs-desktop && install -m 0755 bin/w3bs-desktop /usr/local/bin/ \
     && rm -rf /tmp/*
 COPY session.sh /usr/local/bin/w3bs-kubuntu-session
-RUN chmod 0755 /usr/local/bin/w3bs-kubuntu-session && mkdir -p /vnc /home/desktop && chmod 1777 /vnc /home/desktop
+RUN chmod 0755 /usr/local/bin/w3bs-kubuntu-session /usr/local/bin/w3bs-browser && mkdir -p /vnc /home/desktop && chmod 1777 /vnc /home/desktop
 ENV HOME=/home/desktop
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/w3bs-kubuntu-session"]
