@@ -2286,5 +2286,40 @@
   "install": "curl -fsSL https://w3bs.org/desktop/install.sh | sh",
   "evidence": "w3bs.org/desktop/install.sh 200 (text/x-shellscript); GitHub release desktop-v0.2.1 with 5 archives + SHA256SUMS; installer verified on ubuntu:24.04, macos-latest and windows-latest CI",
   "publisher": "profullstack"
+ },
+ {
+  "id": "submitfleet.com/submitfleet",
+  "name": "submitfleet",
+  "commands": [
+   "submitfleet"
+  ],
+  "examples": [
+   {
+    "run": "submitfleet login",
+    "does": "Sign in through your browser (or submitfleet login --key - with an API key)"
+   },
+   {
+    "run": "submitfleet products add https://your-product.com",
+    "does": "Add a product; its name, tagline and description are read from the page"
+   },
+   {
+    "run": "submitfleet catalog search ai",
+    "does": "Search the 339 launch sites and directories"
+   },
+   {
+    "run": "submitfleet campaign status <id>",
+    "does": "See what is submitted, live, skipped or waiting for you"
+   }
+  ],
+  "description": "CLI and MCP server for SubmitFleet: launch a product on 339 launch sites and directories from one approved profile, and track every submission until it is live.",
+  "homepage": "https://submitfleet.com",
+  "repository": "https://github.com/profullstack/submitfleet",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "0.3.0",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://submitfleet.com/install.sh | sh",
+  "evidence": "npm view @profullstack/submitfleet version = 0.3.0; submitfleet.com/install.sh 200 (text/x-shellscript, w3bs npm-cli template); examples: submitfleet help (src/cli.ts) and submitfleet.com/docs",
+  "publisher": "profullstack"
  }
 ]
