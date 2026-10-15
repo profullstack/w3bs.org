@@ -5,6 +5,7 @@
 #
 #   desktop/tests/rig/fleet-screen.sh [SCRATCH_DIR]
 #   W3BS_BIN=path/to/w3bs KEEP=1 desktop/tests/rig/fleet-screen.sh
+#   VNC_UNIX=1 desktop/tests/rig/fleet-screen.sh   # VNC on a Unix socket, as `w3bs fleet desktop` does
 #
 # Checks: the page shows the remote desktop; in view mode, input the page sends is dropped by
 # the agent (the page's own switch is forced on); after `w3bs fleet screen on --control`,
@@ -21,6 +22,11 @@ NAME=${NAME:-adl-fleet-screen}
 IMAGE=${IMAGE:-fedora:44}
 PORT=${PORT:-3377}
 VNC_PORT=${VNC_PORT:-5937}
+if [ "${VNC_UNIX:-0}" = 1 ]; then
+  VNC_LISTEN="-rfbport -1 -rfbunixpath /rig/vnc.sock"; VNC_ADDR=unix:/rig/vnc.sock
+else
+  VNC_LISTEN="-localhost -rfbport $VNC_PORT"; VNC_ADDR=127.0.0.1:$VNC_PORT
+fi
 W3BS_BIN=${W3BS_BIN:-${CARGO_TARGET_DIR:-$REPO/package-manager/target}/debug/w3bs}
 RENDER=${RENDER:-$(ls /dev/dri/renderD* 2>/dev/null | head -1)}
 [ -n "$RENDER" ] || { echo "no /dev/dri/renderD* on this host; KWin cannot screencast without OpenGL" >&2; exit 2; }
@@ -88,10 +94,10 @@ sleep 2
 mkdir -p /root/.config/tigervnc
 echo '$VNC_PASSWORD' | vncpasswd -f > /root/.config/tigervnc/passwd
 chmod 600 /root/.config/tigervnc/passwd
-setsid w0vncserver -localhost -rfbport $VNC_PORT -SecurityTypes VncAuth \\
+setsid w0vncserver $VNC_LISTEN -SecurityTypes VncAuth \\
   -PasswordFile /root/.config/tigervnc/passwd -AlwaysShared >\$L/w0vncserver.log 2>&1 &
 sleep 1
-w3bs fleet join $TOKEN --api http://localhost:$PORT --no-service --screen view --vnc 127.0.0.1:$VNC_PORT
+w3bs fleet join $TOKEN --api http://localhost:$PORT --no-service --screen view --vnc $VNC_ADDR
 setsid w3bs fleet agent >\$L/agent.log 2>&1 &
 EOF
 chmod +x "$RIG"/*.sh
@@ -110,7 +116,7 @@ for i in $(seq 1 20); do grep -q "input messages dropped" "$RIG/logs/agent.log" 
 grep -q "input messages dropped (view only)" "$RIG/logs/agent.log" && ok "agent: $(grep -m1 'input messages dropped' "$RIG/logs/agent.log" | sed 's/^w3bs fleet agent: //')" || bad "agent log: $(tail -5 "$RIG/logs/agent.log")"
 
 echo "== control: w3bs fleet screen on --control, then typing lands"
-docker exec "$NAME" sh -c ". /rig/env.sh; w3bs fleet screen on --control --vnc 127.0.0.1:$VNC_PORT" >"$RIG/logs/screen-on.log" 2>&1 && ok "$(head -1 "$RIG/logs/screen-on.log")" || bad "screen on: $(cat "$RIG/logs/screen-on.log")"
+docker exec "$NAME" sh -c ". /rig/env.sh; w3bs fleet screen on --control --vnc $VNC_ADDR" >"$RIG/logs/screen-on.log" 2>&1 && ok "$(head -1 "$RIG/logs/screen-on.log")" || bad "screen on: $(cat "$RIG/logs/screen-on.log")"
 for i in $(seq 1 90); do machines | grep -q '"mode":"control"' && machines | grep -q '"screen_listening":true' && break; sleep 0.5; done
 machines | grep -q '"mode":"control"' && ok "agent picked up control mode without a restart" || bad "mode: $(machines | head -c 400)"
 (cd "$REPO" && node "$HERE/fleet-screen-browser.mjs" control "$RIG/state.json" "$RIG/shots" "typed-through-w3bs") >"$RIG/logs/browser-control.log" 2>&1 \

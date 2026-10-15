@@ -111,6 +111,50 @@ pub fn human(r: &OperationResult) {
             }
             return;
         }
+        "fleet.desktop.start" => {
+            let d = &r.data;
+            println!("The Kubuntu desktop is running (container {}, {})", s(&d["container"]), s(&d["image"]));
+            println!("AI agents: desktop layer MCP at {} (register one: w3bs fleet desktop agent <name>)", s(&d["mcp"]));
+            if let Some(url) = d["url"].as_str() {
+                let mode = if d["screen"]["mode"] == "control" { "view and control" } else { "view only" };
+                println!("Watch it ({mode}): {url}");
+            }
+            for n in d["notes"].as_array().into_iter().flatten() {
+                eprintln!("note: {}", s(n));
+            }
+            return;
+        }
+        "fleet.desktop.stop" => {
+            let d = &r.data;
+            println!("{}", if d["removed"] == true { "Stopped the desktop (its home directory is kept)" } else { "No desktop was running" });
+            if d["screen_off"] == true {
+                println!("Screen sharing is off");
+            }
+            return;
+        }
+        "fleet.desktop.status" => {
+            let d = &r.data;
+            println!("Desktop: {}{}", s(&d["state"]), d["started_at"].as_str().map(|t| format!(" since {t}")).unwrap_or_default());
+            if d["image"].is_string() && d["image"] != d["current_image"] {
+                println!("Image: {} (a newer one is built in: w3bs fleet desktop start --rebuild)", s(&d["image"]));
+            }
+            println!("VNC: {} ({})", s(&d["vnc"]), if d["vnc_ready"] == true { "ready" } else { "not ready" });
+            println!("MCP: {}", s(&d["mcp"]));
+            println!("Shared: {}", if d["screen"].is_null() { "no".to_owned() } else { format!("{} from {}", s(&d["screen"]["mode"]), s(&d["screen"]["vnc"])) });
+            println!("Session logs: {}", s(&d["logs"]));
+            return;
+        }
+        "fleet.desktop.logs" => {
+            print!("{}", r.data["log"].as_str().unwrap_or_default());
+            eprintln!("session logs: {}", s(&r.data["session_logs"]));
+            return;
+        }
+        "fleet.desktop.agent" => {
+            let d = &r.data;
+            println!("Registered {} ({}) on the desktop. Add it to Claude Code:", s(&d["agent"]), s(&d["preset"]));
+            println!("{}", s(&d["claude_code"]));
+            return;
+        }
         "fleet.view" => {
             let d = &r.data;
             println!("{}", s(&d["url"]));
