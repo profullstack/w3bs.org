@@ -4,7 +4,8 @@
 //! Then `w3bs fleet agent` keeps one outbound WebSocket to the fleet server
 //! (`/api/fleet/listen`). When the owner opens the screen page, the server sends a session
 //! id; the agent dials `/api/fleet/screen/<id>`, connects it to the local VNC server
-//! (127.0.0.1:5900 unless `--vnc` says otherwise) and copies bytes both ways. Nothing on the
+//! (127.0.0.1:5900 unless `--vnc` says otherwise; `unix:/path` for a Unix socket, which is how
+//! `w3bs fleet desktop` shares its container) and copies bytes both ways. Nothing on the
 //! machine listens to the network.
 //!
 //! In `view` mode the agent follows the RFB stream and drops every message that could change
@@ -60,8 +61,12 @@ impl Screen {
     }
 }
 
-/// `host:port`, with the port required: VNC has no default the user should be guessing at.
+/// `host:port` (the port required: VNC has no default the user should be guessing at), or
+/// `unix:/absolute/path` for a Unix socket.
 pub fn check_addr(addr: &str) -> Result<(), String> {
+    if let Some(path) = addr.strip_prefix("unix:") {
+        return if path.starts_with('/') { Ok(()) } else { Err(format!("{addr:?}: a Unix socket needs an absolute path, e.g. unix:/run/vnc.sock")) };
+    }
     let (host, port) = addr.rsplit_once(':').ok_or_else(|| format!("{addr:?} needs a port, e.g. {DEFAULT_VNC}"))?;
     if host.is_empty() || port.parse::<u16>().is_err() {
         return Err(format!("{addr:?} is not host:port, e.g. {DEFAULT_VNC}"));
@@ -73,7 +78,7 @@ pub fn check_addr(addr: &str) -> Result<(), String> {
 
 static PROBE: Mutex<Option<(Instant, String, bool)>> = Mutex::new(None);
 
-/// Whether something accepts TCP on the VNC address. Checked at most every two minutes so
+/// Whether something accepts connections on the VNC address. Checked at most every two minutes so
 /// the VNC server is not poked on every heartbeat; `forget_probe` forces the next check.
 pub fn reachable(addr: &str) -> bool {
     let mut cache = PROBE.lock().unwrap();
@@ -84,6 +89,12 @@ pub fn reachable(addr: &str) -> bool {
         return *ok;
     }
     use std::net::ToSocketAddrs;
+    #[cfg(unix)]
+    if let Some(path) = addr.strip_prefix("unix:") {
+        let ok = std::os::unix::net::UnixStream::connect(path).is_ok();
+        *cache = Some((Instant::now(), addr.to_owned(), ok));
+        return ok;
+    }
     let ok = addr.to_socket_addrs().ok().into_iter().flatten().any(|sa| std::net::TcpStream::connect_timeout(&sa, Duration::from_secs(1)).is_ok());
     *cache = Some((Instant::now(), addr.to_owned(), ok));
     ok
@@ -397,15 +408,29 @@ pub async fn listen(origin: String, key: String, screen: Screen) {
     }
 }
 
+trait Io: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send {}
+impl<T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send> Io for T {}
+
+/// A connection to the VNC server at `host:port` or `unix:/path`.
+async fn connect_vnc(addr: &str) -> std::io::Result<Box<dyn Io>> {
+    #[cfg(unix)]
+    if let Some(path) = addr.strip_prefix("unix:") {
+        return Ok(Box::new(tokio::net::UnixStream::connect(path).await?));
+    }
+    let tcp = tokio::net::TcpStream::connect(addr).await?;
+    let _ = tcp.set_nodelay(true);
+    Ok(Box::new(tcp))
+}
+
 /// One viewer: the session WebSocket joined to a fresh connection to the VNC server.
 async fn session(origin: String, key: String, screen: Screen, id: String) {
-    let vnc = tokio::time::timeout(CONNECT_TIMEOUT, tokio::net::TcpStream::connect(&screen.vnc)).await;
+    let vnc = tokio::time::timeout(CONNECT_TIMEOUT, connect_vnc(&screen.vnc)).await;
     let mut ws = match dial(&origin, &format!("/api/fleet/screen/{id}"), &key).await {
         Ok(ws) => ws,
         Err(e) => return eprintln!("w3bs fleet agent: screen session {id}: {e:?}"),
     };
-    let tcp = match vnc {
-        Ok(Ok(tcp)) => tcp,
+    let conn = match vnc {
+        Ok(Ok(conn)) => conn,
         failed => {
             forget_probe();
             let why = match failed {
@@ -419,8 +444,7 @@ async fn session(origin: String, key: String, screen: Screen, id: String) {
             return;
         }
     };
-    let _ = tcp.set_nodelay(true);
-    let (mut vnc_rx, mut vnc_tx) = tcp.into_split();
+    let (mut vnc_rx, mut vnc_tx) = tokio::io::split(conn);
     let (mut ws_tx, mut ws_rx) = ws.split();
     let gate = Arc::new(Mutex::new(Gate::new(screen.mode == Mode::View)));
     let (fail_tx, mut fail_rx) = tokio::sync::mpsc::channel::<String>(2);
@@ -608,6 +632,8 @@ mod tests {
         assert!(check_addr("[::1]:5901").is_ok());
         assert!(check_addr("localhost").is_err());
         assert!(check_addr(":5900").is_err());
+        assert!(check_addr("unix:/home/a/.local/share/w3bs/desktop/vnc/vnc.sock").is_ok());
+        assert!(check_addr("unix:vnc.sock").is_err());
         assert_eq!(ws_url("https://w3bs.org", "/api/fleet/listen"), "wss://w3bs.org/api/fleet/listen");
         assert_eq!(ws_url("http://localhost:3000", "/x"), "ws://localhost:3000/x");
     }

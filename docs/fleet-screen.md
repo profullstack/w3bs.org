@@ -5,10 +5,14 @@ running the [Agentic Desktop Layer](/desktop), a machine in another room), open
 **w3bs.org/fleet**, pick the machine and press **View screen**. The page shows its desktop live
 in the browser (noVNC), view only unless you allow control.
 
+**A server with no desktop at all?** One command gives it one: see
+[A headless desktop for AI agents](#a-headless-desktop-for-ai-agents).
+
 ## How it works
 
 ```
-browser (noVNC) --wss--> w3bs.org relay <--wss-- w3bs fleet agent --tcp--> local VNC server
+browser (noVNC) --wss--> w3bs.org relay <--wss-- w3bs fleet agent --> local VNC server
+                                                                    (TCP or a Unix socket)
 ```
 
 - **Nothing on the machine listens to the network.** The fleet agent (`w3bs fleet agent`, the
@@ -31,7 +35,50 @@ browser (noVNC) --wss--> w3bs.org relay <--wss-- w3bs fleet agent --tcp--> local
 - **The VNC password stays in your browser.** VNC authentication is a challenge and response;
   w3bs.org relays the response and never sees the password.
 
-## Turn it on
+## A headless desktop for AI agents
+
+On a Linux server with Docker and no desktop, after `w3bs fleet join`:
+
+```sh
+w3bs fleet desktop start             # view only from /fleet
+w3bs fleet desktop start --control   # also mouse and keyboard from /fleet
+```
+
+That is all. It runs a **Kubuntu desktop in a Docker container** (`w3bs-desktop`) and shares its
+screen on /fleet: press **View screen**. The first start builds the image (a few minutes);
+after that it starts in seconds, and Docker restarts it with the machine.
+
+What is in the container:
+
+- **KDE Plasma** (KWin, Plasma shell, Konsole) from Ubuntu 26.04's packages.
+- **No GPU needed.** KWin drives the kernel's `vkms` virtual display and Mesa renders OpenGL on
+  the CPU. `start` loads `vkms` (asking `sudo` once) and keeps it loaded across reboots.
+- **The [Agentic Desktop Layer](/desktop)**, enabled from the start, with its MCP endpoint on
+  `http://127.0.0.1:7802/mcp` (not 7801, so it never clashes with a desktop layer on the host).
+- **TigerVNC's `w0vncserver`**, built from source in the image (Ubuntu's TigerVNC is too old to
+  have it), listening only on a Unix socket in `~/.local/share/w3bs/desktop/vnc/` that only
+  your user can open. No TCP port, no VNC password to manage.
+- Its home directory is `~/.local/share/w3bs/desktop/home` on the host, kept across restarts.
+
+Give an AI agent the desktop:
+
+```sh
+w3bs fleet desktop agent claude      # registers it, prints the `claude mcp add ...` line
+w3bs fleet desktop agent watcher --preset observe   # look, never touch
+```
+
+Run the printed line on the same machine; the agent then sees and drives the Kubuntu desktop
+through MCP, and you watch it on /fleet.
+
+```sh
+w3bs fleet desktop status            # running? shared? image current?
+w3bs fleet desktop logs              # container log; session logs are under home/.local/state
+w3bs fleet desktop start --rebuild   # rebuild the image (after a w3bs update changes it)
+w3bs fleet desktop start --geometry 2560x1440
+w3bs fleet desktop stop              # remove the container and stop sharing; home is kept
+```
+
+## Turn it on (your own VNC server)
 
 On the machine, after it joined your fleet:
 
@@ -39,6 +86,7 @@ On the machine, after it joined your fleet:
 w3bs fleet screen on                 # view only, VNC server on 127.0.0.1:5900
 w3bs fleet screen on --control       # also allow mouse and keyboard from the page
 w3bs fleet screen on --vnc 127.0.0.1:5901
+w3bs fleet screen on --vnc unix:/run/user/1000/vnc.sock   # a Unix socket
 w3bs fleet screen                    # show the setting and whether the VNC server answers
 w3bs fleet screen off                # stop; open sessions end within one report (30 s)
 ```

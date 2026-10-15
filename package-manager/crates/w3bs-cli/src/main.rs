@@ -2,6 +2,7 @@
 //! manager is the first app, W3BS resources (the w3bs:// registry) the second.
 
 mod auth;
+mod desktop;
 mod fleet;
 mod screen;
 mod render;
@@ -33,6 +34,7 @@ Apps:
              w3bs fleet run <m> <a>   queue refresh, update or restart-desktop on a machine
              w3bs fleet screen on     let the fleet owner watch this desktop (VNC, view only)
              w3bs fleet view <m>      watch a machine's desktop in the browser
+             w3bs fleet desktop start a headless Kubuntu desktop (Docker) for AI agents, shared there
              w3bs fleet --help        status, agent, leave, rm";
 
 const AFTER_HELP: &str = "\
@@ -393,6 +395,12 @@ enum FleetCmd {
         #[arg(long, hide = true, value_name = "PATH", global = true)]
         config: Option<PathBuf>,
     },
+    /// A headless Kubuntu desktop in Docker for AI agents to work on, shared on w3bs.org/fleet
+    /// (KDE Plasma, the Agentic Desktop Layer, a VNC socket; no GPU needed)
+    Desktop {
+        #[command(subcommand)]
+        action: DesktopCmd,
+    },
     /// Open a machine's screen on w3bs.org/fleet in your browser (uses your `w3bs login`)
     View {
         /// Machine name or id from `w3bs fleet ls`
@@ -440,6 +448,36 @@ enum FleetCmd {
         machine: String,
         #[command(flatten)]
         a: Api,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+enum DesktopCmd {
+    /// Build (first time) and start the desktop, and share its screen with the fleet owner
+    Start {
+        /// Also let the owner use the mouse and keyboard from w3bs.org/fleet
+        #[arg(long)]
+        control: bool,
+        /// Screen size
+        #[arg(long, value_name = "WxH")]
+        geometry: Option<String>,
+        /// Rebuild the image even if it is current
+        #[arg(long)]
+        rebuild: bool,
+    },
+    /// Stop and remove the desktop (its home directory is kept) and stop sharing it
+    Stop,
+    /// Whether the desktop runs, and what it shares
+    Status,
+    /// The container's recent log, and where the session logs are
+    Logs,
+    /// Register an AI agent on the desktop and print its MCP setup (Claude Code)
+    Agent {
+        /// Agent name
+        name: String,
+        /// What it may do: observe (look only), broad (whole desktop)
+        #[arg(long, default_value = "broad", value_parser = ["observe", "broad"])]
+        preset: String,
     },
 }
 
@@ -767,6 +805,13 @@ async fn run_fleet(cmd: FleetCmd) -> (&'static str, w3bs_core::Result<OperationR
             };
             local("fleet.screen", fleet::screen_set(config.as_deref(), change))
         }
+        FleetCmd::Desktop { action } => match action {
+            DesktopCmd::Start { control, geometry, rebuild } => local("fleet.desktop.start", desktop::start(control, geometry.as_deref(), rebuild)),
+            DesktopCmd::Stop => local("fleet.desktop.stop", desktop::stop()),
+            DesktopCmd::Status => local("fleet.desktop.status", desktop::status()),
+            DesktopCmd::Logs => local("fleet.desktop.logs", desktop::logs()),
+            DesktopCmd::Agent { name, preset } => local("fleet.desktop.agent", desktop::agent(&name, &preset)),
+        },
         FleetCmd::View { machine, no_open, a } => ("fleet.view", account("fleet.view", &a, |o| async move { fleet::view(&o, &machine, !no_open).await }).await),
         FleetCmd::Agent { config } => local("fleet.agent", fleet::agent(config.as_deref()).await),
         FleetCmd::Status { config } => local("fleet.status", fleet::status(config.as_deref())),
