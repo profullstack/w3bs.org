@@ -148,7 +148,7 @@ export function checkRedirectUri(value) {
   return loopback ? `${url.protocol}//${url.hostname}${url.pathname}${url.search}` : url.href;
 }
 
-export function createAccounts(db, { origin }) {
+export function createAccounts(db, { origin, events }) {
   const rpID = new URL(origin).hostname;
   const expectedOrigin = new URL(origin).origin;
   const sweep = async () => {
@@ -281,6 +281,11 @@ export function createAccounts(db, { origin }) {
   async function consumeLink(value) {
     if (typeof value !== 'string' || value.length > 100)
       throw fail('INVALID_LINK', 'This link is invalid or has expired.');
+    const result = await useLink(value);
+    if (result.created) await events?.record('signup_completed', result.user.id);
+    return result;
+  }
+  async function useLink(value) {
     return db.transaction(async (tx) => {
       const row = await tx.get(
         'SELECT * FROM email_links WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?',
@@ -726,6 +731,7 @@ export function createAccounts(db, { origin }) {
       row.device_hash,
     ]);
     return {
+      userId: row.user_id,
       tokens: await issueTokens(tx, {
         family: token(16),
         clientId,
@@ -776,6 +782,7 @@ export function createAccounts(db, { origin }) {
             error: new OAuthError('invalid_grant', 'code_verifier does not match code_challenge.'),
           };
         return {
+          userId: row.user_id,
           tokens: await issueTokens(tx, {
             family: row.family,
             clientId,
@@ -811,6 +818,7 @@ export function createAccounts(db, { origin }) {
           row.family,
         ]);
         return {
+          userId: row.user_id,
           tokens: await issueTokens(tx, {
             family: row.family,
             clientId,
@@ -828,6 +836,11 @@ export function createAccounts(db, { origin }) {
       };
     });
     if (outcome.error) throw outcome.error;
+    // A new `w3bs login`, not a refresh of an existing one.
+    if (clientId === CLI_CLIENT_ID && body.grant_type !== 'refresh_token')
+      await events?.record('cli_login_completed', outcome.userId, {
+        method: body.grant_type === DEVICE_GRANT ? 'device' : 'browser',
+      });
     return outcome.tokens;
   }
   async function revokeToken(value, clientId) {

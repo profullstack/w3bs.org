@@ -5,6 +5,7 @@ import { W3bsError, parseUri, validateManifest, verifyManifest, compareVersions 
 import { ACCOUNT_SCHEMA, createAccounts } from './accounts.mjs';
 import { FLEET_SCHEMA, createFleet } from './fleet.mjs';
 import { SOCIAL_SCHEMA, createSocial } from './social.mjs';
+import { EVENT_SCHEMA, createEvents } from './events.mjs';
 
 export const ROOT = fileURLToPath(new URL('../', import.meta.url));
 
@@ -38,6 +39,7 @@ async function openSqlite(path) {
   db.exec(ACCOUNT_SCHEMA.sqlite);
   db.exec(FLEET_SCHEMA.sqlite);
   db.exec(SOCIAL_SCHEMA.sqlite);
+  db.exec(EVENT_SCHEMA.sqlite);
   const bind = (target) => ({
     all: async (sql, params = []) => target.prepare(sql).all(...params),
     get: async (sql, params = []) => target.prepare(sql).get(...params),
@@ -89,6 +91,7 @@ async function openPostgres(connectionString) {
   await pool.query(ACCOUNT_SCHEMA.postgres);
   await pool.query(FLEET_SCHEMA.postgres);
   await pool.query(SOCIAL_SCHEMA.postgres);
+  await pool.query(EVENT_SCHEMA.postgres);
   return {
     ...bind(pool),
     dialect: 'postgres',
@@ -344,8 +347,9 @@ export async function openStore({
   await syncPackages();
   // Accounts and OAuth (src/accounts.mjs) share this database. Passkeys are bound to
   // the public origin, which the HTTP app knows, so it asks for them by origin.
-  await createAccounts(db, { origin: 'http://localhost' }).seedClients();
-  const accounts = (origin) => createAccounts(db, { origin });
+  const events = createEvents(db);
+  await createAccounts(db, { origin: 'http://localhost', events }).seedClients();
+  const accounts = (origin) => createAccounts(db, { origin, events });
   if (seed) {
     for (const filename of readdirSync(resolve(ROOT, 'fixtures/resources'))
       .filter((name) => name.endsWith('.json'))
@@ -368,7 +372,8 @@ export async function openStore({
     recordScan,
     latestScan,
     accounts,
-    fleet: createFleet(db),
+    fleet: createFleet(db, { events }),
+    events,
     social: createSocial(db),
     trust,
     dialect: db.dialect,

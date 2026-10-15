@@ -670,7 +670,7 @@
    }
   ],
   "description": "Reference implementation of the LogicSRC OpenContext standard for portable, permissioned agent context.",
-  "homepage": "https://logicsrc.com/opencontext",
+  "homepage": "https://github.com/profullstack/logicsrc/tree/master/packages/opencontext",
   "repository": "https://github.com/profullstack/logicsrc",
   "license": "MIT",
   "agentic": true,

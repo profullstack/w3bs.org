@@ -3,7 +3,13 @@ test('homepage navigation, code tabs and narrow layouts work', async ({ page }, 
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('The open Web.');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Watch your servers');
+  await expect(page.getByRole('link', { name: /Create a free account/ })).toHaveAttribute(
+    'href',
+    '/signup?next=%2Ffleet',
+  );
+  await expect(page.getByRole('button', { name: 'Copy: Sign in' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: /The open Web/ })).toBeVisible();
   await page.getByRole('tab', { name: 'API', exact: true }).click();
   await expect(page.getByRole('tabpanel')).toContainText('curl');
   await page.getByRole('tab', { name: 'API', exact: true }).press('ArrowRight');
@@ -13,6 +19,11 @@ test('homepage navigation, code tabs and narrow layouts work', async ({ page }, 
   );
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: `artifacts/home-${testInfo.project.name}.png`, fullPage: true });
+  await page.goto('/pricing');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Fleet is free.');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `artifacts/pricing-${testInfo.project.name}.png`, fullPage: true });
+  await page.goto('/');
   await page.getByRole('navigation').getByRole('link', { name: 'Standards' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Common ground.');
   await page.getByRole('link', { name: /W3BS-URI-1/ }).click();

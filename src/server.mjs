@@ -41,7 +41,7 @@ export function createApp({
       'Referrer-Policy': 'strict-origin-when-cross-origin',
       'Cache-Control': 'no-store',
       'Content-Security-Policy':
-        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+        "default-src 'self'; script-src 'self' https://crawlproof.com; style-src 'self'; img-src 'self' data:; connect-src 'self' https://crawlproof.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
       'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
     });
     const railwayHealth =
@@ -273,7 +273,7 @@ export function createApp({
     res
       .type('application/xml')
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/packages', '/specs', '/browse', '/prompts', '/desktop', '/social', '/governance', '/developers', '/signup'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/pricing', '/packages', '/specs', '/browse', '/prompts', '/desktop', '/social', '/governance', '/developers', '/signup', '/terms', '/privacy'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
       ),
   );
   app.get('/docs/:file', (req, res) => {

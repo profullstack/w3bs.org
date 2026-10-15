@@ -92,6 +92,7 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
         pageShell({
           robots: 'noindex',
           scripts: '<script type="module" src="/assets/account.js"></script>',
+          track: false,
           ...options,
         }),
       );
@@ -498,6 +499,8 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
       if (req.query.switch === undefined) return res.redirect(302, next);
     }
     page(res, {
+      // A next= can carry an OAuth request or a device code; count only plain sign-ins.
+      track: !req.originalUrl.includes('?') || ['/fleet', '/account'].includes(next),
       title: 'Sign in',
       active: '/account',
       content: `<section class="auth-card"><div class="eyebrow">W3BS ACCOUNT</div><h1>Sign <em>in.</em></h1><button class="button primary auth-wide" type="button" data-action="passkey-login" data-next="${e(next)}">Sign in with a passkey</button><div class="auth-or"><span>or</span></div><form class="auth-form" data-form="login" data-next="${e(next)}"><label class="input-label" for="login">Username or email</label><input id="login" name="login" autocomplete="username webauthn" required maxlength="254"><label class="input-label" for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256"><button class="button dark" type="submit">Sign in</button><p class="form-status" role="status" aria-live="polite"></p></form><details class="auth-fallback"><summary>Forgot your password, or no passkey on this device?</summary>${await emailForm(next)}</details><p class="auth-small">New here? <a href="/signup${next !== '/account' ? `?next=${encodeURIComponent(next)}` : ''}">Create an account</a></p></section>`,
@@ -507,8 +510,9 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
     if (await currentUser(req)) return res.redirect(302, '/account');
     page(res, {
       title: 'Create an account',
+      track: true,
       active: '/account',
-      content: `<section class="auth-card"><div class="eyebrow">W3BS ACCOUNT</div><h1>Create an <em>account.</em></h1><p>One account for w3bs.org, the <code>w3bs</code> CLI and apps that offer "Sign in with W3BS".</p><form class="auth-form" data-form="signup"><label class="input-label" for="username">Username</label><input id="username" name="username" autocomplete="username" required minlength="3" maxlength="32" pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" spellcheck="false" autocapitalize="none"><p class="field-description">3 to 32 lowercase letters, digits and hyphens. Public.</p><label class="input-label" for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required maxlength="254"><p class="field-description">We send a link to confirm it. Never shown publicly.</p><label class="input-label" for="new-password">Password <span class="muted">(optional)</span></label><input id="new-password" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="256"><p class="field-description">At least 10 characters. Leave it empty to use a passkey instead; you add one right after confirming.</p>${await guardFields('signup')}<button class="button primary" type="submit">Create account</button><p class="form-status" role="status" aria-live="polite"></p></form><p class="auth-small">Have an account? <a href="/login">Sign in</a></p></section>`,
+      content: `<section class="auth-card"><div class="eyebrow">W3BS ACCOUNT</div><h1>Create an <em>account.</em></h1><p>One account for w3bs.org, the <code>w3bs</code> CLI and apps that offer "Sign in with W3BS".</p><form class="auth-form" data-form="signup"><label class="input-label" for="username">Username</label><input id="username" name="username" autocomplete="username" required minlength="3" maxlength="32" pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" spellcheck="false" autocapitalize="none"><p class="field-description">3 to 32 lowercase letters, digits and hyphens. Public.</p><label class="input-label" for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required maxlength="254"><p class="field-description">We send a link to confirm it. Never shown publicly.</p><label class="input-label" for="new-password">Password <span class="muted">(optional)</span></label><input id="new-password" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="256"><p class="field-description">At least 10 characters. Leave it empty to use a passkey instead; you add one right after confirming.</p>${await guardFields('signup')}<button class="button primary" type="submit">Create account</button><p class="form-status" role="status" aria-live="polite"></p></form><p class="auth-small">Free. By creating an account you agree to the <a href="/terms">terms</a>; the <a href="/privacy">privacy page</a> says what we keep.</p><p class="auth-small">Have an account? <a href="/login">Sign in</a></p></section>`,
     });
   });
   app.get('/auth/link', onMainHost, async (req, res) => {
@@ -536,8 +540,8 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
       title: 'Your account',
       active: '/account',
       content: `<section class="page-head compact"><div class="eyebrow">W3BS ACCOUNT</div><h1>@${e(user.username)}</h1><p>${e(user.email)} · member since ${date(user.createdAt)}</p></section>${
-        req.query.welcome !== undefined && !passkeys.length
-          ? `<div class="callout"><strong>Welcome. Add a passkey next.</strong><p>A passkey signs you in with your fingerprint, face or device PIN, and cannot be phished.</p></div>`
+        req.query.welcome !== undefined
+          ? `<div class="callout"><strong>Welcome. Next, add a server.</strong><p>Open your fleet and make a join command, or run <code>w3bs login</code> then <code>w3bs fleet join &lt;token&gt;</code> on the server.${passkeys.length ? '' : ' Then add a passkey below: it signs you in with your fingerprint, face or device PIN, and cannot be phished.'}</p><a href="/fleet">Open your fleet →</a></div>`
           : ''
       }<div class="account-grid"><section class="inspector-panel"><h3>Passkeys</h3>${
         passkeys.length
