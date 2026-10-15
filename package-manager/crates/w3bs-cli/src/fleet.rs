@@ -8,8 +8,12 @@
 //! own credential (an agent key) lives in `$XDG_CONFIG_HOME/w3bs/fleet.json` (0600).
 //!
 //! `w3bs fleet ls / run / rm` act on the whole fleet with the account from `w3bs login`.
+//!
+//! `w3bs fleet screen on` lets the owner watch this machine's desktop from the page; see
+//! `screen.rs`. `w3bs fleet view <machine>` opens that page.
 
 use crate::auth;
+use crate::screen::{self, Screen};
 use serde_json::{Map, Value, json};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -40,6 +44,8 @@ pub struct Config {
     pub name: String,
     pub allow_actions: bool,
     pub interval: u64,
+    /// Screen sharing, set on this machine only (`w3bs fleet screen on|off`).
+    pub screen: Option<Screen>,
 }
 
 impl Config {
@@ -51,6 +57,7 @@ impl Config {
             "name": self.name,
             "allow_actions": self.allow_actions,
             "interval": self.interval,
+            "screen": self.screen.as_ref().map(Screen::to_json),
         })
     }
     fn from_json(v: &Value) -> Option<Self> {
@@ -61,6 +68,7 @@ impl Config {
             name: v["name"].as_str().unwrap_or_default().to_owned(),
             allow_actions: v["allow_actions"].as_bool().unwrap_or(false),
             interval: clamp_interval(v["interval"].as_u64()),
+            screen: Screen::from_json(&v["screen"]),
         })
     }
 }
@@ -186,7 +194,7 @@ fn on_path(bin: &str) -> bool {
 }
 
 /// What the agent reports. Fields this platform cannot provide are left out.
-pub fn collect_info() -> Value {
+pub fn collect_info(screen: Option<&Screen>) -> Value {
     let mut m = Map::new();
     let hostname = read("/proc/sys/kernel/hostname").map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()).or_else(|| command_out("hostname", &[]));
     if let Some(h) = hostname {
@@ -228,6 +236,9 @@ pub fn collect_info() -> Value {
     m.insert("desktop".into(), json!({ "installed": installed, "active": active }));
     if let Ok(u) = std::env::var("USER") {
         m.insert("user".into(), u.into());
+    }
+    if let Some(s) = screen {
+        m.insert("screen".into(), screen::info(s));
     }
     Value::Object(m)
 }
@@ -458,13 +469,13 @@ fn server_error(code: &'static str, status: u16, body: &Value) -> Error {
 
 // ------------------------------------------------------------------ commands
 
-pub async fn join(origin: &str, token: &str, name: Option<&str>, no_service: bool) -> Result<Value> {
+pub async fn join(origin: &str, token: &str, name: Option<&str>, no_service: bool, screen: Option<Screen>) -> Result<Value> {
     let path = config_path(None)?;
     if let Some(c) = load_config(&path)? {
         return Err(Error::usage("ALREADY_JOINED", format!("This machine is already in a fleet as {} on {}. Run `w3bs fleet leave` first.", c.name, c.origin)));
     }
     let client = http();
-    let mut body = json!({ "token": token, "info": collect_info() });
+    let mut body = json!({ "token": token, "info": collect_info(screen.as_ref()) });
     if let Some(n) = name {
         body["name"] = n.into();
     }
@@ -479,6 +490,7 @@ pub async fn join(origin: &str, token: &str, name: Option<&str>, no_service: boo
         name: v["name"].as_str().map(str::to_owned).or_else(|| name.map(str::to_owned)).unwrap_or_default(),
         allow_actions: v["allow_actions"].as_bool().unwrap_or(false),
         interval: clamp_interval(v["interval"].as_u64()),
+        screen,
     };
     save_config(&path, &c)?;
     let (service, notes) = if no_service {
@@ -493,6 +505,7 @@ pub async fn join(origin: &str, token: &str, name: Option<&str>, no_service: boo
         "origin": c.origin, "machine_id": c.machine_id, "name": c.name,
         "allow_actions": c.allow_actions, "interval": c.interval,
         "service": service, "notes": notes, "config": path,
+        "screen": c.screen.as_ref().map(screen::info),
     }))
 }
 
@@ -507,21 +520,35 @@ pub fn status(config: Option<&Path>) -> Result<Value> {
     Ok(json!({
         "origin": c.origin, "machine_id": c.machine_id, "name": c.name,
         "allow_actions": c.allow_actions, "interval": c.interval,
-        "config": path, "service": unit, "info": collect_info(),
+        "config": path, "service": unit, "info": collect_info(c.screen.as_ref()),
     }))
 }
 
 /// The agent loop. Returns only on a fatal error; a removed machine exits the process.
 pub async fn agent(config: Option<&Path>) -> Result<Value> {
     let path = config_path(config)?;
-    let c = require_config(&path)?;
+    let mut c = require_config(&path)?;
     let client = http();
     let exe = std::env::current_exe().map(|p| p.display().to_string()).unwrap_or_else(|_| stable_exe());
     let mut interval = c.interval;
     let mut backoff = 5u64;
+    // The screen listener, restarted whenever `w3bs fleet screen` changes the config.
+    let mut listener: Option<(Screen, tokio::task::JoinHandle<()>)> = None;
     eprintln!("w3bs fleet agent: {} reporting to {} every {interval}s", c.name, c.origin);
     loop {
-        let body = json!({ "info": collect_info() });
+        if let Ok(Some(now)) = load_config(&path) {
+            c = now;
+        }
+        if listener.as_ref().map(|(s, _)| s) != c.screen.as_ref() {
+            if let Some((_, task)) = listener.take() {
+                task.abort();
+                eprintln!("w3bs fleet agent: screen sharing changed");
+            }
+            if let Some(s) = c.screen.clone() {
+                listener = Some((s.clone(), tokio::spawn(screen::listen(c.origin.clone(), c.agent_key.clone(), s))));
+            }
+        }
+        let body = json!({ "info": collect_info(c.screen.as_ref()) });
         match call(&client, reqwest::Method::POST, &format!("{}/api/fleet/heartbeat", c.origin), Some(&c.agent_key), Some(&body)).await {
             Ok((200, v)) => {
                 backoff = 5;
@@ -572,6 +599,54 @@ pub async fn leave(config: Option<&Path>) -> Result<Value> {
     let removed = remove_service();
     std::fs::remove_file(&path).map_err(|e| Error::preflight("FLEET_FILE", format!("{}: {e}", path.display())))?;
     Ok(json!({ "origin": c.origin, "name": c.name, "server": server, "service_removed": removed }))
+}
+
+/// `w3bs fleet screen on|off`: change screen sharing on this machine. `None` shows the
+/// current setting, `Some(None)` turns it off. The running agent picks the change up on its next
+/// report, so no restart is needed.
+pub fn screen_set(config: Option<&Path>, change: Option<Option<Screen>>) -> Result<Value> {
+    let path = config_path(config)?;
+    let mut c = require_config(&path)?;
+    if let Some(next) = change {
+        if let Some(s) = &next {
+            screen::check_addr(&s.vnc).map_err(|e| Error::usage("BAD_VNC_ADDRESS", e))?;
+        }
+        c.screen = next;
+        save_config(&path, &c)?;
+        screen::forget_probe();
+    }
+    Ok(json!({
+        "name": c.name, "machine_id": c.machine_id, "origin": c.origin,
+        "screen": c.screen.as_ref().map(screen::info),
+        "url": format!("{}/fleet/{}/screen", c.origin, c.machine_id),
+    }))
+}
+
+/// `w3bs fleet view <machine>`: the machine's screen page, opened in the browser when one is
+/// at hand.
+pub async fn view(origin: &str, machine: &str, open: bool) -> Result<Value> {
+    let token = auth::access_token(origin).await?;
+    let list = machines(&http(), origin, &token).await?;
+    let m = find_machine(&list, machine)?;
+    let url = format!("{origin}/fleet/{}/screen", m["id"].as_str().unwrap_or_default());
+    let opened = open && open_browser(&url);
+    Ok(json!({
+        "machine": m["name"], "machine_id": m["id"], "url": url, "opened": opened,
+        "screen": m["info"]["screen"], "listening": m["screen_listening"],
+    }))
+}
+
+fn open_browser(url: &str) -> bool {
+    let (program, args): (&str, Vec<&str>) = if cfg!(target_os = "macos") {
+        ("open", vec![url])
+    } else if cfg!(windows) {
+        ("cmd", vec!["/C", "start", "", url])
+    } else if std::env::var_os("DISPLAY").is_some() || std::env::var_os("WAYLAND_DISPLAY").is_some() {
+        ("xdg-open", vec![url])
+    } else {
+        return false;
+    };
+    std::process::Command::new(program).args(args).stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).spawn().is_ok()
 }
 
 async fn machines(client: &reqwest::Client, origin: &str, token: &str) -> Result<Vec<Value>> {
@@ -733,7 +808,7 @@ mod tests {
     fn config_round_trip_is_private() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("w3bs/fleet.json");
-        let c = Config { origin: "https://w3bs.org".into(), machine_id: "m1".into(), agent_key: "fm_secret".into(), name: "dev2".into(), allow_actions: true, interval: 30 };
+        let c = Config { origin: "https://w3bs.org".into(), machine_id: "m1".into(), agent_key: "fm_secret".into(), name: "dev2".into(), allow_actions: true, interval: 30, screen: Some(Screen { mode: screen::Mode::View, vnc: "127.0.0.1:5901".into() }) };
         save_config(&path, &c).unwrap();
         assert_eq!(load_config(&path).unwrap(), Some(c));
         #[cfg(unix)]

@@ -3,6 +3,7 @@
 
 mod auth;
 mod fleet;
+mod screen;
 mod render;
 
 use clap::{Args, Parser, Subcommand};
@@ -30,6 +31,8 @@ Apps:
   fleet      w3bs fleet join <token>  add this machine to your fleet on w3bs.org/fleet
              w3bs fleet ls            your machines, online state and health
              w3bs fleet run <m> <a>   queue refresh, update or restart-desktop on a machine
+             w3bs fleet screen on     let the fleet owner watch this desktop (VNC, view only)
+             w3bs fleet view <m>      watch a machine's desktop in the browser
              w3bs fleet --help        status, agent, leave, rm";
 
 const AFTER_HELP: &str = "\
@@ -372,6 +375,31 @@ enum FleetCmd {
         /// Do not install the systemd service; run `w3bs fleet agent` yourself
         #[arg(long)]
         no_service: bool,
+        /// Share this machine's screen on w3bs.org/fleet: view or control (see `w3bs fleet screen`)
+        #[arg(long, value_name = "MODE", value_parser = ["view", "control"])]
+        screen: Option<String>,
+        /// The local VNC server to share (with --screen)
+        #[arg(long, value_name = "HOST:PORT", default_value = screen::DEFAULT_VNC, requires = "screen")]
+        vnc: String,
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Let the fleet owner watch this machine's desktop on w3bs.org/fleet/<id>/screen, through
+    /// a local VNC server (see w3bs.org/docs/fleet-screen.md). Outbound only; view only unless
+    /// --control. Run without arguments to see the current setting.
+    Screen {
+        #[command(subcommand)]
+        action: Option<ScreenCmd>,
+        #[arg(long, hide = true, value_name = "PATH", global = true)]
+        config: Option<PathBuf>,
+    },
+    /// Open a machine's screen on w3bs.org/fleet in your browser (uses your `w3bs login`)
+    View {
+        /// Machine name or id from `w3bs fleet ls`
+        machine: String,
+        /// Print the address only
+        #[arg(long)]
+        no_open: bool,
         #[command(flatten)]
         a: Api,
     },
@@ -413,6 +441,21 @@ enum FleetCmd {
         #[command(flatten)]
         a: Api,
     },
+}
+
+#[derive(Subcommand, Clone)]
+enum ScreenCmd {
+    /// Share the screen: view only (input from the page is dropped) unless --control
+    On {
+        /// Also let the owner use the mouse and keyboard from the page
+        #[arg(long)]
+        control: bool,
+        /// The local VNC server to share
+        #[arg(long, value_name = "HOST:PORT", default_value = screen::DEFAULT_VNC)]
+        vnc: String,
+    },
+    /// Stop sharing; open sessions end within one report interval
+    Off,
 }
 
 #[derive(Subcommand, Clone)]
@@ -709,9 +752,22 @@ async fn run_fleet(cmd: FleetCmd) -> (&'static str, w3bs_core::Result<OperationR
         )
     };
     match cmd {
-        FleetCmd::Join { token, name, no_service, a } => {
-            ("fleet.join", account("fleet.join", &a, |o| async move { fleet::join(&o, &token, name.as_deref(), no_service).await }).await)
+        FleetCmd::Join { token, name, no_service, screen: mode, vnc, a } => {
+            let share = mode.as_deref().and_then(screen::Mode::parse).map(|mode| screen::Screen { mode, vnc });
+            if let Some(Err(e)) = share.as_ref().map(|s| screen::check_addr(&s.vnc)) {
+                return ("fleet.join", Err(w3bs_core::Error::usage("BAD_VNC_ADDRESS", e)));
+            }
+            ("fleet.join", account("fleet.join", &a, |o| async move { fleet::join(&o, &token, name.as_deref(), no_service, share).await }).await)
         }
+        FleetCmd::Screen { action, config } => {
+            let change = match action {
+                None => None,
+                Some(ScreenCmd::Off) => Some(None),
+                Some(ScreenCmd::On { control, vnc }) => Some(Some(screen::Screen { mode: if control { screen::Mode::Control } else { screen::Mode::View }, vnc })),
+            };
+            local("fleet.screen", fleet::screen_set(config.as_deref(), change))
+        }
+        FleetCmd::View { machine, no_open, a } => ("fleet.view", account("fleet.view", &a, |o| async move { fleet::view(&o, &machine, !no_open).await }).await),
         FleetCmd::Agent { config } => local("fleet.agent", fleet::agent(config.as_deref()).await),
         FleetCmd::Status { config } => local("fleet.status", fleet::status(config.as_deref())),
         FleetCmd::Leave { config } => local("fleet.leave", fleet::leave(config.as_deref()).await),

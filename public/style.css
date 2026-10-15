@@ -1814,6 +1814,7 @@ textarea {
   margin: 18px 0;
 }
 .auth-form input:not([type='hidden']):not([type='checkbox']),
+.auth-form select,
 .auth-form textarea {
   width: 100%;
   box-sizing: border-box;
@@ -2048,4 +2049,58 @@ main > .auth-small:last-child {
     justify-content: flex-start;
     gap: 2px 18px;
   }
+}
+/* Fleet screens: the "View screen" link on a card, and /fleet/<id>/screen. */
+.fleet-screen-link {
+  margin-left: 0;
+  color: var(--ink);
+  text-decoration: none;
+}
+.fleet-screen-link.live {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+}
+.screen-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding: 18px 0 12px;
+}
+.screen-bar h1 {
+  margin: 0;
+  font-size: 26px;
+}
+.screen-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.screen-tools .small-button,
+.screen-tools .consent {
+  margin: 0;
+}
+.screen-message:empty {
+  display: none;
+}
+.screen-password {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.screen-frame {
+  width: 100%;
+  height: calc(100vh - 210px);
+  min-height: 320px;
+  background: #16181a;
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.screen-frame:fullscreen {
+  height: 100vh;
+  border-radius: 0;
 }

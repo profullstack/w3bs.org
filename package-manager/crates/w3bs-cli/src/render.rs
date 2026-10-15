@@ -84,8 +84,40 @@ pub fn human(r: &OperationResult) {
                 _ => {}
             }
             println!("Remote actions: {}", if d["allow_actions"] == true { "allowed (refresh, update, restart-desktop)" } else { "not allowed" });
+            if let Some(sc) = d["screen"].as_object() {
+                let mode = if sc["mode"] == "control" { "view and control" } else { "view only" };
+                println!("Screen: shared ({mode}) from {}; watch it at {}/fleet/{}/screen", s(&sc["vnc"]), s(&d["origin"]), s(&d["machine_id"]));
+                if sc["reachable"] != true {
+                    eprintln!("warning: nothing answers on {} yet; start a VNC server there, see https://w3bs.org/docs/fleet-screen.md", s(&sc["vnc"]));
+                }
+            }
             for n in d["notes"].as_array().into_iter().flatten() {
                 eprintln!("note: {}", s(n));
+            }
+            return;
+        }
+        "fleet.screen" => {
+            let d = &r.data;
+            let sc = &d["screen"];
+            if sc.is_null() {
+                println!("Screen sharing is off for {}. Turn it on with: w3bs fleet screen on [--control]", s(&d["name"]));
+                return;
+            }
+            let mode = if sc["mode"] == "control" { "view and control" } else { "view only" };
+            println!("Screen sharing is on for {} ({mode}), from the VNC server on {}", s(&d["name"]), s(&sc["vnc"]));
+            println!("Watch it at {}", s(&d["url"]));
+            if sc["reachable"] != true {
+                eprintln!("warning: nothing answers on {} yet; start a VNC server there, see https://w3bs.org/docs/fleet-screen.md", s(&sc["vnc"]));
+            }
+            return;
+        }
+        "fleet.view" => {
+            let d = &r.data;
+            println!("{}", s(&d["url"]));
+            if d["screen"].is_null() {
+                eprintln!("note: {} does not share its screen; on it, run: w3bs fleet screen on", s(&d["machine"]));
+            } else if d["listening"] != true {
+                eprintln!("note: {}'s agent is not connected for screen sharing right now", s(&d["machine"]));
             }
             return;
         }
@@ -93,6 +125,11 @@ pub fn human(r: &OperationResult) {
             let d = &r.data;
             println!("{} ({}) on {}", s(&d["name"]), s(&d["machine_id"]), s(&d["origin"]));
             println!("Remote actions: {}", if d["allow_actions"] == true { "allowed" } else { "not allowed" });
+            let sc = &d["info"]["screen"];
+            println!(
+                "Screen: {}",
+                if sc.is_null() { "not shared (w3bs fleet screen on)".to_owned() } else { format!("{} from {}{}", if sc["mode"] == "control" { "view and control" } else { "view only" }, s(&sc["vnc"]), if sc["reachable"] == true { "" } else { " (nothing answers there)" }) }
+            );
             println!("Agent service: {}", if d["service"].is_null() { "not installed".to_owned() } else { s(&d["service"]) });
             println!("Reports: {}", serde_json::to_string_pretty(&d["info"]).unwrap_or_default());
             return;

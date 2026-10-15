@@ -18,6 +18,9 @@ export const ACTIONS = {
   update: 'Update w3bs packages',
   'restart-desktop': 'Restart the desktop layer',
 };
+// Labels for the history list: the actions above plus what the relay logs.
+export const HISTORY = { ...ACTIONS, screen: 'Screen session' };
+export const SCREEN_MODES = ['view', 'control'];
 const INTERVAL = 30;
 const ONLINE_WITHIN = 3 * INTERVAL * 1000;
 const TOKEN_TTL = 60 * 60 * 1000;
@@ -69,6 +72,14 @@ function cleanInfo(info) {
         ? { installed: Boolean(source.desktop.installed), active: Boolean(source.desktop.active) }
         : undefined,
     user: text(source.user, 64),
+    screen:
+      source.screen && SCREEN_MODES.includes(source.screen.mode)
+        ? {
+            mode: source.screen.mode,
+            vnc: text(source.screen.vnc, 64),
+            reachable: Boolean(source.screen.reachable),
+          }
+        : undefined,
   };
 }
 
@@ -261,6 +272,23 @@ export function createFleet(db) {
     );
     return { ...row, status: 'queued' };
   }
+  // A finished (or refused) screen session, kept with the machine's action history.
+  async function logScreen(machineId, userId, { status, output, startedAt }) {
+    await db.run("INSERT INTO fleet_actions VALUES (?, ?, ?, 'screen', ?, ?, ?, ?, ?)", [
+      `a_${random(9)}`,
+      machineId,
+      userId,
+      status === 'done' ? 'done' : 'failed',
+      String(output ?? '').slice(0, 2000),
+      startedAt,
+      startedAt,
+      nowIso(),
+    ]);
+    await db.run(
+      'DELETE FROM fleet_actions WHERE machine_id = ? AND id NOT IN (SELECT id FROM fleet_actions WHERE machine_id = ? ORDER BY created_at DESC LIMIT 20)',
+      [machineId, machineId],
+    );
+  }
   async function removeMachine(userId, id) {
     const machine = await owned(userId, id);
     await db.run('DELETE FROM fleet_machines WHERE id = ?', [machine.id]);
@@ -284,5 +312,12 @@ export function createFleet(db) {
     queueAction,
     removeMachine,
     rename,
+    logScreen,
+    // For the screen relay: the machine behind an agent key, and an owner's machine.
+    machineByKey: async (key) => {
+      const row = await agentMachine(key);
+      return row && machineRow(row);
+    },
+    ownedMachine: async (userId, id) => machineRow(await owned(userId, id)),
   };
 }

@@ -2,6 +2,7 @@
 const data = JSON.parse(document.getElementById('fleet-data').textContent);
 const list = document.getElementById('fleet-list');
 const ACTIONS = data.actions;
+const HISTORY = data.history;
 
 async function call(path, { method = 'GET', body } = {}) {
   const response = await fetch(path, {
@@ -102,6 +103,13 @@ function card(machine) {
         : '?',
     ],
     ['Agent user', info.user],
+    [
+      'Screen',
+      info.screen &&
+        `${info.screen.mode === 'control' ? 'view and control' : 'view only'} · ${
+          info.screen.reachable ? 'VNC' : 'no VNC server answering on'
+        } ${info.screen.vnc || ''}`,
+    ],
   ].filter(([, v]) => v != null && v !== '');
   const actionButtons = machine.allow_actions
     ? Object.entries(ACTIONS).map(([action, label]) =>
@@ -130,7 +138,7 @@ function card(machine) {
                 className: `pill ${a.status === 'done' ? 'green' : a.status === 'failed' ? 'red' : ''}`,
                 textContent: a.status,
               }),
-              ` ${ACTIONS[a.action] || a.action} · ${ago(a.created_at)}`,
+              ` ${HISTORY[a.action] || a.action} · ${ago(a.created_at)}`,
               a.output
                 ? el('pre', { className: 'instructions', textContent: a.output.slice(-2000) })
                 : null,
@@ -165,6 +173,16 @@ function card(machine) {
       ]),
     ),
     el('div', { className: 'fleet-actions' }, [
+      info.screen
+        ? el('a', {
+            className: `small-button fleet-screen-link${machine.screen_listening ? ' live' : ''}`,
+            href: `/fleet/${encodeURIComponent(machine.id)}/screen`,
+            textContent: 'View screen',
+            title: machine.screen_listening
+              ? 'Watch this machine\u2019s desktop'
+              : 'The agent is not connected for screen sharing right now',
+          })
+        : null,
       ...actionButtons,
       el('button', {
         className: 'small-button fleet-remove',
@@ -252,6 +270,7 @@ form.addEventListener('submit', async (event) => {
       body: {
         name: values.get('name') || undefined,
         allowActions: values.get('allowActions') === '1',
+        screen: values.get('screen') || undefined,
       },
     });
     document.getElementById('fleet-command').textContent = command;
