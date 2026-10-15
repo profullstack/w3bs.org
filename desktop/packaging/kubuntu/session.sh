@@ -15,6 +15,12 @@ export SHELL=/bin/bash
 LOGS=$HOME/.local/state/w3bs-desktop/logs
 mkdir -p -m 0700 "$XDG_RUNTIME_DIR" && mkdir -p "$LOGS" "$XDG_CONFIG_HOME/xdg-desktop-portal"
 printf '[preferred]\ndefault=kde;gtk\n' > "$XDG_CONFIG_HOME/xdg-desktop-portal/kde-portals.conf"
+# The KDE screenshot portal writes the image under Pictures and answers "response 2" when the
+# folder does not exist; a fresh home has none.
+mkdir -p "$HOME/Pictures"
+# Never lock: nobody is at this screen to unlock it, and a locked session makes the desktop
+# layer disable agent access ("session locked").
+printf '[Daemon]\nAutolock=false\nLockOnResume=false\nTimeout=0\n' > "$XDG_CONFIG_HOME/kscreenlockerrc"
 rm -f /vnc/vnc.sock
 
 say() { echo "w3bs-kubuntu: $*"; }
@@ -40,6 +46,9 @@ wireplumber >"$LOGS/wireplumber.log" 2>&1 &
 # screen. Everything in this compositor is part of one agent desktop that the desktop layer
 # already lets agents see and drive, so turn the check off here; it never touches the host.
 export KWIN_WAYLAND_NO_PERMISSION_CHECKS=1
+# Screenshots are a separate KWin plugin with its own check (ScreenShot2 answers
+# NoAuthorized to the KDE portal here), so the desktop layer's screen capture needs it too.
+export KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1
 kbuildsycoca6 >"$LOGS/kbuildsycoca.log" 2>&1 || true
 
 # KWin on the virtual display; with no GPU, Mesa renders OpenGL on the CPU.

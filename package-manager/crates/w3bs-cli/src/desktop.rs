@@ -23,6 +23,7 @@ pub const IMAGE: &str = "w3bs-kubuntu-desktop";
 pub const MCP: &str = "127.0.0.1:7802";
 const DOCKERFILE: &str = include_str!("../../../../desktop/packaging/kubuntu/Dockerfile");
 const SESSION: &str = include_str!("../../../../desktop/packaging/kubuntu/session.sh");
+const BROWSER: &str = include_str!("../../../../desktop/packaging/kubuntu/browser.sh");
 const START_TIMEOUT: Duration = Duration::from_secs(120);
 
 fn fail(code: &'static str, msg: impl Into<String>) -> Error {
@@ -50,6 +51,8 @@ pub fn image_tag() -> String {
     h.update(DOCKERFILE);
     h.update([0]);
     h.update(SESSION);
+    h.update([0]);
+    h.update(BROWSER);
     let hex: String = h.finalize().iter().take(6).map(|b| format!("{b:02x}")).collect();
     format!("{IMAGE}:{hex}")
 }
@@ -139,7 +142,9 @@ fn gid_of(_: &Path) -> Option<u32> {
 fn build_image(tag: &str) -> Result<()> {
     let ctx = data_dir()?.join("build");
     std::fs::create_dir_all(&ctx).map_err(|e| fail("DESKTOP_BUILD", format!("{}: {e}", ctx.display())))?;
-    std::fs::write(ctx.join("Dockerfile"), DOCKERFILE).and_then(|_| std::fs::write(ctx.join("session.sh"), SESSION)).map_err(|e| fail("DESKTOP_BUILD", e.to_string()))?;
+    std::fs::write(ctx.join("Dockerfile"), DOCKERFILE)
+        .and_then(|_| std::fs::write(ctx.join("session.sh"), SESSION))
+        .and_then(|_| std::fs::write(ctx.join("browser.sh"), BROWSER)).map_err(|e| fail("DESKTOP_BUILD", e.to_string()))?;
     eprintln!("w3bs: building the Kubuntu desktop image {tag} (first time only, a few minutes)");
     let ok = Command::new("docker")
         .args(["build", "--quiet", "-t", tag, "-t", &format!("{IMAGE}:latest")])
@@ -310,5 +315,8 @@ mod tests {
         assert_eq!(t.len(), "w3bs-kubuntu-desktop:".len() + 12);
         assert_eq!(t, image_tag());
         assert!(DOCKERFILE.contains("w0vncserver") && SESSION.contains("/vnc/vnc.sock"));
+        // Screen capture needs KWin's screenshot check off and a Pictures folder; agents need a browser.
+        assert!(SESSION.contains("KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1") && SESSION.contains("Pictures"));
+        assert!(DOCKERFILE.contains("google-chrome-stable") && DOCKERFILE.contains("w3bs-browser") && BROWSER.contains("google-chrome"));
     }
 }
