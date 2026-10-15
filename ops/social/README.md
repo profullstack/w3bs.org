@@ -18,6 +18,9 @@ everything else to the client; `*.social.w3bs.org` handle hosts go straight to t
   `rebrand.py` restyles it in the w3bs.org design: default PDS `social.w3bs.org`, the
   paper/ink/orange palette, the orbit mark and "w3bs." wordmark, a paper welcome dialog
   with a Georgia headline, "W3BS Social" titles, and the icons + social card in `brand/`.
+  It also removes every visible "Bluesky": the pre-JS splash, the word in all UI strings
+  and locale catalogs, policy/help links (now w3bs.org/social), share links (now
+  social.w3bs.org), the go.bsky.app link redirector, and Bluesky metadata in the templates.
 - Rebuild (Metro wants ~8 GB heap and takes several minutes). `rebrand.py` exits on any
   patch that no longer applies, so a moved upstream file stops the build instead of
   shipping half a rebrand:
