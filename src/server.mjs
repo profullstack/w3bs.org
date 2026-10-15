@@ -248,7 +248,8 @@ export function createApp({
       .json({ error: { code: 'METHOD_NOT_ALLOWED', message: 'Use Streamable HTTP POST.' } }),
   );
   const helpers = mountAccounts(app, { store, origin, mailer, formGuard, bridgeClients });
-  mountFleet(app, { store, origin, helpers });
+  // WebSocket upgrades (fleet screens) skip Express; startServer hands them to this.
+  app.locals.fleet = mountFleet(app, { store, origin, helpers });
   app.use(
     '/assets',
     express.static(resolve(ROOT, 'public'), { maxAge: '1h', index: false, fallthrough: false }),
@@ -345,6 +346,9 @@ export async function startServer(options = {}) {
       : undefined);
   scanner?.start();
   const server = createServer({ requestTimeout: 30000, headersTimeout: 10000 }, app);
+  server.on('upgrade', (req, socket, head) => {
+    if (!app.locals.fleet.upgrade(req, socket, head)) socket.destroy();
+  });
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(
@@ -358,6 +362,7 @@ export async function startServer(options = {}) {
     store,
     close: async () => {
       scanner?.stop();
+      app.locals.fleet.close();
       server.closeAllConnections();
       await new Promise((resolve) => server.close(resolve));
       await store.close();
