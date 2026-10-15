@@ -8,7 +8,8 @@
   "packageManager": "bun@1.4.2",
   "bin": {
     "w3bs-reference": "src/cli.mjs",
-    "w3bs-open": "native/client.mjs"
+    "w3bs-open": "native/client.mjs",
+    "w3bs-training": "training/bin/w3bs-training.mjs"
   },
   "scripts": {
     "start": "bun src/server.mjs",
@@ -19,11 +20,14 @@
     "seed:sign": "bun scripts/sign-examples.mjs",
     "mcp": "bun src/mcp-stdio.mjs",
     "conformance": "bun scripts/conformance.mjs",
-    "build": "bun scripts/check.mjs"
+    "build": "bun scripts/check.mjs",
+    "training": "bun training/bin/w3bs-training.mjs",
+    "training:schemas": "bun training/schema/generate.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
     "@profullstack/bridges": "0.2.0",
+    "@profullstack/hqtui": "0.10.3",
     "@profullstack/stack": "0.4.0",
     "@profullstack/threatcrush": "0.13.30",
     "@simplewebauthn/server": "13.3.3",

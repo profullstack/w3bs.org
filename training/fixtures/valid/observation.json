@@ -1,0 +1,22 @@
+{
+  "record": "observation",
+  "why": "A keyframe taken from the pre-action buffer.",
+  "value": {
+    "schema_version": "0.1",
+    "observation_id": "obs_a0",
+    "session_id": "ses_a1",
+    "monotonic_ns": "950000000",
+    "kind": "keyframe",
+    "artifact_id": "art_a0",
+    "semantic": {
+      "app": "Firefox",
+      "window": "Releases · w3bs.org"
+    },
+    "display": {
+      "width": 1920,
+      "height": 1080,
+      "scale": 1
+    },
+    "pre_action_verified": true
+  }
+}

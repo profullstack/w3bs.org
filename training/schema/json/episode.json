@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "episode_id": {
+      "type": "string",
+      "pattern": "^ep_[A-Za-z0-9_-]{1,64}$"
+    },
+    "goal": {
+      "type": "object",
+      "properties": {
+        "value": {},
+        "source": {
+          "type": "string",
+          "enum": [
+            "human",
+            "device_event",
+            "application_event",
+            "deterministic_rule",
+            "model_inference",
+            "imported"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "proposed",
+            "confirmed",
+            "rejected"
+          ]
+        },
+        "evidence": {
+          "default": [],
+          "maxItems": 64,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 80
+          }
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "value",
+        "source",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "segments": {
+      "minItems": 1,
+      "maxItems": 256,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "pattern": "^ses_[A-Za-z0-9_-]{1,64}$"
+          },
+          "from_ns": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,24})$"
+          },
+          "to_ns": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,24})$"
+          }
+        },
+        "required": [
+          "session_id",
+          "from_ns",
+          "to_ns"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "steps": {
+      "default": [],
+      "maxItems": 20000,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^step_[A-Za-z0-9_-]{1,64}$"
+      }
+    },
+    "parameters": {
+      "default": [],
+      "maxItems": 64,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "number",
+              "date",
+              "url",
+              "email",
+              "file",
+              "secret_ref"
+            ]
+          },
+          "placeholder": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "prerequisites": {
+      "default": [],
+      "maxItems": 64,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 500
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "properties": {
+        "value": {},
+        "source": {
+          "type": "string",
+          "enum": [
+            "human",
+            "device_event",
+            "application_event",
+            "deterministic_rule",
+            "model_inference",
+            "imported"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "proposed",
+            "confirmed",
+            "rejected"
+          ]
+        },
+        "evidence": {
+          "default": [],
+          "maxItems": 64,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 80
+          }
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "evidence_type": {
+          "default": "none",
+          "type": "string",
+          "enum": [
+            "ui_confirmation",
+            "state_change",
+            "external_check",
+            "human_assertion",
+            "none"
+          ]
+        }
+      },
+      "required": [
+        "value",
+        "source",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "explanation": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "maxLength": 8000
+        },
+        "author": {
+          "type": "string",
+          "const": "human"
+        }
+      },
+      "required": [
+        "text",
+        "author"
+      ],
+      "additionalProperties": false
+    },
+    "workflow_family": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "parent_episode_id": {
+      "type": "string",
+      "pattern": "^ep_[A-Za-z0-9_-]{1,64}$"
+    },
+    "capture_profile": {
+      "type": "string",
+      "enum": [
+        "visual-review",
+        "semantic-demonstration",
+        "action-supervision"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "episode_id",
+    "goal",
+    "segments",
+    "outcome",
+    "capture_profile"
+  ],
+  "additionalProperties": false,
+  "$id": "https://w3bs.org/schemas/training/0.1/episode.json",
+  "title": "W3BS Demonstration Dataset 0.1: episode"
+}

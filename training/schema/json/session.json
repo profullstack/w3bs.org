@@ -1,0 +1,258 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^ses_[A-Za-z0-9_-]{1,64}$"
+    },
+    "capture_profile": {
+      "type": "string",
+      "enum": [
+        "visual-review",
+        "semantic-demonstration",
+        "action-supervision"
+      ]
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    },
+    "ended_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    },
+    "clock": {
+      "type": "object",
+      "properties": {
+        "wall_clock_anchor": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "monotonic_anchor_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,24})$"
+        },
+        "sync_uncertainty_ns": {
+          "default": "0",
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,24})$"
+        }
+      },
+      "required": [
+        "wall_clock_anchor",
+        "monotonic_anchor_ns"
+      ],
+      "additionalProperties": false
+    },
+    "device": {
+      "default": {
+        "displays": []
+      },
+      "type": "object",
+      "properties": {
+        "os": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "desktop": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "locale": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "keyboard_layout": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "displays": {
+          "default": [],
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              },
+              "width": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "height": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "scale": {
+                "default": 1,
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "id",
+              "x",
+              "y",
+              "width",
+              "height"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "scope": {
+      "default": {
+        "applications": [],
+        "origins": [],
+        "text_values": false
+      },
+      "type": "object",
+      "properties": {
+        "applications": {
+          "default": [],
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "origins": {
+          "default": [],
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "text_values": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "capture_grant": {
+      "type": "object",
+      "properties": {
+        "grant_id": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "purpose": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "revocation_generation": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "grant_id",
+        "purpose"
+      ],
+      "additionalProperties": false
+    },
+    "adapters": {
+      "default": [],
+      "maxItems": 32,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "version": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "name",
+          "version"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "gaps": {
+      "default": [],
+      "maxItems": 10000,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "capture_denied",
+              "protected_surface",
+              "inaccessible_control",
+              "dropped_frames",
+              "missing_origin",
+              "unsupported_ime",
+              "paused",
+              "excluded_scope",
+              "other"
+            ]
+          },
+          "from_ns": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,24})$"
+          },
+          "to_ns": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,24})$"
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "kind",
+          "from_ns"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "session_id",
+    "capture_profile",
+    "started_at",
+    "clock"
+  ],
+  "additionalProperties": false,
+  "$id": "https://w3bs.org/schemas/training/0.1/session.json",
+  "title": "W3BS Demonstration Dataset 0.1: session"
+}

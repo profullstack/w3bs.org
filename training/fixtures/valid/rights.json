@@ -1,0 +1,14 @@
+{
+  "record": "rights",
+  "why": "The uploader's rights declaration.",
+  "value": {
+    "declared_by": "fixture author",
+    "source_rights": "own_capture",
+    "permitted_uses": [
+      "human_review",
+      "private_retrieval",
+      "evaluation",
+      "model_training"
+    ]
+  }
+}

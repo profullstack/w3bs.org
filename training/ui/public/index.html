@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>W3BS Training</title>
+    <link rel="icon" href="/assets/mark.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/app.css" />
+    <script type="module" src="/assets/app.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="top">
+      <a class="brand" href="#/overview"
+        ><img src="/assets/mark.svg" alt="" width="28" height="28" /> <span>W3BS Training</span></a
+      >
+      <p class="status" id="status" role="status" aria-live="polite">Loading…</p>
+    </header>
+    <nav class="tabs" aria-label="Workspace">
+      <a href="#/overview">Overview</a>
+      <a href="#/inbox">Inbox</a>
+      <a href="#/sessions">Sessions</a>
+      <a href="#/datasets">Datasets</a>
+      <a href="#/workflows">Workflows</a>
+      <a href="#/consumers">Consumers</a>
+      <a href="#/runs">Runs</a>
+      <a href="#/settings">Settings</a>
+    </nav>
+    <main id="main" tabindex="-1"></main>
+    <div class="toast" id="toast" role="alert" hidden></div>
+  </body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "record": "manifest",
+  "why": "Only schema 0.1 is defined.",
+  "value": {
+    "format": "w3bs-demonstration-dataset",
+    "schema_version": "1.0",
+    "bundle_id": "bun_a",
+    "created_at": "2026-10-15T16:00:00.000Z",
+    "producer": {
+      "name": "w3bs-training-fixtures",
+      "version": "0.1.0"
+    },
+    "capture_profile": "action-supervision",
+    "counts": {
+      "sessions": 1,
+      "episodes": 1,
+      "observations": 4,
+      "actions": 3,
+      "labels": 0,
+      "artifacts": 4
+    },
+    "privacy": {
+      "text_values_included": false,
+      "redaction_applied": false
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "record": "action",
+  "why": "A text edit that kept only a parameter placeholder.",
+  "value": {
+    "schema_version": "0.1",
+    "step_id": "step_a2",
+    "session_id": "ses_a1",
+    "sequence": 2,
+    "observation_before": "obs_a2",
+    "observation_after": "obs_a3",
+    "action": {
+      "type": "text_edit",
+      "origin": "human",
+      "source": "device_event",
+      "status": "confirmed",
+      "target": {
+        "app": "Text Editor",
+        "role": "text",
+        "name": "announcement.md",
+        "source": "accessibility"
+      },
+      "coordinate_space": "display",
+      "arguments": {
+        "text_placeholder": "{{version_line}}"
+      },
+      "monotonic_ns": "11000000000"
+    },
+    "alignment": {
+      "status": "verified",
+      "evidence": [
+        "event_2",
+        "obs_a2",
+        "obs_a3"
+      ]
+    }
+  }
+}

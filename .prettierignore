@@ -4,3 +4,6 @@ artifacts
 test-results
 fixtures/conformance-report.json
 bun.lock
+training/schema/json/
+training/fixtures/valid/
+training/fixtures/invalid/

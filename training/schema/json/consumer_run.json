@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^run_[A-Za-z0-9_-]{1,64}$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "retrieval",
+        "execution",
+        "export",
+        "training",
+        "evaluation"
+      ]
+    },
+    "consumer": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 80
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "dataset": {
+      "type": "object",
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "pattern": "^ds_[A-Za-z0-9_-]{1,64}$"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "dataset_id",
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "condition": {
+      "type": "string",
+      "enum": [
+        "with_demonstrations",
+        "baseline"
+      ]
+    },
+    "task": {
+      "type": "string",
+      "maxLength": 4000
+    },
+    "task_family": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "used_episodes": {
+      "default": [],
+      "maxItems": 200,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^ep_[A-Za-z0-9_-]{1,64}$"
+      }
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "success",
+        "partial",
+        "failure",
+        "interrupted",
+        "unknown"
+      ]
+    },
+    "interventions": {
+      "default": 0,
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "unsafe_attempts": {
+      "default": 0,
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "elapsed_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "cost_usd": {
+      "type": "number",
+      "minimum": 0
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    }
+  },
+  "required": [
+    "schema_version",
+    "run_id",
+    "kind",
+    "consumer",
+    "outcome",
+    "created_at"
+  ],
+  "additionalProperties": false,
+  "$id": "https://w3bs.org/schemas/training/0.1/consumer_run.json",
+  "title": "W3BS Demonstration Dataset 0.1: consumer_run"
+}

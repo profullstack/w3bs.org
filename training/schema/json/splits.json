@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "strategy": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "seed": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "train": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^ep_[A-Za-z0-9_-]{1,64}$"
+      }
+    },
+    "validation": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^ep_[A-Za-z0-9_-]{1,64}$"
+      }
+    },
+    "test_known_workflows": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^ep_[A-Za-z0-9_-]{1,64}$"
+      }
+    },
+    "test_heldout_families": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^ep_[A-Za-z0-9_-]{1,64}$"
+      }
+    }
+  },
+  "required": [
+    "strategy",
+    "seed",
+    "train",
+    "validation",
+    "test_known_workflows",
+    "test_heldout_families"
+  ],
+  "additionalProperties": false,
+  "$id": "https://w3bs.org/schemas/training/0.1/splits.json",
+  "title": "W3BS Demonstration Dataset 0.1: splits"
+}

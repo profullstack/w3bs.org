@@ -1,0 +1,45 @@
+{
+  "record": "session",
+  "why": "A KDE session with one display and a narrow scope.",
+  "value": {
+    "schema_version": "0.1",
+    "session_id": "ses_a1",
+    "capture_profile": "action-supervision",
+    "started_at": "2026-10-15T16:00:00.000Z",
+    "clock": {
+      "wall_clock_anchor": "2026-10-15T16:00:00.000Z",
+      "monotonic_anchor_ns": "0"
+    },
+    "device": {
+      "os": "linux",
+      "desktop": "KDE Plasma 6.7",
+      "displays": [
+        {
+          "id": "DP-1",
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "scale": 1
+        }
+      ]
+    },
+    "scope": {
+      "applications": [
+        "Firefox",
+        "Text Editor"
+      ],
+      "origins": [
+        "https://w3bs.org"
+      ],
+      "text_values": false
+    },
+    "adapters": [
+      {
+        "name": "fixture",
+        "version": "0.1"
+      }
+    ],
+    "gaps": []
+  }
+}

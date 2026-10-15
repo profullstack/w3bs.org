@@ -1,0 +1,41 @@
+{
+  "record": "episode",
+  "why": "Records are strict; unknown fields are refused.",
+  "value": {
+    "schema_version": "0.1",
+    "episode_id": "ep_a1",
+    "goal": {
+      "value": "Prepare a release-announcement draft",
+      "source": "deterministic_rule",
+      "status": "proposed"
+    },
+    "segments": [
+      {
+        "session_id": "ses_a1",
+        "from_ns": "1000000000",
+        "to_ns": "11000000000"
+      }
+    ],
+    "steps": [
+      "step_a0",
+      "step_a1",
+      "step_a2"
+    ],
+    "parameters": [
+      {
+        "name": "version_line",
+        "type": "string",
+        "placeholder": "release version line"
+      }
+    ],
+    "outcome": {
+      "value": "unknown",
+      "source": "deterministic_rule",
+      "status": "proposed",
+      "evidence_type": "none"
+    },
+    "workflow_family": "release-announcement",
+    "capture_profile": "action-supervision",
+    "productivity_score": 7
+  }
+}
