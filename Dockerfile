@@ -3,14 +3,14 @@
 # `dockerfile: Dockerfile`) builds this file from the repo root on every merge.
 # Plain Express server with no build step: install production dependencies from
 # bun.lock, then run src/bootstrap.mjs directly.
-FROM oven/bun:1.4.0-slim AS deps
+FROM oven/bun:1.4.2-slim AS deps
 WORKDIR /app
 # bunfig.toml turns lifecycle scripts off: ThreatCrush's daemon-only better-sqlite3
 # would otherwise try to compile, and the scanner does not need it.
 COPY package.json bun.lock bunfig.toml ./
 RUN bun install --frozen-lockfile --production
 
-FROM oven/bun:1.4.0-slim AS runtime
+FROM oven/bun:1.4.2-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 W3BS_DATA_DIR=/data
 COPY --from=deps --chown=bun:bun /app ./

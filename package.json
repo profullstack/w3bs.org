@@ -5,7 +5,7 @@
   "description": "W3BS community draft reference stack — the open Web for humans, agents and devices",
   "type": "module",
   "license": "MIT",
-  "packageManager": "bun@1.4.0",
+  "packageManager": "bun@1.4.2",
   "bin": {
     "w3bs-reference": "src/cli.mjs",
     "w3bs-open": "native/client.mjs"
