@@ -1164,6 +1164,23 @@
       "vendor": "Profullstack",
       "license": "Apache-2.0",
       "agentic": true
+    },
+    {
+      "id": "submitfleet.com/submitfleet",
+      "name": "submitfleet",
+      "description": "CLI and MCP server for SubmitFleet: launch a product on 339 launch sites and directories from one approved profile, and track every submission until it is live.",
+      "commands": [
+        "submitfleet"
+      ],
+      "install": {
+        "url": "https://submitfleet.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://submitfleet.com",
+      "repository": "https://github.com/profullstack/submitfleet",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
     }
   ]
 }
