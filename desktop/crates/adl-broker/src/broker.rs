@@ -40,6 +40,8 @@ pub struct Config {
     pub max_tasks_per_agent: usize,
     /// How long `stop` waits for in-flight dispatch to notice cancellation.
     pub stop_wait_ms: u64,
+    /// Desktop Training Mode recorder settings.
+    pub training: crate::recorder::TrainingConfig,
 }
 
 impl Default for Config {
@@ -54,6 +56,7 @@ impl Default for Config {
             default_actions_per_minute: 600,
             max_tasks_per_agent: 8,
             stop_wait_ms: 1_000,
+            training: crate::recorder::TrainingConfig::default(),
         }
     }
 }
@@ -133,14 +136,16 @@ struct Inner {
 }
 
 pub struct Broker {
-    adapter: Arc<dyn Adapter>,
+    pub(crate) adapter: Arc<dyn Adapter>,
     pub store: AgentStore,
     pub audit: Audit,
-    cfg: Config,
-    open: AtomicBool,
-    generation: AtomicU64,
+    pub(crate) cfg: Config,
+    pub(crate) open: AtomicBool,
+    pub(crate) generation: AtomicU64,
     inner: Mutex<Inner>,
     dispatch: Mutex<()>,
+    pub(crate) rec: Mutex<crate::recorder::RecInner>,
+    pub(crate) rec_blocks_leases: AtomicBool,
 }
 
 /// Outcome of executing one action, for result accounting.
@@ -175,6 +180,28 @@ impl Broker {
                 agent_roots: HashSet::new(),
             }),
             dispatch: Mutex::new(()),
+            rec: Mutex::new(crate::recorder::RecInner::default()),
+            rec_blocks_leases: AtomicBool::new(false),
+        }
+    }
+
+    /// Push an event to every control subscriber (tray, panel, control app).
+    pub(crate) fn broadcast_event(&self, event: &str, data: serde_json::Value) {
+        let mut g = self.lock();
+        Self::broadcast(&mut g, &json!({"v": SCHEMA_VERSION, "event": event, "data": data}));
+    }
+
+    pub(crate) fn lease_held(&self) -> bool {
+        self.lock().lease.as_ref().is_some_and(|l| l.info.expires_at_ms > now_ms())
+    }
+
+    /// A deliberate demonstration starts: whoever holds the input lease loses it.
+    pub(crate) fn revoke_lease_for_recording(&self) {
+        let mut g = self.lock();
+        if let Some(l) = g.lease.take() {
+            Self::broadcast(&mut g, &json!({"v": SCHEMA_VERSION, "event": "lease_revoked", "data": {"agent": l.info.agent, "reason": "a person started teaching a task"}}));
+            drop(g);
+            self.audit.log("lease.revoke", Some(&l.info.agent), Some(&l.info.task), "allowed", "", json!({"reason": "training"}));
         }
     }
 
@@ -430,6 +457,10 @@ impl Broker {
             } else {
                 self.set_state(&mut g, GlobalState::Disabled, None);
             }
+        }
+        // A recording ends with the layer: it never outlives Disable, lock or suspend.
+        if end_state == GlobalState::Disabled {
+            self.training_abort(reason);
         }
         report.cleanup_ms = t0.elapsed().as_secs_f64() * 1000.0;
         report.note = "Disabling stops new work. It cannot retract input already delivered, unsend messages, or erase data an agent already received.".into();
@@ -802,6 +833,9 @@ impl Broker {
         let pol = self.policy(p)?;
         if !pol.capabilities.contains(&Capability::Pointer) && !pol.capabilities.contains(&Capability::Keyboard) {
             return Err(AdlError::denied("the input lease needs pointer or keyboard access"));
+        }
+        if self.recording_blocks_leases() {
+            return Err(AdlError::new(ErrorCode::Busy, "a person is recording a demonstration; agent input is paused until they finish"));
         }
         let ttl = ttl_ms.unwrap_or(DEFAULT_LEASE_TTL_MS).clamp(1_000, MAX_LEASE_TTL_MS);
         let now = now_ms();

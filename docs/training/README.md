@@ -8,10 +8,25 @@ authorized agent can use approved examples on its next task. Specified by the
 
 The data side of the M1 local vertical slice is in `training/`: format 0.1,
 import, review, datasets, retrieval over MCP, exports, deletion, a local web
-app and a terminal review. **Recording is not built yet**: the recorder is the
-Agentic Desktop Layer's `w3bs desktop training`, and its capture feasibility
-(M0) comes next. There is no hosted app at w3bs.org/training yet (M2), and no
+app and a terminal review. Recording is the Agentic Desktop Layer's
+`w3bs desktop training` (tray: **Start training…**): focused-window frames of
+approved applications only, `visual-review` profile, verified on a KDE Plasma
+rig; no input events or text are captured (see the capability matrix). There is no hosted app at w3bs.org/training yet (M2), and no
 model-training adapter (M4). See the [capability matrix](capability-matrix.md).
+
+## Install
+
+```sh
+curl -fsSL https://w3bs.org/training/install.sh | sh        # Linux, macOS
+irm https://w3bs.org/training/install.ps1 | iex             # Windows (PowerShell)
+```
+
+One self-contained `w3bs-training` binary (no Bun or Node), checked against the
+release's SHA256SUMS. `w3bs training …` runs it through the w3bs CLI, and the
+desktop recorder finds it on its own. Recordings are encrypted with a key from
+your keyring (libsecret's `secret-tool` on Linux, the login keychain on macOS,
+DPAPI on Windows) or `W3BS_TRAINING_PASSPHRASE`; with none of those it refuses
+to store anything.
 
 ## Documents
 

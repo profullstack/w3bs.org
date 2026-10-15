@@ -108,11 +108,14 @@ not part of this change.
 
 ### 7. Runtime for distribution
 
-`w3bs-training` runs under Bun or Node 24. The PRD requires that users not
-install Node. Two options remain open for the release that registers
-`w3bs-training` in the W3BS package catalog: a `bun build --compile` binary
-(needs the UI assets embedded), or bundling inside the Electron Training
-desktop app. Until then it runs from a checkout (`bun run training`).
+Decided (2026-10-15): `w3bs-training` ships as a `bun build --compile` binary per
+platform, so users install neither Bun nor Node. The local app's files are
+embedded through a generated module (`training/ui/assets.mjs`, drift-checked in
+tests). `.github/workflows/training-release.yml` builds all five targets on a
+`training-v*` tag; `training/packaging/install.sh` and `install.ps1` (served at
+w3bs.org/training/) verify SHA256SUMS and install it for the user. The source
+still runs under Bun or Node 24 from a checkout. An Electron Training app, if it
+comes, bundles the same binary.
 
 ## Licenses
 

@@ -2,7 +2,8 @@
 //
 // Key sources, in order:
 //   1. W3BS_TRAINING_PASSPHRASE (scrypt, salt kept beside the store)
-//   2. the OS key store: libsecret `secret-tool` on Linux, `security` on macOS
+//   2. the OS key store: libsecret `secret-tool` on Linux, `security` on macOS,
+//      DPAPI (through PowerShell) on Windows
 // When neither is available, artifact writes fail with KEY_UNAVAILABLE. There
 // is no plaintext fallback.
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
@@ -40,7 +41,7 @@ export function decrypt(key, sealed, aad) {
   }
 }
 
-function osKeyStore(account) {
+function osKeyStore(account, directory) {
   const service = 'w3bs-training';
   if (process.platform === 'linux') {
     const which = spawnSync('secret-tool', ['--version'], { encoding: 'utf8' });
@@ -101,6 +102,37 @@ function osKeyStore(account) {
       },
     };
   }
+  if (process.platform === 'win32' && directory) {
+    // DPAPI: the key file is only decryptable by this Windows user on this machine.
+    const file = resolve(directory, 'key.dpapi');
+    const ps = (script, input) =>
+      spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
+        input,
+        encoding: 'utf8',
+        windowsHide: true,
+      });
+    const prelude = 'Add-Type -AssemblyName System.Security; $b = [Convert]::FromBase64String([Console]::In.ReadToEnd().Trim());';
+    return {
+      name: 'windows-dpapi',
+      get() {
+        if (!existsSync(file)) return null;
+        const r = ps(
+          `${prelude} [Convert]::ToBase64String([Security.Cryptography.ProtectedData]::Unprotect($b, $null, 'CurrentUser'))`,
+          readFileSync(file, 'utf8'),
+        );
+        return r.status === 0 && r.stdout.trim() ? Buffer.from(r.stdout.trim(), 'base64') : null;
+      },
+      set(key) {
+        const r = ps(
+          `${prelude} [Convert]::ToBase64String([Security.Cryptography.ProtectedData]::Protect($b, $null, 'CurrentUser'))`,
+          key.toString('base64'),
+        );
+        if (r.status !== 0 || !r.stdout.trim()) return false;
+        writeFileSync(file, r.stdout.trim(), { mode: 0o600 });
+        return true;
+      },
+    };
+  }
   return null;
 }
 
@@ -136,7 +168,7 @@ export function keyProvider(directory, workspace, env = process.env) {
       },
     };
   }
-  const store = env.W3BS_TRAINING_NO_KEYRING ? null : osKeyStore(workspace);
+  const store = env.W3BS_TRAINING_NO_KEYRING ? null : osKeyStore(workspace, directory);
   if (store) {
     return {
       mode: store.name,

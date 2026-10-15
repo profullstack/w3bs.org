@@ -93,6 +93,15 @@ pub fn serve(broker: Arc<Broker>) -> std::io::Result<()> {
         });
     }
 
+    // Desktop Training Mode capture loop. It only does work while a recording is running.
+    {
+        let b = broker.clone();
+        std::thread::spawn(move || loop {
+            b.training_tick();
+            std::thread::sleep(Duration::from_millis(b.training_tick_ms()));
+        });
+    }
+
     // Supervisor: session events (lock, suspend, takeover) and shutdown.
     while !SHUTDOWN.load(Ordering::SeqCst) {
         broker.pump_session_events();
@@ -351,6 +360,19 @@ fn control(b: &Arc<Broker>, c: &mut Conn, req: &Request) -> Result<Value> {
             b.handle_session_event(e);
             to(b.status())
         }
+        // Desktop Training Mode. Starting, resuming and explanations need the person (checked in
+        // the broker); pausing, finishing, discarding and deleting only reduce capture.
+        "training.status" => Ok(b.training_status()),
+        "training.apps" => b.training_apps(),
+        "training.start" => b.training_start(&peer, params::<adl_broker::StartRequest>(p)?),
+        "training.pause" => b.training_pause(),
+        "training.resume" => b.training_resume(&peer),
+        "training.mark" => b.training_mark(),
+        "training.explain" => b.training_explain(&peer, &str_param(p, "text")?),
+        "training.finish" => b.training_finish(p.get("outcome").and_then(Value::as_str)),
+        "training.discard" => b.training_discard(),
+        "training.forget" => b.training_forget(p.get("since_ms").and_then(Value::as_u64).ok_or_else(|| AdlError::invalid("since_ms is required"))?),
+        "training.handoff" => b.training_handoff(),
         "subscribe" => {
             let native = p.get("native_control").and_then(Value::as_bool).unwrap_or(false);
             if native && c.native_control {

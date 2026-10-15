@@ -171,6 +171,7 @@ function render() {
   $('#app').hidden = false;
   connect();
   renderStatus();
+  renderTraining();
   renderApprovals();
   renderAgents();
   renderTasks();
@@ -331,6 +332,162 @@ function renderSettings() {
   );
 }
 
+// ---------------------------------------------------------------- training
+
+const TRAINING_WORDS = { idle: 'Not recording', arming: 'Starting', recording: 'Recording', paused: 'Paused', blocked: 'Stopped at size limit', finishing: 'Saving', error: 'Error' };
+const draft = { mode: 'teach', goal: '', apps: new Set(), allow: false };
+let trainingApps = null;
+let trainingView = '';
+let trainingFocused = false;
+
+// An action whose result this section shows itself, without the global reload.
+async function post(action, extra = {}) {
+  const r = await fetch('/control/api/action', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-W3BS-CSRF': csrf },
+    body: JSON.stringify({ action, ...extra }),
+  });
+  const v = await r.json().catch(() => ({}));
+  if (!r.ok || v.error) throw new Error(v.error?.message || `Failed (${r.status})`);
+  return v.result;
+}
+
+async function loadApps() {
+  try {
+    trainingApps = await post('training_apps');
+  } catch (e) {
+    trainingApps = { error: e.message };
+  }
+  renderAppPicker();
+}
+
+function renderAppPicker() {
+  const box = $('[data-training-apps]');
+  if (!box) return;
+  if (!trainingApps) return box.replaceChildren(h('p', { class: 'muted', text: 'Looking for open applications…' }));
+  if (trainingApps.error) return box.replaceChildren(h('p', { class: 'warn', text: trainingApps.error }));
+  if (!trainingApps.length) return box.replaceChildren(h('p', { class: 'muted', text: 'No application windows are open.' }));
+  box.replaceChildren(...trainingApps.map((a) => h('label', { class: 'choice' },
+    h('input', { type: 'checkbox', value: a.app_id, checked: draft.apps.has(a.app_id), onchange: (e) => { if (e.target.checked) draft.apps.add(a.app_id); else draft.apps.delete(a.app_id); } }),
+    h('span', {}, h('code', { text: a.app_id }), h('small', { text: `${a.windows} window${a.windows === 1 ? '' : 's'}${a.focused ? ' · focused now' : ''}` })))));
+}
+
+function startForm() {
+  const enabled = S.status.state === 'enabled';
+  const goal = h('textarea', { id: 'training-goal', rows: '2', maxlength: '500', placeholder: 'Prepare the release announcement draft', oninput: (e) => { draft.goal = e.target.value; } });
+  goal.value = draft.goal;
+  const goalField = h('label', { class: 'field', for: 'training-goal', hidden: draft.mode !== 'teach' }, 'What are you about to do?', goal);
+  const mode = (key, label, help) => h('label', { class: 'choice' },
+    h('input', { type: 'radio', name: 'training-mode', value: key, checked: draft.mode === key, onchange: () => { draft.mode = key; goalField.hidden = key !== 'teach'; } }),
+    h('span', {}, label, h('small', { text: help })));
+  const form = h('form', { class: 'editor', onsubmit: async (e) => {
+    e.preventDefault();
+    if (!draft.apps.size) return notice('Choose at least one application to record.', 'error');
+    if (draft.mode === 'teach' && !draft.goal.trim()) return notice('Say what you are about to do.', 'error');
+    try {
+      await post('training_start', { mode: draft.mode, goal: draft.goal, applications: [...draft.apps], allow_agents: draft.allow });
+      draft.goal = '';
+      notice(draft.mode === 'teach' ? 'Recording. Do the task, then choose how it went.' : 'Recording your work in the chosen applications.');
+      await load();
+    } catch (err) {
+      notice(err.message, 'error');
+    }
+  } },
+  h('fieldset', {}, h('legend', { text: 'WHAT TO RECORD' }),
+    mode('teach', 'Teach this task', 'One deliberate demonstration with a goal. Best for examples an agent will reuse.'),
+    mode('observe', 'Observe my work', 'Keeps recording the chosen applications until you finish. Mark boundaries between tasks.')),
+  goalField,
+  h('fieldset', {}, h('legend', { text: 'APPLICATIONS IT MAY SEE' }), h('div', { 'data-training-apps': '' }),
+    h('button', { type: 'button', class: 'button outline small', onclick: () => loadApps() }, 'Refresh list')),
+  h('label', { class: 'choice' },
+    h('input', { type: 'checkbox', checked: draft.allow, onchange: (e) => { draft.allow = e.target.checked; } }),
+    h('span', {}, 'Let agents keep working while I record', h('small', { text: 'Off: agents cannot use the mouse or keyboard until you finish. On: steps are marked as possibly mixed with agent activity.' }))),
+  enabled ? null : h('p', { class: 'warn' }, 'Turn agent access on first (above): recording uses the same screen permission. Agents still cannot act while you teach unless you allow it here.'),
+  h('div', { class: 'row-actions' }, h('button', { type: 'submit', class: 'button primary', disabled: !enabled }, 'Start recording')));
+  return form;
+}
+
+function recordingControls(t) {
+  const explain = h('textarea', { id: 'training-explain', rows: '2', maxlength: '8000', placeholder: 'Why you did it this way (optional, your own words)' });
+  const doing = (action, extra, msg) => async () => {
+    try {
+      await post(action, extra);
+      if (msg) notice(msg);
+      await load();
+    } catch (e) {
+      notice(e.message, 'error');
+    }
+  };
+  const finish = (outcome, label, cls) => h('button', { type: 'button', class: `button small ${cls}`, onclick: doing('training_finish', { outcome }, 'Finished. The recording is in W3BS Training for your review.') }, label);
+  return h('div', {},
+    h('div', { class: 'row-actions' },
+      t.state === 'recording'
+        ? h('button', { type: 'button', class: 'button outline small', onclick: doing('training_pause', {}, 'Paused.') }, 'Pause')
+        : h('button', { type: 'button', class: 'button primary small', onclick: doing('training_resume', {}, 'Recording again.') }, 'Resume'),
+      t.recording?.mode === 'observe' ? h('button', { type: 'button', class: 'button outline small', onclick: doing('training_mark', {}, 'Task boundary marked.') }, 'Mark task boundary') : null),
+    h('p', { class: 'row-sub', text: 'How did it go? Finishing hands the recording to W3BS Training.' }),
+    h('div', { class: 'row-actions' }, finish('success', 'Complete', 'dark'), finish('partial', 'Partial', 'outline'), finish('failure', 'Failed', 'outline'), finish('unknown', 'Not sure', 'outline'),
+      h('button', { type: 'button', class: 'button outline danger small', onclick: () => { if (confirm('Throw this recording away? Nothing is kept.')) doing('training_discard', {}, 'Recording discarded.')(); } }, 'Discard')),
+    h('label', { class: 'field', for: 'training-explain' }, 'Add an explanation', explain),
+    h('div', { class: 'row-actions' }, h('button', { type: 'button', class: 'button outline small', onclick: async () => {
+      if (!explain.value.trim()) return;
+      await doing('training_explain', { text: explain.value }, 'Explanation added.')();
+      explain.value = '';
+    } }, 'Add explanation')));
+}
+
+function renderTraining() {
+  const t = S.training;
+  const pill = $('[data-training-pill]');
+  pill.textContent = TRAINING_WORDS[t.state] || t.state;
+  pill.className = `pill ${t.state === 'recording' ? 'red' : t.state === 'paused' || t.state === 'blocked' ? 'orange' : ''}`.trim();
+  const box = $('[data-training]');
+  const active = ['recording', 'paused', 'blocked', 'arming', 'finishing'].includes(t.state);
+  const view = active ? `rec:${t.state}` : `idle:${S.status.state}`;
+  if (view !== trainingView) {
+    trainingView = view;
+    if (active) {
+      box.replaceChildren(h('dl', { class: 'facts', 'data-training-facts': '' }), recordingControls(t));
+    } else {
+      box.replaceChildren(startForm());
+      renderAppPicker();
+      if (S.status.state === 'enabled') loadApps();
+    }
+  }
+  if (active && t.recording) {
+    const r = t.recording;
+    const fact = (k, v) => h('div', {}, h('dt', { text: k }), h('dd', { text: v }));
+    $('[data-training-facts]').replaceChildren(
+      fact(r.mode === 'teach' ? 'Teaching' : 'Observing', r.mode === 'teach' ? r.goal : 'my work'),
+      fact('Applications', r.applications.join(', ')),
+      fact('Captured', `${r.frames} frame(s), ${r.steps} step(s) in ${Math.round(r.elapsed_ms / 60000)} min`),
+      fact('Right now', t.state === 'paused' ? 'Paused' : r.excluded_now ? 'Not capturing: the focused window is not one you approved' : 'Capturing the focused window'),
+      fact('Agents', t.agent_leases));
+    if (t.reason) $('[data-training-facts]').append(fact('Note', t.reason));
+  }
+  const after = $('[data-training-after]');
+  const pending = t.pending_handoffs || [];
+  const last = t.last_finished;
+  after.replaceChildren(...[
+    pending.length ? h('div', { class: 'banner' }, h('p', {}, h('strong', { text: `${pending.length} recording(s) waiting for W3BS Training.` }), ` ${pending[0].error}`),
+      h('div', { class: 'banner-actions' }, h('button', { type: 'button', class: 'button primary small', onclick: async () => { try { const r = await post('training_handoff'); notice(`${r.imported} handed over, ${r.still_pending} still waiting.`); await load(); } catch (e) { notice(e.message, 'error'); } } }, 'Try again'),
+        h('span', { class: 'muted', text: 'Held in memory only; lost if the broker stops.' }))) : null,
+    last ? h('p', { class: 'row-sub', text: `Last recording: ${last.summary.frames} frame(s), ${last.summary.episodes} task(s)${last.summary.interrupted ? ', stopped when the desktop layer closed' : ''}. ${last.handoff === 'imported' ? 'In W3BS Training for review.' : 'Waiting to be handed over.'}` }) : null,
+    h('div', { class: 'row-actions' },
+      h('button', { type: 'button', class: 'button outline small', onclick: async () => { try { await post('training_open_app'); notice('W3BS Training is opening in your browser.'); } catch (e) { notice(e.message, 'error'); } } }, 'Open W3BS Training'),
+      h('button', { type: 'button', class: 'button outline danger small', onclick: async () => {
+        if (!confirm('Delete everything recorded in the last 10 minutes that is still here? Recordings already in W3BS Training are deleted there (w3bs training forget).')) return;
+        try { const r = await post('training_forget', { minutes: 10 }); notice(`Deleted ${r.frames_deleted} frame(s). ${r.next}`); await load(); } catch (e) { notice(e.message, 'error'); }
+      } }, 'Delete last 10 minutes')),
+  ].filter(Boolean));
+  if (!trainingFocused && location.hash === '#training') {
+    trainingFocused = true;
+    $('#training').scrollIntoView({ block: 'start' });
+    $('#training').focus({ preventScroll: true });
+  }
+}
+
 // ---------------------------------------------------------------- wiring
 
 document.addEventListener('click', (e) => {
@@ -344,7 +501,7 @@ document.addEventListener('click', (e) => {
 
 if (new URLSearchParams(location.search).has('login')) {
   // Keep the flag for this view, but never leave a sign-in token or flag in history.
-  setTimeout(() => history.replaceState(null, '', '/control/'), 0);
+  setTimeout(() => history.replaceState(null, '', `/control/${location.hash}`), 0);
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/control/sw.js', { scope: '/control/' }).catch(() => {});
 load();

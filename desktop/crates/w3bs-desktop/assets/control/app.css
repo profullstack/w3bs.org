@@ -193,6 +193,15 @@ dd { margin: 4px 0 0; font-size: 14px; overflow-wrap: anywhere; }
 .choice small { display: block; color: var(--muted); font-size: 12px; }
 .editor label.field { display: block; margin-top: 10px; font-size: 13px; }
 .editor input[type='text'] { width: 100%; margin-top: 4px; padding: 9px 10px; border: 1px solid #b8c3b0; border-radius: 3px; background: #fff; font-family: var(--mono); font-size: 13px; }
+.editor fieldset + fieldset, .editor fieldset + label, .editor label.field + fieldset { margin-top: 14px; }
+
+/* training */
+#training label.field { display: block; margin-top: 12px; font-size: 13px; }
+#training textarea { display: block; width: 100%; margin-top: 4px; padding: 9px 10px; border: 1px solid #b8c3b0; border-radius: 3px; background: #fff; font: inherit; font-size: 14px; resize: vertical; }
+#training .facts { grid-template-columns: 1fr; }
+#training .facts div + div { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); }
+#training .row-sub { margin-top: 12px; }
+#training:focus { outline: none; }
 
 /* activity */
 .activity { width: 100%; border-collapse: collapse; font-size: 13px; }

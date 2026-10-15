@@ -13,7 +13,7 @@ const help = `W3BS Training ${VERSION}: review, curate and consume demonstration
 
   w3bs training status
   w3bs training open [--port N] [--no-browser]       local review app (human session)
-  w3bs training import FILE [--preview] [--mapping mapping.json] [--annotations notes.jsonl]
+  w3bs training import FILE|- [--filename NAME] [--preview] [--mapping mapping.json] [--annotations notes.jsonl]
                             [--rights-file rights.json] [--allow-text] [--duration-ms N]
   w3bs training commit IMPORT_ID | imports [IMPORT_ID]
   w3bs training inbox [--all] | review                 review cards (review is interactive)
@@ -126,6 +126,7 @@ const { values, positionals } = (() => {
         from: { type: 'string' },
         to: { type: 'string' },
         'goal-family': { type: 'string' },
+        filename: { type: 'string' },
       },
     });
   } catch (error) {
@@ -167,9 +168,13 @@ try {
     }
     case 'import': {
       const path = need(sub, 'FILE');
+      // `-` reads the file from stdin; the desktop recorder hands bundles over this way so
+      // frames never touch the disk unencrypted.
+      const fromStdin = path === '-';
+      if (fromStdin && !values.filename) fail('MISSING_OPTION', '--filename is required with -.');
       const result = await service.importFile(
         {
-          path,
+          ...(fromStdin ? { data: readFileSync(0), filename: values.filename } : { path }),
           mapping: values.mapping && readJson(values.mapping),
           annotations:
             values.annotations &&

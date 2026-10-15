@@ -23,6 +23,8 @@ COPY --chown=bun:bun catalog ./catalog
 COPY --chown=bun:bun registry ./registry
 # Agentic Desktop Layer installer served at /desktop/install.sh.
 COPY --chown=bun:bun desktop/packaging ./desktop/packaging
+# W3BS Training installers served at /training/install.sh and /training/install.ps1.
+COPY --chown=bun:bun training/packaging ./training/packaging
 # Operators re-scan a package by hand with: bun scripts/scan-packages.mjs --record <id>
 COPY --chown=bun:bun scripts/scan-packages.mjs ./scripts/scan-packages.mjs
 # Production storage is PostgreSQL (DATABASE_URL). Without it the store falls

@@ -479,6 +479,53 @@ st, _, data = req("POST", "/control/api/action", {"Cookie": cookie, "Origin": or
 _, _, after = req("GET", "/control/api/state", {"Cookie": cookie})
 print(st, json.loads(after)["status"]["state"])
 EOF
+cat > "$RIG/train.py" <<'EOF'
+# train.py URL JSON: sign in to the control app with the one-time link the tray's "Start
+# training…" opened (as a browser does), then POST one Training action. Prints
+# "<http status> <training state>".
+import http.client, json, sys, urllib.parse
+url, body = sys.argv[1], json.loads(sys.argv[2])
+u = urllib.parse.urlsplit(url)
+def req(method, path, headers={}, data=None):
+    c = http.client.HTTPConnection(u.hostname, u.port, timeout=60)
+    c.request(method, path, body=data, headers=headers)
+    r = c.getresponse(); out = r.read(); c.close()
+    return r.status, r.getheader("Set-Cookie"), out
+st, cookie, _ = req("GET", u.path + "?" + u.query)
+assert st == 303 and cookie, (st, cookie)
+cookie = cookie.split(";")[0]
+csrf = json.loads(req("GET", "/control/api/state", {"Cookie": cookie})[2])["csrf"]
+origin = "http://%s:%d" % (u.hostname, u.port)
+st, _, data = req("POST", "/control/api/action", {"Cookie": cookie, "Origin": origin, "X-W3BS-CSRF": csrf, "Content-Type": "application/json"}, json.dumps(body))
+after = json.loads(req("GET", "/control/api/state", {"Cookie": cookie})[2])
+print(st, after["training"]["state"], "" if st == 200 else data.decode()[:200])
+EOF
+cat > "$RIG/bundle.py" <<'EOF'
+# bundle.py ZIP APP: check a recording the daemon handed over. Every frame is a PNG cropped to an
+# approved window (size = its observation's size, smaller than the display), every observation
+# names APP, the unapproved app appears nowhere, and the excursion to it is an excluded_scope gap.
+import json, struct, sys, zipfile
+z = zipfile.ZipFile(sys.argv[1]); app = sys.argv[2]
+lines = lambda n: [json.loads(l) for l in z.read(n).decode().splitlines() if l.strip()]
+obs, ses, eps = lines("observations.jsonl"), lines("sessions.jsonl")[0], lines("episodes.jsonl")
+disp = ses["device"]["displays"][0]
+sizes = []
+for o in obs:
+    png = z.read("artifacts/%s.png" % o["artifact_id"])
+    assert png[:8] == b"\x89PNG\r\n\x1a\n", "not a PNG"
+    w, h = struct.unpack(">II", png[16:24])
+    assert (w, h) == (o["display"]["width"], o["display"]["height"]), (w, h, o["display"])
+    assert o["semantic"]["app"] == app, o["semantic"]
+    assert o["pre_action_verified"] is False
+    sizes.append("%dx%d" % (w, h))
+text = b"".join(z.read(n) for n in z.namelist() if not n.endswith(".png"))
+assert b"org.w3bs.rig.other" not in text, "the unapproved app leaked into the bundle"
+gaps = sorted({g["kind"] for g in ses["gaps"]})
+assert obs and all(int(s.split("x")[0]) < disp["width"] for s in sizes), (sizes, disp)
+assert "excluded_scope" in gaps and "paused" in gaps, gaps
+assert eps[0]["goal"]["value"] == "Type a note into the rig terminal" and eps[0]["outcome"]["value"] == "success", eps[0]
+print("%d frame(s) %s on a %dx%d display; gaps %s; profile %s" % (len(obs), " ".join(sorted(set(sizes))), disp["width"], disp["height"], ",".join(gaps), ses["capture_profile"]))
+EOF
 cat > "$RIG/opener.sh" <<'EOF'
 #!/bin/sh
 # Stands in for xdg-open: records the one-time control-app link the native control asked to open.
@@ -494,7 +541,9 @@ echo "== tray (StatusNotifierItem, dbusmenu, GlobalShortcuts)"
 dnf -y install --setopt=install_weak_deps=False kf6-kded plasma-workspace-libs >$L/dnf-tray.log 2>&1
 pkill -f '^w3bs-desktop control' || true; pkill -f '^sleep infinity' || true
 pkill -f '^w3bs-desktop daemon' || true; sleep 1
-setsid w3bs-desktop daemon --adapter auto >$L/daemon-tray.log 2>&1 &
+# Finished recordings go to a file here instead of `w3bs training import` (no Bun in the rig); the
+# host validates it with the real importer after the run.
+W3BS_DESKTOP_TRAINING_HANDOFF='cat > "/rig/rec-$W3BS_TRAINING_BUNDLE"' setsid w3bs-desktop daemon --adapter auto >$L/daemon-tray.log 2>&1 &
 setsid kded6 >$L/kded.log 2>&1 &
 for i in $(seq 1 50); do busctl --user status org.kde.StatusNotifierWatcher >/dev/null 2>&1 && break; sleep 0.2; done
 busctl --user status org.kde.StatusNotifierWatcher >/dev/null 2>&1 && busctl --user status org.kde.kglobalaccel >/dev/null 2>&1 \
@@ -576,6 +625,42 @@ R=$(python3 /rig/panel.py "$(cat /root/panel.url)" disable 2>&1)
 tail -n 20 /root/w3bs/state/audit/* | grep -q '"reason":"disabled from the control app"' && ok "audited as disabled from the control app" || bad "audit: $(tail -n 3 /root/w3bs/state/audit/*)"
 M click "Enable agent access"; until_ '[ "$(state)" = enabled ]' || bad "re-enable after the control app: $(state)"
 
+echo "== tray: Start training… (Desktop Training Mode)"
+tstate() { w3bs-desktop --json training status | python3 -c 'import json,sys; print(json.load(sys.stdin)["state"])'; }
+M labels > /root/menu-t.txt
+grep -qx -- "-Training: Not recording" /root/menu-t.txt && grep -qx "Start training…" /root/menu-t.txt \
+  && ok "menu: Training: Not recording, Start training…" || bad "training menu: $(cat /root/menu-t.txt)"
+rm -f /root/panel.url /rig/rec-*.zip
+M click "Start training…"
+until_ '[ -s /root/panel.url ]' && grep -q '^http://127.0.0.1:7801/control/login?t=login_.*#training$' /root/panel.url \
+  && ok "Start training… opened the control app at #training" || bad "start training link: $(cat /root/panel.url 2>&1)"
+W mouse click --agent tester --x $x1 --y $y1 >/dev/null; sleep 0.5      # T1 (approved app) in front
+R=$(python3 /rig/train.py "$(cat /root/panel.url)" '{"action":"training_start","mode":"teach","goal":"Type a note into the rig terminal","applications":["'"$APP"'"]}')
+[ "${R%% *}" = 200 ] && [ "$(tstate)" = recording ] && ok "control app started Teach this task ($R)" || bad "training_start: $R"
+until_ 'M labels | grep -qx "Pause recording"' 50 && M labels | grep -qx "Finish task" && M labels | grep -q "^-Training: Recording · Teach: Type a note" \
+  && ok "tray while recording: $(M labels | grep '^-Training:'), Pause recording, Finish task" || bad "recording menu: $(M labels | head -14)"
+set +e; W mouse move --agent tester --x 5 --y 5 >/root/lease.out 2>&1; rc=$?; set -e
+[ $rc != 0 ] && grep -q "recording a demonstration" /root/lease.out && ok "agent input refused while the person teaches" || bad "agent during teach rc=$rc $(cat /root/lease.out)"
+sleep 2
+setsid foot --app-id=org.w3bs.rig.other --title=T3 sh -c 'exec cat > /dev/null' >$L/foot3t.log 2>&1 &
+until_ '[ "$(/rig/active.sh)" = T3 ]' 25 || true
+sleep 1.5
+w3bs-desktop --json training status > /root/tr1.json
+python3 -c 'import json; r=json.load(open("/root/tr1.json"))["recording"]; assert r["excluded_now"]=="excluded_scope" and r["frames"]>=1, r' \
+  && ok "unapproved app focused -> not captured ($(python3 -c 'import json; r=json.load(open("/root/tr1.json"))["recording"]; print(r["frames"], "frame(s) so far")'))" || bad "scope: $(cat /root/tr1.json)"
+until_ 'M labels | grep -q "not capturing (outside approved apps)"' 25 && ok "tray says: $(M labels | grep '^-Training:')" || bad "tray scope label: $(M labels | grep '^-Training:')"
+pkill -f 'app-id=org.w3bs.rig.other' || true; sleep 1
+W mouse click --agent tester --x $x2 --y $y2 >/dev/null 2>&1 || true   # refused (recording); focus returns on its own
+M click "Pause recording"; until_ '[ "$(tstate)" = paused ]' && ok "Pause recording from the tray" || bad "pause: $(tstate)"
+M click "Resume recording"; until_ '[ "$(tstate)" = recording ]' && ok "Resume recording from the tray (the native control is the person)" || bad "resume: $(tstate)"
+sleep 1.5
+M click "Complete"
+until_ 'ls /rig/rec-*.zip >/dev/null 2>&1 && [ "$(tstate)" = idle ]' 50 && ok "Finish task > Complete handed the recording over: $(basename /rig/rec-*.zip)" || bad "finish: $(tstate) $(ls /rig)"
+B=$(python3 /rig/bundle.py /rig/rec-*.zip "$APP" 2>&1) && ok "bundle: $B" || bad "bundle: $B"
+until_ 'M labels | grep -qx "Start training…"' && ok "tray back to Start training…" || bad "after finish: $(M labels | head -8)"
+set +e; W mouse move --agent tester --x 5 --y 5 >/root/lease2.out 2>&1; rc=$?; set -e
+[ $rc = 0 ] && ok "agent input allowed again after the recording" || bad "after recording rc=$rc $(cat /root/lease2.out)"
+
 echo "== tray: left click"
 M activate
 until_ '[ "$(state)" = disabled ]' && ok "left click while enabled -> disabled" || bad "activate: $(state)"
@@ -603,3 +688,16 @@ EOF
 
 chmod +x "$RIG"/*.sh
 docker exec -e TRAY="${TRAY:-0}" "$NAME" /rig/inner.sh
+
+# The Training stage's recording, through the real W3BS Training importer on the host.
+REC=$(ls "$RIG"/rec-*.zip 2>/dev/null | head -1)
+if [ -n "$REC" ] && command -v bun >/dev/null 2>&1; then
+  TH=$(mktemp -d)
+  if W3BS_TRAINING_HOME=$TH W3BS_TRAINING_PASSPHRASE=rig bun "$SRC/../training/bin/w3bs-training.mjs" import "$REC" --preview > "$RIG/import.json" 2>&1 \
+    && grep -q '"capture_profile": "visual-review"' "$RIG/import.json"; then
+    echo "PASS: W3BS Training imported the KDE recording ($(python3 -c 'import json,sys; p=json.load(open(sys.argv[1]))["preview"]["counts"]; print(p["observations"], "frames,", p["episodes"], "episode")' "$RIG/import.json"))"
+  else
+    echo "FAIL: W3BS Training refused the KDE recording: $(head -c 600 "$RIG/import.json")"; rm -rf "$TH"; exit 1
+  fi
+  rm -rf "$TH"
+fi

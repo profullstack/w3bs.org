@@ -282,6 +282,10 @@ EOF
   else
     say "  3. Enable access from the tray or GNOME panel when you want the agent to work; disable it the same way."
   fi
+  if ! command -v w3bs-training >/dev/null 2>&1 && [ ! -x "$bin/w3bs-training" ]; then
+    say "  Teach agents by example: tray > Start training… records a task. To keep and review"
+    say "  recordings, install W3BS Training:  curl -fsSL https://w3bs.org/training/install.sh | sh"
+  fi
   say "Docs: https://w3bs.org/desktop"
 }
 
