@@ -1,4 +1,4 @@
-# W3BS Social: the AT Protocol PDS
+# W3BS Social: the AT Protocol PDS and its web client
 
 `w3bs.org/social` is the app's page (`src/social-routes.mjs`). The server itself is
 Bluesky's reference PDS (`ghcr.io/bluesky-social/pds`) on its own hostname,
@@ -6,7 +6,30 @@ Bluesky's reference PDS (`ghcr.io/bluesky-social/pds`) on its own hostname,
 `/xrpc`, `/oauth` and `/.well-known/atproto-did` at the root of its host, so it
 cannot be mounted under a path of w3bs.org.
 
-## Where it runs
+`https://social.w3bs.org/` itself is the Bluesky web client (bluesky-social/social-app,
+its `bskyweb` server), so the host is a full social network UI. nginx sends the PDS
+paths (`/xrpc/`, `/oauth/`, `/@atproto/`, `/.well-known/`, `/account`) to the PDS and
+everything else to the client; `*.social.w3bs.org` handle hosts go straight to the PDS.
+
+## Web client
+
+- dev2, `~/www/w3bs.org-social-web`, container `w3bsorgsocialweb-web-1`, `127.0.0.1:3343`,
+  image `w3bs-social-web:latest`, built locally from social-app's own `Dockerfile` after
+  `rebrand.py` restyles it in the w3bs.org design: default PDS `social.w3bs.org`, the
+  paper/ink/orange palette, the orbit mark and "w3bs." wordmark, a paper welcome dialog
+  with a Georgia headline, "W3BS Social" titles, and the icons + social card in `brand/`.
+- Rebuild (Metro wants ~8 GB heap and takes several minutes). `rebrand.py` exits on any
+  patch that no longer applies, so a moved upstream file stops the build instead of
+  shipping half a rebrand:
+
+  ```sh
+  git clone --depth 1 https://github.com/bluesky-social/social-app.git && cd social-app
+  python3 ~/src/profullstack/w3bs.org/ops/social/rebrand.py .
+  docker build --build-arg EXPO_PUBLIC_ENV=production -t w3bs-social-web:latest .
+  cd ~/www/w3bs.org-social-web && docker compose -p w3bsorgsocialweb -f docker-compose.app.yml --env-file deploy.env up -d
+  ```
+
+## Where the PDS runs
 
 - dev2, `~/www/w3bs.org-social`, container `w3bsorg-social-pds-1`, `127.0.0.1:3342`.
   `docker-compose.app.yml` here is the copy in that directory; `deploy.env` holds
