@@ -353,6 +353,20 @@ splash = re.compile(r"<!-- Bluesky SVG -->\s*<svg[^>]*viewBox=\"0 0 64 57\".*?</
 if not splash.search(html):
     sys.exit("bskyweb/templates/base.html: splash SVG not found; upstream changed")
 html = splash.sub("<!-- W3BS mark -->\n    " + MARK_SVG, html, count=1)
+
+# The JS splash that takes over from it (Splash.web.tsx) draws its own butterfly; it
+# becomes the same orbit mark, square instead of 64x57.
+SW = "src/Splash.web.tsx"
+sw = (ROOT / SW).read_text()
+butterfly = re.compile(r'<Svg\s+fill="none"\s+viewBox="0 0 64 57"(.*?)>\s*<Path\s+fill="#006AFF"\s+d="M13\.873[^"]*"\s*/>\s*</Svg>', re.S)
+if len(butterfly.findall(sw)) != 1:
+    sys.exit(f"{SW}: splash butterfly not found; upstream changed")
+sw = butterfly.sub(lambda m: f'<Svg\n            fill="none"\n            viewBox="0 0 64 64"{m.group(1)}>' + MARK.replace("fill={fill}", f'fill="{ORANGE}"') + "\n          </Svg>", sw, count=1)
+patch_text = sw.replace("import Svg, {Path} from 'react-native-svg'", "import Svg, {Circle, Ellipse, G, Path, Rect} from 'react-native-svg'", 1)
+if patch_text == sw:
+    sys.exit(f"{SW}: react-native-svg import not found; upstream changed")
+sw = patch_text.replace("const ratio = 57 / 64", "const ratio = 1", 1)
+(ROOT / SW).write_text(sw)
 html = re.sub(
     r'<p lang="en">Learn more about Bluesky at .*?</p>',
     '<p lang="en">Learn more at <a href="https://w3bs.org/social">w3bs.org/social</a>.</p>',
@@ -433,3 +447,10 @@ for f in BRAND.iterdir():
     shutil.copy(f, ROOT / "bskyweb/static" / f.name)
 
 print(f"rebranded {ROOT} as W3BS Social")
+
+# Nothing the web build ships may still draw the butterfly (its path starts "M13.873").
+# src/Splash.tsx is the native app's splash mask and is not part of the web bundle.
+left = [str(f.relative_to(ROOT)) for f in [*ROOT.glob("src/**/*.tsx"), *ROOT.glob("bskyweb/templates/*.html")]
+        if "M13.873" in f.read_text() and f.name != "Splash.tsx"]
+if left:
+    sys.exit("butterfly logo still in: " + ", ".join(left))
