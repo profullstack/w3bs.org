@@ -444,6 +444,7 @@ fn state(web: &Web, csrf: &str, addr: SocketAddr) -> Value {
         "status": status,
         "pending_enable": pending.map(|(code, exp)| json!({"code": code, "expires_at_ms": exp})),
         "approvals": b.approvals(),
+        "training": b.training_status(),
         "agents": b.store.list(),
         "tasks": tasks,
         "activity": activity,
@@ -532,6 +533,44 @@ fn action(web: &Web, body: &Value, pid: Option<u32>, key: &str) -> Result<(Value
             Ok((json!({"revoked": a.id}), false))
         }
         "task_cancel" => to(&b.cancel_task(str_of(body, "task")?, None)?),
+        // Desktop Training Mode ("Start training…" in the tray opens this app at #training).
+        "training_apps" => Ok((b.training_apps()?, false)),
+        "training_start" => {
+            let req: adl_broker::StartRequest = serde_json::from_value(json!({
+                "mode": str_of(body, "mode")?,
+                "goal": body.get("goal").and_then(Value::as_str),
+                "applications": body.get("applications").cloned().unwrap_or(json!([])),
+                "allow_agents": body.get("allow_agents").and_then(Value::as_bool).unwrap_or(false),
+            }))
+            .map_err(|e| AdlError::invalid(e.to_string()))?;
+            Ok((b.training_start(&peer, req)?, false))
+        }
+        "training_pause" => Ok((b.training_pause()?, false)),
+        "training_resume" => Ok((b.training_resume(&peer)?, false)),
+        "training_mark" => Ok((b.training_mark()?, false)),
+        "training_explain" => Ok((b.training_explain(&peer, str_of(body, "text")?)?, false)),
+        "training_finish" => Ok((b.training_finish(body.get("outcome").and_then(Value::as_str))?, false)),
+        "training_discard" => Ok((b.training_discard()?, false)),
+        "training_forget" => {
+            let minutes = body.get("minutes").and_then(Value::as_u64).filter(|m| *m > 0 && *m <= 7 * 24 * 60).ok_or_else(|| AdlError::invalid("minutes must be 1 to 10080"))?;
+            Ok((b.training_forget(now_ms().saturating_sub(minutes * 60_000))?, false))
+        }
+        "training_handoff" => Ok((b.training_handoff()?, false)),
+        // Start the W3BS Training review app; it opens itself in the browser with its own
+        // one-time link and keeps running until its window's server is stopped.
+        "training_open_app" => {
+            let started = ["w3bs-training", "w3bs"].into_iter().find_map(|bin| {
+                let mut c = std::process::Command::new(adl_broker::recorder::which(bin)?);
+                if bin == "w3bs" {
+                    c.arg("training");
+                }
+                c.arg("open").stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).spawn().ok().map(|_| bin)
+            });
+            match started {
+                Some(bin) => Ok((json!({"started": bin}), false)),
+                None => Err(AdlError::new(ErrorCode::Unsupported, "W3BS Training is not installed (no w3bs-training or w3bs on PATH)")),
+            }
+        }
         "audit_delete" => {
             let n = b.audit.delete_all();
             b.audit.log("audit.delete", None, None, "allowed", "completed", json!({"files": n, "via": "control app"}));

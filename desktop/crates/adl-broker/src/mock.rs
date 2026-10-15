@@ -97,6 +97,12 @@ impl MockDesktop {
             w.focused = w.id == window;
         }
     }
+    /// Give `window` keyboard focus without raising it (it stays under whatever is on top).
+    pub fn set_focused_only(&self, window: &str) {
+        for w in &mut self.lock().windows {
+            w.focused = w.id == window;
+        }
+    }
     /// Steal focus to `window` after `n` more emitted events (simulates a popup).
     pub fn steal_focus_after(&self, n: usize, window: &str) {
         self.lock().focus_steal_after = Some((n, window.into()));

@@ -240,6 +240,30 @@ test('local app: one-time launch link, host check, CSRF header and session-gated
   }
 });
 
+test('w3bs.org serves the W3BS Training installers', async () => {
+  const { startServer } = await import('../src/server.mjs');
+  const { openStore } = await import('../src/store.mjs');
+  const store = await openStore({ path: ':memory:' });
+  const instance = await startServer({
+    store,
+    port: 0,
+    publicOrigin: 'http://localhost:3000',
+    mailer: { send: async () => ({ sent: true }) },
+  });
+  const base = `http://localhost:${instance.server.address().port}`;
+  try {
+    const sh = await fetch(`${base}/training/install.sh`);
+    assert.equal(sh.status, 200);
+    assert.match(sh.headers.get('content-type'), /text\/x-shellscript/);
+    assert.match(await sh.text(), /^#!\/bin\/sh\n# W3BS Training installer/);
+    const ps = await fetch(`${base}/training/install.ps1`);
+    assert.equal(ps.status, 200);
+    assert.match(await ps.text(), /Install-W3bsTraining/);
+  } finally {
+    await instance.close();
+  }
+});
+
 test('terminal review renders a card with its privacy state', () => {
   const card = {
     episode_id: 'ep_1',

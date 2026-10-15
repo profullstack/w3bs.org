@@ -1,0 +1,891 @@
+//! Desktop Training Mode: the recorder behind `w3bs desktop training` (W3BS Training PRD
+//! sections 5 to 8).
+//!
+//! What it does, and what it deliberately does not:
+//! - It starts Idle, after every daemon start, and returns to Idle whenever the layer is disabled
+//!   (lock, suspend, logout, emergency stop, tray gone). Resuming always needs a fresh human
+//!   action; nothing resumes on its own.
+//! - Only the person starts or resumes it: the native control, the control app, or an interactive
+//!   terminal outside any agent's process tree. Pausing, finishing, discarding and deleting are
+//!   allowed from any control peer because they only reduce capture.
+//! - It polls the focused window. A frame is kept only when that window belongs to an approved
+//!   application and no unapproved window overlaps it; the frame is cropped to the window.
+//!   Everything else becomes a recorded gap, never a guess.
+//! - It records no input events, no typed text and no clipboard. On Wayland there is no passive
+//!   input tap (InputCapture redirects input), so the bundle's profile is `visual-review` and
+//!   actor origin is `unknown`.
+//! - While it records, agents cannot take the input lease unless the person allowed it at start.
+//! - Frames stay in memory. On finish the bundle is piped to `w3bs training import -`; if that
+//!   fails it waits in memory for a retry and is lost if the daemon exits. It is never written
+//!   to disk in plaintext.
+
+use crate::broker::{Broker, Peer};
+use crate::training_bundle::{self as tb, Display, FocusStep, Frame, Gap, RecordingData};
+use crate::util::{now_ms, random_id, sha256_hex};
+use adl_schema::*;
+use serde_json::{json, Value};
+use std::io::Write;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
+
+#[derive(Clone, Debug)]
+pub struct TrainingConfig {
+    pub tick_ms: u64,
+    /// A new frame of the same window at most this often (focus changes always take one).
+    pub keyframe_ms: u64,
+    pub max_frames: usize,
+    pub max_bytes: usize,
+    pub max_pending: usize,
+    /// Hand finished bundles to `w3bs training import`. Off in unit tests.
+    pub handoff: bool,
+}
+
+impl Default for TrainingConfig {
+    fn default() -> Self {
+        Self { tick_ms: 500, keyframe_ms: 4_000, max_frames: 1_500, max_bytes: 256 * 1024 * 1024, max_pending: 4, handoff: true }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecState {
+    Idle,
+    Arming,
+    Recording,
+    Paused,
+    Blocked,
+    Finishing,
+    Error,
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct StartRequest {
+    /// `observe` (my work) or `teach` (this task)
+    pub mode: String,
+    #[serde(default)]
+    pub goal: Option<String>,
+    /// Application ids (as `w3bs desktop windows list` shows them) whose windows may be captured.
+    pub applications: Vec<String>,
+    /// Let agents keep using the input lease while recording (steps become mixed-origin).
+    #[serde(default)]
+    pub allow_agents: bool,
+}
+
+struct Recording {
+    data: RecordingData,
+    t0: Instant,
+    apps: Vec<String>,
+    allow_agents: bool,
+    last_focus: Option<(String, String)>,
+    last_frame: Option<(u64, String)>,
+    last_hash: String,
+    open_gap: Option<Gap>,
+    bytes: usize,
+    errors: u32,
+}
+
+struct Pending {
+    name: String,
+    bundle: Vec<u8>,
+    to_ms: u64,
+    error: String,
+}
+
+pub(crate) struct RecInner {
+    state: RecState,
+    reason: Option<String>,
+    rec: Option<Recording>,
+    pending: Vec<Pending>,
+    last: Option<Value>,
+}
+
+impl Default for RecInner {
+    fn default() -> Self {
+        Self { state: RecState::Idle, reason: None, rec: None, pending: vec![], last: None }
+    }
+}
+
+fn in_scope(apps: &[String], w: &WindowInfo) -> bool {
+    let id = w.app_id.to_lowercase();
+    !id.is_empty() && apps.contains(&id)
+}
+
+fn open_gap(r: &mut Recording, kind: &'static str, ns: u64, detail: &str) {
+    match &r.open_gap {
+        Some(g) if g.kind == kind => {}
+        _ => {
+            close_gap(r, ns);
+            r.open_gap = Some(Gap { kind, from_ns: ns, to_ns: None, detail: detail.into() });
+        }
+    }
+}
+
+fn close_gap(r: &mut Recording, ns: u64) {
+    if let Some(mut g) = r.open_gap.take() {
+        g.to_ns = Some(ns.max(g.from_ns));
+        r.data.gaps.push(g);
+    }
+}
+
+/// Crop a PNG to a pixel rectangle, keeping its colour type.
+fn crop_png(png_bytes: &[u8], x: u32, y: u32, w: u32, h: u32) -> Result<Vec<u8>> {
+    let mut dec = png::Decoder::new(png_bytes);
+    dec.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
+    let mut reader = dec.read_info().map_err(|e| AdlError::internal(format!("decode capture: {e}")))?;
+    let mut buf = vec![0; reader.output_buffer_size()];
+    let info = reader.next_frame(&mut buf).map_err(|e| AdlError::internal(format!("decode capture: {e}")))?;
+    let channels = info.color_type.samples();
+    let (fw, fh) = (info.width, info.height);
+    let (x, y) = (x.min(fw.saturating_sub(1)), y.min(fh.saturating_sub(1)));
+    let (w, h) = (w.min(fw - x).max(1), h.min(fh - y).max(1));
+    let stride = info.line_size;
+    let mut out_px = Vec::with_capacity((w * h) as usize * channels);
+    for row in y..y + h {
+        let start = row as usize * stride + x as usize * channels;
+        out_px.extend_from_slice(&buf[start..start + w as usize * channels]);
+    }
+    let mut out = Vec::new();
+    {
+        let mut enc = png::Encoder::new(&mut out, w, h);
+        enc.set_color(info.color_type);
+        enc.set_depth(png::BitDepth::Eight);
+        enc.set_compression(png::Compression::Fast);
+        let mut wr = enc.write_header().map_err(|e| AdlError::internal(e.to_string()))?;
+        wr.write_image_data(&out_px).map_err(|e| AdlError::internal(e.to_string()))?;
+    }
+    Ok(out)
+}
+
+/// Pipe a bundle to `w3bs training import -`. `W3BS_DESKTOP_TRAINING_HANDOFF` replaces the
+/// command (run by `sh -c`, bundle on stdin, name in `W3BS_TRAINING_BUNDLE`) for rigs and for
+/// people who keep W3BS Training somewhere unusual.
+fn handoff(name: &str, bundle: &[u8]) -> std::result::Result<Value, String> {
+    let mut cmd = if let Ok(sh) = std::env::var("W3BS_DESKTOP_TRAINING_HANDOFF") {
+        let mut c = Command::new("sh");
+        c.arg("-c").arg(sh);
+        c
+    } else if let Some(bin) = which("w3bs-training") {
+        let mut c = Command::new(bin);
+        c.args(["import", "-", "--filename", name]);
+        c
+    } else if let Some(bin) = which("w3bs") {
+        let mut c = Command::new(bin);
+        c.args(["training", "import", "-", "--filename", name]);
+        c
+    } else {
+        return Err(if cfg!(windows) {
+            "W3BS Training is not installed. Install it: irm https://w3bs.org/training/install.ps1 | iex".into()
+        } else {
+            "W3BS Training is not installed. Install it: curl -fsSL https://w3bs.org/training/install.sh | sh".into()
+        });
+    };
+    cmd.env("W3BS_TRAINING_BUNDLE", name).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = cmd.spawn().map_err(|e| format!("could not start W3BS Training: {e}"))?;
+    {
+        let mut stdin = child.stdin.take().ok_or("no stdin")?;
+        stdin.write_all(bundle).map_err(|e| format!("could not hand the recording over: {e}"))?;
+    }
+    let deadline = Instant::now() + Duration::from_secs(120);
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(50)),
+            _ => {
+                let _ = child.kill();
+                return Err("W3BS Training did not finish the import within 120 s".into());
+            }
+        }
+    }
+    let out = child.wait_with_output().map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr);
+        let msg = serde_json::from_str::<Value>(&err).ok().and_then(|v| v["error"]["message"].as_str().map(String::from)).unwrap_or_else(|| err.trim().chars().take(300).collect());
+        return Err(format!("W3BS Training refused the recording: {msg}"));
+    }
+    Ok(serde_json::from_slice(&out.stdout).unwrap_or_else(|_| json!({"imported": true})))
+}
+
+/// Find a program on PATH or where the W3BS installers put it (a user service's PATH often lacks
+/// ~/.local/bin; on Windows a PATH change reaches the broker only after it restarts).
+pub fn which(bin: &str) -> Option<std::path::PathBuf> {
+    use std::path::PathBuf;
+    let mut dirs: Vec<PathBuf> = std::env::var_os("PATH").map(|p| std::env::split_paths(&p).collect()).unwrap_or_default();
+    if let Some(h) = std::env::var_os("HOME") {
+        dirs.push(PathBuf::from(&h).join(".local/bin"));
+        dirs.push(PathBuf::from(h).join(".w3bs/bin"));
+    }
+    if let Some(l) = std::env::var_os("LOCALAPPDATA") {
+        dirs.push(PathBuf::from(l).join("Programs").join(bin).join("bin"));
+    }
+    let name = if cfg!(windows) { format!("{bin}.exe") } else { bin.to_string() };
+    dirs.into_iter().map(|d| d.join(&name)).find(|p| p.is_file())
+}
+
+impl Broker {
+    fn rec(&self) -> std::sync::MutexGuard<'_, RecInner> {
+        self.rec.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn rec_event(&self) {
+        let status = self.training_status();
+        self.broadcast_event("training", status);
+    }
+
+    fn set_rec_state(&self, r: &mut RecInner, s: RecState, reason: Option<String>) {
+        r.state = s;
+        r.reason = reason;
+        let blocks = matches!(s, RecState::Arming | RecState::Recording | RecState::Paused | RecState::Blocked) && r.rec.as_ref().is_some_and(|x| !x.allow_agents);
+        self.rec_blocks_leases.store(blocks, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Whether a recording currently refuses agent input leases.
+    pub fn recording_blocks_leases(&self) -> bool {
+        self.rec_blocks_leases.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    pub fn training_status(&self) -> Value {
+        let r = self.rec();
+        let rec = r.rec.as_ref().map(|x| {
+            json!({
+                "mode": if x.data.teach { "teach" } else { "observe" },
+                "goal": x.data.goal,
+                "applications": x.apps,
+                "allow_agents": x.allow_agents,
+                "started_at": tb::iso(x.data.started_ms),
+                "elapsed_ms": x.t0.elapsed().as_millis() as u64,
+                "frames": x.data.frames.len(),
+                "steps": x.data.steps.len(),
+                "gaps": x.data.gaps.len() + usize::from(x.open_gap.is_some()),
+                "excluded_now": x.open_gap.as_ref().map(|g| g.kind),
+                "marks": x.data.marks.len(),
+                "bytes": x.bytes,
+            })
+        });
+        json!({
+            "state": r.state,
+            "reason": r.reason,
+            "recording": rec,
+            "pending_handoffs": r.pending.iter().map(|p| json!({"name": p.name, "bytes": p.bundle.len(), "error": p.error})).collect::<Vec<_>>(),
+            "last_finished": r.last,
+            "agent_leases": if self.recording_blocks_leases() { "refused while recording" } else { "unchanged" },
+            "captures": "focused-window frames of approved applications only; no input events, typed text, clipboard or audio",
+            "capture_profile": "visual-review",
+        })
+    }
+
+    fn require_person(&self, peer: &Peer, op: &str) -> Result<()> {
+        if peer.agent_descendant || !(peer.native_control || peer.interactive) {
+            self.audit.log(op, None, None, "denied", "", json!({"pid": peer.pid}));
+            return Err(AdlError::denied(format!("{op} needs the person: use the tray, the control app or your own terminal")));
+        }
+        Ok(())
+    }
+
+    /// Applications with open windows, for choosing what may be recorded (ids only, no titles).
+    pub fn training_apps(&self) -> Result<Value> {
+        if !self.open.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(AdlError::new(ErrorCode::Blocked, "turn the desktop layer on to list applications"));
+        }
+        let mut apps: std::collections::BTreeMap<String, (usize, bool)> = Default::default();
+        for w in self.adapter.windows()? {
+            let id = w.app_id.to_lowercase();
+            if id.is_empty() {
+                continue;
+            }
+            let e = apps.entry(id).or_default();
+            e.0 += 1;
+            e.1 |= w.focused;
+        }
+        Ok(Value::Array(apps.into_iter().map(|(id, (n, f))| json!({"app_id": id, "windows": n, "focused": f})).collect()))
+    }
+
+    pub fn training_tick_ms(&self) -> u64 {
+        self.cfg.training.tick_ms
+    }
+
+    /// Observe my work / Teach this task.
+    pub fn training_start(&self, peer: &Peer, req: StartRequest) -> Result<Value> {
+        self.require_person(peer, "training.start")?;
+        let teach = match req.mode.as_str() {
+            "teach" => true,
+            "observe" => false,
+            other => return Err(AdlError::invalid(format!("mode must be observe or teach, not `{other}`"))),
+        };
+        let goal = req.goal.map(|g| g.trim().chars().take(500).collect::<String>()).filter(|g| !g.is_empty());
+        if teach && goal.is_none() {
+            return Err(AdlError::invalid("teach mode needs a goal: what are you about to do?"));
+        }
+        let apps: Vec<String> = req.applications.iter().map(|a| a.trim().to_lowercase()).filter(|a| !a.is_empty()).collect();
+        if apps.is_empty() {
+            return Err(AdlError::invalid("choose at least one application to record; whole-desktop recording is not offered"));
+        }
+        if apps.len() > 32 || apps.iter().any(|a| a.len() > 200) {
+            return Err(AdlError::invalid("too many or too long application ids"));
+        }
+        if !self.open.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(AdlError::new(ErrorCode::Blocked, "turn the desktop layer on first: recording uses its screen access. Agents still cannot act while you record unless you allow them."));
+        }
+        {
+            let mut r = self.rec();
+            if !matches!(r.state, RecState::Idle | RecState::Error) || r.rec.is_some() {
+                return Err(AdlError::new(ErrorCode::Busy, "a recording is already running; finish or discard it first"));
+            }
+            self.set_rec_state(&mut r, RecState::Arming, None);
+        }
+        let layout = self.adapter.layout();
+        let displays = layout
+            .as_ref()
+            .map(|l| l.displays.iter().map(|d| Display { id: d.id.clone(), x: d.logical.x, y: d.logical.y, width: d.logical.width, height: d.logical.height, scale: d.scale }).collect())
+            .unwrap_or_default();
+        let session = random_id("ses", 8);
+        let data = RecordingData {
+            bundle_id: format!("bun_{}", &session[4..]),
+            episode_ids: vec![],
+            session_id: session,
+            teach,
+            goal,
+            applications: apps.clone(),
+            started_ms: now_ms(),
+            ended_ns: 0,
+            tick_ns: self.cfg.training.tick_ms * 1_000_000,
+            frames: vec![],
+            steps: vec![],
+            gaps: vec![],
+            marks: vec![],
+            explanations: vec![],
+            outcome: None,
+            interrupted: false,
+            displays,
+            adapter: self.adapter.name(),
+            producer_version: env!("CARGO_PKG_VERSION").into(),
+            os: std::env::consts::OS.into(),
+            desktop: std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default(),
+            revocation_generation: self.generation.load(std::sync::atomic::Ordering::SeqCst),
+        };
+        let rec = Recording { data, t0: Instant::now(), apps, allow_agents: req.allow_agents, last_focus: None, last_frame: None, last_hash: String::new(), open_gap: None, bytes: 0, errors: 0 };
+        {
+            let mut r = self.rec();
+            r.rec = Some(rec);
+            self.set_rec_state(&mut r, RecState::Recording, None);
+        }
+        if !req.allow_agents {
+            self.revoke_lease_for_recording();
+        }
+        self.audit.log("training.start", None, None, "allowed", if teach { "teach" } else { "observe" }, json!({"applications": req.applications.len(), "allow_agents": req.allow_agents}));
+        self.rec_event();
+        Ok(self.training_status())
+    }
+
+    pub fn training_pause(&self) -> Result<Value> {
+        {
+            let mut r = self.rec();
+            if r.state != RecState::Recording {
+                return Err(AdlError::invalid("not recording"));
+            }
+            if let Some(x) = r.rec.as_mut() {
+                let ns = x.t0.elapsed().as_nanos() as u64;
+                close_gap(x, ns);
+                x.open_gap = Some(Gap { kind: "paused", from_ns: ns, to_ns: None, detail: "paused by the person".into() });
+            }
+            self.set_rec_state(&mut r, RecState::Paused, None);
+        }
+        self.audit.log("training.pause", None, None, "allowed", "", Value::Null);
+        self.rec_event();
+        Ok(self.training_status())
+    }
+
+    pub fn training_resume(&self, peer: &Peer) -> Result<Value> {
+        self.require_person(peer, "training.resume")?;
+        if !self.open.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(AdlError::new(ErrorCode::Blocked, "the desktop layer is off"));
+        }
+        {
+            let mut r = self.rec();
+            if !matches!(r.state, RecState::Paused | RecState::Blocked) {
+                return Err(AdlError::invalid("nothing is paused"));
+            }
+            if r.state == RecState::Blocked && r.rec.as_ref().is_some_and(|x| x.data.frames.len() >= self.cfg.training.max_frames || x.bytes >= self.cfg.training.max_bytes) {
+                return Err(AdlError::new(ErrorCode::Blocked, "this recording reached its size limit; finish it and start another"));
+            }
+            if let Some(x) = r.rec.as_mut() {
+                close_gap(x, x.t0.elapsed().as_nanos() as u64);
+            }
+            self.set_rec_state(&mut r, RecState::Recording, None);
+        }
+        self.audit.log("training.resume", None, None, "allowed", "", Value::Null);
+        self.rec_event();
+        Ok(self.training_status())
+    }
+
+    /// Mark a task boundary (observe mode starts a new episode here).
+    pub fn training_mark(&self) -> Result<Value> {
+        let mut r = self.rec();
+        let x = r.rec.as_mut().ok_or_else(|| AdlError::invalid("not recording"))?;
+        let ns = x.t0.elapsed().as_nanos() as u64;
+        x.data.marks.push(ns);
+        drop(r);
+        self.rec_event();
+        Ok(self.training_status())
+    }
+
+    /// The person's own explanation, stored as a human-authored annotation.
+    pub fn training_explain(&self, peer: &Peer, text: &str) -> Result<Value> {
+        self.require_person(peer, "training.explain")?;
+        let text: String = text.trim().chars().take(8_000).collect();
+        if text.is_empty() {
+            return Err(AdlError::invalid("the explanation is empty"));
+        }
+        let mut r = self.rec();
+        let x = r.rec.as_mut().ok_or_else(|| AdlError::invalid("not recording"))?;
+        if x.data.explanations.len() >= 32 {
+            return Err(AdlError::invalid("too many explanations in one recording"));
+        }
+        x.data.explanations.push(text);
+        drop(r);
+        self.rec_event();
+        Ok(self.training_status())
+    }
+
+    /// Finish and hand the recording to W3BS Training. `outcome` is the person's own verdict.
+    pub fn training_finish(&self, outcome: Option<&str>) -> Result<Value> {
+        if let Some(o) = outcome
+            && !["success", "partial", "failure", "interrupted", "unknown"].contains(&o)
+        {
+            return Err(AdlError::invalid("outcome must be success, partial, failure, interrupted or unknown"));
+        }
+        self.finish_internal(outcome.map(String::from), false).ok_or_else(|| AdlError::invalid("not recording"))
+    }
+
+    /// Stop recording because the layer closed (disable, lock, suspend, emergency stop).
+    pub(crate) fn training_abort(&self, why: &str) {
+        if self.finish_internal(None, true).is_some() {
+            self.audit.log("training.stop", None, None, "allowed", "interrupted", json!({"reason": why}));
+        }
+    }
+
+    fn finish_internal(&self, outcome: Option<String>, interrupted: bool) -> Option<Value> {
+        let mut rec = {
+            let mut r = self.rec();
+            let rec = r.rec.take()?;
+            self.set_rec_state(&mut r, RecState::Finishing, None);
+            rec
+        };
+        let ns = rec.t0.elapsed().as_nanos() as u64;
+        close_gap(&mut rec, ns);
+        rec.data.ended_ns = ns.max(1);
+        rec.data.outcome = outcome;
+        rec.data.interrupted = interrupted;
+        let n = tb::segments(&rec.data).len();
+        rec.data.episode_ids = (0..n).map(|_| random_id("ep", 8)).collect();
+        let bundle = tb::build(&rec.data);
+        let name = format!("{}.w3bs-training.zip", rec.data.session_id);
+        let summary = json!({
+            "session_id": rec.data.session_id, "episodes": n, "frames": rec.data.frames.len(), "steps": rec.data.steps.len(),
+            "gaps": rec.data.gaps.len(), "interrupted": interrupted, "finished_at": tb::iso(now_ms()),
+        });
+        drop(rec);
+        let result = if self.cfg.training.handoff { handoff(&name, &bundle) } else { Err("handoff disabled".into()) };
+        let mut r = self.rec();
+        let last = match result {
+            Ok(v) => json!({"summary": summary, "handoff": "imported", "import": v}),
+            Err(e) => {
+                if r.pending.len() >= self.cfg.training.max_pending {
+                    r.pending.remove(0);
+                }
+                r.pending.push(Pending { name, bundle, to_ms: now_ms(), error: e.clone() });
+                json!({"summary": summary, "handoff": "pending", "error": e, "note": "Held in memory only. Retry from the control app or `w3bs desktop training handoff`; it is lost if the daemon stops."})
+            }
+        };
+        r.last = Some(last.clone());
+        self.set_rec_state(&mut r, RecState::Idle, if interrupted { Some("stopped because the desktop layer closed".into()) } else { None });
+        drop(r);
+        self.audit.log("training.finish", None, None, "allowed", last["handoff"].as_str().unwrap_or(""), json!({"frames": summary["frames"], "interrupted": interrupted}));
+        self.rec_event();
+        Some(last)
+    }
+
+    /// Throw the current recording away without handing anything over.
+    pub fn training_discard(&self) -> Result<Value> {
+        {
+            let mut r = self.rec();
+            if r.rec.take().is_none() {
+                return Err(AdlError::invalid("not recording"));
+            }
+            self.set_rec_state(&mut r, RecState::Idle, None);
+        }
+        self.audit.log("training.discard", None, None, "allowed", "", Value::Null);
+        self.rec_event();
+        Ok(self.training_status())
+    }
+
+    /// Retry handing pending bundles to W3BS Training.
+    pub fn training_handoff(&self) -> Result<Value> {
+        let pending = std::mem::take(&mut self.rec().pending);
+        let mut done = 0;
+        let mut kept = vec![];
+        for mut p in pending {
+            match handoff(&p.name, &p.bundle) {
+                Ok(_) => done += 1,
+                Err(e) => {
+                    p.error = e;
+                    kept.push(p);
+                }
+            }
+        }
+        let left = kept.len();
+        self.rec().pending.splice(0..0, kept);
+        self.rec_event();
+        Ok(json!({"imported": done, "still_pending": left}))
+    }
+
+    /// Delete what the recorder still holds that was captured since `since_ms` (wall clock):
+    /// frames and steps of the current recording, and pending bundles overlapping the window.
+    /// Data already imported lives in W3BS Training: `w3bs training forget`.
+    pub fn training_forget(&self, since_ms: u64) -> Result<Value> {
+        let mut r = self.rec();
+        let mut frames = 0;
+        let mut steps = 0;
+        if let Some(x) = r.rec.as_mut() {
+            let cutoff = since_ms.saturating_sub(x.data.started_ms) * 1_000_000;
+            let before = (x.data.frames.len(), x.data.steps.len());
+            x.data.frames.retain(|f| f.ns < cutoff);
+            x.data.steps.retain(|s| s.ns < cutoff);
+            let kept: std::collections::HashSet<String> = x.data.frames.iter().map(|f| f.observation_id.clone()).collect();
+            for s in &mut x.data.steps {
+                s.before = s.before.take().filter(|o| kept.contains(o));
+                s.after = s.after.take().filter(|o| kept.contains(o));
+            }
+            x.data.marks.retain(|m| *m < cutoff);
+            x.bytes = x.data.frames.iter().map(|f| f.png.len()).sum();
+            x.last_frame = x.data.frames.last().map(|f| (f.ns, f.observation_id.clone()));
+            x.last_hash.clear();
+            frames = before.0 - x.data.frames.len();
+            steps = before.1 - x.data.steps.len();
+            let now = x.t0.elapsed().as_nanos() as u64;
+            close_gap(x, now);
+            if cutoff < now {
+                x.data.gaps.push(Gap { kind: "other", from_ns: cutoff, to_ns: Some(now), detail: "recent activity deleted by the person".into() });
+            }
+        }
+        let before = r.pending.len();
+        r.pending.retain(|p| p.to_ms < since_ms);
+        let dropped = before - r.pending.len();
+        drop(r);
+        self.audit.log("training.forget", None, None, "allowed", "", json!({"frames": frames, "steps": steps, "pending_bundles": dropped}));
+        self.rec_event();
+        Ok(json!({"frames_deleted": frames, "steps_deleted": steps, "pending_bundles_deleted": dropped, "next": "Recordings already handed over live in W3BS Training: run `w3bs training forget` for the same window."}))
+    }
+
+    /// One capture step. The daemon calls it every `tick_ms`; tests call it directly. The tray
+    /// and the control app hear about it when capture stops or resumes (an unapproved window
+    /// took focus or went away), not only on state changes.
+    pub fn training_tick(&self) {
+        let gap = || self.rec().rec.as_ref().and_then(|x| x.open_gap.as_ref().map(|g| g.kind));
+        let before = gap();
+        self.capture_tick();
+        if gap() != before {
+            self.rec_event();
+        }
+    }
+
+    fn capture_tick(&self) {
+        let mut r = self.rec();
+        if r.state != RecState::Recording {
+            return;
+        }
+        if !self.open.load(std::sync::atomic::Ordering::SeqCst) {
+            drop(r);
+            self.training_abort("desktop layer closed");
+            return;
+        }
+        let lease_held = self.lease_held();
+        let cfg = self.cfg.training.clone();
+        let Some(x) = r.rec.as_mut() else { return };
+        let ns = x.t0.elapsed().as_nanos() as u64;
+        let w = match self.adapter.focused_window() {
+            Ok(Some(w)) => w,
+            Ok(None) => {
+                open_gap(x, "other", ns, "no focused window");
+                return;
+            }
+            Err(_) => {
+                x.errors += 1;
+                open_gap(x, "other", ns, "window state unavailable");
+                if x.errors >= 20 {
+                    self.set_rec_state(&mut r, RecState::Error, Some("the desktop stopped reporting windows".into()));
+                    drop(r);
+                    self.rec_event();
+                }
+                return;
+            }
+        };
+        x.errors = 0;
+        if !in_scope(&x.apps, &w) {
+            // Which application it was is not recorded: it was not approved. Coming back to an
+            // approved window afterwards counts as a focus change.
+            x.last_focus = None;
+            open_gap(x, "excluded_scope", ns, "a window outside the approved applications was focused");
+            return;
+        }
+        let focus = (w.id.clone(), w.title.clone());
+        let changed = x.last_focus.as_ref() != Some(&focus);
+        let due = x.last_frame.as_ref().is_none_or(|(t, _)| ns.saturating_sub(*t) >= cfg.keyframe_ms * 1_000_000);
+        let before = x.last_frame.as_ref().map(|(_, id)| id.clone());
+        let mut after = None;
+        if changed || due {
+            match self.capture_window(x, &w, ns) {
+                Ok(Some(id)) => {
+                    close_gap(x, ns);
+                    after = Some(id);
+                }
+                Ok(None) => {}
+                Err(_) => open_gap(x, "dropped_frames", ns, "the screen capture failed"),
+            }
+        }
+        if changed {
+            x.last_focus = Some(focus);
+            let origin = if lease_held { "mixed" } else { "unknown" };
+            x.data.steps.push(FocusStep { step_id: random_id("step", 8), ns, app: w.app_id.clone(), title: w.title.clone(), before, after, origin });
+        }
+        if x.data.frames.len() >= cfg.max_frames || x.bytes >= cfg.max_bytes {
+            let ns = x.t0.elapsed().as_nanos() as u64;
+            open_gap(x, "paused", ns, "size limit reached");
+            self.set_rec_state(&mut r, RecState::Blocked, Some("this recording reached its size limit; finish it to keep what was captured".into()));
+            drop(r);
+            self.rec_event();
+        }
+    }
+
+    /// Capture the focused window's display, refuse if an unapproved window overlaps it, crop to
+    /// the window. Returns the new frame's observation id, or None when nothing was kept.
+    fn capture_window(&self, x: &mut Recording, w: &WindowInfo, ns: u64) -> Result<Option<String>> {
+        let Some(b) = w.bounds else {
+            open_gap(x, "other", ns, "the focused window reported no geometry");
+            return Ok(None);
+        };
+        let layout = self.adapter.layout()?;
+        let d = w
+            .display
+            .as_ref()
+            .and_then(|id| layout.displays.iter().find(|d| &d.id == id))
+            .or_else(|| layout.displays.iter().find(|d| d.logical.contains(b.x + b.width / 2.0, b.y + b.height / 2.0)))
+            .ok_or_else(|| AdlError::not_found("no display for the window"))?
+            .clone();
+        // Strict scope: a 3x3 grid inside the window must show this window or another approved one.
+        for i in 1..=3 {
+            for j in 1..=3 {
+                let (px, py) = (b.x + b.width * f64::from(i) / 4.0, b.y + b.height * f64::from(j) / 4.0);
+                if let Ok(Some(top)) = self.adapter.window_at(px, py)
+                    && top.id != w.id
+                    && !in_scope(&x.apps, &top)
+                {
+                    open_gap(x, "excluded_scope", ns, "an unapproved window overlapped the approved one");
+                    return Ok(None);
+                }
+            }
+        }
+        let gen0 = self.generation.load(std::sync::atomic::Ordering::SeqCst);
+        let (png, pw, ph) = self.adapter.capture(&d.id)?;
+        if !self.open.load(std::sync::atomic::Ordering::SeqCst) || self.generation.load(std::sync::atomic::Ordering::SeqCst) != gen0 {
+            // The layer closed while capturing: discard the late frame.
+            return Ok(None);
+        }
+        let (sx, sy) = (f64::from(pw) / d.logical.width, f64::from(ph) / d.logical.height);
+        let left = ((b.x.max(d.logical.x) - d.logical.x) * sx).floor().max(0.0) as u32;
+        let top = ((b.y.max(d.logical.y) - d.logical.y) * sy).floor().max(0.0) as u32;
+        let right = (((b.x + b.width).min(d.logical.x + d.logical.width) - d.logical.x) * sx).ceil().max(0.0) as u32;
+        let bottom = (((b.y + b.height).min(d.logical.y + d.logical.height) - d.logical.y) * sy).ceil().max(0.0) as u32;
+        if right <= left || bottom <= top {
+            open_gap(x, "other", ns, "the window is outside its display");
+            return Ok(None);
+        }
+        let cropped = crop_png(&png, left, top, right - left, bottom - top)?;
+        let hash = sha256_hex(&cropped);
+        if hash == x.last_hash {
+            // Nothing changed on screen: keep the earlier frame, refresh its time.
+            if let Some((t, _)) = x.last_frame.as_mut() {
+                *t = ns;
+            }
+            return Ok(x.last_frame.as_ref().map(|(_, id)| id.clone()));
+        }
+        let id = random_id("obs", 8);
+        x.bytes += cropped.len();
+        x.data.frames.push(Frame { observation_id: id.clone(), artifact_id: random_id("art", 8), ns, png: cropped, width: right - left, height: bottom - top, app: w.app_id.clone(), title: w.title.clone() });
+        x.last_frame = Some((ns, id.clone()));
+        x.last_hash = hash;
+        Ok(Some(id))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::adapter::SessionEvent;
+    use crate::audit::Audit;
+    use crate::mock::MockDesktop;
+    use crate::store::AgentStore;
+    use crate::Config;
+    use std::sync::Arc;
+
+    fn broker() -> (Arc<Broker>, Arc<MockDesktop>, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let mock = Arc::new(MockDesktop::new());
+        let cfg = Config {
+            pace_ms: 0,
+            require_native_control: false,
+            training: TrainingConfig { keyframe_ms: 0, handoff: false, ..TrainingConfig::default() },
+            ..Config::default()
+        };
+        let b = Arc::new(Broker::new(mock.clone(), AgentStore::open(dir.path().join("agents.json")).unwrap(), Audit::open(dir.path().join("audit"), 7), cfg));
+        (b, mock, dir)
+    }
+    fn person() -> Peer {
+        Peer { pid: Some(1), agent_descendant: false, interactive: true, native_control: false }
+    }
+    fn enable(b: &Broker) {
+        let peer = Peer { native_control: true, ..person() };
+        let ch = b.enable_request(&peer).unwrap();
+        b.enable_confirm(&peer, &ch.code.unwrap()).unwrap();
+    }
+    fn teach(b: &Broker, apps: &[&str]) -> Result<Value> {
+        b.training_start(&person(), StartRequest { mode: "teach".into(), goal: Some("Write the release notes".into()), applications: apps.iter().map(|s| s.to_string()).collect(), allow_agents: false })
+    }
+    fn state(b: &Broker) -> String {
+        b.training_status()["state"].as_str().unwrap().to_string()
+    }
+
+    #[test]
+    fn starts_idle_and_only_a_person_can_start() {
+        let (b, _m, _d) = broker();
+        assert_eq!(state(&b), "idle");
+        assert_eq!(teach(&b, &["org.kde.kate"]).unwrap_err().code, ErrorCode::Blocked, "layer off");
+        enable(&b);
+        let agent = Peer { agent_descendant: true, ..person() };
+        let req = || StartRequest { mode: "observe".into(), goal: None, applications: vec!["org.kde.kate".into()], allow_agents: false };
+        assert_eq!(b.training_start(&agent, req()).unwrap_err().code, ErrorCode::Denied);
+        let pipe = Peer { interactive: false, ..person() };
+        assert_eq!(b.training_start(&pipe, req()).unwrap_err().code, ErrorCode::Denied);
+        assert_eq!(b.training_start(&person(), StartRequest { applications: vec![], ..req() }).unwrap_err().code, ErrorCode::Invalid);
+        assert!(b.training_start(&person(), StartRequest { mode: "teach".into(), ..req() }).is_err(), "teach needs a goal");
+        b.training_start(&person(), req()).unwrap();
+        assert_eq!(state(&b), "recording");
+        assert_eq!(b.training_start(&person(), req()).unwrap_err().code, ErrorCode::Busy);
+    }
+
+    #[test]
+    fn captures_only_approved_unoccluded_windows_cropped() {
+        let (b, m, _d) = broker();
+        enable(&b);
+        teach(&b, &["org.kde.kate"]).unwrap();
+        // Kate is focused and topmost.
+        b.training_tick();
+        m.focus("w-browser"); // unapproved app takes focus
+        b.training_tick();
+        m.focus("w-editor"); // back, but Firefox no longer overlaps (Kate is topmost again)
+        b.training_tick();
+        let s = b.training_status();
+        assert_eq!(s["recording"]["frames"], 1, "the same unchanged window is deduplicated");
+        assert_eq!(s["recording"]["steps"], 2);
+        let last = b.training_finish(Some("success")).unwrap();
+        assert_eq!(last["handoff"], "pending");
+        assert_eq!(state(&b), "idle");
+        let st = b.training_status();
+        assert_eq!(st["pending_handoffs"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn overlap_by_an_unapproved_window_is_a_gap_not_a_frame() {
+        let (b, m, _d) = broker();
+        enable(&b);
+        // Approve Firefox only; Kate (unapproved) sits on top of part of Firefox.
+        m.focus("w-editor");
+        let r = b.training_start(&person(), StartRequest { mode: "observe".into(), goal: None, applications: vec!["org.mozilla.firefox".into()], allow_agents: false });
+        r.unwrap();
+        // Focus Firefox without raising it above Kate: simulate by focusing then re-raising Kate.
+        m.focus("w-browser");
+        m.focus("w-editor");
+        m.set_focused_only("w-browser");
+        b.training_tick();
+        let s = b.training_status();
+        assert_eq!(s["recording"]["frames"], 0);
+        assert_eq!(s["recording"]["excluded_now"], "excluded_scope");
+    }
+
+    #[test]
+    fn agents_cannot_take_the_lease_while_teaching() {
+        let (b, _m, _d) = broker();
+        enable(&b);
+        teach(&b, &["org.kde.kate"]).unwrap();
+        assert!(b.recording_blocks_leases());
+        b.training_pause().unwrap();
+        assert!(b.recording_blocks_leases(), "paused still refuses agents");
+        b.training_discard().unwrap();
+        assert!(!b.recording_blocks_leases());
+    }
+
+    #[test]
+    fn disable_lock_and_emergency_stop_end_the_recording() {
+        for event in [SessionEvent::Locked, SessionEvent::Suspending, SessionEvent::EmergencyStop] {
+            let (b, _m, _d) = broker();
+            enable(&b);
+            teach(&b, &["org.kde.kate"]).unwrap();
+            b.training_tick();
+            b.handle_session_event(event.clone());
+            let s = b.training_status();
+            assert_eq!(s["state"], "idle", "{event:?}");
+            assert_eq!(s["last_finished"]["summary"]["interrupted"], true);
+            // Nothing resumes on its own: a tick does nothing, and the layer is off.
+            b.training_tick();
+            assert_eq!(state(&b), "idle");
+            assert!(b.training_resume(&person()).is_err());
+        }
+    }
+
+    #[test]
+    fn pause_resume_and_forget() {
+        let (b, m, _d) = broker();
+        enable(&b);
+        teach(&b, &["org.kde.kate", "org.mozilla.firefox"]).unwrap();
+        b.training_tick();
+        b.training_pause().unwrap();
+        b.training_tick();
+        assert_eq!(b.training_status()["recording"]["frames"], 1, "nothing captured while paused");
+        assert!(b.training_resume(&Peer { agent_descendant: true, ..person() }).is_err());
+        b.training_resume(&person()).unwrap();
+        m.focus("w-browser");
+        b.training_tick();
+        assert_eq!(b.training_status()["recording"]["frames"], 2);
+        let r = b.training_forget(0).unwrap();
+        assert_eq!(r["frames_deleted"], 2);
+        assert_eq!(b.training_status()["recording"]["frames"], 0);
+    }
+
+    #[test]
+    fn a_finished_recording_is_a_valid_bundle_shape() {
+        let (b, m, _d) = broker();
+        enable(&b);
+        teach(&b, &["org.kde.kate", "org.mozilla.firefox"]).unwrap();
+        b.training_tick();
+        m.focus("w-browser");
+        b.training_tick();
+        b.training_explain(&person(), "Copy the version line first.").unwrap();
+        b.training_finish(Some("success")).unwrap();
+        let bundle = b.rec().pending[0].bundle.clone();
+        // Central directory lists every file; the PNG frames are cropped to the windows.
+        let text = String::from_utf8_lossy(&bundle);
+        for name in ["manifest.json", "sessions.jsonl", "episodes.jsonl", "observations.jsonl", "actions.jsonl", "artifacts.jsonl", "rights.json", "checksums.json"] {
+            assert!(text.contains(name), "{name}");
+        }
+        assert!(text.contains("\"capture_profile\":\"visual-review\""));
+        assert!(text.contains("Copy the version line first."));
+        assert!(!text.contains("Console"), "never records the unapproved terminal");
+    }
+
+    #[test]
+    fn crop_keeps_the_requested_rectangle() {
+        let png = crate::training_bundle::tests::png(10, 8, 7);
+        let out = crop_png(&png, 2, 1, 5, 4).unwrap();
+        let dec = png::Decoder::new(out.as_slice()).read_info().unwrap();
+        assert_eq!((dec.info().width, dec.info().height), (5, 4));
+    }
+}

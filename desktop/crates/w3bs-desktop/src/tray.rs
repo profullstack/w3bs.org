@@ -27,6 +27,12 @@ enum Act {
     Emergency,
     Decide(String, bool),
     OpenPanel,
+    /// Open the control app at its Training section ("Start training…", "Training options…").
+    OpenTraining,
+    TrainingPause,
+    TrainingResume,
+    TrainingMark,
+    TrainingFinish(&'static str),
     Revoke(String, String),
     Shortcut(String),
     Quit,
@@ -54,6 +60,8 @@ struct View {
     agents: Vec<AgentRow>,
     /// Last audit entries, newest first, already formatted
     activity: Vec<String>,
+    /// Desktop Training Mode status as the broker reports it.
+    training: Value,
 }
 
 struct DesktopTray {
@@ -140,6 +148,29 @@ impl DesktopTray {
     fn enabled(&self) -> bool {
         self.view.state == "enabled"
     }
+    fn training_state(&self) -> &str {
+        self.view.training["state"].as_str().unwrap_or("idle")
+    }
+    /// One line for the menu and tooltip, e.g. "Recording · Teach: Write the release notes".
+    fn training_text(&self) -> String {
+        let t = &self.view.training;
+        let state = match self.training_state() {
+            "recording" => "Recording",
+            "paused" => "Paused",
+            "blocked" => "Stopped at its size limit",
+            "finishing" => "Saving",
+            "error" => "Error",
+            "arming" => "Starting",
+            _ => "Not recording",
+        };
+        let what = match t["recording"]["mode"].as_str() {
+            Some("teach") => format!(" · Teach: {}", lit(t["recording"]["goal"].as_str().unwrap_or(""))),
+            Some(_) => " · Observe my work".into(),
+            None => String::new(),
+        };
+        let outside = if t["recording"]["excluded_now"].is_string() { " · not capturing (outside approved apps)" } else { "" };
+        format!("{state}{what}{outside}")
+    }
 }
 
 impl ksni::Tray for DesktopTray {
@@ -173,6 +204,7 @@ impl ksni::Tray for DesktopTray {
         if !self.view.approvals.is_empty() {
             d += &format!("\n{} approval(s) waiting; agent input is paused", self.view.approvals.len());
         }
+        d += &format!("\nTraining: {}", self.training_text());
         ksni::ToolTip { title: "Agentic Desktop Layer".into(), description: d, ..Default::default() }
     }
     fn menu(&self) -> Vec<MenuItem<Self>> {
@@ -183,6 +215,34 @@ impl ksni::Tray for DesktopTray {
         }
         if let Some(note) = &self.view.note {
             m.push(label(note.clone()));
+        }
+        m.push(MenuItem::Separator);
+        // Desktop Training Mode: start from here, choose scope and goal in the control app.
+        m.push(label(format!("Training: {}", self.training_text())));
+        match self.training_state() {
+            "recording" | "paused" | "blocked" => {
+                if self.training_state() == "recording" {
+                    m.push(item("Pause recording", "media-playback-pause", tx, Act::TrainingPause));
+                    m.push(item("Mark task boundary", "bookmark-new", tx, Act::TrainingMark));
+                } else {
+                    m.push(item("Resume recording", "media-record", tx, Act::TrainingResume));
+                }
+                m.push(submenu(
+                    "Finish task",
+                    "dialog-ok",
+                    vec![
+                        item("Complete", "dialog-ok", tx, Act::TrainingFinish("success")),
+                        item("Partial", "", tx, Act::TrainingFinish("partial")),
+                        item("Failed", "dialog-error", tx, Act::TrainingFinish("failure")),
+                        item("Not sure", "", tx, Act::TrainingFinish("unknown")),
+                    ],
+                ));
+                m.push(item("Training options…", "preferences-other", tx, Act::OpenTraining));
+            }
+            _ => m.push(item("Start training…", "media-record", tx, Act::OpenTraining)),
+        }
+        if let Some(n) = self.view.training["pending_handoffs"].as_array().map(Vec::len).filter(|n| *n > 0) {
+            m.push(label(format!("{n} recording(s) waiting for W3BS Training")));
         }
         m.push(MenuItem::Separator);
         if self.enabled() {
@@ -297,6 +357,7 @@ pub fn run() -> std::io::Result<()> {
                     Some("lease") => t.view.lease = data.as_object().map(|l| (who.clone(), l["task"].as_str().unwrap_or("").into())),
                     Some("approval_requested") => t.view.approvals.push((data["id"].as_str().unwrap_or("").into(), format!("{who} wants: {}", data["summary"].as_str().unwrap_or("")))),
                     Some("approval_decided") => t.view.approvals.retain(|(id, _)| Some(id.as_str()) != data["id"].as_str()),
+                    Some("training") => t.view.training = data.clone(),
                     _ => {}
                 });
             }
@@ -319,6 +380,9 @@ pub fn run() -> std::io::Result<()> {
         }
     };
     call("subscribe", json!({"native_control": true})).map_err(std::io::Error::other)?;
+    if let Ok(v) = call("training.status", json!({})) {
+        handle.update(|t| t.view.training = v);
+    }
 
     // Agents and recent activity change without broker events; refresh them on a second
     // connection every few seconds (and right after this tray changes something).
@@ -388,6 +452,14 @@ pub fn run() -> std::io::Result<()> {
                 let url = v["url"].as_str().unwrap_or_default();
                 crate::control_web::open_url(url).map(|_| Value::Null).map_err(|e| format!("{e}; run `w3bs desktop control --open`"))
             }),
+            Act::OpenTraining => call("control.login", json!({"via": "tray"})).and_then(|v| {
+                let url = format!("{}#training", v["url"].as_str().unwrap_or_default());
+                crate::control_web::open_url(&url).map(|_| Value::Null).map_err(|e| format!("{e}; run `w3bs desktop training open`"))
+            }),
+            Act::TrainingPause => call("training.pause", json!({})),
+            Act::TrainingResume => call("training.resume", json!({})),
+            Act::TrainingMark => call("training.mark", json!({})),
+            Act::TrainingFinish(outcome) => call("training.finish", json!({"outcome": outcome})),
             Act::Revoke(id, _name) => call("agents.revoke", json!({"agent": id})),
             // Tell the broker which shortcut the desktop bound, so the control app can show it.
             Act::Shortcut(desc) => call("native.shortcut", json!({"description": desc})),

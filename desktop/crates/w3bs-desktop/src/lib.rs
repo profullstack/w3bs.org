@@ -147,6 +147,9 @@ enum Cmd {
     /// Local audit metadata (no screenshots, text or message bodies are kept)
     #[command(subcommand)]
     Audit(AuditCmd),
+    /// Desktop Training Mode: record demonstrations of your own work for W3BS Training
+    #[command(subcommand)]
+    Training(TrainingCmd),
     /// Displays, their logical geometry and the layout generation (agent)
     Layout {
         #[command(flatten)]
@@ -185,6 +188,107 @@ enum Cmd {
         #[arg(long, value_name = "URL", num_args = 0..=1, default_missing_value = "http://127.0.0.1:7801/mcp")]
         http: Option<String>,
     },
+}
+
+#[derive(Subcommand)]
+enum TrainingCmd {
+    /// What the recorder is doing
+    Status,
+    /// Applications with open windows (ids to pass to --app)
+    Apps,
+    /// Observe my work: record approved applications until you finish
+    Observe {
+        /// Application id whose windows may be recorded (repeat); nothing else is captured
+        #[arg(long = "app", required = true)]
+        apps: Vec<String>,
+        /// Let agents keep their input lease while recording (steps become mixed-origin)
+        #[arg(long)]
+        allow_agents: bool,
+    },
+    /// Teach this task: one deliberate demonstration with a goal
+    Teach {
+        /// File holding the goal (what you are about to do); sensitive text never goes in arguments
+        #[arg(long)]
+        goal_file: PathBuf,
+        #[arg(long = "app", required = true)]
+        apps: Vec<String>,
+        #[arg(long)]
+        allow_agents: bool,
+    },
+    /// Pause recording (anything may pause; resuming needs you)
+    Pause,
+    /// Resume a paused recording
+    Resume,
+    /// Mark a task boundary (observe mode starts a new task here)
+    Mark,
+    /// Add your own explanation from a file
+    Explain {
+        #[arg(long)]
+        from_file: PathBuf,
+    },
+    /// Finish and hand the recording to W3BS Training for review
+    Finish {
+        #[arg(long, value_enum)]
+        outcome: Option<TrainingOutcome>,
+    },
+    /// Throw the current recording away
+    Discard,
+    /// Delete recent activity: what the recorder holds, then (in a terminal) W3BS Training's copy
+    Forget {
+        /// How far back, e.g. 10m, 2h, 1d
+        #[arg(long)]
+        last: String,
+    },
+    /// Retry handing finished recordings to W3BS Training
+    Handoff,
+    /// Open the Training section of the control app (one-time sign-in link)
+    Open {
+        #[arg(long)]
+        no_browser: bool,
+    },
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum TrainingOutcome {
+    Success,
+    Partial,
+    Failure,
+    Interrupted,
+    Unknown,
+}
+
+fn parse_last(s: &str) -> Result<u64> {
+    let (n, unit) = s.trim().split_at(s.trim().len().saturating_sub(1));
+    let n: u64 = n.parse().map_err(|_| AdlError::invalid("--last takes a duration like 30s, 10m, 2h or 1d"))?;
+    let ms = match unit {
+        "s" => 1_000,
+        "m" => 60_000,
+        "h" => 3_600_000,
+        "d" => 86_400_000,
+        _ => return Err(AdlError::invalid("--last takes a duration like 30s, 10m, 2h or 1d")),
+    };
+    Ok(n * ms)
+}
+
+fn training_line(v: &Value) -> String {
+    let mut s = format!("Training: {}", v["state"].as_str().unwrap_or("?").to_uppercase());
+    if let Some(r) = v["reason"].as_str() {
+        s += &format!(" ({r})");
+    }
+    if let Some(r) = v["recording"].as_object() {
+        s += &format!(
+            "\n{} · {} frame(s), {} step(s), {} gap(s){} · apps: {}",
+            if r["mode"] == "teach" { format!("Teach: {}", r["goal"].as_str().unwrap_or("")) } else { "Observe my work".into() },
+            r["frames"], r["steps"], r["gaps"],
+            if r["excluded_now"].is_string() { " · not capturing (outside approved apps)" } else { "" },
+            r["applications"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect::<Vec<_>>().join(", ")).unwrap_or_default()
+        );
+    }
+    if let Some(p) = v["pending_handoffs"].as_array().filter(|p| !p.is_empty()) {
+        s += &format!("\n{} recording(s) waiting for W3BS Training: `w3bs desktop training handoff`", p.len());
+    }
+    s += &format!("\nAgent input leases: {}", v["agent_leases"].as_str().unwrap_or(""));
+    s
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -687,6 +791,59 @@ fn run_with(cli: Cli) {
                 AuditCmd::Export => c.call("audit.export", json!({})),
                 AuditCmd::Delete => c.call("audit.delete", json!({})),
             }
+        }
+        Cmd::Training(t) => {
+            let mut c = control_client()?;
+            let read = |p: &PathBuf| std::fs::read_to_string(p).map_err(|e| AdlError::invalid(format!("{}: {e}", p.display())));
+            let v = match t {
+                TrainingCmd::Status => c.call("training.status", json!({}))?,
+                TrainingCmd::Apps => return c.call("training.apps", json!({})),
+                TrainingCmd::Observe { apps, allow_agents } => c.call("training.start", json!({"mode": "observe", "applications": apps, "allow_agents": allow_agents}))?,
+                TrainingCmd::Teach { goal_file, apps, allow_agents } => c.call("training.start", json!({"mode": "teach", "goal": read(&goal_file)?, "applications": apps, "allow_agents": allow_agents}))?,
+                TrainingCmd::Pause => c.call("training.pause", json!({}))?,
+                TrainingCmd::Resume => c.call("training.resume", json!({}))?,
+                TrainingCmd::Mark => c.call("training.mark", json!({}))?,
+                TrainingCmd::Explain { from_file } => c.call("training.explain", json!({"text": read(&from_file)?}))?,
+                TrainingCmd::Finish { outcome } => {
+                    let o = outcome.map(|o| match o {
+                        TrainingOutcome::Success => "success",
+                        TrainingOutcome::Partial => "partial",
+                        TrainingOutcome::Failure => "failure",
+                        TrainingOutcome::Interrupted => "interrupted",
+                        TrainingOutcome::Unknown => "unknown",
+                    });
+                    return c.call("training.finish", json!({"outcome": o}));
+                }
+                TrainingCmd::Discard => c.call("training.discard", json!({}))?,
+                TrainingCmd::Handoff => return c.call("training.handoff", json!({})),
+                TrainingCmd::Forget { last } => {
+                    let since = adl_broker::util::now_ms().saturating_sub(parse_last(&last)?);
+                    let r = c.call("training.forget", json!({"since_ms": since}))?;
+                    // What was already handed over lives in W3BS Training, which asks the person
+                    // in this terminal to confirm.
+                    if std::io::stdin().is_terminal() {
+                        let bin = ["w3bs-training", "w3bs"].into_iter().find(|b| std::process::Command::new(b).arg("--help").stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status().is_ok());
+                        match bin {
+                            Some("w3bs-training") => drop(std::process::Command::new("w3bs-training").args(["forget", "--last", &last]).status()),
+                            Some(_) => drop(std::process::Command::new("w3bs").args(["training", "forget", "--last", &last]).status()),
+                            None => eprintln!("W3BS Training is not installed here; nothing else to delete."),
+                        }
+                    }
+                    return Ok(r);
+                }
+                TrainingCmd::Open { no_browser } => {
+                    let v = c.call("control.login", json!({"via": "cli"}))?;
+                    let url = format!("{}#training", v["url"].as_str().unwrap_or_default());
+                    if no_browser {
+                        return Ok(json!(url));
+                    }
+                    return match control_web::open_url(&url) {
+                        Ok(()) => Ok(json!("Opened Training in the control app.")),
+                        Err(e) => Ok(json!(format!("{e}. Open this one-time link within {} s:\n{url}", v["expires_in_s"]))),
+                    };
+                }
+            };
+            Ok(if j { v } else { json!(training_line(&v)) })
         }
         Cmd::Layout { auth } => agent_client(&auth)?.call("layout", json!({})),
         Cmd::Windows(WindowsCmd::List { auth }) => agent_client(&auth)?.call("windows", json!({})),

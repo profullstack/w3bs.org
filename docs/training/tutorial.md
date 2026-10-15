@@ -4,13 +4,27 @@ This walks one task through the whole loop on your own machine: import,
 review, version, approve, release, connect an agent, retrieve, report, export,
 delete. No account, cloud service or paid model is involved.
 
-Recording from your desktop is the Agentic Desktop Layer's job
-(`w3bs desktop training`, not yet released). This tutorial starts from a
-synthetic bundle so every step works today.
+This tutorial starts from a synthetic bundle so it works without a desktop; the
+section after this one shows how to record your own.
+
+## Recording your own task instead
+
+With the Agentic Desktop Layer running and agent access enabled, click the tray
+icon and choose **Start training…**. The control app opens at Training: pick
+**Teach this task**, say what you are about to do, tick the applications it may
+see, and start. Do the task, then tray → **Finish task** → **Complete**. The
+recording goes straight into W3BS Training (step 2 below). From a terminal:
+
+```sh
+echo 'Write the release notes in Kate' > goal.txt
+w3bs desktop training teach --goal-file goal.txt --app org.kde.kate
+w3bs desktop training finish --outcome success
+```
 
 ## 0. Setup
 
-From a checkout of `profullstack/w3bs.org`:
+Install the binary (`curl -fsSL https://w3bs.org/training/install.sh | sh`), or
+from a checkout of `profullstack/w3bs.org`:
 
 ```sh
 bun install

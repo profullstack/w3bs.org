@@ -88,6 +88,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS episode_fts USING fts5(episode_id UNINDEXED, 
 
 export function defaultHome(env = process.env) {
   if (env.W3BS_TRAINING_HOME) return resolve(env.W3BS_TRAINING_HOME);
+  if (process.platform === 'win32' && env.LOCALAPPDATA) return resolve(env.LOCALAPPDATA, 'w3bs', 'training');
   const data = env.XDG_DATA_HOME || resolve(homedir(), '.local/share');
   return resolve(data, 'w3bs/training');
 }

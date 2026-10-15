@@ -60,6 +60,11 @@ test('committed JSON Schemas match format.mjs', () => {
   assert.equal(result.status, 0, result.stderr);
 });
 
+test('embedded local-app assets match training/ui/public', () => {
+  const result = spawnSync(process.execPath, ['training/ui/build-assets.mjs', '--check'], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+});
+
 test('fixture records validate and invalid records are refused', () => {
   const r = sampleRecords();
   for (const s of r.sessions) RECORDS.session.parse(s);
