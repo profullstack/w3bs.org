@@ -1,0 +1,27 @@
+# social.w3bs.org: the Bluesky web client (bluesky-social/social-app's bskyweb), built
+# locally as w3bs-social-web with DEFAULT_SERVICE=https://social.w3bs.org and the title
+# "W3BS Social". nginx sends the PDS paths (/xrpc, /oauth, /@atproto, /.well-known,
+# /account) to the PDS in ~/www/w3bs.org-social and everything else here.
+# Rebuild: see ops/social/README.md in profullstack/w3bs.org.
+services:
+  web:
+    image: w3bs-social-web:latest
+    restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 512m
+    command: ["/usr/bin/bskyweb", "serve"]
+    environment:
+      HTTP_ADDRESS: ":8100"
+      ATP_APPVIEW_HOST: "https://public.api.bsky.app"
+      CORS_ALLOWED_ORIGINS: "https://social.w3bs.org"
+      BSKY_CANONICAL_INSTANCE: "false"
+    ports:
+      - "127.0.0.1:${APP_PORT}:8100"
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "3" }
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.200.143.0/24
