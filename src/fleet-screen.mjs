@@ -204,7 +204,12 @@ export function createScreenRelay({ fleet, origin, currentUser }) {
           return true;
         }
         socket.on('error', () => socket.destroy());
-        handler(req, socket, head, match[1]).catch(() => socket.destroy());
+        handler(req, socket, head, match[1]).catch((error) => {
+          process.stderr.write(
+            `fleet screen: ${req.url.split('?')[0]}: ${error?.stack || error}\n`,
+          );
+          socket.destroy();
+        });
         return true;
       }
       return false;

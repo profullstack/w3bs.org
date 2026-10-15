@@ -64,7 +64,7 @@ async function boot() {
     );
     return { ...joined, id: listed.id };
   };
-  return { http, user, socket, machine, close: () => instance.close() };
+  return { http, user, socket, machine, store, close: () => instance.close() };
 }
 const text = (data) => new TextDecoder().decode(data);
 const until = async (check) => {
@@ -197,6 +197,28 @@ test('fleet screen: strangers, other sites, other machines and unshared screens 
       false,
     );
     viewer.ws.close();
+  } finally {
+    await t.close();
+  }
+});
+
+// Production looks agent keys up in Postgres, a real network wait before the upgrade. Bun
+// 1.4.0's built-in ws threw in handleUpgrade after such a wait (fixed in 1.4.2); SQLite never
+// showed it, so slow the lookup down on purpose.
+test('fleet screen: the upgrade survives a slow key lookup', async () => {
+  const t = await boot();
+  try {
+    const alice = await t.user('alice');
+    const m = await t.machine(alice);
+    const fleet = t.store.fleet;
+    const lookup = fleet.machineByKey;
+    fleet.machineByKey = async (key) => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      return lookup(key);
+    };
+    const listen = t.socket('/api/fleet/listen', { Authorization: `Bearer ${m.agent_key}` });
+    assert.equal(await listen.opened, true);
+    listen.ws.close();
   } finally {
     await t.close();
   }
