@@ -2274,6 +2274,10 @@
    {
     "run": "w3bs-desktop disable",
     "does": "Stop all agent access at once"
+   },
+   {
+    "run": "w3bs-desktop training teach --goal-file goal.txt --app org.kde.kate",
+    "does": "Record a demonstration of one task in approved apps for W3BS Training (or tray: Start training…)"
    }
   ],
   "description": "Lets Claude Code, OpenCode and Codex use your real desktop with mouse and keyboard on Linux, macOS and Windows, through a local broker and MCP server. Starts disabled; you turn it on and off from the tray, panel or menu bar.",
@@ -2281,10 +2285,45 @@
   "repository": "https://github.com/profullstack/w3bs.org/tree/main/desktop",
   "license": "Apache-2.0",
   "agentic": true,
-  "latest_version": "0.2.1",
+  "latest_version": "0.4.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://w3bs.org/desktop/install.sh | sh",
-  "evidence": "w3bs.org/desktop/install.sh 200 (text/x-shellscript); GitHub release desktop-v0.2.1 with 5 archives + SHA256SUMS; installer verified on ubuntu:24.04, macos-latest and windows-latest CI",
+  "evidence": "w3bs.org/desktop/install.sh 200 (text/x-shellscript); GitHub release desktop-v0.4.0 with 5 archives + SHA256SUMS; installer verified on ubuntu:24.04, macos-latest and windows-latest CI; Training Mode verified on the KDE Plasma rig (73/73)",
+  "publisher": "profullstack"
+ },
+ {
+  "id": "w3bs.org/w3bs-training",
+  "name": "w3bs-training",
+  "commands": [
+   "w3bs-training"
+  ],
+  "examples": [
+   {
+    "run": "w3bs-training open",
+    "does": "Review recorded tasks in the local app (one-time link)"
+   },
+   {
+    "run": "w3bs-training import demo.w3bs-training.zip",
+    "does": "Import a demonstration bundle, JSON/JSONL events with a mapping, or a video"
+   },
+   {
+    "run": "w3bs-training setup claude-code --consumer claude-code",
+    "does": "Print the claude mcp add line so an agent can retrieve approved demonstrations"
+   },
+   {
+    "run": "w3bs-training forget --last 10m",
+    "does": "Delete everything captured in the last ten minutes"
+   }
+  ],
+  "description": "Review, curate and version demonstrations of your desktop work, then let an authorized agent retrieve approved examples over MCP. Local-first, encrypted at rest, nothing leaves the machine unless you export it. Records come from the Agentic Desktop Layer tray (Start training…) or imported bundles.",
+  "homepage": "https://github.com/profullstack/w3bs.org/tree/main/docs/training",
+  "repository": "https://github.com/profullstack/w3bs.org/tree/main/training",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "0.1.0",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://w3bs.org/training/install.sh | sh",
+  "evidence": "w3bs.org/training/install.sh 200 (text/x-shellscript); GitHub release training-v0.1.0 with 5 archives + SHA256SUMS; installed from w3bs.org in a clean ubuntu:24.04 container and imported a recorder bundle; desktop recorder handoff verified in the same container",
   "publisher": "profullstack"
  },
  {

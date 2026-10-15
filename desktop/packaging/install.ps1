@@ -4,7 +4,7 @@
 #
 # Inspect first if you like:  irm https://w3bs.org/desktop/install.ps1 -OutFile install.ps1; notepad install.ps1; .\install.ps1
 # Options (from a saved copy, or with the one-liner as a script block):
-#   & ([scriptblock]::Create((irm https://w3bs.org/desktop/install.ps1))) -Version 0.3.0 -NoService
+#   & ([scriptblock]::Create((irm https://w3bs.org/desktop/install.ps1))) -Version 0.4.0 -NoService
 #   & ([scriptblock]::Create((irm https://w3bs.org/desktop/install.ps1))) -Uninstall [-Purge]
 #
 # What this does, for the current user only (no administrator rights needed):
@@ -29,7 +29,7 @@
 function Install-W3bsDesktop {
     [CmdletBinding()]
     param(
-        [string]$Version = $(if ($env:W3BS_DESKTOP_VERSION) { $env:W3BS_DESKTOP_VERSION } else { '0.3.0' }),
+        [string]$Version = $(if ($env:W3BS_DESKTOP_VERSION) { $env:W3BS_DESKTOP_VERSION } else { '0.4.0' }),
         [switch]$NoService,
         [switch]$Uninstall,
         [switch]$Purge

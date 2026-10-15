@@ -29,7 +29,7 @@ RUN cmake /src -DCMAKE_BUILD_TYPE=Release -DBUILD_VIEWER=OFF -DENABLE_NLS=OFF -D
     && make -j"$(nproc)" w0vncserver && install -m 0755 unix/w0vncserver/w0vncserver /usr/local/bin/
 
 FROM ubuntu:26.04
-ARG DESKTOP_VERSION=0.3.0
+ARG DESKTOP_VERSION=0.4.0
 ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8
 RUN apt-get update && apt-get install -y --no-install-recommends \
       kwin-wayland plasma-desktop plasma-workspace konsole breeze breeze-cursor-theme libkscreen-bin \
