@@ -48,7 +48,10 @@ everything else to the client; `*.social.w3bs.org` handle hosts go straight to t
 `PDS_INVITE_REQUIRED=true`. A signed-in W3BS account gets one single-use code from
 `POST /api/social/invite`; the app mints it with the PDS admin API and stores it in
 `social_invites`. The app needs `W3BS_SOCIAL_ADMIN_PASSWORD` (= `PDS_ADMIN_PASSWORD`);
-without it the page says invites are not open yet. `W3BS_SOCIAL_PDS` overrides the PDS
+without it the page says invites are not open yet.
+`W3BS_SOCIAL_PUBLIC_INVITE` is a shared multi-use code shown to everyone on the page
+(with its uses left, read from `admin.getInviteCodes`, cached 5 min); when it is used up
+or disabled the page falls back to the one-per-account flow. `W3BS_SOCIAL_PDS` overrides the PDS
 URL (default `https://social.w3bs.org`).
 
 ## Admin

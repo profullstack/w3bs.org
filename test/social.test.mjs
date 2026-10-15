@@ -7,7 +7,7 @@ const ORIGIN = 'http://localhost:3000';
 const PDS = 'https://social.example';
 
 // A stand-in PDS: describeServer, and createInviteCode behind admin Basic auth.
-function fakePds({ online = true } = {}) {
+function fakePds({ online = true, codes = [] } = {}) {
   const calls = [];
   let n = 0;
   const fetchImpl = async (url, init = {}) => {
@@ -19,6 +19,8 @@ function fakePds({ online = true } = {}) {
         availableUserDomains: ['.social.example'],
         inviteCodeRequired: true,
       });
+    if (String(url).includes('/xrpc/com.atproto.admin.getInviteCodes'))
+      return Response.json({ codes });
     if (String(url).endsWith('/xrpc/com.atproto.server.createInviteCode')) {
       if (init.headers?.Authorization !== `Basic ${Buffer.from('admin:secret').toString('base64')}`)
         return new Response('{}', { status: 401 });
@@ -29,15 +31,15 @@ function fakePds({ online = true } = {}) {
   return { fetchImpl, calls };
 }
 
-async function boot({ adminPassword = 'secret', online = true } = {}) {
-  const pds = fakePds({ online });
+async function boot({ adminPassword = 'secret', online = true, publicInvite = '', codes } = {}) {
+  const pds = fakePds({ online, codes });
   const store = await openStore({ path: ':memory:' });
   const instance = await startServer({
     store,
     port: 0,
     publicOrigin: ORIGIN,
     mailer: { send: async () => ({ sent: true }) },
-    social: { pds: PDS, adminPassword },
+    social: { pds: PDS, adminPassword, publicInvite },
     socialFetch: pds.fetchImpl,
   });
   const base = `http://localhost:${instance.server.address().port}`;
@@ -115,6 +117,34 @@ test('social: without an admin password or a reachable PDS, the page still rende
     const res = await t.http('/api/social/invite', { method: 'POST', cookie: alice });
     assert.equal(res.status, 503);
     assert.equal((await res.json()).error.code, 'SOCIAL_UNAVAILABLE');
+  } finally {
+    await t.close();
+  }
+});
+
+test('social: a shared invite is shown to everyone with its uses left', async () => {
+  const codes = [{ code: 'shared-code', available: 1000, disabled: false, uses: [{}, {}] }];
+  const t = await boot({ publicInvite: 'shared-code', codes });
+  try {
+    const html = await (await t.http('/social')).text();
+    assert.match(html, /id="social-code">shared-code</);
+    assert.match(html, /998 sign-ups left/);
+    assert.doesNotMatch(html, /Sign in for an invite/);
+    const api = await (await t.http('/api/social')).json();
+    assert.deepEqual(api.publicInvite, { code: 'shared-code', remaining: 998 });
+  } finally {
+    await t.close();
+  }
+});
+
+test('social: a used-up or disabled shared invite falls back to per-account invites', async () => {
+  const codes = [{ code: 'shared-code', available: 2, disabled: false, uses: [{}, {}] }];
+  const t = await boot({ publicInvite: 'shared-code', codes });
+  try {
+    const html = await (await t.http('/social')).text();
+    assert.doesNotMatch(html, /shared-code/);
+    assert.match(html, /Sign in for an invite/);
+    assert.equal((await (await t.http('/api/social')).json()).publicInvite, null);
   } finally {
     await t.close();
   }

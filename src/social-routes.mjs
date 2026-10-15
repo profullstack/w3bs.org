@@ -2,7 +2,8 @@
 // server) at social.w3bs.org with handles under .social.w3bs.org. The PDS runs as its
 // own service on its own hostname, because atproto puts /xrpc, /oauth and
 // /.well-known/atproto-did at the root of a host and cannot live under a path.
-// Sign-up on the PDS needs an invite code; a signed-in W3BS account gets one here.
+// Sign-up on the PDS needs an invite code: the shared one in W3BS_SOCIAL_PUBLIC_INVITE
+// while it has uses left, otherwise one per signed-in W3BS account.
 import { W3bsError } from './core.mjs';
 import { escapeHtml as e } from './site.mjs';
 
@@ -12,6 +13,7 @@ export function socialConfig(env = process.env) {
   return {
     pds: (env.W3BS_SOCIAL_PDS || 'https://social.w3bs.org').replace(/\/+$/, ''),
     adminPassword: env.W3BS_SOCIAL_ADMIN_PASSWORD || '',
+    publicInvite: (env.W3BS_SOCIAL_PUBLIC_INVITE || '').trim(),
   };
 }
 
@@ -20,6 +22,9 @@ export function mountSocial(app, { store, helpers, config = socialConfig(), fetc
   const social = store.social;
   const host = new URL(config.pds).hostname;
   let described = { at: 0, value: null };
+  let shared = { at: 0, value: null };
+  const adminAuth = () =>
+    `Basic ${Buffer.from(`admin:${config.adminPassword}`).toString('base64')}`;
 
   // The PDS's own description (handle domains, invite rule, links), cached briefly so the
   // page never waits on it twice; null when the PDS does not answer.
@@ -37,8 +42,41 @@ export function mountSocial(app, { store, helpers, config = socialConfig(), fetc
     described = { at: Date.now(), value };
     return value;
   }
+  // The shared invite and how many sign-ups it has left. The admin API has no lookup by
+  // code, so page through the codes (cached like describe). Without an admin password, or
+  // when the code is not found, the count is unknown and the code is still shown.
+  async function publicInvite() {
+    if (!config.publicInvite) return null;
+    if (Date.now() - shared.at < DESCRIBE_TTL) return shared.value;
+    let value = { code: config.publicInvite, remaining: null, open: true };
+    if (config.adminPassword) {
+      try {
+        let cursor = '';
+        for (let pageNo = 0; pageNo < 20; pageNo++) {
+          const response = await fetchImpl(
+            `${config.pds}/xrpc/com.atproto.admin.getInviteCodes?sort=recent&limit=500${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+            { headers: { Authorization: adminAuth() }, signal: AbortSignal.timeout(5000) },
+          );
+          if (!response.ok) break;
+          const body = await response.json();
+          const found = body.codes?.find((c) => c.code === config.publicInvite);
+          if (found) {
+            const remaining = Math.max(0, found.available - (found.uses?.length ?? 0));
+            value = { code: found.code, remaining, open: !found.disabled && remaining > 0 };
+            break;
+          }
+          if (!body.cursor || !body.codes?.length) break;
+          cursor = body.cursor;
+        }
+      } catch {
+        // keep the unknown-count value
+      }
+    }
+    shared = { at: Date.now(), value };
+    return value;
+  }
   const info = async () => {
-    const server = await describe();
+    const [server, invite] = await Promise.all([describe(), publicInvite()]);
     return {
       name: 'W3BS Social',
       protocol: 'atproto',
@@ -48,6 +86,7 @@ export function mountSocial(app, { store, helpers, config = socialConfig(), fetc
       handleDomains: server?.availableUserDomains ?? [`.${host}`],
       inviteCodeRequired: server?.inviteCodeRequired ?? true,
       invitesFromW3bs: Boolean(config.adminPassword),
+      publicInvite: invite?.open ? { code: invite.code, remaining: invite.remaining } : null,
     };
   };
 
@@ -58,7 +97,7 @@ export function mountSocial(app, { store, helpers, config = socialConfig(), fetc
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Basic ${Buffer.from(`admin:${config.adminPassword}`).toString('base64')}`,
+        Authorization: adminAuth(),
       },
       body: JSON.stringify({ useCount: 1 }),
       signal: AbortSignal.timeout(10000),
@@ -88,11 +127,14 @@ export function mountSocial(app, { store, helpers, config = socialConfig(), fetc
     const invite = user ? await social.invite(user.id) : null;
     const domain = about.handleDomains[0] ?? `.${host}`;
     const example = `${user ? e(user.username.toLowerCase()) : 'you'}${e(domain)}`;
-    const join = !about.invitesFromW3bs
-      ? `<p>Invites are not open yet. Ask on <a class="inline-link" href="/bbs">the community forums</a> and we will send you one.</p>`
-      : !user
-        ? `<p>Sign in with your W3BS account and you get an invite code here, one per account.</p><a class="button primary" href="/login?next=${encodeURIComponent('/social')}">Sign in for an invite</a> <a class="button" href="/signup">Create a W3BS account</a>`
-        : `<form class="auth-form inline" data-form="social-invite"${invite ? ' hidden' : ''}><p>One invite code for @${e(user.username)}. It works once.</p><button class="button primary" type="submit">Get my invite code</button><p class="form-status" role="status" aria-live="polite"></p></form><div class="social-invite"${invite ? '' : ' hidden'}><p>Your invite code:</p><pre class="instructions" id="social-code">${e(invite?.code ?? '')}</pre><button class="small-button" type="button" data-action="copy-code">Copy</button></div>`;
+    const shared = about.publicInvite;
+    const join = shared
+      ? `<p>Everyone can use this invite code${shared.remaining == null ? '' : ` (${shared.remaining.toLocaleString('en-US')} sign-ups left)`}. No W3BS account needed.</p><pre class="instructions" id="social-code">${e(shared.code)}</pre><button class="small-button" type="button" data-action="copy-code">Copy</button> <a class="button primary" href="${e(config.pds)}">Create your account</a>`
+      : !about.invitesFromW3bs
+        ? `<p>Invites are not open yet. Ask on <a class="inline-link" href="/bbs">the community forums</a> and we will send you one.</p>`
+        : !user
+          ? `<p>Sign in with your W3BS account and you get an invite code here, one per account.</p><a class="button primary" href="/login?next=${encodeURIComponent('/social')}">Sign in for an invite</a> <a class="button" href="/signup">Create a W3BS account</a>`
+          : `<form class="auth-form inline" data-form="social-invite"${invite ? ' hidden' : ''}><p>One invite code for @${e(user.username)}. It works once.</p><button class="button primary" type="submit">Get my invite code</button><p class="form-status" role="status" aria-live="polite"></p></form><div class="social-invite"${invite ? '' : ' hidden'}><p>Your invite code:</p><pre class="instructions" id="social-code">${e(invite?.code ?? '')}</pre><button class="small-button" type="button" data-action="copy-code">Copy</button></div>`;
     page(res, {
       title: 'Social',
       active: '/social',
@@ -104,7 +146,7 @@ export function mountSocial(app, { store, helpers, config = socialConfig(), fetc
 DID        ${e(about.did)}
 Handles    *${e(domain)}
 Describe   ${e(config.pds)}/xrpc/com.atproto.server.describeServer
-This page  GET /api/social · POST /api/social/invite (session or w3bs login bearer)</pre><p>Agents get accounts the same way people do. Label an automated account as a bot in its profile.</p></section><section class="inspector-panel" id="policy"><h3>Terms and privacy</h3><p>W3BS Social is a community service run by the W3BS initiative with no guarantee of uptime. Your posts, likes and follows are public on the AT Protocol network and get copied by relays and apps we do not control, so deleting them here does not delete those copies. We store your email address and password hash only to run your account, and we never sell or share them. Spam, harassment, illegal content and impersonation get an account taken down. Bluesky's moderation service labels content across the network. Questions or reports: <a class="inline-link" href="mailto:hello@w3bs.org">hello@w3bs.org</a>.</p></section>`,
+This page  GET /api/social (includes the shared invite) · POST /api/social/invite (session or w3bs login bearer)</pre><p>Agents get accounts the same way people do. Label an automated account as a bot in its profile.</p></section><section class="inspector-panel" id="policy"><h3>Terms and privacy</h3><p>W3BS Social is a community service run by the W3BS initiative with no guarantee of uptime. Your posts, likes and follows are public on the AT Protocol network and get copied by relays and apps we do not control, so deleting them here does not delete those copies. We store your email address and password hash only to run your account, and we never sell or share them. Spam, harassment, illegal content and impersonation get an account taken down. Bluesky's moderation service labels content across the network. Questions or reports: <a class="inline-link" href="mailto:hello@w3bs.org">hello@w3bs.org</a>.</p></section>`,
     });
   });
 }
