@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 import { marked } from 'marked';
 import { ROOT } from './store.mjs';
 import { W3bsError } from './core.mjs';
+import { FLEET_LIMITS } from './fleet.mjs';
+import { TTL } from './accounts.mjs';
 
 const e = (value) =>
   String(value ?? '').replace(
@@ -83,11 +85,41 @@ function header(active) {
     )}</nav><a class="header-account" href="/account" ${active === '/account' ? 'aria-current="page"' : ''}>Account</a><a class="header-action" href="/developers">Start building <span aria-hidden="true">↗</span></a></header>`;
 }
 function footer() {
-  return `<footer><div><a class="wordmark" href="/mission">w3bs<span class="wordmark-dot">.</span></a><p>Human-friendly. Agent-native.<br>Device-friendly. Open by design.</p></div><div><span class="eyebrow">THE INITIATIVE</span><a href="/governance">Governance & participation</a><a href="/bbs">Community forums</a><a href="/social">W3BS Social (AT Protocol)</a><a href="/docs/founding-prd.md">Founding PRD · v2.0</a><a href="/docs/roadmap.md">Implementation status</a><a href="/desktop">Agentic Desktop Layer</a></div><div><span class="eyebrow">FOR IMPLEMENTERS</span><a href="/developers">Developer guide</a><a href="/.well-known/w3bs.json">Machine discovery ↗</a><a href="/api">API reference ↗</a></div><div class="footer-bottom"><span>Open standards for the Agentic Era.</span><span>Community drafts · No Recommendations issued</span></div></footer>`;
+  return `<footer><div><a class="wordmark" href="/mission">w3bs<span class="wordmark-dot">.</span></a><p>Human-friendly. Agent-native.<br>Device-friendly. Open by design.</p><p class="footer-support"><strong>Need help?</strong> Email <a href="mailto:hello@w3bs.org">hello@w3bs.org</a> or ask on the <a href="/bbs/f/help">Help board</a>.</p></div><div><span class="eyebrow">FLEET AND ACCOUNTS</span><a href="/fleet">Your fleet</a><a href="/pricing">Pricing: Fleet is free</a><a href="/signup?next=%2Ffleet">Create an account</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><span class="eyebrow footer-gap">THE INITIATIVE</span><a href="/governance">Governance & participation</a><a href="/bbs">Community forums</a><a href="/social">W3BS Social (AT Protocol)</a><a href="/desktop">Agentic Desktop Layer</a></div><div><span class="eyebrow">FOR IMPLEMENTERS</span><a href="/developers">Developer guide</a><a href="/packages">Packages and the w3bs CLI</a><a href="/docs/founding-prd.md">Founding PRD · v2.0</a><a href="/docs/roadmap.md">Implementation status</a><a href="/.well-known/w3bs.json">Machine discovery ↗</a><a href="/api">API reference ↗</a><a href="https://github.com/profullstack/w3bs.org" rel="noopener">Source on GitHub ↗</a></div><div class="footer-bottom"><span>Operated by Profullstack, Inc. Open standards for the Agentic Era.</span><span>Community drafts · No Recommendations issued</span></div></footer>`;
+}
+const INSTALL = 'curl -fsSL https://w3bs.org/install.sh | sh';
+// The campaign path: install the CLI, sign in, join a server, watch it on /fleet.
+const FLEET_STEPS = [
+  ['Install the w3bs CLI', INSTALL, 'Linux or macOS. Installs to your home directory, no root.'],
+  [
+    'Sign in',
+    'w3bs login',
+    'Opens your browser. Over SSH it shows a code to enter at w3bs.org/device instead.',
+  ],
+  [
+    'Join this server',
+    'w3bs fleet join <token>',
+    'Get the token on w3bs.org/fleet with Make join command. It works once, for an hour.',
+  ],
+];
+function fleetHero() {
+  const copy = (text, label) =>
+    `<button class="small-button" type="button" data-copy="${e(text)}" aria-label="Copy: ${e(label)}">Copy</button>`;
+  return `<section class="hero fleet-hero" aria-labelledby="fleet-title"><div class="hero-copy"><div class="eyebrow"><span class="status-dot"></span> W3BS FLEET · FREE</div><h1 id="fleet-title">Watch your servers <em>from one page.</em></h1><p class="hero-sub">Free. Set up in 2 minutes.</p><p class="hero-body">Install the w3bs CLI, sign in and join a Linux server. It shows up on w3bs.org/fleet with memory, disk, load and uptime, updated every ${FLEET_LIMITS.intervalSeconds} seconds.</p><div class="actions"><a class="button primary" href="/signup?next=%2Ffleet">Create a free account <span aria-hidden="true">↗</span></a><a class="text-link" href="/fleet">Open your fleet <span aria-hidden="true">→</span></a></div><div class="hero-note"><span class="status-dot"></span> No credit card. No paid plan. Up to ${FLEET_LIMITS.machines} machines. <a href="/pricing">What is free</a></div></div><div class="terminal fleet-terminal"><div class="terminal-tabs"><span class="terminal-title">set up w3bs fleet</span></div><ol class="fleet-steps">${FLEET_STEPS.map(
+    ([title, command, note], index) =>
+      `<li><span class="terminal-label">${index + 1} · ${e(title.toUpperCase())}</span><div class="fleet-step-line"><code>${e(command)}</code>${command.includes('<token>') ? '' : copy(command, title)}</div><span class="terminal-muted">${e(note)}</span></li>`,
+  ).join(
+    '',
+  )}</ol><div class="terminal-result"><span class="terminal-label">THEN OPEN</span><a class="fleet-terminal-link" href="/fleet">w3bs.org/fleet <span aria-hidden="true">→</span></a><span><span class="status-dot"></span> online · memory · disk · load · uptime</span></div></div></section>`;
+}
+function fleetFree() {
+  return `<section class="section fleet-free" aria-labelledby="free-title"><div class="section-heading"><div><div class="eyebrow">WHAT YOU GET, FREE</div><h2 id="free-title">One page.<br>Every server.</h2></div><p>Fleet is free while it is in beta, and there is no paid plan. The <a class="inline-link" href="/pricing">pricing page</a> lists every limit.</p></div><div class="principle-grid"><article><span class="card-index">01 / LIVE</span><h3>Live stats.</h3><p>Each server reports every ${FLEET_LIMITS.intervalSeconds} seconds: memory, disk, load, uptime, OS and kernel. Silent for ${FLEET_LIMITS.offlineAfterSeconds} seconds means offline.</p><a href="/fleet">Open your fleet <span aria-hidden="true">↗</span></a></article><article><span class="card-index">02 / FREE</span><h3>Up to ${FLEET_LIMITS.machines} machines.</h3><p>No card, no trial clock. Join servers with a one-time token. Remove one from the page or with <code>w3bs fleet rm</code>.</p><a href="/pricing">Limits and what is free <span aria-hidden="true">↗</span></a></article><article><span class="card-index">03 / YOUR CALL</span><h3>Read-only by default.</h3><p>A server takes no actions from this page unless you allowed them when it joined. Even then only three: report now, update w3bs, restart the desktop layer. Screen sharing is off unless you turn it on.</p><a href="/privacy">What the agent sends <span aria-hidden="true">↗</span></a></article></div></section>`;
 }
 async function home(store) {
   const count = (await store.search()).length;
-  return `<section class="hero"><div class="hero-copy"><div class="eyebrow"><span class="status-dot"></span> AN OPEN STANDARDS INITIATIVE</div><h1>The open Web.<br>For <em>all</em> of us.</h1><p class="hero-sub">Like Nostr but for everything</p><p class="hero-body">A Web where every participant can discover, communicate and collaborate. Open protocols. Portable resources. Authority you can inspect.</p><div class="actions"><a class="button primary" href="/browse?uri=${encodeURIComponent(canonicalExample)}">Explore the open Web <span aria-hidden="true">↗</span></a><a class="text-link" href="/specs">Read the standards <span aria-hidden="true">→</span></a></div><div class="hero-note"><span class="status-dot"></span> Founding stage. Built in the open.</div></div><div class="hero-visual" aria-label="One W3BS resource connects humans, agents and devices through multiple interfaces"><div class="visual-heading"><span>ONE IDENTITY. EVERY INTERFACE.</span><span class="visual-cross">+</span></div><div class="orbit"><svg class="orbit-lines" viewBox="0 0 440 340" aria-hidden="true"><ellipse cx="220" cy="170" rx="184" ry="118"/><ellipse cx="220" cy="170" rx="118" ry="155" transform="rotate(55 220 170)"/><path d="M50 170H390M220 40V300"/></svg><span class="actor human"><span aria-hidden="true">◉</span> Humans</span><span class="actor agent"><span aria-hidden="true">✳</span> Agents</span><span class="actor device"><span aria-hidden="true">▣</span> Devices</span><span class="center-mark">w3bs<span>://</span></span><span class="orbit-dot dot-one"></span><span class="orbit-dot dot-two"></span></div><div class="uri-window"><div><span class="status-dot"></span> CANONICAL RESOURCE <span class="window-dots">···</span></div><code>w3bs://<span>prompt</span>/w3bs/research@1</code><p>Same identity. Same manifest. Same meaning.</p></div><div class="surface-strip"><span>CLI</span><span>API</span><span>MCP</span><span>WEB</span><span>NATIVE</span></div></div></section>
+  return `${fleetHero()}
+  ${fleetFree()}
+  <section class="hero hero-standards" aria-labelledby="standards-title"><div class="hero-copy"><div class="eyebrow"><span class="status-dot"></span> ALSO ON W3BS · AN OPEN STANDARDS INITIATIVE</div><h2 class="hero-title" id="standards-title">The open Web.<br>For <em>all</em> of us.</h2><p class="hero-sub">Like Nostr but for everything</p><p class="hero-body">A Web where every participant can discover, communicate and collaborate. Open protocols. Portable resources. Authority you can inspect.</p><div class="actions"><a class="button primary" href="/browse?uri=${encodeURIComponent(canonicalExample)}">Explore the open Web <span aria-hidden="true">↗</span></a><a class="text-link" href="/specs">Read the standards <span aria-hidden="true">→</span></a></div><div class="hero-note"><span class="status-dot"></span> Founding stage. Built in the open.</div></div><div class="hero-visual" aria-label="One W3BS resource connects humans, agents and devices through multiple interfaces"><div class="visual-heading"><span>ONE IDENTITY. EVERY INTERFACE.</span><span class="visual-cross">+</span></div><div class="orbit"><svg class="orbit-lines" viewBox="0 0 440 340" aria-hidden="true"><ellipse cx="220" cy="170" rx="184" ry="118"/><ellipse cx="220" cy="170" rx="118" ry="155" transform="rotate(55 220 170)"/><path d="M50 170H390M220 40V300"/></svg><span class="actor human"><span aria-hidden="true">◉</span> Humans</span><span class="actor agent"><span aria-hidden="true">✳</span> Agents</span><span class="actor device"><span aria-hidden="true">▣</span> Devices</span><span class="center-mark">w3bs<span>://</span></span><span class="orbit-dot dot-one"></span><span class="orbit-dot dot-two"></span></div><div class="uri-window"><div><span class="status-dot"></span> CANONICAL RESOURCE <span class="window-dots">···</span></div><code>w3bs://<span>prompt</span>/w3bs/research@1</code><p>Same identity. Same manifest. Same meaning.</p></div><div class="surface-strip"><span>CLI</span><span>API</span><span>MCP</span><span>WEB</span><span>NATIVE</span></div></div></section>
   <div class="principles-strip"><span>OPEN BY DEFAULT</span><span>VENDOR NEUTRAL</span><span>VERIFIABLE BY DESIGN</span><span>BUILT TO INTEROPERATE</span></div>
   <section class="section"><div class="section-heading"><div><div class="eyebrow">A SHARED FOUNDATION</div><h2>The Web is getting<br>new participants.</h2></div><p>Pages became applications. Applications are becoming collaborators. The next chapter needs common ground that belongs to everyone.</p></div><div class="principle-grid"><article><span class="card-index">01 / DISCOVER</span><h3>A common address.</h3><p>A <code>w3bs://</code> URI identifies the resource. The interface, registry and transport can change without changing what it means.</p><a href="/specs/W3BS-URI-1">Explore identifiers <span aria-hidden="true">↗</span></a></article><article><span class="card-index">02 / UNDERSTAND</span><h3>Nothing hidden.</h3><p>Inspect who published it, what it contains, which permissions it needs and whether its signature checks out.</p><a href="/specs/W3BS-MANIFEST-1">Inside a manifest <span aria-hidden="true">↗</span></a></article><article><span class="card-index">03 / COLLABORATE</span><h3>Authority, on purpose.</h3><p>Content is data by default. A signature proves provenance; running instructions still requires explicit authorization.</p><a href="/specs/W3BS-TRUST-1">Understand trust <span aria-hidden="true">↗</span></a></article></div></section>
   <section class="section resource-feature"><div><div class="eyebrow">TRY THE REFERENCE STACK</div><h2>One resource.<br>Every way in.</h2><p>Resolve a signed research prompt through the web, CLI, API, MCP or experimental native client. Compare the canonical manifest across surfaces.</p><a class="text-link" href="${resourceLink(canonicalExample)}">Inspect the example <span aria-hidden="true">→</span></a><div class="resource-count"><strong>${count.toString().padStart(2, '0')}</strong><span>signed, versioned prompts<br>ready to inspect and reuse</span></div></div><div class="terminal"><div class="terminal-tabs" role="tablist" aria-label="Access examples"><button type="button" role="tab" aria-selected="true" id="tab-cli" aria-controls="code-example" data-example="cli">CLI</button><button type="button" role="tab" aria-selected="false" tabindex="-1" id="tab-api" aria-controls="code-example" data-example="api">API</button><button type="button" role="tab" aria-selected="false" tabindex="-1" id="tab-mcp" aria-controls="code-example" data-example="mcp">MCP</button><span class="terminal-title">w3bs / reference</span></div><pre id="code-example" role="tabpanel" aria-labelledby="tab-cli"><code>w3bs resolve \\\n  w3bs://prompt/w3bs/research@1</code></pre><div class="terminal-result"><span class="terminal-label">RESOLVES TO</span><code>prompt/w3bs/research@1.0.0</code><span><span class="status-dot"></span> Signature verified</span><span class="terminal-muted">Authority: DATA · Permissions: none</span></div></div></section>
@@ -130,7 +162,6 @@ function resourceDetail(result) {
       '',
     )}<label class="consent"><input type="checkbox" id="run-consent" required> I authorize rendering this template with the inputs above.</label><button class="button dark" type="submit" ${!v.valid ? 'disabled' : ''}>Render instructions <span aria-hidden="true">→</span></button><p id="run-status" role="status" aria-live="polite"></p><pre class="instructions" id="run-output" hidden></pre></form></section><details class="inspector-panel"><summary>Canonical manifest</summary><pre class="json-source">${e(JSON.stringify(m, null, 2))}</pre></details></div><aside><section class="inspector-panel metadata"><h3>Resource details</h3><dl><dt>Version</dt><dd>${e(m.version)}</dd><dt>Publisher</dt><dd>${e(m.publisher.name)}</dd><dt>License</dt><dd>${e(m.license)}</dd><dt>Created</dt><dd>${e(m.createdAt.slice(0, 10))}</dd><dt>Runtime</dt><dd>${e(m.content.runtime)}</dd><dt>Permissions</dt><dd>${m.permissions.length ? e(m.permissions.join(', ')) : 'None requested'}</dd><dt>Dependencies</dt><dd>${m.dependencies.length ? e(m.dependencies.join(', ')) : 'None'}</dd><dt>Declared class</dt><dd>${e(m.trust.classification)}</dd><dt>Effective authority</dt><dd>${e(v.authority)}</dd></dl></section><section class="inspector-panel metadata"><h3>Verification</h3><dl><dt>Signature</dt><dd>${v.signatureValid ? 'Valid Ed25519 signature' : 'Not verified'}</dd><dt>Publisher key</dt><dd>${v.publisherTrusted ? 'Pinned by registry operator' : 'Untrusted'}</dd><dt>Revocation</dt><dd>${v.revoked ? 'Revoked' : 'Not revoked'}</dd><dt>Key ID</dt><dd>${e(v.keyId)}</dd><dt>Digest</dt><dd class="digest">${e(v.digest)}</dd></dl><a class="text-link" href="/api/manifest?uri=${encodeURIComponent(m.id)}">Download manifest ↗</a><a class="text-link" href="/api/conformance?uri=${encodeURIComponent(m.id)}">View fixture checks ↗</a></section><section class="inspector-panel"><h3>Provenance</h3><a class="break" href="${e(m.provenance.source)}">${e(m.provenance.source)}</a><p>${m.provenance.derivedFrom.length ? `Derived from ${e(m.provenance.derivedFrom.join(', '))}` : 'Original reference example.'}</p></section></aside></div></section>`;
 }
-const INSTALL = 'curl -fsSL https://w3bs.org/install.sh | sh';
 // ThreatCrush scan state for a catalog package (src/scan.mjs).
 const SCAN_LABELS = {
   passed: ['No malware found', 'green', '#3f7d3a'],
@@ -369,6 +400,75 @@ async function packageDetail(store, id, origin) {
   }[scan.status];
   return `<section class="resource-detail"><div class="resource-title"><div><div class="eyebrow"><a href="/packages">PACKAGES</a> / ${e(item.vendor || item.publisher)}</div><h2>${e(item.name)}</h2><p>${e(item.description)}</p></div>${scanPill(scan)}</div><div class="identity-line"><span class="eyebrow">INSTALL</span><code>${e(item.w3bs)}</code>${copy(item.w3bs)}</div><p class="muted install-hint">No <code>w3bs</code> yet? <code>${e(INSTALL)}</code></p><div class="inspector-grid"><div>${usagePanel(item, copy)}<section class="inspector-panel" id="scan"><h3>Malware scan</h3><p>${explanation}</p>${scan.status === 'passed' || scan.status === 'flagged' ? `<dl class="scan-facts"><dt>Scanned</dt><dd>${e(scan.scannedAt?.slice(0, 16).replace('T', ' '))} UTC · ${e(scan.scanner)}</dd><dt>Files</dt><dd>${e(scan.filesScanned)} (installer${scan.sources?.repository ? ` + ${e(scan.sources.repository)}${scan.sources.commit ? `@${e(scan.sources.commit.slice(0, 12))}` : ''}` : ''})</dd><dt>Findings</dt><dd>${e(counts)}${scan.malware ? ` · <strong>${e(scan.malware)} malware indicator${scan.malware === 1 ? '' : 's'}</strong>` : ''}</dd></dl>` : ''}${(scan.notes || []).map((note) => `<p class="muted">${e(note)}</p>`).join('')}${malwareFindings ? `<ul class="scan-findings">${malwareFindings}</ul>` : ''}${otherFindings}</section><section class="inspector-panel"><h3>Badge for your README</h3><p><img src="/api/packages/${e(id)}/badge.svg" alt="ThreatCrush: ${e(scanLabel(scan)[0])}" height="20"></p><pre class="instructions">${e(badgeMarkdown)}</pre>${copy(badgeMarkdown)}</section></div><aside><section class="inspector-panel metadata"><h3>Package details</h3><dl><dt>ID</dt><dd>${e(item.id)}</dd><dt>Version</dt><dd>${e(item.latest_version || 'Publisher managed')}</dd><dt>Vendor</dt><dd>${e(item.vendor || '')}</dd><dt>License</dt><dd>${e(item.license || 'Not stated')}</dd><dt>Commands</dt><dd>${e((item.commands || []).join(', '))}</dd><dt>Kind</dt><dd>${item.agentic ? 'Agentic' : 'CLI'}</dd><dt>Publisher's installer</dt><dd><code class="break">${e(item.install)}</code></dd></dl>${item.homepage ? `<a class="text-link" href="${e(item.homepage)}" rel="noopener">Website ↗</a>` : ''}${item.repository ? `<a class="text-link" href="${e(item.repository)}" rel="noopener">Source ↗</a>` : ''}<a class="text-link" href="/api/packages/${e(id)}">Package JSON ↗</a></section></aside></div></section>`;
 }
+const DAYS = (ms) => Math.round(ms / (24 * 60 * 60 * 1000));
+const UPDATED = '2026-10-15';
+const factTable = (caption, rows) =>
+  `<div class="table-wrap"><table class="platform-table fact-table"><caption class="sr-only">${e(caption)}</caption><tbody>${rows.map(([label, value]) => `<tr><th scope="row">${label}</th><td>${value}</td></tr>`).join('')}</tbody></table></div>`;
+const signupActions = `<div class="actions"><a class="button primary" href="/signup?next=%2Ffleet">Create a free account <span aria-hidden="true">↗</span></a><a class="text-link" href="/fleet">Open your fleet <span aria-hidden="true">→</span></a></div>`;
+function pricingPage() {
+  const L = FLEET_LIMITS;
+  return `<section class="page-head"><div class="eyebrow">PRICING · W3BS FLEET</div><h1>Fleet is <em>free.</em></h1><p>Watch your servers from one page at w3bs.org/fleet. It costs nothing. There is no paid plan and no card to enter, just a username and an email address. Fleet is a beta run by Profullstack, Inc.</p>${signupActions}</section>
+  <section class="section" aria-labelledby="included-title"><div class="section-heading"><div><div class="eyebrow">INCLUDED</div><h2 id="included-title">Everything Fleet does.</h2></div><p>There is one plan, and this is all of it.</p></div><div class="principle-grid"><article><span class="card-index">LIVE STATS</span><h3>Every ${L.intervalSeconds} seconds.</h3><p>Memory, disk on the root mount, load, uptime, CPU count, OS, kernel and the w3bs version. Online or offline at a glance.</p></article><article><span class="card-index">ACTIONS</span><h3>Three, if you allow them.</h3><p>Report now, update w3bs packages, restart the desktop layer. Only on machines that joined with actions allowed.</p></article><article><span class="card-index">TERMINAL AND SCREEN</span><h3>Your choice of surface.</h3><p><code>w3bs fleet ls</code>, <code>run</code> and <code>rm</code> from any computer you signed in with <code>w3bs login</code>. Optional screen sharing through a VNC server on the machine.</p></article></div></section>
+  <section class="section" aria-labelledby="limits-title"><div class="section-heading"><div><div class="eyebrow">LIMITS</div><h2 id="limits-title">The numbers.</h2></div><p>These come straight from the code that runs Fleet. If one changes, this page changes with it.</p></div>${factTable(
+    'Fleet limits',
+    [
+      ['Machines per account', `${L.machines}`],
+      ['Report interval', `Every ${L.intervalSeconds} seconds`],
+      ['Marked offline', `After ${L.offlineAfterSeconds} seconds with no report`],
+      [
+        'Stats history',
+        'Latest report only. Each report replaces the one before; Fleet keeps no graphs or history.',
+      ],
+      ['Join tokens', `One machine each, valid for ${L.tokenMinutes} minutes`],
+      ['Actions waiting per machine', `${L.pendingActions}`],
+      ['Action timeout', `${L.actionTimeoutMinutes} minutes, then marked failed`],
+      [
+        'Action history',
+        `The newest ${L.actionHistory} per machine, with the last ${L.actionOutputKB} KB of each one's output`,
+      ],
+      ['Alerts', 'None yet. Fleet does not email or page you when a machine goes offline.'],
+      [
+        'Platforms',
+        'Linux. The agent installs as a systemd service; without systemd, run <code>w3bs fleet agent</code> yourself.',
+      ],
+      [
+        'Sign-in',
+        `Web sessions last ${DAYS(TTL.session)} days. <code>w3bs login</code> stays signed in while you use it at least every ${DAYS(TTL.refresh)} days. The agent on each machine uses its own key, which lasts until you remove the machine.`,
+      ],
+      [
+        'Sign-up and sign-in limits',
+        'From one IP address: 5 sign-up forms and 10 email-link requests per hour. Per email address: 5 links per hour. After 10 wrong passwords in 15 minutes, the password stops working for 15 minutes or until you sign in with an emailed link.',
+      ],
+    ],
+  )}</section>
+  <section class="section" aria-labelledby="promise-title"><div class="section-heading"><div><div class="eyebrow">WHAT WE DO NOT PROMISE</div><h2 id="promise-title">A beta, honestly.</h2></div><p>Read this before you rely on it.</p></div><div class="principle-grid"><article><span class="card-index">UPTIME</span><h3>No uptime guarantee.</h3><p>There is no SLA. Fleet can be down, change or lose data. Keep your own monitoring for anything that matters.</p></article><article><span class="card-index">WHAT IT SEES</span><h3>Only what machines report.</h3><p>Fleet shows what each agent sends. It does not check your servers from outside, so a machine that cannot reach w3bs.org just looks offline.</p></article><article><span class="card-index">PRICE</span><h3>Free today.</h3><p>No paid plan exists. Questions go to <a href="mailto:hello@w3bs.org">hello@w3bs.org</a>. See the <a href="/terms">terms</a> and <a href="/privacy">privacy</a> pages.</p></article></div></section>`;
+}
+const legalHead = (eyebrow, title, intro) =>
+  `<section class="page-head compact"><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${intro}</p></section><div class="draft-note"><strong>Plain-language beta version.</strong> Last updated ${UPDATED}. W3BS is a free beta. This page says what we actually do in plain words; a fuller version may replace it, and changes are posted here with a new date.</div>`;
+function termsPage() {
+  return `${legalHead('TERMS · BETA', 'Terms of <em>use.</em>', 'The rules for using w3bs.org, the w3bs CLI and W3BS Fleet. Short on purpose.')}<article class="prose legal">
+<h2>Who runs this</h2><p>w3bs.org and its services are operated by Profullstack, Inc. Questions: <a href="mailto:hello@w3bs.org">hello@w3bs.org</a>.</p>
+<h2>A free beta</h2><p>Accounts, the w3bs CLI, Fleet, the package catalog and W3BS Social are free and in beta. They are provided as they are, with no warranty and no uptime guarantee. We can change, limit or stop any of them. Do not make Fleet your only monitoring.</p>
+<h2>Your account</h2><p>Keep your password, passkeys and the machine keys on your servers safe. You are responsible for what is done with your account and on the machines you join to it. Tell us at <a href="mailto:hello@w3bs.org">hello@w3bs.org</a> if you think someone else is using it.</p>
+<h2>Machines you join</h2><p>Only join machines you own or are allowed to manage. If you allow actions or screen control when a machine joins, they run on that machine as the user the agent runs as. Turning them on is your choice and your responsibility.</p>
+<h2>Fair use</h2><p>Do not use W3BS to attack, probe or break into other people's accounts or machines, send spam, host illegal content, impersonate others, or overload the service. We may suspend or remove accounts and machines that do, and limit use that strains the service.</p>
+<h2>Software and packages</h2><p>The code for this site and the w3bs CLI is open source under the MIT license at <a href="https://github.com/profullstack/w3bs.org" rel="noopener">github.com/profullstack/w3bs.org</a>. Tools in the <a href="/packages">package catalog</a> come from their own publishers under their own licenses. W3BS runs their installers and scans them for malware, but does not write or guarantee them.</p>
+<h2>Liability</h2><p>As far as the law allows, Profullstack, Inc. is not liable for losses that come from using or not being able to use W3BS, including downtime, lost data or something an action did on your machine.</p>
+<h2>Ending</h2><p>You can stop at any time: remove your machines on <a href="/fleet">/fleet</a> and ask us to delete your account. How your data is handled is on the <a href="/privacy">privacy page</a>.</p>
+</article>`;
+}
+function privacyPage() {
+  return `${legalHead('PRIVACY · BETA', 'Your <em>data.</em>', 'What W3BS collects, why, how long it stays and how to remove it.')}<article class="prose legal">
+<h2>Who we are</h2><p>w3bs.org is operated by Profullstack, Inc. Questions and deletion requests: <a href="mailto:hello@w3bs.org">hello@w3bs.org</a>. We do not sell your data.</p>
+<h2>Your account</h2><ul><li>Your username, which is public.</li><li>Your email address, to confirm it and to send sign-in links. It is never shown publicly.</li><li>A hash of your password, if you set one, and the public keys and names of your passkeys.</li><li>Sign-in sessions, a record of sign-in attempts (time and whether it worked), and the apps and CLI sign-ins you approved. Tokens are stored only as hashes.</li></ul>
+<h2>What a Fleet machine sends</h2><p>Every ${FLEET_LIMITS.intervalSeconds} seconds, the agent on each machine you join sends: its hostname, OS name and version, kernel, CPU architecture and count, uptime, load averages, total and available memory, total and available disk for the root mount, the w3bs version, whether the desktop layer is installed and running, the user name the agent runs as, and its screen-sharing setting (mode, local VNC address, whether it is reachable). Nothing else in the report is stored.</p><ul><li>Only the latest report is kept. Each one replaces the last.</li><li>Actions you queue are kept with their output (the newest ${FLEET_LIMITS.actionHistory} per machine, last ${FLEET_LIMITS.actionOutputKB} KB of output).</li><li>Screen sharing passes through our server live and is not recorded. A line with its time and result is kept in the machine's history.</li></ul>
+<h2>Counting what works</h2><p>The server records three events: an account was created, the w3bs CLI signed in, and an account's first machine reported in. Each row holds the event name, your account id and the time. No IP address, email or hostname.</p>
+<h2>Page analytics</h2><p>Public pages load <a href="https://crawlproof.com" rel="noopener">CrawlProof</a> stats, also run by Profullstack. It records the page address, the referring page, screen and window size, language, time zone and a random visitor id kept in your browser's local storage. It sets no cookie. It is not loaded on your account, Fleet, device sign-in or email link pages.</p>
+<h2>Email and logs</h2><p>We send email only for sign-up and sign-in links, through our email provider Resend. Mail to hello@w3bs.org is forwarded to us by Forward Email. Sign-up and sign-in forms use your IP address to limit repeated attempts, and our web server may log IP addresses and requested pages for security and debugging.</p>
+<h2>How long it stays</h2><ul><li>Account data stays until you ask us to delete the account.</li><li>Web sessions end after ${DAYS(TTL.session)} days; CLI sign-ins after ${DAYS(TTL.refresh)} days unused. Expired ones are deleted.</li><li>Email links expire in ${Math.round(TTL.emailLink / 60000)} minutes and are deleted a day later.</li><li>A machine's stats and history are deleted when you remove it.</li><li>Event rows are kept; deleting your account removes your account id from them.</li></ul>
+<h2>Removing your data</h2><p>Remove a machine on <a href="/fleet">/fleet</a> or with <code>w3bs fleet rm</code>. Sign the CLI out on <a href="/account">your account page</a> or with <code>w3bs logout</code>. To delete your account, email <a href="mailto:hello@w3bs.org">hello@w3bs.org</a> from the address on it. That removes your profile, passkeys, sessions, sign-ins, machines and their history. W3BS Social has its own notes on <a href="/social#policy">its page</a>, because posts there are public on the AT Protocol network.</p>
+</article>`;
+}
 export async function renderPage({ path, host, query, store, origin }) {
   if (path === '/')
     path = host.startsWith('browse.')
@@ -385,7 +485,8 @@ export async function renderPage({ path, host, query, store, origin }) {
       'Open standards for a Web where humans, agents and devices can discover, communicate and collaborate. Explore the W3BS community drafts and reference stack.',
     scripts = '';
   if (path === '/mission') {
-    title = 'Like Nostr but for everything';
+    title = 'Watch your servers from one page';
+    description = `W3BS Fleet: watch your servers from one page. Free, up to ${FLEET_LIMITS.machines} machines. Install the w3bs CLI, sign in, join a server. Also home of the W3BS open standards.`;
     content = await home(store);
   } else if (path === '/prompts') {
     title = 'Open Prompt Registry';
@@ -409,6 +510,17 @@ export async function renderPage({ path, host, query, store, origin }) {
   } else if (path === '/specs') {
     title = 'Open Standards';
     content = specIndex();
+  } else if (path === '/pricing' || path === '/free') {
+    title = 'Pricing: Fleet is free';
+    description = `W3BS Fleet is free: watch up to ${FLEET_LIMITS.machines} servers from one page, live stats every ${FLEET_LIMITS.intervalSeconds} seconds. No paid plan, no uptime guarantee.`;
+    active = '/pricing';
+    content = pricingPage();
+  } else if (path === '/terms') {
+    title = 'Terms of use';
+    content = termsPage();
+  } else if (path === '/privacy') {
+    title = 'Privacy';
+    content = privacyPage();
   } else if (path === '/governance') {
     title = 'Governance & Participation';
     content = document('governance', title);
@@ -428,6 +540,20 @@ export async function renderPage({ path, host, query, store, origin }) {
   return pageShell({ title, description, active, content, scripts });
 }
 export const escapeHtml = e;
+// CrawlProof page analytics (crawlproof.com/stats.js). The id is the CrawlProof project
+// for w3bs.org. It is rendered only when the app runs as https://w3bs.org, so local runs
+// and CI do not count as traffic; W3BS_CRAWLPROOF_SITE overrides it ('' turns it off).
+export const CRAWLPROOF_SITE_ID = '2400d7b5-128e-4142-b9aa-a4331085d07a';
+export function trackerSite(env = process.env) {
+  if (env.W3BS_CRAWLPROOF_SITE !== undefined) return env.W3BS_CRAWLPROOF_SITE.trim();
+  return (env.PUBLIC_ORIGIN || '').replace(/\/+$/, '') === 'https://w3bs.org'
+    ? CRAWLPROOF_SITE_ID
+    : '';
+}
+const tracker = (site) =>
+  /^[0-9a-f-]{36}$/i.test(site)
+    ? `<script async src="https://crawlproof.com/stats.js" data-site="${site}" data-careers="off"></script>`
+    : '';
 export function pageShell({
   title,
   description = 'Open standards for a Web where humans, agents and devices can discover, communicate and collaborate.',
@@ -435,6 +561,9 @@ export function pageShell({
   content,
   scripts = '',
   robots = '',
+  // Off for pages whose address or buttons can carry account data (email links, device
+  // codes, machine names): stats.js reports the full URL and the text of clicked buttons.
+  track = true,
 }) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${e(title)} — W3BS</title><meta name="description" content="${e(description)}">${robots ? `<meta name="robots" content="${e(robots)}">` : ''}<meta name="theme-color" content="#f6f4ed"><link rel="icon" type="image/svg+xml" href="/assets/mark.svg"><link rel="manifest" href="/manifest.webmanifest"><link rel="stylesheet" href="/assets/style.css"><script type="module" src="/assets/app.js"></script>${scripts}</head><body>${header(active)}<main id="main">${content}</main>${footer()}<div id="toast" class="toast" role="status" aria-live="polite" hidden></div></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${e(title)} — W3BS</title><meta name="description" content="${e(description)}">${robots ? `<meta name="robots" content="${e(robots)}">` : ''}<meta name="theme-color" content="#f6f4ed"><link rel="icon" type="image/svg+xml" href="/assets/mark.svg"><link rel="manifest" href="/manifest.webmanifest"><link rel="stylesheet" href="/assets/style.css"><script type="module" src="/assets/app.js"></script>${scripts}${track ? tracker(trackerSite()) : ''}</head><body>${header(active)}<main id="main">${content}</main>${footer()}<div id="toast" class="toast" role="status" aria-live="polite" hidden></div></body></html>`;
 }

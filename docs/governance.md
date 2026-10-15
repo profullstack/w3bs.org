@@ -6,7 +6,7 @@ Founder stewardship can begin the work. Permanent unilateral control cannot be i
 
 ## Participate
 
-The repository includes public issue templates for proposals, interoperability reports and implementation bugs, plus a pull request template. Until a public repository is published, contributors can prepare proposals using `CONTRIBUTING.md`; a public submission channel is a launch requirement, not an existing service.
+The repository is public at [github.com/profullstack/w3bs.org](https://github.com/profullstack/w3bs.org). It has issue templates for proposals, interoperability reports and implementation bugs, plus a pull request template; `CONTRIBUTING.md` explains how to propose a change. Questions and discussion are also welcome on the [community forums](/bbs) and at hello@w3bs.org.
 
 Useful first contributions include trying a reference client, publishing a compatible registry, reproducing conformance results, finding unclear normative language and proposing a different implementation. Participation must not require adopting a founder's commercial product.
 

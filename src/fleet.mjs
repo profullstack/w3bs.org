@@ -21,11 +21,23 @@ export const ACTIONS = {
 // Labels for the history list: the actions above plus what the relay logs.
 export const HISTORY = { ...ACTIONS, screen: 'Screen session' };
 export const SCREEN_MODES = ['view', 'control'];
-const INTERVAL = 30;
-const ONLINE_WITHIN = 3 * INTERVAL * 1000;
-const TOKEN_TTL = 60 * 60 * 1000;
-const ACTION_TIMEOUT = 20 * 60 * 1000;
-const MAX_MACHINES = 50;
+// The limits /pricing states; change them here and the page follows.
+export const FLEET_LIMITS = {
+  machines: 50, // per account
+  intervalSeconds: 30, // the agent reports this often
+  offlineAfterSeconds: 90, // no report for this long reads as offline
+  tokenMinutes: 60, // a join token works once, for this long
+  pendingActions: 5, // queued or running, per machine
+  actionTimeoutMinutes: 20,
+  actionHistory: 20, // newest actions and screen sessions kept per machine
+  actionOutputKB: 16, // the tail of an action's output that is kept
+};
+const INTERVAL = FLEET_LIMITS.intervalSeconds;
+const ONLINE_WITHIN = FLEET_LIMITS.offlineAfterSeconds * 1000;
+const TOKEN_TTL = FLEET_LIMITS.tokenMinutes * 60 * 1000;
+const ACTION_TIMEOUT = FLEET_LIMITS.actionTimeoutMinutes * 60 * 1000;
+const MAX_MACHINES = FLEET_LIMITS.machines;
+const HISTORY_KEPT = FLEET_LIMITS.actionHistory;
 
 const random = (bytes = 32) => randomBytes(bytes).toString('base64url');
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
@@ -83,7 +95,7 @@ function cleanInfo(info) {
   };
 }
 
-export function createFleet(db) {
+export function createFleet(db, { events } = {}) {
   const machineRow = (row, actions = []) => ({
     id: row.id,
     name: row.name,
@@ -180,7 +192,7 @@ export function createFleet(db) {
     const machine = await agentMachine(key);
     if (!machine) throw fail('UNKNOWN_MACHINE', 'This machine is not in a fleet.', 401);
     await expireActions();
-    return db.transaction(async (tx) => {
+    const reply = await db.transaction(async (tx) => {
       await tx.run('UPDATE fleet_machines SET info = ?, last_seen_at = ? WHERE id = ?', [
         JSON.stringify(cleanInfo(info)),
         nowIso(),
@@ -197,6 +209,9 @@ export function createFleet(db) {
         ]);
       return { actions: queued, interval: INTERVAL };
     });
+    // Activation: the agent on one of this account's machines is reporting.
+    await events?.firstReport(machine.user_id);
+    return reply;
   }
   async function actionResult(key, id, { status, output }) {
     const machine = await agentMachine(key);
@@ -204,7 +219,13 @@ export function createFleet(db) {
     const finished = status === 'done' ? 'done' : 'failed';
     await db.run(
       "UPDATE fleet_actions SET status = ?, output = ?, finished_at = ? WHERE id = ? AND machine_id = ? AND status = 'running'",
-      [finished, String(output ?? '').slice(-16384), nowIso(), String(id), machine.id],
+      [
+        finished,
+        String(output ?? '').slice(-FLEET_LIMITS.actionOutputKB * 1024),
+        nowIso(),
+        String(id),
+        machine.id,
+      ],
     );
     return { ok: true };
   }
@@ -256,8 +277,12 @@ export function createFleet(db) {
       "SELECT COUNT(*) AS n FROM fleet_actions WHERE machine_id = ? AND status IN ('queued', 'running')",
       [machine.id],
     );
-    if (Number(pending.n) >= 5)
-      throw fail('BUSY', 'Five actions are already waiting on this machine.', 429);
+    if (Number(pending.n) >= FLEET_LIMITS.pendingActions)
+      throw fail(
+        'BUSY',
+        `${FLEET_LIMITS.pendingActions} actions are already waiting on this machine.`,
+        429,
+      );
     const row = { id: `a_${random(9)}`, action };
     await db.run("INSERT INTO fleet_actions VALUES (?, ?, ?, ?, 'queued', '', ?, NULL, NULL)", [
       row.id,
@@ -267,7 +292,7 @@ export function createFleet(db) {
       nowIso(),
     ]);
     await db.run(
-      'DELETE FROM fleet_actions WHERE machine_id = ? AND id NOT IN (SELECT id FROM fleet_actions WHERE machine_id = ? ORDER BY created_at DESC LIMIT 20)',
+      `DELETE FROM fleet_actions WHERE machine_id = ? AND id NOT IN (SELECT id FROM fleet_actions WHERE machine_id = ? ORDER BY created_at DESC LIMIT ${HISTORY_KEPT})`,
       [machine.id, machine.id],
     );
     return { ...row, status: 'queued' };
@@ -285,7 +310,7 @@ export function createFleet(db) {
       nowIso(),
     ]);
     await db.run(
-      'DELETE FROM fleet_actions WHERE machine_id = ? AND id NOT IN (SELECT id FROM fleet_actions WHERE machine_id = ? ORDER BY created_at DESC LIMIT 20)',
+      `DELETE FROM fleet_actions WHERE machine_id = ? AND id NOT IN (SELECT id FROM fleet_actions WHERE machine_id = ? ORDER BY created_at DESC LIMIT ${HISTORY_KEPT})`,
       [machineId, machineId],
     );
   }

@@ -11,7 +11,7 @@ bun install
 bun run start
 ```
 
-Open http://localhost:3000 and set `W3BS_API=http://localhost:3000` in your shell. Ten signed resources seed the persistent SQLite registry on first start. The private example signing key is not required to run or deploy it.
+Open `http://localhost:3000` in your browser and set `W3BS_API=http://localhost:3000` in your shell. Ten signed resources seed the persistent SQLite registry on first start. The private example signing key is not required to run or deploy it.
 
 The standards, gateway and registry work at `/specs`, `/browse` and `/prompts`. The production subdomains are deployment targets; these instructions do not imply they are live.
 
