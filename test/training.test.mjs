@@ -61,7 +61,9 @@ test('committed JSON Schemas match format.mjs', () => {
 });
 
 test('embedded local-app assets match training/ui/public', () => {
-  const result = spawnSync(process.execPath, ['training/ui/build-assets.mjs', '--check'], { encoding: 'utf8' });
+  const result = spawnSync(process.execPath, ['training/ui/build-assets.mjs', '--check'], {
+    encoding: 'utf8',
+  });
   assert.equal(result.status, 0, result.stderr);
 });
 
@@ -260,7 +262,8 @@ test('artifacts are sealed at rest and there is no plaintext fallback', async ()
     locked.t.importFile({ data: sampleBundle(), filename: 'a.zip' }, human),
     'KEY_UNAVAILABLE',
   );
-  assert.equal(readdirSync(join(locked.home, 'artifacts')).length, 0);
+  const dir = join(locked.home, 'artifacts');
+  assert.equal(existsSync(dir) ? readdirSync(dir).length : 0, 0);
   assert.equal((await locked.t.listImports()).length, 0);
 });
 
@@ -637,7 +640,7 @@ test('retention expires unreviewed episodes unless pinned', async () => {
   const two = await importSample(t, { variant: 'b' });
   await t.review(two.episodes[0], { decision: 'pin' }, human);
   clock = new Date('2026-10-23T12:00:00Z');
-  const result = t.gc();
+  const result = await t.gc();
   assert.equal(result.expired_episodes, 1);
   await rejects(t.getEpisode(one.episodes[0]), 'NOT_FOUND');
   assert.ok(await t.getEpisode(two.episodes[0]));

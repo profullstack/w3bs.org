@@ -62,11 +62,22 @@ framework already in the host, because:
 - it is a security boundary (loopback, one-time launch link), and fewer moving
   parts make that boundary easier to review.
 
-**Open question for M2:** run Next/Hono as a second process behind the
-existing host (which then needs a supervisor and a session bridge) or mount the
-`/api/v1/training` Express router from `training/http.mjs` directly in
-`src/server.mjs` and build the hosted UI on the existing renderer. The router
-already has the PRD's resource layout so either choice keeps the contract.
+**Decided for M2 (2026-10-15):** mount, do not add a second process. The
+`/api/v1/training` Express router from `training/http.mjs` is mounted in
+`src/server.mjs` by `training/hosted-routes.mjs`, and `/training/app/` serves
+the same review app the local CLI serves. One process, one session, one
+deploy; no supervisor or session bridge. Next 16 / Hono remain an option if the
+hosted UI outgrows a dependency-free page, and the router contract would not
+change.
+
+The service became async with pluggable storage (`training/core/db.mjs`):
+SQLite locally, PostgreSQL on w3bs.org with **one schema per account**
+(`tr_<sha256 of the user id>`), selected through each pool's `search_path`, so
+the same SQL runs on both and one account's queries cannot name another's
+tables. Artifacts are blobs in that schema, sealed with a per-workspace key
+derived (HKDF-SHA256) from `W3BS_TRAINING_MASTER_KEY` (vault
+`w3bs-org--prod`). That is hosted processing: the server can decrypt what is
+pushed to it, and the docs say so.
 
 ### 4. Routing and sessions (M2, decided now so M1 does not paint us in)
 

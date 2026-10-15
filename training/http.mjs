@@ -1,6 +1,6 @@
-// /api/v1/training as an Express router over the Training service. The local
+// /api/v1/training as an Express router over the Training req.svc. The local
 // app mounts it with a human session actor; the hosted app (M2) will mount the
-// same contract with workspace authentication. Policy stays in the service.
+// same contract with workspace authentication. Policy stays in the req.svc.
 import express from 'express';
 
 const wrap = (fn) => async (req, res) => {
@@ -18,35 +18,51 @@ const wrap = (fn) => async (req, res) => {
   }
 };
 
-export function trainingRouter(service, { actorFor, onChange = () => {} }) {
+// `service` is a Training service, or `async (req) => service` for one per account.
+// hosted: exports come back as a zip download (nothing is written on the server) and uploads
+// are capped at uploadLimit.
+export function trainingRouter(
+  service,
+  { actorFor, onChange = () => {}, hosted = false, uploadLimit = '512mb' },
+) {
   const router = express.Router();
   const json = express.json({ limit: '1mb', strict: true });
-  const changed = (kind) => (result) => {
-    onChange(kind);
+  router.use(async (req, res, next) => {
+    try {
+      req.svc = typeof service === 'function' ? await service(req) : service;
+      next();
+    } catch (error) {
+      res
+        .status(error.status >= 400 ? error.status : 500)
+        .json({ error: { code: error.code || 'REQUEST_FAILED', message: error.message } });
+    }
+  });
+  const a = (req) => actorFor(req);
+  const changed = (kind, req) => (result) => {
+    onChange(kind, req);
     return result;
   };
-  const a = (req) => actorFor(req);
   const page = (req) => Math.min(Number(req.query.limit) || 100, 1000);
 
   router.get(
     '/status',
-    wrap(() => service.status()),
+    wrap((req) => req.svc.status()),
   );
   router.get(
     '/inbox',
-    wrap((req) => service.inbox({ all: req.query.all === '1' })),
+    wrap((req) => req.svc.inbox({ all: req.query.all === '1' })),
   );
 
   router.get(
     '/imports',
-    wrap(() => service.listImports()),
+    wrap((req) => req.svc.listImports()),
   );
   router.post(
     '/imports',
-    express.raw({ type: () => true, limit: '512mb' }),
+    express.raw({ type: () => true, limit: uploadLimit }),
     wrap(async (req) => {
       const meta = req.get('x-w3bs-import') ? JSON.parse(req.get('x-w3bs-import')) : {};
-      return service
+      return req.svc
         .importFile(
           {
             data: req.body,
@@ -58,205 +74,220 @@ export function trainingRouter(service, { actorFor, onChange = () => {} }) {
           },
           a(req),
         )
-        .then(changed('imports'));
+        .then(changed('imports', req));
     }),
   );
   router.get(
     '/imports/:id',
-    wrap((req) => service.getImport(req.params.id)),
+    wrap((req) => req.svc.getImport(req.params.id)),
   );
   router.post(
     '/imports/:id/complete',
-    wrap((req) => service.commitImport(req.params.id, a(req)).then(changed('episodes'))),
+    wrap((req) => req.svc.commitImport(req.params.id, a(req)).then(changed('episodes', req))),
   );
 
   router.get(
     '/sessions',
-    wrap((req) => service.listEpisodes({ state: req.query.state, limit: page(req) })),
+    wrap((req) => req.svc.listEpisodes({ state: req.query.state, limit: page(req) })),
   );
   router.get(
     '/episodes',
-    wrap((req) => service.listEpisodes({ state: req.query.state, limit: page(req) })),
+    wrap((req) => req.svc.listEpisodes({ state: req.query.state, limit: page(req) })),
   );
   router.get(
     '/episodes/:id',
-    wrap((req) => service.getEpisode(req.params.id)),
+    wrap((req) => req.svc.getEpisode(req.params.id)),
   );
   router.patch(
     '/episodes/:id',
     json,
-    wrap((req) => service.review(req.params.id, req.body, a(req)).then(changed('episodes'))),
+    wrap((req) => req.svc.review(req.params.id, req.body, a(req)).then(changed('episodes', req))),
   );
   router.post(
     '/episodes/:id/review',
     json,
-    wrap((req) => service.review(req.params.id, req.body, a(req)).then(changed('episodes'))),
+    wrap((req) => req.svc.review(req.params.id, req.body, a(req)).then(changed('episodes', req))),
   );
   router.post(
     '/episodes/:id/split',
     json,
-    wrap((req) => service.split(req.params.id, req.body, a(req)).then(changed('episodes'))),
+    wrap((req) => req.svc.split(req.params.id, req.body, a(req)).then(changed('episodes', req))),
   );
   router.post(
     '/episodes/merge',
     json,
-    wrap((req) => service.merge(req.body.episodes, a(req)).then(changed('episodes'))),
+    wrap((req) => req.svc.merge(req.body.episodes, a(req)).then(changed('episodes', req))),
   );
 
   router.get(
     '/datasets',
-    wrap(() => service.listDatasets()),
+    wrap((req) => req.svc.listDatasets()),
   );
   router.post(
     '/datasets',
     json,
-    wrap((req) => service.createDataset(req.body, a(req)).then(changed('datasets'))),
+    wrap((req) => req.svc.createDataset(req.body, a(req)).then(changed('datasets', req))),
   );
   router.get(
     '/datasets/:id',
-    wrap((req) => service.inspectDataset(req.params.id)),
+    wrap((req) => req.svc.inspectDataset(req.params.id)),
   );
   router.patch(
     '/datasets/:id',
     json,
-    wrap((req) => service.updateDataset(req.params.id, req.body, a(req)).then(changed('datasets'))),
+    wrap((req) =>
+      req.svc.updateDataset(req.params.id, req.body, a(req)).then(changed('datasets', req)),
+    ),
   );
   router.delete(
     '/datasets/:id',
     wrap((req) =>
-      service
+      req.svc
         .deleteDataset(req.params.id, { confirm: req.query.confirm === '1' }, a(req))
-        .then(changed('datasets')),
+        .then(changed('datasets', req)),
     ),
   );
   router.post(
     '/datasets/:id/episodes',
     json,
     wrap(async (req) => {
-      if (req.body.add?.length) await service.addEpisodes(req.params.id, req.body.add, a(req));
+      if (req.body.add?.length) await req.svc.addEpisodes(req.params.id, req.body.add, a(req));
       if (req.body.remove?.length)
-        await service.removeEpisodes(req.params.id, req.body.remove, a(req));
-      onChange('datasets');
-      return service.inspectDataset(req.params.id);
+        await req.svc.removeEpisodes(req.params.id, req.body.remove, a(req));
+      onChange('datasets', req);
+      return req.svc.inspectDataset(req.params.id);
     }),
   );
   router.post(
     '/datasets/:id/versions',
     json,
     wrap((req) =>
-      service.createVersion(req.params.id, req.body ?? {}, a(req)).then(changed('datasets')),
+      req.svc.createVersion(req.params.id, req.body ?? {}, a(req)).then(changed('datasets', req)),
     ),
   );
   router.get(
     '/datasets/:id/versions/:version',
-    wrap((req) => service.getVersion(req.params.id, req.params.version)),
+    wrap((req) => req.svc.getVersion(req.params.id, req.params.version)),
   );
   router.post(
     '/datasets/:id/versions/:version/approve',
     json,
     wrap((req) =>
-      service
+      req.svc
         .approve(req.params.id, req.params.version, req.body.purposes ?? [], a(req))
-        .then(changed('datasets')),
+        .then(changed('datasets', req)),
     ),
   );
   router.post(
     '/datasets/:id/versions/:version/release',
     wrap((req) =>
-      service.release(req.params.id, req.params.version, a(req)).then(changed('datasets')),
+      req.svc.release(req.params.id, req.params.version, a(req)).then(changed('datasets', req)),
     ),
   );
   router.post(
     '/datasets/:id/versions/:version/revoke',
     wrap((req) =>
-      service.revoke(req.params.id, req.params.version, a(req)).then(changed('datasets')),
+      req.svc.revoke(req.params.id, req.params.version, a(req)).then(changed('datasets', req)),
     ),
   );
 
   router.get(
     '/grants',
-    wrap(() => service.listGrants()),
+    wrap((req) => req.svc.listGrants()),
   );
   router.post(
     '/grants',
     json,
-    wrap((req) => service.grant(req.body, a(req)).then(changed('grants'))),
+    wrap((req) => req.svc.grant(req.body, a(req)).then(changed('grants', req))),
   );
   router.delete(
     '/grants/:id',
-    wrap((req) => service.revokeGrant(req.params.id, a(req)).then(changed('grants'))),
+    wrap((req) => req.svc.revokeGrant(req.params.id, a(req)).then(changed('grants', req))),
   );
   router.post(
     '/access',
     json,
-    wrap((req) => service.setAgentAccess(req.body.on === true, a(req)).then(changed('grants'))),
+    wrap((req) =>
+      req.svc.setAgentAccess(req.body.on === true, a(req)).then(changed('grants', req)),
+    ),
   );
   router.post(
     '/retrieve',
     json,
-    wrap((req) => service.retrieve(req.body, a(req))),
+    wrap((req) => req.svc.retrieve(req.body, a(req))),
   );
 
   router.get(
     '/exports',
-    wrap(() =>
-      service.auditLog({ limit: 500 }).then((rows) => rows.filter((r) => r.operation === 'export')),
+    wrap((req) =>
+      req.svc.auditLog({ limit: 500 }).then((rows) => rows.filter((r) => r.operation === 'export')),
     ),
   );
   router.post(
     '/exports',
     json,
-    wrap((req) =>
-      service
-        .export(req.body.dataset_id, req.body.version, req.body, a(req))
-        .then(changed('exports')),
-    ),
+    wrap(async (req, res) => {
+      const options = hosted
+        ? { format: req.body.format, purpose: req.body.purpose, download: true }
+        : req.body;
+      const result = await req.svc.export(req.body.dataset_id, req.body.version, options, a(req));
+      onChange('exports', req);
+      if (!result.data) return result;
+      res.set({
+        'content-type': 'application/zip',
+        'content-disposition': `attachment; filename="${result.filename.replace(/[^A-Za-z0-9._-]/g, '_')}"`,
+        'x-w3bs-export': JSON.stringify({ export_id: result.export_id, excluded: result.excluded }),
+      });
+      res.end(result.data);
+    }),
   );
 
   router.get(
     '/runs',
-    wrap((req) => service.listRuns({ consumer: req.query.consumer, limit: page(req) })),
+    wrap((req) => req.svc.listRuns({ consumer: req.query.consumer, limit: page(req) })),
   );
   router.post(
     '/runs/:id/review',
     json,
-    wrap((req) => service.reviewRun(req.params.id, req.body, a(req)).then(changed('runs'))),
+    wrap((req) => req.svc.reviewRun(req.params.id, req.body, a(req)).then(changed('runs', req))),
   );
   router.get(
     '/evaluations',
     wrap((req) =>
-      service.evaluate({ consumer: req.query.consumer, task_family: req.query.task_family }),
+      req.svc.evaluate({ consumer: req.query.consumer, task_family: req.query.task_family }),
     ),
   );
   router.get(
     '/workflows',
-    wrap(() => service.listWorkflows()),
+    wrap((req) => req.svc.listWorkflows()),
   );
   router.post(
     '/workflows',
     json,
-    wrap((req) => service.deriveWorkflow(req.body.episode_id, a(req)).then(changed('workflows'))),
+    wrap((req) =>
+      req.svc.deriveWorkflow(req.body.episode_id, a(req)).then(changed('workflows', req)),
+    ),
   );
   router.get(
     '/training-jobs',
-    wrap(async () => ({ adapters: await service.trainingAdapters(), jobs: [] })),
+    wrap(async (req) => ({ adapters: await req.svc.trainingAdapters(), jobs: [] })),
   );
   router.post(
     '/training-jobs',
     json,
-    wrap((req) => service.submitTrainingJob(req.body, a(req))),
+    wrap((req) => req.svc.submitTrainingJob(req.body, a(req))),
   );
   router.get(
     '/approvals',
-    wrap(() => service.listApprovals()),
+    wrap((req) => req.svc.listApprovals()),
   );
   router.post(
     '/approvals/:id',
     json,
     wrap((req) =>
-      service
+      req.svc
         .decideApproval(req.params.id, req.body.approve === true, a(req))
-        .then(changed('approvals')),
+        .then(changed('approvals', req)),
     ),
   );
 
@@ -265,25 +296,25 @@ export function trainingRouter(service, { actorFor, onChange = () => {} }) {
     json,
     wrap((req) =>
       (req.body.episodes
-        ? service.deleteEpisodes(req.body.episodes, a(req))
-        : service.forget({ from: req.body.from, to: req.body.to }, a(req))
-      ).then(changed('episodes')),
+        ? req.svc.deleteEpisodes(req.body.episodes, a(req))
+        : req.svc.forget({ from: req.body.from, to: req.body.to }, a(req))
+      ).then(changed('episodes', req)),
     ),
   );
   router.get(
     '/deletion-requests/:id',
-    wrap((req) => service.getDeletion(req.params.id)),
+    wrap((req) => req.svc.getDeletion(req.params.id)),
   );
   router.get(
     '/audit',
-    wrap(() => service.auditLog()),
+    wrap((req) => req.svc.auditLog()),
   );
 
   // Artifact bytes need a current human session; there are no public URLs.
   router.get(
     '/artifacts/:id',
     wrap(async (req, res) => {
-      const artifact = await service.artifact(req.params.id, a(req));
+      const artifact = await req.svc.artifact(req.params.id, a(req));
       res.set({
         'content-type': artifact.media_type,
         'cache-control': 'no-store',

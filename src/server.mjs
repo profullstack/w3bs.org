@@ -15,6 +15,8 @@ import { mountAccounts, OPEN_CORS, bearerOf } from './auth-routes.mjs';
 import { mountFleet } from './fleet-routes.mjs';
 import { mountSocial, socialConfig } from './social-routes.mjs';
 import { createMailer } from './mail.mjs';
+import { createHostedTraining } from '../training/hosted.mjs';
+import { mountTraining } from '../training/hosted-routes.mjs';
 
 export function createApp({
   store,
@@ -28,6 +30,9 @@ export function createApp({
     : undefined,
   social = socialConfig(),
   socialFetch = fetch,
+  // W3BS Training workspaces need PostgreSQL and a master key (W3BS_TRAINING_MASTER_KEY, from the
+  // vault); without them /training/app and /api/v1/training answer "not enabled".
+  training = { databaseUrl: process.env.DATABASE_URL, masterKey: process.env.W3BS_TRAINING_MASTER_KEY },
 } = {}) {
   if (!store) throw new Error('createApp requires an opened store; use startServer or openStore.');
   const app = express();
@@ -254,6 +259,12 @@ export function createApp({
   // WebSocket upgrades (fleet screens) skip Express; startServer hands them to this.
   app.locals.fleet = mountFleet(app, { store, origin, helpers });
   mountSocial(app, { store, helpers, config: social, fetchImpl: socialFetch });
+  const hostedTraining =
+    training?.databaseUrl && training?.masterKey
+      ? createHostedTraining(training)
+      : { configured: false, forUser: async () => null, close: async () => {} };
+  app.locals.training = hostedTraining;
+  mountTraining(app, { helpers, hosted: hostedTraining, origin });
   app.use(
     '/assets',
     express.static(resolve(ROOT, 'public'), { maxAge: '1h', index: false, fallthrough: false }),
@@ -378,6 +389,7 @@ export async function startServer(options = {}) {
     close: async () => {
       scanner?.stop();
       app.locals.fleet.close();
+      await app.locals.training.close();
       server.closeAllConnections();
       await new Promise((resolve) => server.close(resolve));
       await store.close();
