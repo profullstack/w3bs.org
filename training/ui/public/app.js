@@ -980,7 +980,16 @@ const views = {
         : h(
             'pre',
             {},
-            'claude mcp add w3bs-training -- w3bs training mcp serve --stdio --consumer claude-code\nw3bs training setup codex --consumer codex\nw3bs training setup opencode --consumer opencode',
+            [
+              '# Claude Code',
+              'claude mcp add w3bs-training -- w3bs training mcp serve --stdio --consumer claude-code',
+              '# Claude (desktop app): prints what to add to claude_desktop_config.json',
+              'w3bs training setup claude --consumer claude',
+              '# Codex',
+              'w3bs training setup codex --consumer codex',
+              '# OpenCode',
+              'w3bs training setup opencode --consumer opencode',
+            ].join('\n'),
           ),
       h(
         'p',
@@ -1193,7 +1202,10 @@ async function agentTokens() {
                 'div',
                 { class: 'notice' },
                 h('strong', {}, 'Copy this now; it is shown once.'),
+                h('p', {}, 'Claude Code:'),
                 h('pre', {}, r.claude_code),
+                h('p', {}, 'Claude (desktop app), in claude_desktop_config.json:'),
+                h('pre', {}, JSON.stringify(r.claude_desktop, null, 2)),
                 h('p', { class: 'muted' }, `MCP endpoint: ${r.mcp_url}. ${r.note}`),
               ),
             );

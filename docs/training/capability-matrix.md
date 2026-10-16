@@ -61,10 +61,11 @@ window with no trace of the unapproved app, and the host's W3BS Training importe
 
 ## Consumer clients
 
-| Client      | Status                                                                                                            |
-| ----------- | ----------------------------------------------------------------------------------------------------------------- |
-| Claude Code | `w3bs training setup claude-code` prints the `claude mcp add` line; stdio MCP verified by the SDK client in tests |
-| Codex       | config snippet only; not yet run against a pinned Codex version                                                   |
-| OpenCode    | config snippet only; not yet run against a pinned OpenCode version                                                |
+| Client      | Status                                                                                                                                                                                      |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code | `w3bs training setup claude-code` prints the `claude mcp add` line; stdio MCP verified by the SDK client in tests                                                                           |
+| Claude app  | `w3bs training setup claude` prints the `claude_desktop_config.json` entry (absolute `w3bs` path); hosted tokens include an `mcp-remote` entry; not yet run against a pinned Claude version |
+| Codex       | config snippet only; not yet run against a pinned Codex version                                                                                                                             |
+| OpenCode    | config snippet only; not yet run against a pinned OpenCode version                                                                                                                          |
 
 MCP access says nothing about whether the model behind a client can be fine-tuned.

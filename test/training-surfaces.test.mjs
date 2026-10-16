@@ -85,6 +85,9 @@ test('CLI imports, reports status and refuses human-only commands without a term
   assert.equal(cli(dir, 'jobs', 'adapters').json.length, 0);
   const setup = cli(dir, 'setup', 'codex', '--consumer', 'codex');
   assert.match(setup.json.add, /mcp_servers\.w3bs-training/);
+  const claude = cli(dir, 'setup', 'claude', '--consumer', 'claude').json;
+  assert.match(claude.file, /claude_desktop_config\.json$/);
+  assert.deepEqual(claude.add.mcpServers['w3bs-training'].args.slice(-2), ['--consumer', 'claude']);
   assert.equal(cli(dir, 'nonsense').error.code, 'UNKNOWN_COMMAND');
 });
 
