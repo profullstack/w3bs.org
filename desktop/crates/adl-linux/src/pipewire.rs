@@ -497,7 +497,7 @@ impl Capture {
             let mut out = Vec::with_capacity((c.width * c.height * 4) as usize);
             for row in y..y + c.height {
                 let line = std::slice::from_raw_parts(base.add(row as usize * stride + x as usize * 4), c.width as usize * 4);
-                for p in line.chunks_exact(4) {
+                for p in line.as_chunks::<4>().0 {
                     out.extend_from_slice(&[p[order[0]], p[order[1]], p[order[2]], 0xff]);
                 }
             }
