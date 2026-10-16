@@ -24,6 +24,7 @@ const help = `W3BS Training ${VERSION}: review, curate and consume demonstration
                          | add ID EP... | remove ID EP... | delete ID --dry-run|--confirm
   w3bs training versions create DATASET_ID [--manifest-file selection.json] | show ID V
                          | approve ID V --purpose a,b | release ID V | revoke ID V
+  w3bs training share [--consumer claude-code]         every reviewed task, released and granted to one agent
   w3bs training consumers add --config-file consumer.json | list | revoke GRANT_ID
   w3bs training access on|off                          every agent's retrieval at once
   w3bs training retrieve --consumer NAME --query-file task.txt [--dataset ID]
@@ -340,6 +341,18 @@ try {
           ),
         );
       else fail('UNKNOWN_COMMAND', 'versions create|show|approve|release|revoke');
+      break;
+    }
+    case 'share': {
+      const consumer = values.consumer ?? 'claude-code';
+      out(
+        await service.shareReviewed(
+          { consumer },
+          await humanActor(
+            `Release every reviewed task for private retrieval and let agent "${consumer}" retrieve it for 30 days.`,
+          ),
+        ),
+      );
       break;
     }
     case 'consumers': {

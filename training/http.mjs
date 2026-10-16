@@ -200,6 +200,16 @@ export function trainingRouter(
     json,
     wrap((req) => req.svc.grant(req.body, a(req)).then(changed('grants', req))),
   );
+  router.post(
+    '/share',
+    json,
+    wrap((req) =>
+      req.svc
+        .shareReviewed(req.body, a(req))
+        .then(changed('datasets', req))
+        .then(changed('grants', req)),
+    ),
+  );
   router.delete(
     '/grants/:id',
     wrap((req) => req.svc.revokeGrant(req.params.id, a(req)).then(changed('grants', req))),

@@ -448,6 +448,23 @@ test('approval is per purpose and needs declared rights for external use', async
   );
 });
 
+test('share reviewed tasks: one human call releases and grants; agents cannot', async () => {
+  const { t } = await fresh();
+  await rejects(t.shareReviewed({ consumer: 'claude-code' }, human), 'NOTHING_TO_SHARE');
+  const { episodes } = await importSample(t);
+  await t.review(episodes[0], { decision: 'complete', confirm_goal: true }, human);
+  await rejects(t.shareReviewed({ consumer: 'claude-code' }, agent), 'HUMAN_APPROVAL_REQUIRED');
+  const first = await t.shareReviewed({ consumer: 'claude-code' }, human);
+  assert.equal(first.episodes, 1);
+  assert.equal(first.version, 1);
+  const found = await t.retrieve({ query: 'release' }, agent);
+  assert.equal(found.episodes[0].goal, 'Prepare a release-announcement draft');
+  // Sharing again reuses the dataset and releases the next version.
+  const again = await t.shareReviewed({ consumer: 'claude-code' }, human);
+  assert.equal(again.dataset_id, first.dataset_id);
+  assert.equal(again.version, 2);
+});
+
 test('a released version serves its snapshot even after the episode is edited', async () => {
   const { t } = await fresh();
   const { episode, dataset } = await released(t);
