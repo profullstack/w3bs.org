@@ -1068,6 +1068,7 @@ mod tests {
         assert_eq!(m.frame_stream_state(), (false, 1), "the stream stops with the recording");
     }
 
+    #[cfg(unix)]
     #[test]
     fn waiting_recordings_survive_a_restart_through_the_spill_dir() {
         let spill = tempfile::tempdir().unwrap();
