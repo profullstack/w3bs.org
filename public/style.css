@@ -1801,6 +1801,15 @@ textarea {
   margin-top: 8px;
   font-size: 13px;
 }
+.training-quick pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  font-size: 13px;
+}
 .desktop-install-box {
   display: grid;
   gap: 12px;
