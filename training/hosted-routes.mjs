@@ -125,6 +125,15 @@ export function mountTraining(app, { helpers, hosted, origin }) {
         token,
         mcp_url: mcp,
         claude_code: `claude mcp add --transport http w3bs-training ${mcp} --header "Authorization: Bearer ${token}"`,
+        // Claude's desktop app config takes stdio servers; mcp-remote bridges to HTTP with the header.
+        claude_desktop: {
+          mcpServers: {
+            'w3bs-training': {
+              command: 'npx',
+              args: ['-y', 'mcp-remote', mcp, '--header', `Authorization: Bearer ${token}`],
+            },
+          },
+        },
         note: 'Shown once. The agent still needs a retrieval grant for a released dataset version (Consumers > Grant).',
       };
     }),

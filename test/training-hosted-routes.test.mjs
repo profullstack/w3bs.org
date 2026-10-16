@@ -141,6 +141,7 @@ test(
       assert.equal(tok.status, 200);
       assert.match(tok.json.token, /^trn_/);
       assert.match(tok.json.claude_code, /claude mcp add --transport http w3bs-training/);
+      assert.match(JSON.stringify(tok.json.claude_desktop), /mcp-remote.*Bearer trn_/);
       const client = new Client({ name: 't', version: '0' });
       await client.connect(
         new StreamableHTTPClientTransport(new URL(`${base}/api/v1/training/mcp`), {
@@ -169,7 +170,10 @@ test(
         403,
       );
       // A forged token for another account fails.
-      const forged = tok.json.token.replace(/^trn_[^.]+\./, `trn_${Buffer.from('someone-else').toString('base64url')}.`);
+      const forged = tok.json.token.replace(
+        /^trn_[^.]+\./,
+        `trn_${Buffer.from('someone-else').toString('base64url')}.`,
+      );
       assert.equal((await call('/status', { bearer: forged })).status, 401);
 
       // Revoked token stops working.

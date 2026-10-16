@@ -2,8 +2,9 @@
 // w3bs-training: the W3BS Training CLI. The w3bs CLI runs it for
 // `w3bs training ...`. Output is JSON unless a command is interactive.
 import { randomBytes } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { userInfo } from 'node:os';
+import { existsSync, readFileSync } from 'node:fs';
+import { homedir, userInfo } from 'node:os';
+import { delimiter, join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import { openTraining, VERSION } from '../core/service.mjs';
@@ -36,7 +37,8 @@ const help = `W3BS Training ${VERSION}: review, curate and consume demonstration
   w3bs training push EPISODE_ID... | --all-reviewed [--api https://w3bs.org]
                                                        send episodes to your w3bs.org workspace
   w3bs training mcp serve --stdio --consumer NAME
-  w3bs training setup claude-code|codex|opencode --consumer NAME
+  w3bs training setup claude-code|claude|codex|opencode --consumer NAME
+                                                       claude = Claude's desktop app
 
 Human-only commands (review, label, approve, release, grant, export, delete,
 forget) need an interactive terminal and a typed confirmation code. Shell access
@@ -505,8 +507,31 @@ try {
     case 'setup': {
       const consumer = values.consumer ?? sub;
       const args = ['training', 'mcp', 'serve', '--stdio', '--consumer', consumer];
+      // Claude's desktop app starts servers from the GUI, whose PATH often lacks ~/.local/bin.
+      const w3bsBin = () => {
+        const name = process.platform === 'win32' ? 'w3bs.exe' : 'w3bs';
+        const dirs = [
+          ...(process.env.PATH ?? '').split(delimiter),
+          join(homedir(), '.local', 'bin'),
+          join(homedir(), '.w3bs', 'bin'),
+        ];
+        return dirs.map((d) => d && join(d, name)).find((p) => p && existsSync(p)) ?? 'w3bs';
+      };
+      const claudeConfig =
+        process.platform === 'darwin'
+          ? '~/Library/Application Support/Claude/claude_desktop_config.json'
+          : process.platform === 'win32'
+            ? '%APPDATA%\\Claude\\claude_desktop_config.json'
+            : '~/.config/Claude/claude_desktop_config.json';
+      const claudeDesktop = {
+        file: claudeConfig,
+        add: { mcpServers: { 'w3bs-training': { command: w3bsBin(), args } } },
+        restart: 'Quit and reopen Claude so it loads the server.',
+      };
       const configs = {
         'claude-code': { run: `claude mcp add w3bs-training -- w3bs ${args.join(' ')}` },
+        claude: claudeDesktop,
+        'claude-desktop': claudeDesktop,
         codex: {
           file: '~/.codex/config.toml',
           add: `[mcp_servers.w3bs-training]\ncommand = "w3bs"\nargs = ${JSON.stringify(args)}\n`,
@@ -516,7 +541,7 @@ try {
           add: { mcp: { 'w3bs-training': { type: 'local', command: ['w3bs', ...args] } } },
         },
       };
-      if (!configs[sub]) fail('UNKNOWN_COMMAND', 'setup claude-code|codex|opencode');
+      if (!configs[sub]) fail('UNKNOWN_COMMAND', 'setup claude-code|claude|codex|opencode');
       out({
         client: sub,
         consumer,
