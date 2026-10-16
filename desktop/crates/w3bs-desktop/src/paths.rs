@@ -34,6 +34,29 @@ pub fn runtime_dir() -> PathBuf {
     }
 }
 
+/// Where recordings waiting for W3BS Training are kept across a restart of the broker: only a
+/// memory-backed (tmpfs) runtime directory qualifies, because recordings are never written to a
+/// disk unencrypted. Linux's `XDG_RUNTIME_DIR` is tmpfs; elsewhere this is None.
+pub fn memory_backed_spill_dir() -> Option<PathBuf> {
+    #[cfg(target_os = "linux")]
+    {
+        const TMPFS_MAGIC: i64 = 0x0102_1994;
+        let dir = runtime_dir();
+        let probe = dir.parent().unwrap_or(&dir);
+        let c = std::ffi::CString::new(probe.as_os_str().as_encoded_bytes()).ok()?;
+        let mut st: libc::statfs = unsafe { std::mem::zeroed() };
+        // SAFETY: statfs fills `st` for a NUL-terminated path.
+        if unsafe { libc::statfs(c.as_ptr(), &mut st) } != 0 || st.f_type as i64 != TMPFS_MAGIC {
+            return None;
+        }
+        Some(dir.join("training-pending"))
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        None
+    }
+}
+
 /// The per-user temporary directory. On macOS this asks the system (`confstr`) rather than
 /// reading `$TMPDIR`, which launchd does not set for LaunchAgents: the broker started at login
 /// and the CLI started from a terminal must agree on where the sockets are.

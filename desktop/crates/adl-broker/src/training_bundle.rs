@@ -365,6 +365,40 @@ pub(crate) mod tests {
         }
     }
 
+    /// Scratch: `W3BS_BIG_BUNDLE=/path cargo test -p adl-broker big_bundle -- --ignored`.
+    #[test]
+    #[ignore]
+    fn big_bundle() {
+        let Ok(path) = std::env::var("W3BS_BIG_BUNDLE") else { return };
+        let mut d = golden();
+        let mut seed = 1u32;
+        let (w, h) = (1000u32, 600u32);
+        d.frames = (0..475u32)
+            .map(|i| {
+                let mut raw = Vec::with_capacity((w * h) as usize);
+                for _ in 0..w * h {
+                    seed = seed.wrapping_mul(1_103_515_245).wrapping_add(12345);
+                    raw.push((seed >> 24) as u8);
+                }
+                let mut out = Vec::new();
+                {
+                    let mut enc = png::Encoder::new(&mut out, w, h);
+                    enc.set_color(png::ColorType::Grayscale);
+                    enc.set_depth(png::BitDepth::Eight);
+                    let mut wr = enc.write_header().unwrap();
+                    wr.write_image_data(&raw).unwrap();
+                }
+                Frame { observation_id: format!("obs_big{i}"), artifact_id: format!("art_big{i}"), ns: 500_000_000 + u64::from(i) * 2_000_000_000, png: out, width: w, height: h, app: "org.kde.kate".into(), title: "big - Kate".into() }
+            })
+            .collect();
+        d.ended_ns = 500_000_000 + 476 * 2_000_000_000;
+        d.steps.truncate(1);
+        d.steps[0].after = Some("obs_big0".into());
+        d.steps[0].app = "org.kde.kate".into();
+        d.gaps.clear();
+        std::fs::write(path, build(&d)).unwrap();
+    }
+
     #[test]
     fn iso_dates() {
         assert_eq!(iso(0), "1970-01-01T00:00:00.000Z");

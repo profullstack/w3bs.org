@@ -128,6 +128,20 @@ adl_main() {
   [ "$want" = "$got" ] || die "checksum mismatch for $archive (expected $want, got $got)"
   mkdir -p "$tmp/x" && tar -xzf "$tmp/$archive" -C "$tmp/x" || die "cannot unpack $archive"
 
+  # Installing restarts the broker, and a recording lives in the broker's memory: refuse while one
+  # is running or waiting for W3BS Training, before anything is replaced.
+  if [ -x "$bin/w3bs-desktop" ] && [ "${W3BS_DESKTOP_FORCE_RESTART:-0}" != 1 ]; then
+    st="$("$bin/w3bs-desktop" --json training status 2>/dev/null | tr -d ' \n' || true)"
+    case "$st" in
+      *'"state":"recording"'* | *'"state":"paused"'* | *'"state":"blocked"'* | *'"state":"arming"'*)
+        die "a Training recording is in progress. Finish it (tray > Finish task) and run the update again, or set W3BS_DESKTOP_FORCE_RESTART=1 to discard it." ;;
+    esac
+    case "$st" in
+      *'"pending_handoffs":[{'*)
+        die "a finished recording is still waiting for W3BS Training and would be lost. Hand it over first (control app > Training > Try again, or: w3bs desktop training handoff), or set W3BS_DESKTOP_FORCE_RESTART=1 to discard it." ;;
+    esac
+  fi
+
   mkdir -p "$bin" "$share" || die "cannot create $bin"
   # Replace rather than overwrite in place: a running broker keeps its old (still valid) image,
   # and on macOS the code signature cache never sees a modified file.

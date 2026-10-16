@@ -45,11 +45,15 @@ pub struct TrainingConfig {
     pub max_pending: usize,
     /// Hand finished bundles to `w3bs training import`. Off in unit tests.
     pub handoff: bool,
+    /// Where bundles waiting for W3BS Training are also kept so a restart of the desktop layer
+    /// (an update) does not lose them. Must be memory-backed (Linux: the tmpfs runtime dir), so
+    /// nothing reaches a disk unencrypted; None keeps them in this process only.
+    pub spill_dir: Option<std::path::PathBuf>,
 }
 
 impl Default for TrainingConfig {
     fn default() -> Self {
-        Self { tick_ms: 500, keyframe_ms: 4_000, stream_eval_ms: 1_000, min_change_permille: 1, max_frames: 1_500, max_bytes: 256 * 1024 * 1024, max_pending: 4, handoff: true }
+        Self { tick_ms: 500, keyframe_ms: 4_000, stream_eval_ms: 1_000, min_change_permille: 1, max_frames: 1_500, max_bytes: 256 * 1024 * 1024, max_pending: 4, handoff: true, spill_dir: None }
     }
 }
 
@@ -229,14 +233,16 @@ fn handoff(name: &str, bundle: &[u8]) -> std::result::Result<Value, String> {
         let mut stdin = child.stdin.take().ok_or("no stdin")?;
         stdin.write_all(bundle)
     };
-    let deadline = Instant::now() + Duration::from_secs(120);
+    // Two minutes, plus a second for every 2 MB: a long recording takes a while to seal.
+    let limit = 120 + (bundle.len() / (2 * 1024 * 1024)) as u64;
+    let deadline = Instant::now() + Duration::from_secs(limit);
     loop {
         match child.try_wait() {
             Ok(Some(_)) => break,
             Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(50)),
             _ => {
                 let _ = child.kill();
-                return Err("W3BS Training did not finish the import within 120 s".into());
+                return Err(format!("W3BS Training did not finish the import within {limit} s"));
             }
         }
     }
@@ -581,11 +587,20 @@ impl Broker {
         let last = match result {
             Ok(v) => json!({"summary": summary, "handoff": "imported", "import": v}),
             Err(e) => {
+                eprintln!("w3bs-desktop: recording {name} was not handed to W3BS Training: {e}");
                 if r.pending.len() >= self.cfg.training.max_pending {
-                    r.pending.remove(0);
+                    let dropped = r.pending.remove(0);
+                    self.unspill(&dropped.name);
                 }
-                r.pending.push(Pending { name, bundle, to_ms: now_ms(), error: e.clone() });
-                json!({"summary": summary, "handoff": "pending", "error": e, "note": "Held in memory only. Retry from the control app or `w3bs desktop training handoff`; it is lost if the daemon stops."})
+                let p = Pending { name, bundle, to_ms: now_ms(), error: e.clone() };
+                let kept = self.spill(&p);
+                r.pending.push(p);
+                let note = if kept {
+                    "Kept in memory (and the session's memory-backed runtime directory) until it is handed over; it survives a restart of the desktop layer, not a logout. Retry from the control app or `w3bs desktop training handoff`."
+                } else {
+                    "Held in memory only. Retry from the control app or `w3bs desktop training handoff`; it is lost if the daemon stops."
+                };
+                json!({"summary": summary, "handoff": "pending", "error": e, "note": note})
             }
         };
         r.last = Some(last.clone());
@@ -594,6 +609,66 @@ impl Broker {
         self.audit.log("training.finish", None, None, "allowed", last["handoff"].as_str().unwrap_or(""), json!({"frames": summary["frames"], "interrupted": interrupted}));
         self.rec_event();
         Some(last)
+    }
+
+    /// Keep a waiting bundle in the memory-backed spill directory. Returns whether it was kept.
+    fn spill(&self, p: &Pending) -> bool {
+        let Some(dir) = &self.cfg.training.spill_dir else { return false };
+        let write = || -> std::io::Result<()> {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+                std::fs::DirBuilder::new().recursive(true).mode(0o700).create(dir)?;
+                let mut f = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(dir.join(&p.name))?;
+                std::io::Write::write_all(&mut f, &p.bundle)
+            }
+            #[cfg(not(unix))]
+            {
+                let _ = (dir, p);
+                Err(std::io::Error::other("spilling is unix-only"))
+            }
+        };
+        match write() {
+            Ok(()) => true,
+            Err(e) => {
+                eprintln!("w3bs-desktop: could not keep {} across restarts: {e}", p.name);
+                false
+            }
+        }
+    }
+
+    fn unspill(&self, name: &str) {
+        if let Some(dir) = &self.cfg.training.spill_dir {
+            let _ = std::fs::remove_file(dir.join(name));
+        }
+    }
+
+    /// Load bundles a previous run of the desktop layer left waiting. Called once at startup.
+    pub fn training_restore_pending(&self) -> usize {
+        let Some(dir) = &self.cfg.training.spill_dir else { return 0 };
+        let Ok(entries) = std::fs::read_dir(dir) else { return 0 };
+        let mut found: Vec<(u64, String, Vec<u8>)> = entries
+            .flatten()
+            .filter_map(|e| {
+                let name = e.file_name().into_string().ok()?;
+                if !name.ends_with(".w3bs-training.zip") {
+                    return None;
+                }
+                let ms = e.metadata().ok()?.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as u64;
+                Some((ms, name, std::fs::read(e.path()).ok()?))
+            })
+            .collect();
+        found.sort();
+        let mut r = self.rec();
+        let n = found.len();
+        for (to_ms, name, bundle) in found {
+            if r.pending.len() >= self.cfg.training.max_pending {
+                let dropped = r.pending.remove(0);
+                self.unspill(&dropped.name);
+            }
+            r.pending.push(Pending { name, bundle, to_ms, error: "kept across a restart of the desktop layer; not handed over yet".into() });
+        }
+        n
     }
 
     /// Throw the current recording away without handing anything over.
@@ -617,8 +692,12 @@ impl Broker {
         let mut kept = vec![];
         for mut p in pending {
             match handoff(&p.name, &p.bundle) {
-                Ok(_) => done += 1,
+                Ok(_) => {
+                    self.unspill(&p.name);
+                    done += 1;
+                }
                 Err(e) => {
+                    eprintln!("w3bs-desktop: recording {} was not handed to W3BS Training: {e}", p.name);
                     p.error = e;
                     kept.push(p);
                 }
@@ -661,7 +740,11 @@ impl Broker {
             }
         }
         let before = r.pending.len();
-        r.pending.retain(|p| p.to_ms < since_ms);
+        let (keep, gone): (Vec<Pending>, Vec<Pending>) = std::mem::take(&mut r.pending).into_iter().partition(|p| p.to_ms < since_ms);
+        for p in &gone {
+            self.unspill(&p.name);
+        }
+        r.pending = keep;
         let dropped = before - r.pending.len();
         drop(r);
         self.audit.log("training.forget", None, None, "allowed", "", json!({"frames": frames, "steps": steps, "pending_bundles": dropped}));
@@ -983,6 +1066,47 @@ mod tests {
         let last = b.training_finish(Some("success")).unwrap();
         assert_eq!(last["summary"]["frames"], 3, "the end state is kept however small the change");
         assert_eq!(m.frame_stream_state(), (false, 1), "the stream stops with the recording");
+    }
+
+    #[test]
+    fn waiting_recordings_survive_a_restart_through_the_spill_dir() {
+        let spill = tempfile::tempdir().unwrap();
+        let make = |dir: &std::path::Path| {
+            let mock = Arc::new(MockDesktop::new());
+            let cfg = Config {
+                pace_ms: 0,
+                require_native_control: false,
+                training: TrainingConfig { keyframe_ms: 0, handoff: false, spill_dir: Some(spill.path().join("pending")), ..TrainingConfig::default() },
+                ..Config::default()
+            };
+            Arc::new(Broker::new(mock, AgentStore::open(dir.join("agents.json")).unwrap(), Audit::open(dir.join("audit"), 7), cfg))
+        };
+        let d1 = tempfile::tempdir().unwrap();
+        let b = make(d1.path());
+        enable(&b);
+        teach(&b, &["org.kde.kate"]).unwrap();
+        b.training_tick();
+        let last = b.training_finish(Some("success")).unwrap();
+        assert_eq!(last["handoff"], "pending");
+        assert!(last["note"].as_str().unwrap().contains("survives a restart"), "{last}");
+        let files: Vec<_> = std::fs::read_dir(spill.path().join("pending")).unwrap().flatten().collect();
+        assert_eq!(files.len(), 1);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(files[0].metadata().unwrap().permissions().mode() & 0o777, 0o600);
+        }
+        drop(b);
+        // A new broker (the updated desktop layer) finds it waiting.
+        let d2 = tempfile::tempdir().unwrap();
+        let b2 = make(d2.path());
+        assert_eq!(b2.training_restore_pending(), 1);
+        let st = b2.training_status();
+        assert_eq!(st["pending_handoffs"].as_array().unwrap().len(), 1);
+        assert!(st["pending_handoffs"][0]["error"].as_str().unwrap().contains("restart"));
+        // Deleting recent activity deletes the kept copy too.
+        b2.training_forget(0).unwrap();
+        assert_eq!(std::fs::read_dir(spill.path().join("pending")).unwrap().count(), 0);
     }
 
     #[test]
