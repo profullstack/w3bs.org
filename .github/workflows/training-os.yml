@@ -1,0 +1,86 @@
+# W3BS Training on macOS and Windows: build this commit's packaged binary, install it with the
+# real installer (install.sh / install.ps1, checksum-verified local archive), then run
+# training/packaging/os-smoke.mjs against the OS key store (login keychain / DPAPI): import,
+# commit from a second process, the recorder's stdin handoff, and `setup claude`. Each job also
+# installs the published release from GitHub the way a person would.
+# The desktop recorder itself needs an interactive session; that is still the KDE rig only.
+name: Training on macOS and Windows
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'training/**'
+      - 'src/core.mjs'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/training-os.yml'
+  pull_request:
+    paths:
+      - 'training/**'
+      - 'src/core.mjs'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/training-os.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - name: Build and install this commit (install.sh, local archive)
+        run: |
+          v=$(sed -n "s/^export const VERSION = '\(.*\)';/\1/p" training/core/service.mjs)
+          case "$(uname -m)" in arm64) t=aarch64-apple-darwin ;; *) t=x86_64-apple-darwin ;; esac
+          sh training/packaging/build.sh "$v" dist "$t"
+          a="dist/w3bs-training-$v-$t.tar.gz"
+          W3BS_TRAINING_ARCHIVE="$a" W3BS_TRAINING_SHA256="$(shasum -a 256 "$a" | cut -d' ' -f1)" \
+            W3BS_BIN_DIR="$HOME/.local/bin" sh training/packaging/install.sh
+      - name: Login keychain end to end
+        run: bun training/packaging/os-smoke.mjs "$HOME/.local/bin/w3bs-training" macos-keychain
+      - name: Published release installs
+        run: |
+          W3BS_BIN_DIR="$RUNNER_TEMP/release" sh training/packaging/install.sh
+          "$RUNNER_TEMP/release/w3bs-training" version
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - name: Build and install this commit (install.ps1, local archive)
+        run: |
+          $ErrorActionPreference = 'Stop'
+          bun training/ui/build-assets.mjs --check
+          if ($LASTEXITCODE) { exit 1 }
+          New-Item -ItemType Directory -Force stage/bin, dist | Out-Null
+          bun build training/bin/w3bs-training.mjs --compile --minify --target=bun-windows-x64-baseline --outfile stage/bin/w3bs-training.exe
+          if ($LASTEXITCODE) { exit 1 }
+          Copy-Item LICENSE stage/LICENSE
+          Copy-Item docs/training/README.md stage/README.md
+          Compress-Archive -Path stage/* -DestinationPath dist/w3bs-training.zip
+          $env:W3BS_TRAINING_ARCHIVE = (Resolve-Path dist/w3bs-training.zip).Path
+          $env:W3BS_TRAINING_SHA256 = (Get-FileHash dist/w3bs-training.zip -Algorithm SHA256).Hash.ToLower()
+          ./training/packaging/install.ps1
+      - name: DPAPI end to end
+        run: |
+          bun training/packaging/os-smoke.mjs "$env:LOCALAPPDATA\Programs\w3bs-training\bin\w3bs-training.exe" windows-dpapi
+          if ($LASTEXITCODE) { exit 1 }
+      - name: Published release installs (Windows PowerShell 5.1)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./training/packaging/install.ps1
+          & "$env:LOCALAPPDATA\Programs\w3bs-training\bin\w3bs-training.exe" version
+          if ($LASTEXITCODE) { exit 1 }
