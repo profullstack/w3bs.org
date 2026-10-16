@@ -25,7 +25,7 @@
 
 wt_main() {
   set -u
-  VERSION="${W3BS_TRAINING_VERSION:-0.2.3}"
+  VERSION="${W3BS_TRAINING_VERSION:-0.2.4}"
   BASE="https://github.com/profullstack/w3bs.org/releases/download/training-v$VERSION"
 
   say() { printf '%s\n' "$*" >&2; }
