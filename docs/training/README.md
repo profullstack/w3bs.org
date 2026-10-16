@@ -4,6 +4,59 @@ Review, curate, version and consume demonstrations of desktop work, so an
 authorized agent can use approved examples on its next task. Specified by the
 [PRD](prd.md).
 
+## Quick start: record on your desktop, use it from Claude Code
+
+Two machines: the **desktop** where you do the task (Linux, macOS or Windows
+with the Agentic Desktop Layer), and the **agent machine** where Claude Code
+runs. They can be the same computer. Recordings never leave the desktop; Claude
+reads them over ssh.
+
+### On the desktop
+
+```sh
+w3bs update                       # upgrades the desktop layer and W3BS Training (approve the prompt)
+```
+
+First time instead:
+
+```sh
+curl -fsSL https://w3bs.org/install.sh | sh             # the w3bs CLI
+w3bs install agentic-desktop-layer w3bs-training
+sudo apt install libsecret-tools                        # Linux only: lets Training use your keyring
+```
+
+Then, each time:
+
+1. **Record.** Tray icon → **Start training…** → say what you are about to do,
+   tick the apps it may see → **Start**. Do the task. Tray → **Finish task** →
+   Complete, Partial, Failed or Not sure.
+2. **Review.** `w3bs training open` → **Inbox** → confirm each task.
+3. **Share.** **Consumers** → **Share all reviewed tasks** (agent name
+   `claude-code`). Or `w3bs training share` in a terminal. Do this again after
+   reviewing new tasks; a share lasts 30 days.
+
+### On the agent machine
+
+```sh
+w3bs update                       # keeps w3bs current (optional here)
+
+# once: Claude Code runs Training's MCP server on the desktop over ssh (key auth)
+claude mcp add --scope user w3bs-training -- \
+  ssh -o BatchMode=yes you@desktop '~/.local/bin/w3bs-training' mcp serve --stdio --consumer claude-code
+
+claude mcp list                   # w3bs-training: ✔ Connected
+```
+
+Then start a new Claude Code session and ask, for example: _"Use w3bs-training
+to find how I did the release checklist, then do it for v2.3."_ Claude gets the
+reviewed examples as evidence, not instructions, and no control of the desktop.
+
+Same computer? `claude mcp add --scope user w3bs-training -- w3bs training mcp serve --stdio --consumer claude-code`.
+
+If Claude finds nothing: the desktop must be on with you logged in (the keyring
+unlocks with your session), and the tasks must be reviewed **and** shared.
+`w3bs training status` on the desktop shows `active_grants`.
+
 ## Status (2026-10-15)
 
 The data side of the M1 local vertical slice is in `training/`: format 0.1,
