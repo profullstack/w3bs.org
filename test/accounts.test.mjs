@@ -9,7 +9,7 @@ const ORIGIN = 'http://localhost:3000';
 const b64url = (bytes) => Buffer.from(bytes).toString('base64url');
 const sha = (value) => createHash('sha256').update(value).digest();
 
-async function boot() {
+async function boot(options = {}) {
   const mail = [];
   const instance = await startServer({
     store: await openStore({ path: ':memory:' }),
@@ -17,6 +17,7 @@ async function boot() {
     publicOrigin: ORIGIN,
     mailer: { send: async (message) => (mail.push(message), { sent: true }) },
     formGuard: { minAgeMs: 0, rateLimit: false },
+    ...options,
   });
   const base = `http://localhost:${instance.server.address().port}`;
   const jar = new Map();
@@ -676,4 +677,34 @@ test('loopback redirect URIs match any port, nothing else is loose', () => {
   assert.ok(!redirectAllowed(registered, 'https://app.example/cb?x=1'));
   assert.ok(!redirectAllowed(registered, 'https://app.example:444/cb'));
   assert.ok(!redirectAllowed(registered, 'https://app.example/cb#frag'));
+});
+
+test('a signed-out bridge sign-in goes to /login and comes back to the bridge', async () => {
+  const callback = 'https://board.example/bbs/auth/bridge/callback';
+  const t = await boot({
+    bridgeClients: { tsbb: { secret: 'x'.repeat(43), redirectUris: [callback] } },
+  });
+  try {
+    const query = new URLSearchParams({
+      response_type: 'code',
+      client_id: 'tsbb',
+      redirect_uri: callback,
+      state: 'st',
+      code_challenge: b64url(sha('verifier')),
+      code_challenge_method: 'S256',
+      prompt: 'login',
+    });
+    const res = await t.http(`/api/v1/bridge/authorize?${query}`);
+    assert.equal(res.status, 302);
+    const login = new URL(res.headers.get('location'), ORIGIN);
+    assert.equal(login.pathname, '/login');
+    // /login only follows a local path, so an absolute next would be dropped for /account.
+    const next = login.searchParams.get('next');
+    assert.ok(next.startsWith('/api/v1/bridge/authorize?'), next);
+    assert.equal(new URL(next, ORIGIN).searchParams.get('client_id'), 'tsbb');
+    const page = await (await t.http(`${login.pathname}${login.search}`)).text();
+    assert.ok(page.includes(`data-next="${next.replaceAll('&', '&amp;')}"`));
+  } finally {
+    await t.close();
+  }
 });
