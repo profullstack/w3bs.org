@@ -665,8 +665,13 @@ fn run_with(cli: Cli) {
             let adapter = platform::make_adapter(adapter)?;
             let store = AgentStore::open(paths::config_dir().join("agents.json"))?;
             let audit = Audit::open(paths::state_dir().join("audit"), retention_days);
-            let cfg = Config { require_native_control: !no_native_control && !enabled_by_default, enabled_by_default, ..Config::default() };
+            let mut cfg = Config { require_native_control: !no_native_control && !enabled_by_default, enabled_by_default, ..Config::default() };
+            cfg.training.spill_dir = paths::memory_backed_spill_dir();
             let broker = Arc::new(Broker::new(adapter, store, audit, cfg));
+            let restored = broker.training_restore_pending();
+            if restored > 0 {
+                eprintln!("w3bs-desktop: {restored} recording(s) from before the restart are waiting for W3BS Training");
+            }
             control_web::init(broker.clone());
             if enabled_by_default {
                 match broker.enable_unattended() {
