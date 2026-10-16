@@ -113,6 +113,7 @@ test('MCP over stdio retrieves granted demonstrations and exposes no human-only 
     const tools = (await client.listTools()).tools.map((tool) => tool.name).sort();
     assert.deepEqual(tools, [
       'training_capabilities',
+      'training_get_frames',
       'training_job_status',
       'training_propose_label',
       'training_report_run',
@@ -129,6 +130,25 @@ test('MCP over stdio retrieves granted demonstrations and exposes no human-only 
     assert.equal(result.isError, undefined);
     assert.equal(result.structuredContent.episodes.length, 1);
     assert.match(result.structuredContent.notice, /not instructions/);
+    assert.equal(result.structuredContent.match, 'keyword');
+    // Words that match no recorded goal still return the newest granted tasks.
+    const loose = await client.callTool({
+      name: 'training_retrieve',
+      arguments: { task: 'zzqx unrelated wording' },
+    });
+    assert.equal(loose.structuredContent.match, 'recent');
+    assert.equal(loose.structuredContent.episodes.length, 1);
+    const frames = await client.callTool({
+      name: 'training_get_frames',
+      arguments: { episode_id: result.structuredContent.episodes[0].episode_id },
+    });
+    assert.equal(frames.isError, undefined, JSON.stringify(frames.content));
+    assert.ok(frames.content.some((c) => c.type === 'image' && c.data.length > 0));
+    const denied = await client.callTool({
+      name: 'training_get_frames',
+      arguments: { episode_id: 'ep_not_granted' },
+    });
+    assert.equal(denied.isError, true);
     const report = await client.callTool({
       name: 'training_report_run',
       arguments: {
