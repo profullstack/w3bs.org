@@ -28,36 +28,36 @@ window with no trace of the unapproved app, and the host's W3BS Training importe
 
 ## Data side (`w3bs training`)
 
-| Capability                                                                                        | Status                                                              |
-| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Format 0.1 schema, JSON Schema, valid/invalid fixtures                                            | shipped                                                             |
-| Native bundle import with quarantine, limits and preview                                          | shipped                                                             |
-| JSON/JSONL mapping import                                                                         | shipped                                                             |
-| Video import (visual-review)                                                                      | shipped                                                             |
-| Privacy scrub (secrets, text values, URL queries, sensitive contexts)                             | shipped                                                             |
-| Encrypted artifacts (passphrase, libsecret, macOS keychain)                                       | shipped; Windows key store not yet                                  |
-| Review inbox with priorities and daily budget                                                     | shipped                                                             |
-| Complete/Partial/Failed/Unknown/Rename/Split/Merge/Discard/Exclude steps                          | shipped                                                             |
-| Datasets, immutable versions, splits, digests                                                     | shipped                                                             |
-| Per-purpose approval, release, revoke                                                             | shipped                                                             |
-| Retrieval grants, agent-access switch                                                             | shipped                                                             |
-| Retrieval over MCP (stdio)                                                                        | shipped                                                             |
-| Run reporting and with/without comparison                                                         | shipped (aggregates reported runs; does not run agents)             |
-| Exports: bundle, canonical JSONL, next-action                                                     | shipped                                                             |
-| Deletion by episode, by capture-time window, dataset; lineage report; tombstones; retention       | shipped                                                             |
-| Local web app (loopback, one-time link)                                                           | shipped                                                             |
-| Terminal review on hqtui                                                                          | shipped                                                             |
-| Workflows derived from episodes                                                                   | shipped (always `untested`)                                         |
-| Model training adapters                                                                           | none; `jobs submit` returns `TRAIN_ADAPTER_UNAVAILABLE`             |
-| Optional model labelling (Anthropic SDK adapter)                                                  | not started; cloud budget is $0                                     |
-| Embeddings                                                                                        | not started                                                         |
-| Hosted app at w3bs.org/training/app (account sign-in, PostgreSQL per-account schema)              | shipped                                                             |
-| `w3bs training push` (local -> hosted, `w3bs login` session)                                      | shipped; pull and two-way sync not started                          |
-| MCP over HTTP for hosted workspaces (per-agent `trn_` tokens)                                     | shipped                                                             |
-| Team workspaces and shared review                                                                 | not started                                                         |
-| Packaged `w3bs-training` binary (Linux x64/arm64, macOS, Windows) with curl/PowerShell installers | shipped; Linux installer verified in a clean Ubuntu 24.04 container |
-| Electron desktop app                                                                              | not started                                                         |
-| NicheDB exchange                                                                                  | not started                                                         |
+| Capability                                                                                        | Status                                                                                                               |
+| ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Format 0.1 schema, JSON Schema, valid/invalid fixtures                                            | shipped                                                                                                              |
+| Native bundle import with quarantine, limits and preview                                          | shipped                                                                                                              |
+| JSON/JSONL mapping import                                                                         | shipped                                                                                                              |
+| Video import (visual-review)                                                                      | shipped                                                                                                              |
+| Privacy scrub (secrets, text values, URL queries, sensitive contexts)                             | shipped                                                                                                              |
+| Encrypted artifacts (passphrase, libsecret, macOS keychain, Windows DPAPI)                        | shipped; keychain and DPAPI verified end to end in CI (training-os.yml), libsecret on KDE                            |
+| Review inbox with priorities and daily budget                                                     | shipped                                                                                                              |
+| Complete/Partial/Failed/Unknown/Rename/Split/Merge/Discard/Exclude steps                          | shipped                                                                                                              |
+| Datasets, immutable versions, splits, digests                                                     | shipped                                                                                                              |
+| Per-purpose approval, release, revoke                                                             | shipped                                                                                                              |
+| Retrieval grants, agent-access switch                                                             | shipped                                                                                                              |
+| Retrieval over MCP (stdio)                                                                        | shipped                                                                                                              |
+| Run reporting and with/without comparison                                                         | shipped (aggregates reported runs; does not run agents)                                                              |
+| Exports: bundle, canonical JSONL, next-action                                                     | shipped                                                                                                              |
+| Deletion by episode, by capture-time window, dataset; lineage report; tombstones; retention       | shipped                                                                                                              |
+| Local web app (loopback, one-time link)                                                           | shipped                                                                                                              |
+| Terminal review on hqtui                                                                          | shipped                                                                                                              |
+| Workflows derived from episodes                                                                   | shipped (always `untested`)                                                                                          |
+| Model training adapters                                                                           | none; `jobs submit` returns `TRAIN_ADAPTER_UNAVAILABLE`                                                              |
+| Optional model labelling (Anthropic SDK adapter)                                                  | not started; cloud budget is $0                                                                                      |
+| Embeddings                                                                                        | not started                                                                                                          |
+| Hosted app at w3bs.org/training/app (account sign-in, PostgreSQL per-account schema)              | shipped                                                                                                              |
+| `w3bs training push` (local -> hosted, `w3bs login` session)                                      | shipped; pull and two-way sync not started                                                                           |
+| MCP over HTTP for hosted workspaces (per-agent `trn_` tokens)                                     | shipped                                                                                                              |
+| Team workspaces and shared review                                                                 | not started                                                                                                          |
+| Packaged `w3bs-training` binary (Linux x64/arm64, macOS, Windows) with curl/PowerShell installers | shipped; installers verified in a clean Ubuntu 24.04 container and on macOS and Windows CI (pwsh and PowerShell 5.1) |
+| Electron desktop app                                                                              | not started                                                                                                          |
+| NicheDB exchange                                                                                  | not started                                                                                                          |
 
 ## Consumer clients
 
