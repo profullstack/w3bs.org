@@ -248,7 +248,14 @@ X-GNOME-Autostart-enabled=true
 NoDisplay=true
 EOF
         if [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]; then
-          (sleep 1; nohup "$bin/w3bs-desktop" tray >/dev/null 2>&1 &) && say "Tray control started (and added to your session's autostart)"
+          # Through the user manager when it can: it holds the desktop session's environment, so
+          # an update run over ssh (or `w3bs update` from a tty) still gets a tray that can open
+          # the browser. A tray started from this shell would inherit the shell's environment.
+          if systemctl --user show-environment 2>/dev/null | grep -qE '^(WAYLAND_)?DISPLAY='; then
+            systemd-run --user --collect --quiet --unit="w3bs-desktop-tray-$$" "$bin/w3bs-desktop" tray >/dev/null 2>&1
+          else
+            (sleep 1; nohup "$bin/w3bs-desktop" tray >/dev/null 2>&1 &)
+          fi && say "Tray control started (and added to your session's autostart)"
         fi
         ;;
     esac
