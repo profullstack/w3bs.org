@@ -22,14 +22,30 @@ model-training adapter yet (M4). See the [capability matrix](capability-matrix.m
 ```sh
 curl -fsSL https://w3bs.org/training/install.sh | sh        # Linux, macOS
 irm https://w3bs.org/training/install.ps1 | iex             # Windows (PowerShell)
+w3bs install w3bs-training                                  # with the w3bs CLI
+```
+
+On Linux, also install libsecret's `secret-tool` so the encryption key can live
+in your desktop keyring (KWallet or GNOME Keyring). Most desktops do not ship it:
+
+```sh
+sudo apt install libsecret-tools     # Debian, Ubuntu, Kubuntu
+sudo dnf install libsecret           # Fedora
+sudo pacman -S libsecret             # Arch
 ```
 
 One self-contained `w3bs-training` binary (no Bun or Node), checked against the
 release's SHA256SUMS. `w3bs training …` runs it through the w3bs CLI, and the
-desktop recorder finds it on its own. Recordings are encrypted with a key from
-your keyring (libsecret's `secret-tool` on Linux, the login keychain on macOS,
-DPAPI on Windows) or `W3BS_TRAINING_PASSPHRASE`; with none of those it refuses
-to store anything.
+desktop recorder finds it on its own (no restart needed). Recordings are
+encrypted with a key from your keyring (libsecret's `secret-tool` on Linux, the
+login keychain on macOS, DPAPI on Windows) or `W3BS_TRAINING_PASSPHRASE`; with
+none of those it refuses to store anything. For recordings from the desktop
+tray, the passphrase has to be in the desktop layer's environment, not just
+your shell's, so the keyring is the easier route.
+
+If the control app says a recording is waiting, install what it names and press
+**Try again**. Waiting recordings are held in memory only, so do this before you
+log out or restart the desktop layer.
 
 ## Documents
 
