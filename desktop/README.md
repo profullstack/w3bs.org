@@ -203,7 +203,13 @@ and sharing the result is [W3BS Training](../docs/training/README.md) (`w3bs tra
   sure. The control app has the same, plus Discard, an explanation box and **Delete last 10
   minutes**.
 - **What it captures:** the focused window of an approved application, cropped to that window,
-  every few seconds and on every focus change. An unapproved window in focus, or overlapping the
+  on every focus change and whenever the window visibly changes. On Linux the frames come from
+  the ScreenCast stream the portal session already shares (PipeWire, at most 5 a second; no new
+  consent and no screenshot per frame); elsewhere, or with `W3BS_DESKTOP_CAPTURE=screenshot`,
+  from screenshots every few seconds. A frame is kept only when at least 1 in 1,000 of the
+  window's pixels changed since the last kept one (a blinking caret or a passing pointer is not
+  activity; small changes add up and are kept once they pass that), and the end state is
+  always kept when you finish. An unapproved window in focus, or overlapping the
   approved one, is recorded as a gap, never captured. No keystrokes, typed text, clipboard or
   audio: Wayland offers no passive input tap, so recordings are the `visual-review` profile and
   steps are window-focus changes with origin `unknown`.

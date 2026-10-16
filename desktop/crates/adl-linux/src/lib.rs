@@ -3,6 +3,7 @@
 //! - [`vela`]: Vela compositor command socket (observation, focus, occlusion, lock and
 //!   authentication-prompt interlocks). Clean-room from interface facts.
 //! - [`portal`]: KDE Plasma / GNOME input and capture through the XDG desktop portals.
+//! - [`pipewire`]: the portal session's monitors as live PipeWire streams, for recording.
 //! - [`kwin`]: KDE Plasma window list, stacking, focus, activation and the polkit interlock via
 //!   KWin scripts; [`kwin::WithKWin`] pairs it with the portal backend.
 //! - [`gnome`]: the same window data on GNOME Shell from the W3BS Shell extension;
@@ -19,6 +20,8 @@ pub mod gnome;
 pub mod kwin;
 #[cfg(feature = "dbus")]
 pub mod logind;
+#[cfg(feature = "dbus")]
+pub mod pipewire;
 #[cfg(feature = "dbus")]
 pub mod portal;
 pub mod vela;

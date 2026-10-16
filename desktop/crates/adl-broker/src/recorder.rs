@@ -21,7 +21,8 @@
 
 use crate::broker::{Broker, Peer};
 use crate::training_bundle::{self as tb, Display, FocusStep, Frame, Gap, RecordingData};
-use crate::util::{now_ms, random_id, sha256_hex};
+use crate::adapter::PixelRect;
+use crate::util::{now_ms, random_id};
 use adl_schema::*;
 use serde_json::{json, Value};
 use std::io::Write;
@@ -31,8 +32,14 @@ use std::time::{Duration, Instant};
 #[derive(Clone, Debug)]
 pub struct TrainingConfig {
     pub tick_ms: u64,
-    /// A new frame of the same window at most this often (focus changes always take one).
+    /// Without a live stream: look at the same window this often (focus changes always look).
     pub keyframe_ms: u64,
+    /// With a live stream: look at most this often, and only after the compositor sent new pixels.
+    pub stream_eval_ms: u64,
+    /// Keep a new frame of the same window only when at least this many pixels per thousand
+    /// changed since the last kept frame: a blinking caret or a passing mouse pointer is not
+    /// activity. Smaller changes add up against the last kept frame, so they are never lost.
+    pub min_change_permille: u32,
     pub max_frames: usize,
     pub max_bytes: usize,
     pub max_pending: usize,
@@ -42,7 +49,7 @@ pub struct TrainingConfig {
 
 impl Default for TrainingConfig {
     fn default() -> Self {
-        Self { tick_ms: 500, keyframe_ms: 4_000, max_frames: 1_500, max_bytes: 256 * 1024 * 1024, max_pending: 4, handoff: true }
+        Self { tick_ms: 500, keyframe_ms: 4_000, stream_eval_ms: 1_000, min_change_permille: 1, max_frames: 1_500, max_bytes: 256 * 1024 * 1024, max_pending: 4, handoff: true }
     }
 }
 
@@ -78,7 +85,13 @@ struct Recording {
     allow_agents: bool,
     last_focus: Option<(String, String)>,
     last_frame: Option<(u64, String)>,
-    last_hash: String,
+    /// Pixels of the last kept frame, to tell real change from noise.
+    last_px: Option<Pixels>,
+    /// Reading displays from a live stream (portal ScreenCast) instead of screenshots.
+    streaming: bool,
+    /// (display id, stream sequence) last looked at: an unchanged sequence means no new pixels.
+    last_seq: Option<(String, u64)>,
+    last_eval: u64,
     open_gap: Option<Gap>,
     bytes: usize,
     errors: u32,
@@ -127,8 +140,41 @@ fn close_gap(r: &mut Recording, ns: u64) {
     }
 }
 
+/// Raw pixels of a crop, in the colour type they will be encoded with.
+#[derive(Clone)]
+struct Pixels {
+    width: u32,
+    height: u32,
+    color: png::ColorType,
+    data: Vec<u8>,
+}
+
+impl Pixels {
+    /// Pixels that differ from `other`, or None when the two cannot be compared.
+    fn changed_from(&self, other: &Pixels) -> Option<usize> {
+        if (self.width, self.height, self.color) != (other.width, other.height, other.color) {
+            return None;
+        }
+        let n = self.color.samples();
+        Some(self.data.chunks_exact(n).zip(other.data.chunks_exact(n)).filter(|(a, b)| a != b).count())
+    }
+
+    fn to_png(&self) -> Result<Vec<u8>> {
+        let mut out = Vec::new();
+        {
+            let mut enc = png::Encoder::new(&mut out, self.width, self.height);
+            enc.set_color(self.color);
+            enc.set_depth(png::BitDepth::Eight);
+            enc.set_compression(png::Compression::Fast);
+            let mut wr = enc.write_header().map_err(|e| AdlError::internal(e.to_string()))?;
+            wr.write_image_data(&self.data).map_err(|e| AdlError::internal(e.to_string()))?;
+        }
+        Ok(out)
+    }
+}
+
 /// Crop a PNG to a pixel rectangle, keeping its colour type.
-fn crop_png(png_bytes: &[u8], x: u32, y: u32, w: u32, h: u32) -> Result<Vec<u8>> {
+fn crop_png_pixels(png_bytes: &[u8], x: u32, y: u32, w: u32, h: u32) -> Result<Pixels> {
     let mut dec = png::Decoder::new(png_bytes);
     dec.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
     let mut reader = dec.read_info().map_err(|e| AdlError::internal(format!("decode capture: {e}")))?;
@@ -139,21 +185,17 @@ fn crop_png(png_bytes: &[u8], x: u32, y: u32, w: u32, h: u32) -> Result<Vec<u8>>
     let (x, y) = (x.min(fw.saturating_sub(1)), y.min(fh.saturating_sub(1)));
     let (w, h) = (w.min(fw - x).max(1), h.min(fh - y).max(1));
     let stride = info.line_size;
-    let mut out_px = Vec::with_capacity((w * h) as usize * channels);
+    let mut data = Vec::with_capacity((w * h) as usize * channels);
     for row in y..y + h {
         let start = row as usize * stride + x as usize * channels;
-        out_px.extend_from_slice(&buf[start..start + w as usize * channels]);
+        data.extend_from_slice(&buf[start..start + w as usize * channels]);
     }
-    let mut out = Vec::new();
-    {
-        let mut enc = png::Encoder::new(&mut out, w, h);
-        enc.set_color(info.color_type);
-        enc.set_depth(png::BitDepth::Eight);
-        enc.set_compression(png::Compression::Fast);
-        let mut wr = enc.write_header().map_err(|e| AdlError::internal(e.to_string()))?;
-        wr.write_image_data(&out_px).map_err(|e| AdlError::internal(e.to_string()))?;
-    }
-    Ok(out)
+    Ok(Pixels { width: w, height: h, color: info.color_type, data })
+}
+
+#[cfg(test)]
+fn crop_png(png_bytes: &[u8], x: u32, y: u32, w: u32, h: u32) -> Result<Vec<u8>> {
+    crop_png_pixels(png_bytes, x, y, w, h)?.to_png()
 }
 
 /// Pipe a bundle to `w3bs training import -`. `W3BS_DESKTOP_TRAINING_HANDOFF` replaces the
@@ -290,6 +332,7 @@ impl Broker {
                 "steps": x.data.steps.len(),
                 "gaps": x.data.gaps.len() + usize::from(x.open_gap.is_some()),
                 "excluded_now": x.open_gap.as_ref().map(|g| g.kind),
+                "capture": if x.streaming { "screencast" } else { "screenshot" },
                 "marks": x.data.marks.len(),
                 "bytes": x.bytes,
             })
@@ -395,7 +438,10 @@ impl Broker {
             desktop: std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default(),
             revocation_generation: self.generation.load(std::sync::atomic::Ordering::SeqCst),
         };
-        let rec = Recording { data, t0: Instant::now(), apps, allow_agents: req.allow_agents, last_focus: None, last_frame: None, last_hash: String::new(), open_gap: None, bytes: 0, errors: 0 };
+        // Read displays from the live stream when the backend has one (no compositor round trip
+        // per frame, and new pixels only when something changed); otherwise screenshots.
+        let streaming = self.adapter.start_frame_stream();
+        let rec = Recording { data, t0: Instant::now(), apps, allow_agents: req.allow_agents, last_focus: None, last_frame: None, last_px: None, streaming, last_seq: None, last_eval: 0, open_gap: None, bytes: 0, errors: 0 };
         {
             let mut r = self.rec();
             r.rec = Some(rec);
@@ -504,6 +550,19 @@ impl Broker {
             rec
         };
         let ns = rec.t0.elapsed().as_nanos() as u64;
+        // The end state counts: one last look keeps any change since the last kept frame, however
+        // small. Not after an interruption: the layer is closed and must not capture.
+        if !interrupted
+            && self.open.load(std::sync::atomic::Ordering::SeqCst)
+            && rec.open_gap.is_none()
+            && let Ok(Some(w)) = self.adapter.focused_window()
+            && in_scope(&rec.apps, &w)
+        {
+            let _ = self.capture_window(&mut rec, &w, ns, true, 0);
+        }
+        if rec.streaming {
+            self.adapter.stop_frame_stream();
+        }
         close_gap(&mut rec, ns);
         rec.data.ended_ns = ns.max(1);
         rec.data.outcome = outcome;
@@ -591,7 +650,8 @@ impl Broker {
             x.data.marks.retain(|m| *m < cutoff);
             x.bytes = x.data.frames.iter().map(|f| f.png.len()).sum();
             x.last_frame = x.data.frames.last().map(|f| (f.ns, f.observation_id.clone()));
-            x.last_hash.clear();
+            x.last_px = None;
+            x.last_seq = None;
             frames = before.0 - x.data.frames.len();
             steps = before.1 - x.data.steps.len();
             let now = x.t0.elapsed().as_nanos() as u64;
@@ -662,11 +722,15 @@ impl Broker {
         }
         let focus = (w.id.clone(), w.title.clone());
         let changed = x.last_focus.as_ref() != Some(&focus);
-        let due = x.last_frame.as_ref().is_none_or(|(t, _)| ns.saturating_sub(*t) >= cfg.keyframe_ms * 1_000_000);
+        // A live stream says when pixels changed, so look often but cheaply; screenshots cost a
+        // compositor round trip each, so look only every keyframe interval.
+        let every = if x.streaming { cfg.stream_eval_ms } else { cfg.keyframe_ms };
+        let due = x.last_frame.is_none() || ns.saturating_sub(x.last_eval) >= every * 1_000_000;
         let before = x.last_frame.as_ref().map(|(_, id)| id.clone());
         let mut after = None;
         if changed || due {
-            match self.capture_window(x, &w, ns) {
+            x.last_eval = ns;
+            match self.capture_window(x, &w, ns, changed, cfg.min_change_permille) {
                 Ok(Some(id)) => {
                     close_gap(x, ns);
                     after = Some(id);
@@ -690,8 +754,10 @@ impl Broker {
     }
 
     /// Capture the focused window's display, refuse if an unapproved window overlaps it, crop to
-    /// the window. Returns the new frame's observation id, or None when nothing was kept.
-    fn capture_window(&self, x: &mut Recording, w: &WindowInfo, ns: u64) -> Result<Option<String>> {
+    /// the window. Returns the frame that now shows the window: a new one when it changed enough
+    /// (any change at all when `force`, e.g. a focus change), else the last kept one. None when
+    /// nothing could be kept.
+    fn capture_window(&self, x: &mut Recording, w: &WindowInfo, ns: u64, force: bool, min_permille: u32) -> Result<Option<String>> {
         let Some(b) = w.bounds else {
             open_gap(x, "other", ns, "the focused window reported no geometry");
             return Ok(None);
@@ -704,6 +770,17 @@ impl Broker {
             .or_else(|| layout.displays.iter().find(|d| d.logical.contains(b.x + b.width / 2.0, b.y + b.height / 2.0)))
             .ok_or_else(|| AdlError::not_found("no display for the window"))?
             .clone();
+        let last_id = x.last_frame.as_ref().map(|(_, id)| id.clone());
+        // With a stream, an unchanged sequence number means the compositor sent no new pixels:
+        // nothing happened on this display, so there is nothing to look at.
+        let probe = if x.streaming { self.adapter.stream_pixels(&d.id, None) } else { None };
+        if let Some(p) = &probe
+            && !force
+            && x.open_gap.is_none()
+            && x.last_seq.as_ref() == Some(&(d.id.clone(), p.seq))
+        {
+            return Ok(last_id);
+        }
         // Strict scope: a 3x3 grid inside the window must show this window or another approved one.
         for i in 1..=3 {
             for j in 1..=3 {
@@ -718,34 +795,57 @@ impl Broker {
             }
         }
         let gen0 = self.generation.load(std::sync::atomic::Ordering::SeqCst);
-        let (png, pw, ph) = self.adapter.capture(&d.id)?;
+        // The window's rectangle in the display's pixels, for a frame of pw x ph pixels.
+        let rect = |pw: u32, ph: u32| {
+            let (sx, sy) = (f64::from(pw) / d.logical.width, f64::from(ph) / d.logical.height);
+            let left = ((b.x.max(d.logical.x) - d.logical.x) * sx).floor().max(0.0) as u32;
+            let top = ((b.y.max(d.logical.y) - d.logical.y) * sy).floor().max(0.0) as u32;
+            let right = (((b.x + b.width).min(d.logical.x + d.logical.width) - d.logical.x) * sx).ceil().max(0.0) as u32;
+            let bottom = (((b.y + b.height).min(d.logical.y + d.logical.height) - d.logical.y) * sy).ceil().max(0.0) as u32;
+            (right > left && bottom > top).then_some(PixelRect { x: left, y: top, width: right - left, height: bottom - top })
+        };
+        let streamed = probe.and_then(|p| {
+            let r = rect(p.width, p.height)?;
+            let got = self.adapter.stream_pixels(&d.id, Some(r))?;
+            let c = got.crop?;
+            (got.rgba.len() == (c.width * c.height * 4) as usize).then_some((got.seq, Pixels { width: c.width, height: c.height, color: png::ColorType::Rgba, data: got.rgba }))
+        });
+        let px = match streamed {
+            Some((seq, px)) => {
+                x.last_seq = Some((d.id.clone(), seq));
+                px
+            }
+            None => {
+                let (png, pw, ph) = self.adapter.capture(&d.id)?;
+                let Some(r) = rect(pw, ph) else {
+                    open_gap(x, "other", ns, "the window is outside its display");
+                    return Ok(None);
+                };
+                crop_png_pixels(&png, r.x, r.y, r.width, r.height)?
+            }
+        };
         if !self.open.load(std::sync::atomic::Ordering::SeqCst) || self.generation.load(std::sync::atomic::Ordering::SeqCst) != gen0 {
             // The layer closed while capturing: discard the late frame.
             return Ok(None);
         }
-        let (sx, sy) = (f64::from(pw) / d.logical.width, f64::from(ph) / d.logical.height);
-        let left = ((b.x.max(d.logical.x) - d.logical.x) * sx).floor().max(0.0) as u32;
-        let top = ((b.y.max(d.logical.y) - d.logical.y) * sy).floor().max(0.0) as u32;
-        let right = (((b.x + b.width).min(d.logical.x + d.logical.width) - d.logical.x) * sx).ceil().max(0.0) as u32;
-        let bottom = (((b.y + b.height).min(d.logical.y + d.logical.height) - d.logical.y) * sy).ceil().max(0.0) as u32;
-        if right <= left || bottom <= top {
-            open_gap(x, "other", ns, "the window is outside its display");
-            return Ok(None);
-        }
-        let cropped = crop_png(&png, left, top, right - left, bottom - top)?;
-        let hash = sha256_hex(&cropped);
-        if hash == x.last_hash {
-            // Nothing changed on screen: keep the earlier frame, refresh its time.
-            if let Some((t, _)) = x.last_frame.as_mut() {
-                *t = ns;
+        if let Some(last) = &x.last_px
+            && let Some(changed) = px.changed_from(last)
+        {
+            let total = (px.width as usize * px.height as usize).max(1);
+            if changed == 0 || (!force && changed * 1000 < total * min_permille as usize) {
+                // Nothing (or only noise) changed since the last kept frame: it still shows the window.
+                if let Some((t, _)) = x.last_frame.as_mut() {
+                    *t = ns;
+                }
+                return Ok(last_id);
             }
-            return Ok(x.last_frame.as_ref().map(|(_, id)| id.clone()));
         }
+        let png = px.to_png()?;
         let id = random_id("obs", 8);
-        x.bytes += cropped.len();
-        x.data.frames.push(Frame { observation_id: id.clone(), artifact_id: random_id("art", 8), ns, png: cropped, width: right - left, height: bottom - top, app: w.app_id.clone(), title: w.title.clone() });
+        x.bytes += png.len();
+        x.data.frames.push(Frame { observation_id: id.clone(), artifact_id: random_id("art", 8), ns, png, width: px.width, height: px.height, app: w.app_id.clone(), title: w.title.clone() });
         x.last_frame = Some((ns, id.clone()));
-        x.last_hash = hash;
+        x.last_px = Some(px);
         Ok(Some(id))
     }
 }
@@ -789,7 +889,7 @@ mod tests {
         let cfg = Config {
             pace_ms: 0,
             require_native_control: false,
-            training: TrainingConfig { keyframe_ms: 0, handoff: false, ..TrainingConfig::default() },
+            training: TrainingConfig { keyframe_ms: 0, stream_eval_ms: 0, handoff: false, ..TrainingConfig::default() },
             ..Config::default()
         };
         let b = Arc::new(Broker::new(mock.clone(), AgentStore::open(dir.path().join("agents.json")).unwrap(), Audit::open(dir.path().join("audit"), 7), cfg));
@@ -847,6 +947,54 @@ mod tests {
         assert_eq!(state(&b), "idle");
         let st = b.training_status();
         assert_eq!(st["pending_handoffs"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_live_stream_keeps_frames_only_when_the_window_really_changed() {
+        let (b, m, _d) = broker();
+        m.offer_frame_stream(true);
+        enable(&b);
+        teach(&b, &["org.kde.kate"]).unwrap();
+        assert_eq!(m.frame_stream_state(), (true, 1));
+        let frames = |b: &Broker| b.training_status()["recording"]["frames"].as_u64().unwrap();
+        // Kate is 800x600 at (100,100) on DP-1 (scale 1): 480,000 pixels, so 1/1000 is 480.
+        let px = |x, y, w, h| PixelRect { x, y, width: w, height: h };
+        b.training_tick();
+        assert_eq!(frames(&b), 1, "the first look keeps a frame");
+        for _ in 0..3 {
+            b.training_tick();
+        }
+        assert_eq!(frames(&b), 1, "no new pixels from the compositor: nothing to keep");
+        m.repaint();
+        b.training_tick();
+        assert_eq!(frames(&b), 1, "a new frame with identical pixels is not activity");
+        m.paint("DP-1", px(1000, 800, 200, 200), 0);
+        b.training_tick();
+        assert_eq!(frames(&b), 1, "a change outside the approved window is not kept or looked at");
+        m.paint("DP-1", px(200, 200, 10, 10), 0);
+        b.training_tick();
+        assert_eq!(frames(&b), 1, "100 changed pixels (a caret, a pointer) is noise");
+        m.paint("DP-1", px(300, 300, 30, 30), 0);
+        b.training_tick();
+        assert_eq!(frames(&b), 2, "changes add up against the last kept frame and are kept");
+        m.paint("DP-1", px(400, 400, 5, 5), 0);
+        b.training_tick();
+        assert_eq!(frames(&b), 2);
+        let last = b.training_finish(Some("success")).unwrap();
+        assert_eq!(last["summary"]["frames"], 3, "the end state is kept however small the change");
+        assert_eq!(m.frame_stream_state(), (false, 1), "the stream stops with the recording");
+    }
+
+    #[test]
+    fn without_a_stream_small_changes_are_noise_too() {
+        let (b, m, _d) = broker();
+        enable(&b);
+        teach(&b, &["org.kde.kate"]).unwrap();
+        assert_eq!(m.frame_stream_state(), (false, 0));
+        for _ in 0..3 {
+            b.training_tick();
+        }
+        assert_eq!(b.training_status()["recording"]["frames"], 1, "screenshots of an unchanged window keep one frame");
     }
 
     #[test]

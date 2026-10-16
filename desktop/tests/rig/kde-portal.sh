@@ -642,6 +642,13 @@ until_ 'M labels | grep -qx "Pause recording"' 50 && M labels | grep -qx "Finish
 set +e; W mouse move --agent tester --x 5 --y 5 >/root/lease.out 2>&1; rc=$?; set -e
 [ $rc != 0 ] && grep -q "recording a demonstration" /root/lease.out && ok "agent input refused while the person teaches" || bad "agent during teach rc=$rc $(cat /root/lease.out)"
 sleep 2
+# Frames come from the session's ScreenCast stream (no Screenshot portal call per frame), and an
+# idle approved window adds no frames.
+rec() { w3bs-desktop --json training status | python3 -c 'import json,sys; r=json.load(sys.stdin)["recording"]; print(r["'"$1"'"])'; }
+cap=$(rec capture); f0=$(rec frames)
+[ "$cap" = screencast ] && [ "$f0" -ge 1 ] && ok "recording reads the portal ScreenCast stream ($f0 frame(s))" || bad "capture=$cap frames=$f0 $(grep -i 'pipewire\|screenshots' $L/daemon-tray.log | tail -2)"
+sleep 3; f1=$(rec frames)
+[ "$f1" = "$f0" ] && ok "idle approved window: no new frames in 3 s ($f1)" || bad "idle window kept frames: $f0 -> $f1"
 setsid foot --app-id=org.w3bs.rig.other --title=T3 sh -c 'exec cat > /dev/null' >$L/foot3t.log 2>&1 &
 until_ '[ "$(/rig/active.sh)" = T3 ]' 25 || true
 sleep 1.5

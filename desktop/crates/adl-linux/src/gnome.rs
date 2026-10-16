@@ -30,7 +30,7 @@
 //! utility windows; `window_at()` walks every visible window actor top to bottom (menus,
 //! popups and tooltips included) plus the top bar, because any of them can cover a target.
 
-use adl_broker::{Adapter, InputEvent, SessionEvent};
+use adl_broker::{Adapter, InputEvent, PixelRect, SessionEvent, StreamPixels};
 use adl_schema::*;
 use serde::Deserialize;
 use std::collections::BTreeSet;
@@ -536,6 +536,18 @@ impl<A: Adapter> Adapter for WithGnome<A> {
 
     fn capture(&self, display: &str) -> Result<(Vec<u8>, u32, u32)> {
         self.input.capture(display)
+    }
+
+    fn start_frame_stream(&self) -> bool {
+        self.input.start_frame_stream()
+    }
+
+    fn stop_frame_stream(&self) {
+        self.input.stop_frame_stream()
+    }
+
+    fn stream_pixels(&self, display: &str, crop: Option<PixelRect>) -> Option<StreamPixels> {
+        self.input.stream_pixels(display, crop)
     }
 
     fn pointer_position(&self) -> Result<Option<(f64, f64)>> {
