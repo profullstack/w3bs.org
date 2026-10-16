@@ -27,7 +27,7 @@ import { defaultHome } from './store.mjs';
 import { fsBlobs, openSqliteDb } from './db.mjs';
 import { writeZip } from './zip.mjs';
 
-export const VERSION = '0.2.1';
+export const VERSION = '0.2.2';
 const DAY = 86400000;
 const RETRIEVAL_PURPOSES = ['private_retrieval', 'external_retrieval'];
 // Purposes that send data beyond the person's own private use need declared rights.
@@ -1753,6 +1753,37 @@ export async function openTraining({
         purpose,
         expires_at: expires,
       };
+    },
+
+    // One click for the common case: every reviewed task goes into the "Reviewed tasks" dataset,
+    // a new version is approved for private retrieval and released, and `consumer` is granted
+    // it. Each step keeps its own checks; the person clicking is the consent for all of them.
+    async shareReviewed({ consumer, days = 30 }, actor) {
+      requireHuman(actor, 'Sharing reviewed tasks with an agent');
+      const reviewed = await service.listEpisodes({ state: 'reviewed', limit: 1000 });
+      if (!reviewed.length)
+        throw error(
+          'NOTHING_TO_SHARE',
+          'Review a task first; only reviewed tasks are shared.',
+          409,
+        );
+      const name = 'Reviewed tasks';
+      const existing = (await service.listDatasets()).find((d) => d.name === name);
+      const datasetId =
+        existing?.dataset_id ?? (await service.createDataset({ name }, actor)).dataset_id;
+      await service.addEpisodes(
+        datasetId,
+        reviewed.map((e) => e.episode_id),
+        actor,
+      );
+      const v = await service.createVersion(datasetId, {}, actor);
+      await service.approve(datasetId, v.version, ['private_retrieval'], actor);
+      await service.release(datasetId, v.version, actor);
+      const grant = await service.grant(
+        { consumer, dataset_id: datasetId, version: v.version, purpose: 'private_retrieval', days },
+        actor,
+      );
+      return { ...grant, episodes: v.episodes, excluded: v.excluded };
     },
 
     async listGrants() {

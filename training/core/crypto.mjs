@@ -44,7 +44,13 @@ export function decrypt(key, sealed, aad) {
 function osKeyStore(account, directory) {
   const service = 'w3bs-training';
   if (process.platform === 'linux') {
-    const which = spawnSync('secret-tool', ['--version'], { encoding: 'utf8' });
+    // Started over ssh or by a service, there is no DBUS_SESSION_BUS_ADDRESS; the logged-in
+    // desktop's keyring is still on the user's standard session bus socket.
+    const env = { ...process.env };
+    const bus = `/run/user/${process.getuid?.()}/bus`;
+    if (!env.DBUS_SESSION_BUS_ADDRESS && existsSync(bus))
+      env.DBUS_SESSION_BUS_ADDRESS = `unix:path=${bus}`;
+    const which = spawnSync('secret-tool', ['--version'], { encoding: 'utf8', env });
     if (which.error) return null;
     return {
       name: 'libsecret',
@@ -54,6 +60,7 @@ function osKeyStore(account, directory) {
           ['lookup', 'service', service, 'account', account],
           {
             encoding: 'utf8',
+            env,
           },
         );
         return result.status === 0 && result.stdout.trim()
@@ -64,7 +71,7 @@ function osKeyStore(account, directory) {
         const result = spawnSync(
           'secret-tool',
           ['store', '--label', `W3BS Training ${account}`, 'service', service, 'account', account],
-          { input: key.toString('base64'), encoding: 'utf8' },
+          { input: key.toString('base64'), encoding: 'utf8', env },
         );
         return result.status === 0;
       },

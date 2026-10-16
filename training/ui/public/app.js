@@ -941,6 +941,38 @@ const views = {
           status.agent_access === 'on' ? 'Switch off every agent' : 'Switch agent access on',
         ),
       ),
+      h('h2', {}, 'Share with an agent'),
+      (() => {
+        const who = h('input', { 'aria-label': 'Agent name', value: 'claude-code' });
+        return h(
+          'div',
+          {},
+          h(
+            'p',
+            { class: 'muted' },
+            'One click: every reviewed task goes into a "Reviewed tasks" dataset, released for private retrieval and granted to this agent for 30 days. Click again after reviewing more.',
+          ),
+          h(
+            'div',
+            { class: 'row' },
+            who,
+            h(
+              'button',
+              {
+                class: 'primary',
+                onclick: run(async () => {
+                  const r = await api('/share', { method: 'POST', body: { consumer: who.value } });
+                  toast(
+                    `Shared ${r.episodes} reviewed task(s) with ${r.consumer} until ${r.expires_at.slice(0, 10)}`,
+                  );
+                  render();
+                }),
+              },
+              'Share all reviewed tasks',
+            ),
+          ),
+        );
+      })(),
       h('h2', {}, 'Grant retrieval'),
       released.length
         ? h(
