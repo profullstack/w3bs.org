@@ -455,7 +455,12 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
           }
         );
       },
-      loginUrl: (returnTo) => `/login?next=${encodeURIComponent(returnTo)}`,
+      // returnTo is absolute; /login follows only a local path, so hand it one.
+      loginUrl: (returnTo) => {
+        const back = new URL(returnTo, origin);
+        const next = back.origin === origin ? `${back.pathname}${back.search}` : '/account';
+        return `/login?next=${encodeURIComponent(next)}`;
+      },
     });
     const toRequest = (req) =>
       new Request(`${origin}${req.originalUrl}`, {
