@@ -1135,13 +1135,41 @@ textarea {
     height: 320px;
   }
 }
-@media (max-width: 1240px) {
+@media (max-width: 1340px) {
   .header {
     gap: 24px;
   }
   .header nav {
     gap: 16px;
     font-size: 13px;
+  }
+}
+@media (max-width: 1100px) {
+  /* Ten nav items no longer fit beside the wordmark: the nav takes its own row, as on phones. */
+  .header {
+    height: auto;
+    min-height: 82px;
+    flex-wrap: wrap;
+    row-gap: 12px;
+    padding: 20px 32px;
+  }
+  .header nav {
+    order: 3;
+    width: 100%;
+    gap: 22px;
+    margin-left: 0;
+    border-top: 1px solid var(--line);
+    padding-top: 7px;
+    justify-content: space-between;
+  }
+  .header-account {
+    margin-left: auto;
+  }
+  .header-action {
+    font-size: 12px;
+  }
+  .header-action span {
+    padding-left: 8px;
   }
 }
 @media (max-width: 1000px) {
@@ -1182,32 +1210,6 @@ textarea {
   }
   .prompt-grid {
     grid-template-columns: repeat(2, 1fr);
-  }
-  /* Nine nav items no longer fit beside the wordmark: the nav takes its own row, as on phones. */
-  .header {
-    height: auto;
-    min-height: 82px;
-    flex-wrap: wrap;
-    row-gap: 12px;
-    padding: 20px 32px;
-  }
-  .header nav {
-    order: 3;
-    width: 100%;
-    gap: 22px;
-    margin-left: 0;
-    border-top: 1px solid var(--line);
-    padding-top: 7px;
-    justify-content: space-between;
-  }
-  .header-account {
-    margin-left: auto;
-  }
-  .header-action {
-    font-size: 12px;
-  }
-  .header-action span {
-    padding-left: 8px;
   }
 }
 @media (max-width: 720px) {
