@@ -440,7 +440,16 @@ for tmpl in sorted((ROOT / "bskyweb/templates").glob("*.html")):
     text = re.sub(r'\s*<meta name="twitter:site" content="@bluesky" />', "", text)
     text = re.sub(r'\s*<meta name="apple-itunes-app"[^>]*>', "", text)
     text = re.sub(r'\s*Our <a href="https://bluesky\.statuspage\.io/">Status Page</a> might have more context\.', "", text)
+    text = re.sub(r'\s*<link rel="preconnect" href="https://go\.bsky\.app">', "", text)
+    # og:url, canonical and the og/twitter card image are absolute bsky.app URLs, so a
+    # shared link previewed Bluesky's card. Ours is brand/social-card-default-gradient.png.
+    text = text.replace("https://bsky.app", PDS)
     tmpl.write_text(text)
+# Post and profile pages set og:url and canonical from these, also bsky.app.
+patch("bskyweb/cmd/bskyweb/jsonld.go", '"https://bsky.app/profile/', f'"{PDS}/profile/', count=4)
+left = [t.name for t in (ROOT / "bskyweb/templates").glob("*.html") if re.search(r"https://bsky\.app[/\"]", t.read_text())]
+if left:
+    sys.exit("bsky.app link metadata still in: " + ", ".join(left))
 
 # 7. Icons and the default social card.
 for f in BRAND.iterdir():
