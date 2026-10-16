@@ -20,7 +20,7 @@
 //! Status: compiles and follows the portal spec; NOT certified on any desktop yet.
 
 use crate::keymap;
-use adl_broker::{Adapter, InputEvent, SessionEvent};
+use adl_broker::{Adapter, InputEvent, PixelRect, SessionEvent, StreamPixels};
 use adl_schema::*;
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
@@ -66,6 +66,8 @@ pub struct PortalAdapter {
     screensaver: Option<crate::screensaver::ScreenSaverWatcher>,
     windows_note: String,
     resolver: Option<Box<dyn KeysymResolver>>,
+    /// The session's monitors as live PipeWire streams, while a recording reads them.
+    capture: Mutex<Option<crate::pipewire::Capture>>,
 }
 
 type Results = HashMap<String, OwnedValue>;
@@ -87,7 +89,7 @@ impl PortalAdapter {
         let logind = crate::logind::LogindWatcher::start().map_err(|e| eprintln!("w3bs-desktop: logind unavailable ({e}); lock/suspend rely on the native control")).ok();
         let screensaver = crate::screensaver::ScreenSaverWatcher::start().map_err(|e| eprintln!("w3bs-desktop: screen saver signals unavailable ({e})")).ok();
         let windows_note = "window data needs a desktop-specific observer (KWin on Plasma, the W3BS GNOME Shell extension on GNOME); targeted input is refused".into();
-        Self { conn: Mutex::new(None), session: Mutex::new(None), generation: Mutex::new(1), events: Arc::new(Mutex::new(vec![])), token_file, logind, screensaver, windows_note, resolver: None }
+        Self { conn: Mutex::new(None), session: Mutex::new(None), generation: Mutex::new(1), events: Arc::new(Mutex::new(vec![])), token_file, logind, screensaver, windows_note, resolver: None, capture: Mutex::new(None) }
     }
 
     /// Check and map text through `r` instead of sending every character's keysym as is.
@@ -400,6 +402,7 @@ impl Adapter for PortalAdapter {
     }
 
     fn end(&self) {
+        self.capture.lock().unwrap().take();
         if let Some(s) = self.session.lock().unwrap().take()
             && let Ok(conn) = self.conn()
                 && let Ok(p) = Proxy::new(&conn, DEST, s.handle, "org.freedesktop.portal.Session") {
@@ -467,6 +470,48 @@ impl Adapter for PortalAdapter {
             y1 = y1.max(d.logical.y + d.logical.height);
         }
         crop(&bytes, Rect { x: x0, y: y0, width: x1 - x0, height: y1 - y0 }, &d.logical)
+    }
+
+    fn start_frame_stream(&self) -> bool {
+        // W3BS_DESKTOP_CAPTURE=screenshot keeps the old per-frame Screenshot portal path.
+        if std::env::var("W3BS_DESKTOP_CAPTURE").is_ok_and(|v| v == "screenshot") {
+            return false;
+        }
+        let (handle, nodes) = {
+            let s = self.session.lock().unwrap();
+            let Some(s) = s.as_ref() else { return false };
+            (s.handle.clone(), s.streams.iter().map(|st| st.node).collect::<Vec<_>>())
+        };
+        // The monitors are already shared with this session (that is how input gets absolute
+        // positions), so reading them needs no new consent: just the session's PipeWire socket.
+        let Ok(conn) = self.conn() else { return false };
+        let Ok(sc) = Proxy::new(&conn, DEST, PATH, "org.freedesktop.portal.ScreenCast") else { return false };
+        let fd: zbus::zvariant::OwnedFd = match sc.call("OpenPipeWireRemote", &(&handle, HashMap::<&str, Value>::new())) {
+            Ok(fd) => fd,
+            Err(e) => {
+                eprintln!("w3bs-desktop: no PipeWire stream for recording ({e}); using screenshots");
+                return false;
+            }
+        };
+        match crate::pipewire::Capture::start(fd.into(), &nodes) {
+            Some(c) => {
+                *self.capture.lock().unwrap() = Some(c);
+                true
+            }
+            None => {
+                eprintln!("w3bs-desktop: libpipewire unavailable or refused the streams; recording uses screenshots");
+                false
+            }
+        }
+    }
+
+    fn stop_frame_stream(&self) {
+        self.capture.lock().unwrap().take();
+    }
+
+    fn stream_pixels(&self, display: &str, crop: Option<PixelRect>) -> Option<StreamPixels> {
+        let node = display.strip_prefix("stream-")?.parse().ok()?;
+        self.capture.lock().unwrap().as_ref()?.pixels(node, crop)
     }
 
     fn emit(&self, event: &InputEvent) -> Result<()> {

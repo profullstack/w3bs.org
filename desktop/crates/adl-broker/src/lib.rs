@@ -9,6 +9,6 @@ pub mod store;
 pub mod training_bundle;
 pub mod util;
 
-pub use adapter::{Adapter, InputEvent, SessionEvent};
+pub use adapter::{Adapter, InputEvent, PixelRect, SessionEvent, StreamPixels};
 pub use broker::{Broker, Config, EnableChallenge, Peer, Principal};
 pub use recorder::{StartRequest, TrainingConfig};

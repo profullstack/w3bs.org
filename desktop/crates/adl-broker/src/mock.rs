@@ -5,7 +5,7 @@
 //! fractional scaling. Windows have a z-order so occlusion can be tested, and every emitted
 //! event is recorded.
 
-use crate::adapter::{Adapter, InputEvent, SessionEvent};
+use crate::adapter::{Adapter, InputEvent, PixelRect, SessionEvent, StreamPixels};
 use adl_schema::*;
 use std::collections::BTreeSet;
 use std::sync::Mutex;
@@ -31,6 +31,13 @@ struct State {
     begin_error: Option<String>,
     interlock: Option<String>,
     untypeable: String,
+    /// A fake live capture stream: offered when `stream_offered`, running between start and stop.
+    stream_offered: bool,
+    stream_running: bool,
+    stream_starts: usize,
+    stream_seq: u64,
+    /// Painted pixel rectangles on top of the uniform 0xe0 grey, per display.
+    paint: Vec<(String, PixelRect, u8)>,
 }
 
 pub struct MockDesktop {
@@ -136,6 +143,25 @@ impl MockDesktop {
     pub fn open_stream(&self) {
         self.lock().streams += 1;
     }
+    /// Offer a live frame stream to recordings (otherwise they use `capture`).
+    pub fn offer_frame_stream(&self, on: bool) {
+        self.lock().stream_offered = on;
+    }
+    /// (running now, times started).
+    pub fn frame_stream_state(&self) -> (bool, usize) {
+        let s = self.lock();
+        (s.stream_running, s.stream_starts)
+    }
+    /// Paint a rectangle of one display (pixels) and, like a compositor, send a new frame.
+    pub fn paint(&self, display: &str, r: PixelRect, value: u8) {
+        let mut s = self.lock();
+        s.paint.push((display.into(), r, value));
+        s.stream_seq += 1;
+    }
+    /// A new frame with no change, like a compositor repainting the same pixels.
+    pub fn repaint(&self) {
+        self.lock().stream_seq += 1;
+    }
 }
 
 fn button_name(b: Button) -> String {
@@ -226,6 +252,48 @@ impl Adapter for MockDesktop {
             wr.write_image_data(&vec![0xe0u8; (w * h) as usize]).map_err(|e| AdlError::internal(e.to_string()))?;
         }
         Ok((out, w, h))
+    }
+
+    fn start_frame_stream(&self) -> bool {
+        let mut s = self.lock();
+        if s.stream_offered {
+            s.stream_running = true;
+            s.stream_starts += 1;
+        }
+        s.stream_running
+    }
+
+    fn stop_frame_stream(&self) {
+        self.lock().stream_running = false;
+    }
+
+    fn stream_pixels(&self, display: &str, crop: Option<PixelRect>) -> Option<StreamPixels> {
+        let s = self.lock();
+        if !s.stream_running {
+            return None;
+        }
+        let d = s.displays.iter().find(|d| d.id == display)?;
+        let (w, h) = d.pixel_size();
+        let crop = crop.map(|c| {
+            let (x, y) = (c.x.min(w - 1), c.y.min(h - 1));
+            PixelRect { x, y, width: c.width.min(w - x), height: c.height.min(h - y) }
+        });
+        let mut rgba = Vec::new();
+        if let Some(c) = crop {
+            rgba.reserve((c.width * c.height * 4) as usize);
+            for py in c.y..c.y + c.height {
+                for px in c.x..c.x + c.width {
+                    let v = s
+                        .paint
+                        .iter()
+                        .rev()
+                        .find(|(id, r, _)| id == display && px >= r.x && px < r.x + r.width && py >= r.y && py < r.y + r.height)
+                        .map_or(0xe0, |(_, _, v)| *v);
+                    rgba.extend_from_slice(&[v, v, v, 0xff]);
+                }
+            }
+        }
+        Some(StreamPixels { seq: s.stream_seq, width: w, height: h, rgba, crop })
     }
 
     fn pointer_position(&self) -> Result<Option<(f64, f64)>> {

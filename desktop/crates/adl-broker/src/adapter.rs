@@ -18,6 +18,26 @@ pub enum InputEvent {
     Text { text: String },
 }
 
+/// A rectangle in one display's pixels.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PixelRect {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// What `Adapter::stream_pixels` returns.
+#[derive(Clone, Debug, PartialEq)]
+pub struct StreamPixels {
+    pub seq: u64,
+    pub width: u32,
+    pub height: u32,
+    /// Tightly packed RGBA of the requested crop (clamped to the frame).
+    pub rgba: Vec<u8>,
+    pub crop: Option<PixelRect>,
+}
+
 /// Something that happened to the session that the broker must react to.
 #[derive(Clone, Debug, PartialEq)]
 pub enum SessionEvent {
@@ -60,6 +80,19 @@ pub trait Adapter: Send + Sync {
     fn inspect(&self, window: &str) -> Result<AccessNode>;
     /// PNG of one display, already rotated as displayed. Returns (png, pixel width, pixel height).
     fn capture(&self, display: &str) -> Result<(Vec<u8>, u32, u32)>;
+    /// Start reading displays from a live stream (a portal ScreenCast) for a recording. Returns
+    /// whether `stream_pixels` will serve frames; when false the recorder uses `capture`.
+    fn start_frame_stream(&self) -> bool {
+        false
+    }
+    /// Stop the stream `start_frame_stream` started. Must not block on the compositor.
+    fn stop_frame_stream(&self) {}
+    /// The newest streamed frame of `display`: its sequence number (changes only when the
+    /// compositor sent new pixels), its pixel size, and the RGBA pixels of `crop` (empty when
+    /// `crop` is None). None: no stream frame for this display yet.
+    fn stream_pixels(&self, _display: &str, _crop: Option<PixelRect>) -> Option<StreamPixels> {
+        None
+    }
     fn pointer_position(&self) -> Result<Option<(f64, f64)>> {
         Ok(None)
     }
