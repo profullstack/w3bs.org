@@ -20,7 +20,9 @@ everything else to the client; `*.social.w3bs.org` handle hosts go straight to t
   with a Georgia headline, "W3BS Social" titles, and the icons + social card in `brand/`.
   It also removes every visible "Bluesky": both loading splashes (the pre-JS one in base.html and the JS one in Splash.web.tsx; the build stops if any web source still draws the butterfly), the word in all UI strings
   and locale catalogs, policy/help links (now w3bs.org/social), share links (now
-  social.w3bs.org), the go.bsky.app link redirector, and Bluesky metadata in the templates.
+  social.w3bs.org), the go.bsky.app link redirector, and Bluesky metadata in the templates:
+  og:url, canonical and the og/twitter card image point at social.w3bs.org (the build stops
+  if a template still names bsky.app), so shared links preview the W3BS card.
 - Rebuild (Metro wants ~8 GB heap and takes several minutes). `rebrand.py` exits on any
   patch that no longer applies, so a moved upstream file stops the build instead of
   shipping half a rebrand:
