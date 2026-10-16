@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { openTraining, computeSplits, wilson } from '../training/core/service.mjs';
 import { readZip, writeZip, crc32 } from '../training/core/zip.mjs';
-import { detectSecrets, stripUrl } from '../training/core/privacy.mjs';
+import { detectSecrets, scrubRecord, stripUrl } from '../training/core/privacy.mjs';
 import { segmentSteps } from '../training/core/segment.mjs';
 import { RECORDS, Session, Action, Episode } from '../training/schema/format.mjs';
 import { sampleRecords, bundleFrom, sampleBundle, PNG_1X1 } from '../training/fixtures/sample.mjs';
@@ -248,6 +248,22 @@ test('privacy scrub redacts secrets, strips text and URL queries, and blocks adm
   assert.equal((await t.getEpisode(episodes[0])).state, 'reviewed');
   assert.deepEqual(detectSecrets('card 4111 1111 1111 1111'), ['payment_card']);
   assert.equal(stripUrl('https://a.example/p?q=1#f'), 'https://a.example/p');
+});
+
+test('long-recording timestamps are not mistaken for card numbers', () => {
+  // 4111111111111111 ns is about 47 days, but any 13-16 digit timestamp can pass the checksum.
+  const obs = {
+    observation_id: 'obs_1',
+    monotonic_ns: '4111111111111111',
+    semantic: { window: 'card 4111 1111 1111 1111 - Notes' },
+  };
+  const findings = scrubRecord(obs, 'observations[0]');
+  assert.equal(obs.monotonic_ns, '4111111111111111');
+  assert.equal(obs.semantic.window, '[redacted:payment_card]');
+  assert.deepEqual(
+    findings.map((f) => f.path),
+    ['observations[0].semantic.window'],
+  );
 });
 
 test('artifacts are sealed at rest and there is no plaintext fallback', async () => {

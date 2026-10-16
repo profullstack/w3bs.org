@@ -64,6 +64,11 @@ export function stripUrl(value) {
   }
 }
 
+// Fields the format itself defines (timestamps, ids, hashes, versions). They hold no captured
+// content, and a long recording's nanosecond timestamps are 13-16 digit numbers that can pass the
+// card checksum: redacting one broke the import ("Failed to parse String to BigInt").
+const STRUCTURAL_KEY = /(?:_ns|_id|_at|_ms|sha256|digest|checksum|schema_version)$/;
+
 // Walks a record and redacts in place. `path` names the location for the
 // warning. Returns a list of { kind, path } findings.
 export function scrubRecord(record, path, { allowText = false } = {}) {
@@ -73,6 +78,7 @@ export function scrubRecord(record, path, { allowText = false } = {}) {
     for (const key of Object.keys(node)) {
       const value = node[key];
       const here = `${at}.${key}`;
+      if (typeof value === 'string' && STRUCTURAL_KEY.test(key)) continue;
       if (typeof value === 'string') {
         if (key === 'text' && !allowText) {
           delete node[key];
