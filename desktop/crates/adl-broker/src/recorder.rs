@@ -181,10 +181,12 @@ fn handoff(name: &str, bundle: &[u8]) -> std::result::Result<Value, String> {
     };
     cmd.env("W3BS_TRAINING_BUNDLE", name).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = cmd.spawn().map_err(|e| format!("could not start W3BS Training: {e}"))?;
-    {
+    // A child that exits before reading (not installed, wrong program) closes the pipe; keep
+    // going so its own words, not "Broken pipe", reach the person.
+    let wrote = {
         let mut stdin = child.stdin.take().ok_or("no stdin")?;
-        stdin.write_all(bundle).map_err(|e| format!("could not hand the recording over: {e}"))?;
-    }
+        stdin.write_all(bundle)
+    };
     let deadline = Instant::now() + Duration::from_secs(120);
     loop {
         match child.try_wait() {
@@ -197,12 +199,43 @@ fn handoff(name: &str, bundle: &[u8]) -> std::result::Result<Value, String> {
         }
     }
     let out = child.wait_with_output().map_err(|e| e.to_string())?;
-    if !out.status.success() {
-        let err = String::from_utf8_lossy(&out.stderr);
-        let msg = serde_json::from_str::<Value>(&err).ok().and_then(|v| v["error"]["message"].as_str().map(String::from)).unwrap_or_else(|| err.trim().chars().take(300).collect());
-        return Err(format!("W3BS Training refused the recording: {msg}"));
+    if out.status.success() && wrote.is_ok() {
+        return Ok(serde_json::from_slice(&out.stdout).unwrap_or_else(|_| json!({"imported": true})));
     }
-    Ok(serde_json::from_slice(&out.stdout).unwrap_or_else(|_| json!({"imported": true})))
+    let err = String::from_utf8_lossy(&out.stderr);
+    if err.trim().is_empty() {
+        let why = wrote.err().map(|e| e.to_string()).unwrap_or_else(|| format!("it exited with {}", out.status));
+        return Err(format!("W3BS Training did not take the recording ({why}). {}", install_hint()));
+    }
+    Err(refusal(&err))
+}
+
+fn install_hint() -> &'static str {
+    if cfg!(windows) {
+        "Install it: irm https://w3bs.org/training/install.ps1 | iex"
+    } else {
+        "Install it: curl -fsSL https://w3bs.org/training/install.sh | sh"
+    }
+}
+
+/// Turn W3BS Training's stderr into one sentence that says what to do next.
+fn refusal(stderr: &str) -> String {
+    // `w3bs training …` without w3bs-training installed: the w3bs CLI has no such command.
+    if stderr.contains("unknown command") && stderr.contains("training") {
+        return format!("W3BS Training is not installed. {}, then Try again.", install_hint());
+    }
+    let v = serde_json::from_str::<Value>(stderr.trim()).ok();
+    let code = v.as_ref().and_then(|v| v["error"]["code"].as_str()).unwrap_or("");
+    let msg = v.as_ref().and_then(|v| v["error"]["message"].as_str().map(String::from)).unwrap_or_else(|| stderr.trim().chars().take(300).collect());
+    if code == "KEY_UNAVAILABLE" {
+        let fix = if cfg!(target_os = "linux") {
+            "Install libsecret's secret-tool so it can use your desktop keyring (Debian/Ubuntu: sudo apt install libsecret-tools; Fedora: sudo dnf install libsecret; Arch: sudo pacman -S libsecret), then Try again."
+        } else {
+            "Unlock your keychain, then Try again."
+        };
+        return format!("W3BS Training has no key to encrypt the recording with. {fix}");
+    }
+    format!("W3BS Training refused the recording: {msg}")
 }
 
 /// Find a program on PATH or where the W3BS installers put it (a user service's PATH often lacks
@@ -726,6 +759,28 @@ mod tests {
     use crate::store::AgentStore;
     use crate::Config;
     use std::sync::Arc;
+
+    #[test]
+    fn handoff_to_a_child_that_exits_early_says_why() {
+        // The only test that runs handoff(); the others disable it, so the env var is safe.
+        unsafe { std::env::set_var("W3BS_DESKTOP_TRAINING_HANDOFF", "echo 'w3bs: unknown command `training` (no `w3bs-training` on PATH)' >&2; exit 2") };
+        let big = vec![0u8; 4 * 1024 * 1024];
+        let e = handoff("x.w3bs-training.zip", &big).unwrap_err();
+        assert!(e.starts_with("W3BS Training is not installed."), "{e}");
+        assert!(!e.contains("Broken pipe"), "{e}");
+        unsafe { std::env::set_var("W3BS_DESKTOP_TRAINING_HANDOFF", "exec 0<&-; exit 3") };
+        let e = handoff("x.w3bs-training.zip", &big).unwrap_err();
+        assert!(e.contains("did not take the recording") && e.contains("install.sh"), "{e}");
+        unsafe { std::env::remove_var("W3BS_DESKTOP_TRAINING_HANDOFF") };
+    }
+
+    #[test]
+    fn refusals_name_the_fix() {
+        let key = r#"{"error":{"code":"KEY_UNAVAILABLE","message":"No protected key store is available."}}"#;
+        assert!(refusal(key).starts_with("W3BS Training has no key"));
+        assert_eq!(refusal(key).contains("libsecret-tools"), cfg!(target_os = "linux"));
+        assert_eq!(refusal(r#"{"error":{"code":"BAD","message":"nope"}}"#), "W3BS Training refused the recording: nope");
+    }
 
     fn broker() -> (Arc<Broker>, Arc<MockDesktop>, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();

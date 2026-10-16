@@ -215,7 +215,8 @@ and sharing the result is [W3BS Training](../docs/training/README.md) (`w3bs tra
   the layer is disabled: lock, suspend, logout, emergency stop, tray gone. Resuming needs you.
 - **Handoff:** frames stay in memory. **Finish** pipes the bundle to `w3bs training import -`; if
   W3BS Training is not installed (`curl -fsSL https://w3bs.org/training/install.sh | sh`, or
-  `irm https://w3bs.org/training/install.ps1 | iex` on Windows) the recording waits in memory (Retry in the app,
+  `irm https://w3bs.org/training/install.ps1 | iex` on Windows), or on Linux has no keyring
+  access (`sudo apt install libsecret-tools`), the recording waits in memory (Try again in the app,
   `w3bs desktop training handoff`) and is lost if the daemon stops. Nothing is written to disk
   unencrypted. `W3BS_DESKTOP_TRAINING_HANDOFF` replaces the command (`sh -c`, bundle on stdin).
 
