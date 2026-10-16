@@ -54,6 +54,8 @@ jobs:
       run:
         shell: pwsh
     steps:
+      # Windows git checks text out as CRLF; the embedded UI assets (and their drift check) are LF.
+      - run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
