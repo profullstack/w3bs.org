@@ -760,6 +760,7 @@ mod tests {
     use crate::Config;
     use std::sync::Arc;
 
+    #[cfg(unix)]
     #[test]
     fn handoff_to_a_child_that_exits_early_says_why() {
         // The only test that runs handoff(); the others disable it, so the env var is safe.
