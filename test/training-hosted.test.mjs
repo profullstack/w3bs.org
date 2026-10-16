@@ -44,8 +44,10 @@ test(
         { kind: 'agent', id: 'claude-code' },
       );
       assert.equal(r.episodes.length, 1, 'PostgreSQL full-text retrieval');
-      const none = await t.retrieve({ query: 'kubernetes' }, { kind: 'agent', id: 'claude-code' });
-      assert.equal(none.episodes.length, 0);
+      // No word matches: the newest granted task comes back, labelled as such.
+      const loose = await t.retrieve({ query: 'kubernetes' }, { kind: 'agent', id: 'claude-code' });
+      assert.equal(loose.match, 'recent');
+      assert.equal(loose.episodes.length, 1);
       const exp = await t.export(
         ds.dataset_id,
         1,
