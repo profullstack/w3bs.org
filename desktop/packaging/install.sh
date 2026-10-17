@@ -256,7 +256,7 @@ EOF
 Type=Application
 Name=Agentic Desktop Layer
 Comment=Your desktop. Your agents. Your switch.
-Exec=$bin/w3bs-desktop tray
+Exec=$bin/w3bs-desktop tray --wait-for-broker 60
 Icon=input-mouse
 X-GNOME-Autostart-enabled=true
 NoDisplay=true
