@@ -34,6 +34,66 @@ impl std::fmt::Display for Endpoint {
 
 pub use imp::{connect, Listener};
 
+/// How long a tray waits for the broker before giving up. At login the tray autostart and the
+/// broker service start in the same second, so the control socket is often not there yet.
+pub const BROKER_START_WAIT: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// `connect`, but waits up to `wait` while the broker is not listening yet (endpoint missing, or a
+/// stale socket refusing). Any other error returns at once.
+pub fn connect_waiting(ep: &Endpoint, wait: std::time::Duration) -> io::Result<Box<dyn Duplex>> {
+    retry_while_starting(wait, || connect(ep))
+}
+
+fn retry_while_starting<T>(wait: std::time::Duration, mut attempt: impl FnMut() -> io::Result<T>) -> io::Result<T> {
+    let deadline = std::time::Instant::now() + wait;
+    let mut delay = std::time::Duration::from_millis(100);
+    loop {
+        match attempt() {
+            Err(e) if matches!(e.kind(), io::ErrorKind::NotFound | io::ErrorKind::ConnectionRefused) => {
+                let now = std::time::Instant::now();
+                if now >= deadline {
+                    return Err(e);
+                }
+                std::thread::sleep(delay.min(deadline - now));
+                delay = (delay * 2).min(std::time::Duration::from_secs(2));
+            }
+            r => return r,
+        }
+    }
+}
+
+#[cfg(test)]
+mod retry_tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn retries_until_the_broker_listens() {
+        let mut n = 0;
+        let r = retry_while_starting(Duration::from_secs(5), || {
+            n += 1;
+            if n < 3 { Err(io::Error::from(io::ErrorKind::NotFound)) } else { Ok(n) }
+        });
+        assert_eq!(r.unwrap(), 3);
+    }
+
+    #[test]
+    fn gives_up_after_the_wait() {
+        let r: io::Result<()> = retry_while_starting(Duration::from_millis(250), || Err(io::Error::from(io::ErrorKind::ConnectionRefused)));
+        assert_eq!(r.unwrap_err().kind(), io::ErrorKind::ConnectionRefused);
+    }
+
+    #[test]
+    fn other_errors_are_not_retried() {
+        let mut n = 0;
+        let r: io::Result<()> = retry_while_starting(Duration::from_secs(5), || {
+            n += 1;
+            Err(io::Error::from(io::ErrorKind::PermissionDenied))
+        });
+        assert_eq!((r.unwrap_err().kind(), n), (io::ErrorKind::PermissionDenied, 1));
+    }
+}
+
 #[cfg(unix)]
 mod imp {
     use super::*;
