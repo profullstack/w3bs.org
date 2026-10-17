@@ -114,6 +114,19 @@ export function trainingRouter(
     wrap((req) => req.svc.split(req.params.id, req.body, a(req)).then(changed('episodes', req))),
   );
   router.post(
+    '/episodes/:id/moshscript',
+    wrap(async (req, res) => {
+      const result = await req.svc.exportMoshscript(req.params.id, a(req));
+      onChange('exports', req);
+      res.set({
+        'content-type': 'text/plain; charset=utf-8',
+        'content-disposition': `attachment; filename="${result.filename.replace(/[^A-Za-z0-9._-]/g, '_')}"`,
+        'x-w3bs-export': JSON.stringify({ export_id: result.export_id, run: result.run }),
+      });
+      res.end(result.script);
+    }),
+  );
+  router.post(
     '/episodes/merge',
     json,
     wrap((req) => req.svc.merge(req.body.episodes, a(req)).then(changed('episodes', req))),

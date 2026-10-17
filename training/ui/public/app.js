@@ -503,6 +503,41 @@ const views = {
         render();
       });
     const open = e.warnings.filter((w) => !w.resolved_at && w.blocking);
+    const runnable = body.outcome.value === 'success' && e.state === 'reviewed';
+    const runHint = h('p', { class: 'muted', hidden: true });
+    const exportMosh = run(async () => {
+      const response = await fetch(`${API}/episodes/${id}/moshscript`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'x-w3bs-training': '1' },
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        const err = new Error(data?.error?.message || response.statusText);
+        err.code = data?.error?.code;
+        throw err;
+      }
+      const filename =
+        /filename="([^"]+)"/.exec(response.headers.get('content-disposition') || '')?.[1] ||
+        'task.mosh';
+      const url = URL.createObjectURL(await response.blob());
+      const link = h('a', { href: url, download: filename });
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      runHint.replaceChildren(
+        'Saved ',
+        h('code', {}, filename),
+        '. Run it with ',
+        h('code', {}, `moshcode run ${filename}`),
+        ' (add ',
+        h('code', {}, '--dry-run'),
+        ' to see what it does first). The copy lives outside W3BS.',
+      );
+      runHint.hidden = false;
+      toast(`Exported ${filename}`);
+    });
     return [
       h('p', {}, h('a', { href: '#/sessions' }, '← Sessions')),
       h('h1', {}, String(body.goal.value)),
@@ -515,6 +550,24 @@ const views = {
         chip(`result ${body.outcome.value} (${body.outcome.status})`),
         e.pinned ? chip('pinned', 'ok') : null,
       ),
+      h(
+        'div',
+        { class: 'actions episode-actions' },
+        h(
+          'button',
+          {
+            class: 'primary',
+            disabled: !runnable,
+            title: runnable
+              ? 'Download this task as a .mosh script for moshcode'
+              : 'Mark the result complete first: only reviewed, successful tasks export',
+            onclick: exportMosh,
+          },
+          'Export as moshscript',
+        ),
+        runnable ? null : h('span', { class: 'muted' }, 'Mark the result complete to export.'),
+      ),
+      runHint,
       open.length
         ? h(
             'div',

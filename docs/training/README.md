@@ -57,6 +57,24 @@ If Claude finds nothing: the desktop must be on with you logged in (the keyring
 unlocks with your session), and the tasks must be reviewed **and** shared.
 `w3bs training status` on the desktop shows `active_grants`.
 
+### Run a task again with moshcode
+
+Open a reviewed, successful task in the app and choose **Export as moshscript**
+(or `w3bs training moshscript EPISODE_ID --out task.mosh` at a terminal). You get
+a `.mosh` file for [moshcode](https://moshcoding.com):
+
+```sh
+moshcode run task.mosh --dry-run   # what it will do
+moshcode run task.mosh             # opens claude with the task; `codex` or another engine as the next argument
+```
+
+Nothing is replayed: the script hands the recorded steps (no coordinates, no typed
+text) to the engine, which does the task through the Agentic Desktop Layer
+(`w3bs-desktop` MCP), looking at the screen before each action. Set that up once
+with `w3bs desktop agents add claude-code --preset broad` and
+`w3bs desktop setup claude-code --agent claude-code`. The file is an export: it
+lives outside W3BS and deleting the task lists it but cannot recall it.
+
 ## Status (2026-10-15)
 
 The data side of the M1 local vertical slice is in `training/`: format 0.1,
