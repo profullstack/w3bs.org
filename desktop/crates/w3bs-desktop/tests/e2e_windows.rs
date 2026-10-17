@@ -116,6 +116,8 @@ fn daemon_control_cli_and_mcp() {
     std::thread::sleep(Duration::from_millis(200));
     writeln!(ctl_in, "enable").unwrap();
     wait_state(&env, "enabled");
+    // The person at this desktop chose "Always allow" (the prompt itself is checked in e2e.rs).
+    assert_eq!(env.json(&["drive", "always-allow", "on"]).1["drive_always_allow"], true);
 
     // CLI input acquires and releases the lease itself.
     let (code, v) = env.json(&["mouse", "click", "--agent", "claude-code", "--x", "50", "--y", "50", "--window", "w-editor"]);
