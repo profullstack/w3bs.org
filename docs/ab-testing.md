@@ -10,12 +10,12 @@ keys.
 
 ## The model
 
-| Thing | What it is |
-| --- | --- |
+| Thing      | What it is                                                                                                                                                                                                                                      |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Experiment | An id (`checkout-button`), a name, a randomization unit (user, account, session, device or custom), two or more variants with integer weights and JSON parameters, a window and a minimum sample per variant. The first variant is the control. |
-| Assignment | The first `assign` call for a participant picks a variant and stores it. Every later call returns the stored one, on any server, forever. |
-| Exposure | You showed the participant their variant, on a named surface. |
-| Conversion | The goal happened. Once per participant unless you send distinct `conversionId`s. Optionally carries a value (`valueMinor` + `currency`) or a full OpenABTest `price` for purchases. |
+| Assignment | The first `assign` call for a participant picks a variant and stores it. Every later call returns the stored one, on any server, forever.                                                                                                       |
+| Exposure   | You showed the participant their variant, on a named surface.                                                                                                                                                                                   |
+| Conversion | The goal happened. Once per participant unless you send distinct `conversionId`s. Optionally carries a value (`valueMinor` + `currency`) or a full OpenABTest `price` for purchases.                                                            |
 
 States: `draft` (editable, enrolls nobody), `running`, `paused` (no new participants; existing
 assignments are still returned and events still recorded), `closed` (terminal). Starting fixes
@@ -77,7 +77,10 @@ a hash. Emails are refused.
 const ab = (path, body) =>
   fetch(`https://w3bs.org/api/ab/${path}`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${process.env.W3BS_AB_KEY}`, 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: `Bearer ${process.env.W3BS_AB_KEY}`,
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ experiment: 'checkout-button', ...body }),
   }).then((r) => r.json());
 
@@ -86,7 +89,12 @@ const color = parameters?.color ?? 'blue'; // null when not enrolled: the defaul
 // ...render, then:
 await ab('exposure', { participant: user.id, surface: 'checkout' });
 // ...on purchase:
-await ab('conversion', { participant: user.id, conversionId: order.id, valueMinor: order.total, currency: 'USD' });
+await ab('conversion', {
+  participant: user.id,
+  conversionId: order.id,
+  valueMinor: order.total,
+  currency: 'USD',
+});
 ```
 
 Assignment is a server decision by design: do not call these endpoints from a browser with your
@@ -132,16 +140,16 @@ Each experiment has a goal id (default `conversion`; set it when you create the 
 
 Session cookie or a `w3bs login` bearer.
 
-| Method | Path | |
-| --- | --- | --- |
-| GET | `/api/ab/experiments` | your experiments |
-| POST | `/api/ab/experiments` | create a draft: `name`, `slug`, `unit`, `goal`, `variants: [{id, weight, parameters}]`, optional `eligibilityRule`, `days`, `startsAt`, `endsAt`, `minimumEligiblePerVariant`, `minimumObservationDays` |
-| GET | `/api/ab/experiments/<id>` | results |
-| PATCH | `/api/ab/experiments/<id>` | edit a draft |
-| POST | `/api/ab/experiments/<id>/state` | `{"state":"running"\|"paused"\|"closed"}` |
-| DELETE | `/api/ab/experiments/<id>` | delete it with its assignments and events |
-| GET/POST | `/api/ab/keys` | list, make (`{"name"}`; the key is shown once) |
-| DELETE | `/api/ab/keys/<key id>` | revoke |
+| Method   | Path                             |                                                                                                                                                                                                         |
+| -------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET      | `/api/ab/experiments`            | your experiments                                                                                                                                                                                        |
+| POST     | `/api/ab/experiments`            | create a draft: `name`, `slug`, `unit`, `goal`, `variants: [{id, weight, parameters}]`, optional `eligibilityRule`, `days`, `startsAt`, `endsAt`, `minimumEligiblePerVariant`, `minimumObservationDays` |
+| GET      | `/api/ab/experiments/<id>`       | results                                                                                                                                                                                                 |
+| PATCH    | `/api/ab/experiments/<id>`       | edit a draft                                                                                                                                                                                            |
+| POST     | `/api/ab/experiments/<id>/state` | `{"state":"running"\|"paused"\|"closed"}`                                                                                                                                                               |
+| DELETE   | `/api/ab/experiments/<id>`       | delete it with its assignments and events                                                                                                                                                               |
+| GET/POST | `/api/ab/keys`                   | list, make (`{"name"}`; the key is shown once)                                                                                                                                                          |
+| DELETE   | `/api/ab/keys/<key id>`          | revoke                                                                                                                                                                                                  |
 
 ## From the terminal
 
