@@ -2,9 +2,9 @@
 // w3bs-training: the W3BS Training CLI. The w3bs CLI runs it for
 // `w3bs training ...`. Output is JSON unless a command is interactive.
 import { randomBytes } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir, userInfo } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import { openTraining, VERSION } from '../core/service.mjs';
@@ -31,6 +31,7 @@ const help = `W3BS Training ${VERSION}: review, curate and consume demonstration
   w3bs training export DATASET_ID --version V --format bundle|jsonl|next-action --out PATH [--purpose P]
   w3bs training runs [--consumer NAME] | evaluate --plan-file evaluation.json
   w3bs training workflows derive EPISODE_ID | list
+  w3bs training moshscript EPISODE_ID [--out FILE.mosh]   a reviewed task as a script for \`moshcode run\`
   w3bs training approvals list | approve ID | deny ID
   w3bs training jobs adapters | submit --plan-file plan.json | cancel JOB_ID
   w3bs training forget --last 10m | --from ISO [--to ISO]
@@ -433,6 +434,24 @@ try {
       else if (sub === 'list') out(await service.listWorkflows());
       else fail('UNKNOWN_COMMAND', 'workflows derive|list');
       break;
+    case 'moshscript': {
+      const id = need(sub, 'EPISODE_ID');
+      const result = await service.exportMoshscript(
+        id,
+        await humanActor(
+          `Export ${id} as a moshscript.\nThe script will live outside W3BS: deleting the episode cannot recall it.`,
+        ),
+      );
+      const file = resolve(values.out ?? result.filename);
+      writeFileSync(file, result.script, { mode: 0o755, flag: 'wx' });
+      out({
+        export_id: result.export_id,
+        file,
+        run: `moshcode run ${file}`,
+        warning: result.warning,
+      });
+      break;
+    }
     case 'approvals':
       if (sub === 'list') out(await service.listApprovals());
       else if (sub === 'approve' || sub === 'deny')

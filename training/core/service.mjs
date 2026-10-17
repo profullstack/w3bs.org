@@ -22,12 +22,13 @@ import {
 } from '../schema/format.mjs';
 import { decrypt, encrypt, keyProvider } from './crypto.mjs';
 import { newId, sha256, stageBundle, stageEvents, stageVideo } from './ingest.mjs';
+import { moshscriptFilename, toMoshscript } from './moshscript.mjs';
 import { scrubRecord } from './privacy.mjs';
 import { defaultHome } from './store.mjs';
 import { fsBlobs, openSqliteDb } from './db.mjs';
 import { writeZip } from './zip.mjs';
 
-export const VERSION = '0.2.4';
+export const VERSION = '0.2.5';
 const DAY = 86400000;
 const RETRIEVAL_PURPOSES = ['private_retrieval', 'external_retrieval'];
 // Purposes that send data beyond the person's own private use need declared rights.
@@ -68,6 +69,14 @@ const normGoal = (goal) =>
 const fraction = (seed, value) => parseInt(sha256(`${seed}:${value}`).slice(0, 8), 16) / 0xffffffff;
 
 // Wilson score interval for a binomial proportion.
+// What a workflow or an exported moshscript tells an agent about where to stop and ask.
+const STOP_CONDITIONS = [
+  'a target cannot be found on the current screen',
+  'an unexpected dialog appears',
+  'a credential or payment prompt appears',
+];
+const HUMAN_APPROVALS = ['before submitting, sending, purchasing or deleting anything'];
+
 export function wilson(successes, n, z = 1.96) {
   if (!n) return { rate: null, low: null, high: null };
   const p = successes / n;
@@ -2431,12 +2440,8 @@ export async function openTraining({
         prerequisites: row.body.prerequisites,
         steps: (await stepsOf(row.body)).map((s, i) => describeStep(s, i + 1)),
         expected_result: row.body.outcome.evidence_type,
-        stop_conditions: [
-          'a target cannot be found on the current screen',
-          'an unexpected dialog appears',
-          'a credential or payment prompt appears',
-        ],
-        human_approvals: ['before submitting, sending, purchasing or deleting anything'],
+        stop_conditions: STOP_CONDITIONS,
+        human_approvals: HUMAN_APPROVALS,
         sources: [episodeId],
         status: 'untested',
         note: 'A workflow is untested until a separate evaluation run passes. It grants no permission to act.',
@@ -2452,6 +2457,58 @@ export async function openTraining({
       return (await db.all('SELECT body FROM workflows ORDER BY created_at DESC')).map((r) =>
         JSON.parse(r.body),
       );
+    },
+    // A reviewed, successful episode as a .mosh for `moshcode run`. The file leaves
+    // W3BS, so it is recorded as an export and named in later deletion reports.
+    async exportMoshscript(episodeId, actor) {
+      requireHuman(actor, 'Exporting a moshscript');
+      const row = await episodeRow(episodeId);
+      if (row.state !== 'reviewed' || row.body.outcome.value !== 'success')
+        throw error('INVALID_STATE', 'A moshscript needs a reviewed, successful episode.', 409);
+      const sessions = [...new Set(row.body.segments.map((s) => s.session_id))];
+      const exportedAt = iso();
+      const filename = moshscriptFilename(row.body.goal.value, episodeId);
+      const script = toMoshscript({
+        episodeId,
+        goal: row.body.goal.value,
+        family: row.body.workflow_family,
+        explanation: row.body.explanation?.text,
+        steps: (await stepsOf(row.body)).map((s, i) => describeStep(s, i + 1)),
+        gaps: (await mapSeries(sessions, async (sid) => (await sessionOf(sid))?.gaps ?? [])).flat(),
+        stopConditions: STOP_CONDITIONS,
+        humanApprovals: HUMAN_APPROVALS,
+        exportedAt,
+        version: VERSION,
+      });
+      const exportId = newId('exp');
+      const destination = `download:${filename}`;
+      await db.run(
+        'INSERT INTO exports (export_id, dataset_id, version, format, purpose, destination, created_by, created_at, episodes, body) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          exportId,
+          '',
+          0,
+          'moshscript',
+          'human_review',
+          destination,
+          actor.id,
+          exportedAt,
+          JSON.stringify([episodeId]),
+          JSON.stringify({ sha256: sha256(Buffer.from(script)) }),
+        ],
+      );
+      await audit(actor, 'export', exportId, {
+        format: 'moshscript',
+        destination,
+        episode: episodeId,
+      });
+      return {
+        export_id: exportId,
+        filename,
+        script,
+        run: `moshcode run ${filename}`,
+        warning: 'This script lives outside W3BS. Deleting the episode cannot recall it.',
+      };
     },
 
     // ------------------------------------------------------------- approvals
