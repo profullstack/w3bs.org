@@ -39,7 +39,7 @@ fn tools() -> Value {
         t("desktop_windows", "Windows you are allowed to see: id, app id, title, bounds (desktop logical), focused.", json!({}), &[]),
         t("desktop_inspect", "Accessibility tree of a window: roles, names, values, actions and bounds.", json!({"window": {"type": "string"}}), &["window"]),
         t("desktop_screenshot", "Capture one display. Returns a PNG and a `capture` id; points in that image can be used with space=capture until the layout changes or the capture expires.", json!({"display": {"type": "string"}}), &["display"]),
-        t("task_begin", "Start a task and take the desktop input lease. Required before any mouse or keyboard tool. Only one agent can hold the lease.", json!({"description": {"type": "string"}, "ttl_ms": {"type": "integer"}}), &["description"]),
+        t("task_begin", "Start a task and take the desktop input lease. Required before any mouse or keyboard tool. Only one agent can hold the lease. The person at the desktop may be asked first whether you may drive; this call waits up to two minutes for their answer. Describe the task plainly: they see the description.", json!({"description": {"type": "string"}, "ttl_ms": {"type": "integer"}}), &["description"]),
         t("task_end", "Finish the current task and release the input lease.", json!({"outcome": {"type": "string", "enum": ["completed", "failed", "cancelled"]}}), &[]),
         t("mouse_move", "Move the pointer.", json!({"to": point_schema()}), &["to"]),
         t("mouse_click", "Click. Omit `at` to click where the pointer is.", json!({"at": point_schema(), "button": {"type": "string", "enum": ["left", "right", "middle", "back", "forward"]}, "count": {"type": "integer", "minimum": 1, "maximum": 3}, "modifiers": {"type": "array", "items": {"type": "string"}}, "window": target}), &[]),
@@ -57,7 +57,10 @@ fn tools() -> Value {
 fn err_text(e: &AdlError) -> String {
     let hint = match e.code {
         ErrorCode::Disabled => " Ask the human to enable agent access from the native control.",
+        ErrorCode::ApprovalRequired if e.details.get("drive_request_id").is_some() => " The person at the desktop has not answered yet (Allow, Deny, Postpone or Always allow). Call task_begin again to keep waiting.",
         ErrorCode::ApprovalRequired => " A human must approve it; poll approval_status, then retry the identical request.",
+        ErrorCode::Busy if e.details.get("retry_after_ms").is_some() => " The person postponed your turn: wait retry_after_ms, then call task_begin again.",
+        ErrorCode::Denied if e.details.get("drive_request_id").is_some() => " The person declined; do not retry until retry_after_ms has passed, and tell the user.",
         ErrorCode::TargetStale => " Observe again (windows/screenshot) before retrying.",
         ErrorCode::OutcomeUnknown => " Check the result before retrying; do not blindly repeat.",
         _ => "",
@@ -104,7 +107,7 @@ impl Session {
             "task_begin" => {
                 let t = self.client.call("task.begin", json!({"description": a.get("description")}))?;
                 let id = t["id"].as_str().unwrap_or_default().to_string();
-                match self.client.call("lease.acquire", json!({"task": id, "ttl_ms": a.get("ttl_ms")})) {
+                match crate::acquire_lease(&mut self.client, &id, a.get("ttl_ms")) {
                     Ok(lease) => {
                         self.task = Some(id);
                         Ok(json!({"task": t, "lease": lease}))

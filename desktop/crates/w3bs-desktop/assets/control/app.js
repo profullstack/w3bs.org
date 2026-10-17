@@ -171,6 +171,7 @@ function render() {
   $('#app').hidden = false;
   connect();
   renderStatus();
+  renderDrive();
   renderTraining();
   renderApprovals();
   renderAgents();
@@ -211,6 +212,23 @@ function renderStatus() {
   const needsControl = S.settings.requires_native_control && S.settings.native_controls === 0;
   hint.hidden = !(needsControl && !on);
   hint.replaceChildren('Enabling needs the tray, the GNOME panel or ', h('code', { text: 'w3bs desktop control' }), ' running: that switch turns access off if it goes away. This app is not that switch, so closing it never turns access off.');
+}
+
+// Agents asking to drive: the person answers before any agent gets the pointer and keyboard.
+function renderDrive() {
+  const pending = (S.drive || []).filter((d) => d.status === 'pending');
+  $('[data-drive]').replaceChildren(...pending.map((d) => h('div', { class: 'banner' },
+    h('p', {}, h('strong', { text: `${d.agent_name} wants to drive your desktop.` }), ' ', h('span', { text: d.description ? `Task: ${d.description}` : 'It will move the pointer and type until its task ends.' })),
+    h('div', { class: 'banner-actions' },
+      h('button', { type: 'button', class: 'button primary small', onclick: () => act('drive', { drive: d.id, decision: 'allow' }) }, 'Allow'),
+      h('button', { type: 'button', class: 'button outline small', onclick: () => act('drive', { drive: d.id, decision: 'deny' }) }, 'Deny'),
+      h('button', { type: 'button', class: 'button outline small', onclick: () => act('drive', { drive: d.id, decision: 'postpone' }) }, 'Postpone 10 min'),
+      h('button', { type: 'button', class: 'button outline small', onclick: () => act('drive', { drive: d.id, decision: 'always_allow' }) }, 'Always allow'),
+      h('span', { class: 'muted', text: `Asks again after ${time(d.expires_at_ms)} if unanswered.` })),
+  )));
+  const box = $('[data-always-allow]');
+  box.checked = Boolean(S.status.drive_always_allow);
+  box.onchange = () => act('always_allow', { on: box.checked });
 }
 
 function renderApprovals() {

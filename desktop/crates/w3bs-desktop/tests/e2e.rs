@@ -116,6 +116,34 @@ fn daemon_control_cli_and_mcp() {
     writeln!(ctl_in, "enable").unwrap();
     wait_state(&env, "enabled");
 
+    // Drive prompt: the agent's first input waits for the person, who allows it.
+    let click = env
+        .cmd()
+        .env("W3BS_DESKTOP_DRIVE_WAIT_S", "20")
+        .args(["--json", "mouse", "click", "--agent", "claude-code", "--x", "50", "--y", "50", "--window", "w-editor"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let t = Instant::now();
+    let req = loop {
+        let (_, v) = env.json(&["drive", "list"]);
+        if let Some(d) = v.as_array().and_then(|a| a.iter().find(|d| d["status"] == "pending")) {
+            break d.clone();
+        }
+        assert!(t.elapsed() < Duration::from_secs(10), "no drive prompt appeared: {v}");
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    assert_eq!(req["agent_name"], "claude-code");
+    assert_eq!(env.json(&["status"]).1["pending_drive_requests"], 1);
+    let (code, v) = env.json(&["drive", "allow", req["id"].as_str().unwrap()]);
+    assert_eq!((code, v["status"].as_str()), (0, Some("allowed")), "{v}");
+    let out = click.wait_with_output().unwrap();
+    let v: Value = serde_json::from_slice(&out.stdout).unwrap_or(Value::Null);
+    assert_eq!(v["outcome"], "completed", "{v} {}", String::from_utf8_lossy(&out.stderr));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("waiting for the person at the desktop"));
+
     // CLI input acquires and releases the lease itself.
     let (code, v) = env.json(&["mouse", "click", "--agent", "claude-code", "--x", "50", "--y", "50", "--window", "w-editor"]);
     assert_eq!(code, 0, "{v}");
@@ -237,6 +265,8 @@ fn mcp_over_http_in_the_daemon() {
     std::thread::sleep(Duration::from_millis(200));
     writeln!(ctl_in, "enable").unwrap();
     wait_state(&env, "enabled");
+    // The person at this desktop chose "Always allow" (the prompt itself is checked above).
+    assert_eq!(env.json(&["drive", "always-allow", "on"]).1["drive_always_allow"], true);
 
     let bearer = format!("Bearer {token}");
     let init = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0"}}}"#;

@@ -20,7 +20,8 @@ fn human() -> Peer {
 }
 
 fn cfg() -> Config {
-    Config { pace_ms: 0, ..Config::default() }
+    // The drive prompt has its own tests below; the rest exercise input with a lease in hand.
+    Config { pace_ms: 0, drive_prompt: false, ..Config::default() }
 }
 
 fn harness_with(cfg: Config) -> H {
@@ -599,4 +600,173 @@ fn closed_connection_ends_its_tasks_and_lease() {
     assert!(h.b.status().lease.is_none(), "lease freed when its connection closed");
     assert_eq!(h.b.task(&t).unwrap().state, TaskState::Cancelled);
     assert_eq!(h.b.task(&t2).unwrap().state, TaskState::Running);
+}
+
+// ------------------------------------------------------------------ Drive prompt
+
+fn prompted() -> (Arc<Broker>, mpsc::Receiver<String>) {
+    let m = Arc::new(MockDesktop::new());
+    let b = Arc::new(Broker::new(m, AgentStore::memory(), Audit::memory(), Config { drive_prompt: true, ..cfg() }));
+    let (tx, rx) = mpsc::channel();
+    b.subscribe(tx, true);
+    let c = b.enable_request(&human()).unwrap();
+    b.enable_confirm(&human(), c.code.as_deref().unwrap()).unwrap();
+    (b, rx)
+}
+
+fn add(b: &Broker, name: &str) -> Principal {
+    let (_, token) = b.add_agent(&human(), name, broad()).unwrap();
+    b.authenticate(&token, None).unwrap()
+}
+
+/// The `drive_request_id` from a refused `lease.acquire`.
+fn drive_id(e: &AdlError) -> String {
+    e.details["drive_request_id"].as_str().expect("drive_request_id").to_string()
+}
+
+fn events(rx: &mpsc::Receiver<String>, name: &str) -> Vec<serde_json::Value> {
+    rx.try_iter().filter_map(|l| serde_json::from_str::<serde_json::Value>(&l).ok()).filter(|v| v["event"] == name).collect()
+}
+
+#[test]
+fn drive_prompt_asks_once_per_agent_and_allow_lasts_while_it_drives() {
+    let m = Arc::new(MockDesktop::new());
+    let b = Arc::new(Broker::new(m, AgentStore::memory(), Audit::memory(), Config { drive_prompt: true, drive_idle_ms: 300, ..cfg() }));
+    let (tx, rx) = mpsc::channel();
+    b.subscribe(tx, true);
+    let c = b.enable_request(&human()).unwrap();
+    b.enable_confirm(&human(), c.code.as_deref().unwrap()).unwrap();
+
+    let a = add(&b, "claude-code");
+    let t = b.task_begin(&a, "post the MIT lectures").unwrap().id;
+    let e = b.lease_acquire(&a, &t, None).unwrap_err();
+    assert_eq!(e.code, ErrorCode::ApprovalRequired);
+    let id = drive_id(&e);
+    let asked = events(&rx, "drive_requested");
+    assert_eq!(asked.len(), 1);
+    assert_eq!(asked[0]["data"]["agent_name"], "claude-code");
+    assert_eq!(asked[0]["data"]["description"], "post the MIT lectures");
+    assert_eq!(b.status().pending_drive_requests, 1);
+    // The task ending (a CLI that gave up) leaves the prompt up; asking again is the same request.
+    b.task_end(&a, &t, TaskState::Cancelled).unwrap();
+    let t2 = b.task_begin(&a, "click submit").unwrap().id;
+    assert_eq!(drive_id(&b.lease_acquire(&a, &t2, None).unwrap_err()), id);
+    assert!(events(&rx, "drive_requested").is_empty(), "no second prompt");
+    assert_eq!(b.drive_requests()[0].description, "click submit", "the prompt shows what it wants now");
+
+    b.decide_drive(&human(), &id, DriveDecision::Allow, None).unwrap();
+    assert_eq!(b.status().pending_drive_requests, 0);
+    b.lease_acquire(&a, &t2, None).unwrap();
+    b.lease_release(&a).unwrap();
+    // The next CLI command is a new task; it is covered while the agent keeps going.
+    std::thread::sleep(Duration::from_millis(150));
+    let t3 = b.task_begin(&a, "type the title").unwrap().id;
+    b.lease_acquire(&a, &t3, None).unwrap();
+    b.lease_release(&a).unwrap();
+    std::thread::sleep(Duration::from_millis(150));
+    let t4 = b.task_begin(&a, "press enter").unwrap().id;
+    b.lease_acquire(&a, &t4, None).unwrap();
+    b.lease_release(&a).unwrap();
+
+    // Idle longer than drive_idle_ms: asked again.
+    std::thread::sleep(Duration::from_millis(400));
+    let t5 = b.task_begin(&a, "later").unwrap().id;
+    assert_eq!(b.lease_acquire(&a, &t5, None).unwrap_err().code, ErrorCode::ApprovalRequired);
+    assert_eq!(events(&rx, "drive_requested").len(), 1);
+}
+
+#[test]
+fn drive_deny_and_postpone() {
+    let (b, _rx) = prompted();
+    let a = add(&b, "claude-code");
+    let t = b.task_begin(&a, "x").unwrap().id;
+    let id = drive_id(&b.lease_acquire(&a, &t, None).unwrap_err());
+    b.decide_drive(&human(), &id, DriveDecision::Deny, None).unwrap();
+    let e = b.lease_acquire(&a, &t, None).unwrap_err();
+    assert_eq!(e.code, ErrorCode::Denied);
+    assert!(e.details["retry_after_ms"].as_u64().unwrap() > 0, "denied for a while, not forever");
+    let t2 = b.task_begin(&a, "y").unwrap().id;
+    assert_eq!(b.lease_acquire(&a, &t2, None).unwrap_err().code, ErrorCode::Denied, "deny covers the agent, not one task");
+
+    let z = add(&b, "codex");
+    let t2 = b.task_begin(&z, "y").unwrap().id;
+    let id2 = drive_id(&b.lease_acquire(&z, &t2, None).unwrap_err());
+    let d = b.decide_drive(&human(), &id2, DriveDecision::Postpone, Some(15 * 60_000)).unwrap();
+    assert_eq!(d.status, DriveStatus::Postponed);
+    let e = b.lease_acquire(&z, &t2, None).unwrap_err();
+    assert_eq!(e.code, ErrorCode::Busy);
+    let retry = e.details["retry_after_ms"].as_u64().unwrap();
+    assert!(retry > 14 * 60_000 && retry <= 15 * 60_000, "retry_after_ms {retry}");
+    // A request already answered cannot be answered again.
+    assert_eq!(b.decide_drive(&human(), &id, DriveDecision::Allow, None).unwrap_err().code, ErrorCode::Invalid);
+}
+
+#[test]
+fn only_the_human_answers_a_drive_prompt() {
+    let (b, _rx) = prompted();
+    let a = add(&b, "claude-code");
+    let t = b.task_begin(&a, "x").unwrap().id;
+    let id = drive_id(&b.lease_acquire(&a, &t, None).unwrap_err());
+    let agentish = Peer { agent_descendant: true, ..human() };
+    assert_eq!(b.decide_drive(&agentish, &id, DriveDecision::Allow, None).unwrap_err().code, ErrorCode::Denied);
+    assert_eq!(b.decide_drive(&agentish, &id, DriveDecision::AlwaysAllow, None).unwrap_err().code, ErrorCode::Denied);
+    assert_eq!(b.set_drive_always_allow(&agentish, true).unwrap_err().code, ErrorCode::Denied);
+    assert!(!b.status().drive_always_allow);
+    assert_eq!(b.lease_acquire(&a, &t, None).unwrap_err().code, ErrorCode::ApprovalRequired);
+}
+
+#[test]
+fn drive_always_allow_lets_everyone_in_until_turned_off() {
+    let (b, rx) = prompted();
+    let a = add(&b, "claude-code");
+    let z = add(&b, "codex");
+    let ta = b.task_begin(&a, "x").unwrap().id;
+    let tz = b.task_begin(&z, "y").unwrap().id;
+    let ia = drive_id(&b.lease_acquire(&a, &ta, None).unwrap_err());
+    drive_id(&b.lease_acquire(&z, &tz, None).unwrap_err());
+    b.decide_drive(&human(), &ia, DriveDecision::AlwaysAllow, None).unwrap();
+    assert!(b.status().drive_always_allow);
+    assert_eq!(b.status().pending_drive_requests, 0, "the other waiting agent was let in too");
+    assert_eq!(events(&rx, "drive_always_allow").len(), 1);
+    b.lease_acquire(&a, &ta, None).unwrap();
+    b.lease_release(&a).unwrap();
+    b.lease_acquire(&z, &tz, None).unwrap();
+    b.lease_release(&z).unwrap();
+    // New tasks: no prompt while it is on.
+    let t3 = b.task_begin(&a, "z").unwrap().id;
+    b.lease_acquire(&a, &t3, None).unwrap();
+    b.lease_release(&a).unwrap();
+    assert!(events(&rx, "drive_requested").is_empty());
+
+    b.set_drive_always_allow(&human(), false).unwrap();
+    let n = add(&b, "newcomer");
+    let t4 = b.task_begin(&n, "w").unwrap().id;
+    assert_eq!(b.lease_acquire(&n, &t4, None).unwrap_err().code, ErrorCode::ApprovalRequired);
+}
+
+#[test]
+fn headless_instances_skip_it_and_stop_forgets_every_answer() {
+    // Nobody is at a non-desktop instance's screen, so nobody is asked.
+    let m = Arc::new(MockDesktop::new());
+    let b = Broker::new(m, AgentStore::memory(), Audit::memory(), Config { enabled_by_default: true, drive_prompt: true, ..cfg() });
+    b.enable_unattended().unwrap();
+    let a = add(&b, "ci");
+    let t = b.task_begin(&a, "x").unwrap().id;
+    b.lease_acquire(&a, &t, None).unwrap();
+
+    let (b, _rx) = prompted();
+    let a = add(&b, "claude-code");
+    let t = b.task_begin(&a, "x").unwrap().id;
+    let id = drive_id(&b.lease_acquire(&a, &t, None).unwrap_err());
+    b.decide_drive(&human(), &id, DriveDecision::Allow, None).unwrap();
+    let z = add(&b, "codex");
+    let tz = b.task_begin(&z, "y").unwrap().id;
+    drive_id(&b.lease_acquire(&z, &tz, None).unwrap_err());
+    // Stop is the person taking the desktop back: every answer is forgotten, agents ask again.
+    let r = b.stop_all("test");
+    assert_eq!(r.approvals_withdrawn, 1);
+    assert_eq!(b.status().pending_drive_requests, 0);
+    assert!(b.drive_requests().is_empty());
+    let t2 = b.task_begin(&a, "again").unwrap().id;
+    assert_eq!(b.lease_acquire(&a, &t2, None).unwrap_err().code, ErrorCode::ApprovalRequired);
 }

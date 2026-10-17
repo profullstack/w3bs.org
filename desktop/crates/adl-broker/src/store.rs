@@ -18,6 +18,9 @@ struct Record {
 struct File {
     v: u32,
     agents: Vec<Record>,
+    /// The person chose "Always allow": agents take the desktop without a drive prompt.
+    #[serde(default)]
+    drive_always_allow: bool,
 }
 
 pub struct AgentStore {
@@ -28,13 +31,13 @@ pub struct AgentStore {
 impl AgentStore {
     /// In-memory store (tests).
     pub fn memory() -> Self {
-        Self { path: None, file: Mutex::new(File { v: 1, agents: vec![] }) }
+        Self { path: None, file: Mutex::new(File { v: 1, agents: vec![], drive_always_allow: false }) }
     }
 
     pub fn open(path: PathBuf) -> Result<Self> {
         let file = match std::fs::read(&path) {
             Ok(b) => serde_json::from_slice(&b).map_err(|e| AdlError::internal(format!("{}: {e}", path.display())))?,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => File { v: 1, agents: vec![] },
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => File { v: 1, agents: vec![], drive_always_allow: false },
             Err(e) => return Err(AdlError::internal(format!("{}: {e}", path.display()))),
         };
         Ok(Self { path: Some(path), file: Mutex::new(file) })
@@ -140,6 +143,16 @@ impl AgentStore {
             r.info.revoked = true;
             r.info.policy = Policy::default();
         }
+        self.save(&f)
+    }
+
+    pub fn drive_always_allow(&self) -> bool {
+        self.lock().drive_always_allow
+    }
+
+    pub fn set_drive_always_allow(&self, on: bool) -> Result<()> {
+        let mut f = self.lock();
+        f.drive_always_allow = on;
         self.save(&f)
     }
 }

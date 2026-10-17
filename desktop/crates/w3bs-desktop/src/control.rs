@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, IsTerminal, Write};
 use std::sync::mpsc;
 
-const HELP: &str = "commands: enable | disable | stop | confirm | approve <id> | deny <id> | approvals | tasks | status | open (the control app) | quit (quitting disables access)";
+const HELP: &str = "commands: enable | disable | stop | confirm | approve <id> | deny <id> | approvals | allow | deny | postpone [minutes] | always (an agent asking to drive; add an id to pick one) | always off | tasks | status | open (the control app) | quit (quitting disables access)";
 
 fn print_state(v: &Value) {
     let st = v["state"].as_str().unwrap_or("?");
@@ -47,6 +47,9 @@ pub fn run() -> std::io::Result<()> {
     let (resp_tx, resp_rx) = mpsc::channel::<Response>();
     let last_code = std::sync::Arc::new(std::sync::Mutex::new(None::<String>));
     let code_slot = last_code.clone();
+    // The drive request the person was last asked about: `allow`, `deny`, `postpone`, `always` answer it.
+    let last_drive = std::sync::Arc::new(std::sync::Mutex::new(None::<String>));
+    let drive_slot = last_drive.clone();
     std::thread::spawn(move || {
         for line in reader.lines() {
             let Ok(line) = line else { break };
@@ -64,6 +67,21 @@ pub fn run() -> std::io::Result<()> {
                     println!("\n  APPROVAL NEEDED [{}] agent {} wants: {} (target {})", a["id"].as_str().unwrap_or(""), a["agent"].as_str().unwrap_or(""), a["summary"].as_str().unwrap_or(""), a["target"].as_str().unwrap_or(""));
                     println!("  Agent input is paused. `approve {0}` or `deny {0}`.", a["id"].as_str().unwrap_or(""));
                 }
+                Some("drive_requested") => {
+                    let d = &v["data"];
+                    let id = d["id"].as_str().unwrap_or_default().to_string();
+                    println!("\n  AGENT WANTS TO DRIVE [{id}] {} for: {}", d["agent_name"].as_str().unwrap_or(""), d["description"].as_str().unwrap_or(""));
+                    println!("  Type `allow`, `deny`, `postpone` (10 min, or `postpone 30`), or `always` (allow every agent until `always off`).");
+                    *drive_slot.lock().unwrap() = Some(id);
+                }
+                Some("drive_decided") => {
+                    let mut slot = drive_slot.lock().unwrap();
+                    if slot.as_deref() == v["data"]["id"].as_str() {
+                        *slot = None;
+                    }
+                    println!("  Drive request {} is {}", v["data"]["id"].as_str().unwrap_or(""), v["data"]["status"].as_str().unwrap_or(""));
+                }
+                Some("drive_always_allow") => println!("  Always allow is {}", if v["data"]["on"].as_bool().unwrap_or(false) { "ON: agents drive without asking" } else { "off: you are asked first" }),
                 Some("lease") if !v["data"].is_null() => println!("  Agent {} took the input lease for task {}", v["data"]["agent"].as_str().unwrap_or(""), v["data"]["task"].as_str().unwrap_or("")),
                 Some("lease") => println!("  Input lease released"),
                 Some(other) => println!("  event: {other} {}", v["data"]),
@@ -115,10 +133,29 @@ pub fn run() -> std::io::Result<()> {
             },
             "disable" => call("disable", json!({"reason": "disabled from the terminal control"})),
             "stop" => call("stop", json!({"reason": "stopped from the terminal control"})),
-            "approve" | "deny" => match arg {
-                Some(id) => call("approvals.decide", json!({"approval": id, "approve": cmd == "approve"})),
-                None => Err(format!("usage: {cmd} <approval id>")),
+            "approve" => match arg {
+                Some(id) => call("approvals.decide", json!({"approval": id, "approve": true})),
+                None => Err("usage: approve <approval id>".into()),
             },
+            // `deny <appr_...>` refuses an input approval; bare `deny` or `deny <drive_...>` a drive request.
+            "deny" if arg.is_some_and(|a| a.starts_with("appr")) => call("approvals.decide", json!({"approval": arg.unwrap(), "approve": false})),
+            "always" if arg == Some("off") => call("drive.always_allow", json!({"on": false})),
+            "allow" | "deny" | "postpone" | "always" => {
+                // An id, or the latest prompt; `postpone 30` is minutes, not an id.
+                let minutes = if cmd == "postpone" { arg.and_then(|a| a.parse::<u64>().ok()) } else { None };
+                let id = arg.filter(|a| a.starts_with("drive")).map(String::from).or_else(|| last_drive.lock().unwrap().clone());
+                match id {
+                    Some(id) => {
+                        let decision = match cmd { "allow" => "allow", "deny" => "deny", "postpone" => "postpone", _ => "always_allow" };
+                        let mut p = json!({"drive": id, "decision": decision});
+                        if let Some(m) = minutes {
+                            p["postpone_ms"] = json!(m.clamp(1, 240) * 60_000);
+                        }
+                        call("drive.decide", p)
+                    }
+                    None => Err("no agent is waiting to drive (`always off` turns prompting back on)".into()),
+                }
+            }
             "approvals" => call("approvals.list", json!({})),
             "tasks" => call("tasks.list", json!({})),
             "status" => call("status", json!({})),

@@ -159,6 +159,8 @@ echo "== broker"
 setsid w3bs-desktop daemon --adapter auto >$L/daemon.log 2>&1 &
 sleep 1
 w3bs-desktop agents add tester --preset broad >/dev/null
+# The person at this rig said "Always allow" (the drive prompt has its own conformance tests).
+w3bs-desktop drive always-allow on >/dev/null
 rm -f /root/ctl.fifo; mkfifo /root/ctl.fifo
 setsid sh -c 'exec sleep infinity > /root/ctl.fifo' &
 setsid w3bs-desktop control < /root/ctl.fifo > $L/control.log 2>&1 &

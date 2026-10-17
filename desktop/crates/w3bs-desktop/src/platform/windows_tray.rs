@@ -43,6 +43,11 @@ pub const ID_DISABLE: usize = 3;
 pub const ID_STOP: usize = 4;
 pub const ID_QUIT: usize = 5;
 pub const ID_OPEN_PANEL: usize = 6;
+/// "Always allow agents to drive (I'm away)", a checked toggle.
+pub const ID_ALWAYS_ALLOW: usize = 7;
+/// Drive request i: allow, deny, postpone, always allow = ID_DRIVE + 4i + 0..3 (at most 12 shown).
+pub const ID_DRIVE: usize = 50;
+const DRIVE_DECISIONS: [&str; 4] = ["allow", "deny", "postpone", "always_allow"];
 /// Approval i: approve = ID_APPROVAL + 2i, deny = ID_APPROVAL + 2i + 1.
 pub const ID_APPROVAL: usize = 100;
 
@@ -54,6 +59,8 @@ enum Act {
     Stop,
     Emergency,
     Decide(String, bool),
+    Drive(String, &'static str),
+    AlwaysAllow(bool),
     OpenPanel,
     Shortcut(String),
     Quit,
@@ -67,6 +74,10 @@ struct View {
     approvals: Vec<(String, String)>,
     /// Approval ids in the order the last menu showed them.
     menu_approvals: Vec<String>,
+    /// Agents waiting to drive: (request id, text).
+    drives: Vec<(String, String)>,
+    menu_drives: Vec<String>,
+    always_allow: bool,
     pending_code: Option<String>,
     note: Option<String>,
     shortcut: Option<String>,
@@ -93,7 +104,7 @@ impl View {
         self.state == "enabled"
     }
     fn attention(&self) -> bool {
-        self.lease.is_some() || !self.approvals.is_empty() || self.pending_code.is_some()
+        self.lease.is_some() || !self.approvals.is_empty() || !self.drives.is_empty() || self.pending_code.is_some()
     }
 }
 
@@ -146,6 +157,9 @@ fn tooltip(v: &View) -> String {
     }
     if !v.approvals.is_empty() {
         t += &format!("\n{} approval(s) waiting", v.approvals.len());
+    }
+    if !v.drives.is_empty() {
+        t += &format!("\n{} agent(s) asking to drive", v.drives.len());
     }
     t
 }
@@ -228,6 +242,17 @@ fn menu_items() -> Vec<(usize, String)> {
     if let Some(code) = &v.pending_code {
         m.push((ID_CONFIRM, format!("Confirm the enable request from a terminal (code {code})")));
     }
+    v.menu_drives = v.drives.iter().take(12).map(|(id, _)| id.clone()).collect();
+    if !v.drives.is_empty() {
+        m.push((usize::MAX, String::new()));
+        for (i, (_, text)) in v.drives.iter().take(12).enumerate() {
+            m.push((0, text.clone()));
+            for (k, label) in ["    Allow", "    Deny", "    Postpone 10 min", "    Always allow"].iter().enumerate() {
+                m.push((ID_DRIVE + 4 * i + k, (*label).into()));
+            }
+        }
+    }
+    m.push((ID_ALWAYS_ALLOW, "Always allow agents to drive (I'm away)".into()));
     v.menu_approvals = v.approvals.iter().map(|(id, _)| id.clone()).collect();
     if !v.approvals.is_empty() {
         m.push((usize::MAX, String::new()));
@@ -258,7 +283,10 @@ fn show_menu(hwnd: HWND) {
             if *id == usize::MAX {
                 let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
             } else {
-                let flags = if *id == 0 { MF_STRING | MF_GRAYED } else { MF_STRING };
+                let mut flags = if *id == 0 { MF_STRING | MF_GRAYED } else { MF_STRING };
+                if *id == ID_ALWAYS_ALLOW && view().always_allow {
+                    flags |= MF_CHECKED;
+                }
                 let _ = AppendMenuW(menu, flags, *id, &HSTRING::from(text.as_str()));
             }
         }
@@ -281,6 +309,11 @@ fn command(id: usize) {
         ID_STOP => Some(Act::Stop),
         ID_QUIT => Some(Act::Quit),
         ID_OPEN_PANEL => Some(Act::OpenPanel),
+        ID_ALWAYS_ALLOW => Some(Act::AlwaysAllow(!view().always_allow)),
+        n if (ID_DRIVE..ID_DRIVE + 48).contains(&n) => {
+            let i = (n - ID_DRIVE) / 4;
+            view().menu_drives.get(i).cloned().map(|d| Act::Drive(d, DRIVE_DECISIONS[(n - ID_DRIVE) % 4]))
+        }
         n if n >= ID_APPROVAL => {
             let i = (n - ID_APPROVAL) / 2;
             view().menu_approvals.get(i).cloned().map(|a| Act::Decide(a, (n - ID_APPROVAL).is_multiple_of(2)))
@@ -442,6 +475,7 @@ pub fn run() -> std::io::Result<()> {
                         if t.state != "enabled" {
                             t.lease = None;
                             t.approvals.clear();
+                            t.drives.clear();
                         }
                         eprintln!("w3bs-desktop tray: state {}", t.state_text());
                     }
@@ -456,6 +490,16 @@ pub fn run() -> std::io::Result<()> {
                         t.approvals.push((data["id"].as_str().unwrap_or("").into(), summary));
                     }
                     "approval_decided" => t.approvals.retain(|(id, _)| Some(id.as_str()) != data["id"].as_str()),
+                    "drive_requested" => {
+                        let (name, desc) = (data["agent_name"].as_str().unwrap_or(""), data["description"].as_str().unwrap_or(""));
+                        let text = if desc.is_empty() { format!("{name} wants to drive") } else { format!("{name} wants to drive: {desc}") };
+                        t.balloon = Some((format!("{name} wants to drive your desktop"), "Allow, deny, postpone or always allow from the tray menu.".into()));
+                        let id = data["id"].as_str().unwrap_or("").to_string();
+                        t.drives.retain(|(d, _)| *d != id);
+                        t.drives.push((id, text));
+                    }
+                    "drive_decided" => t.drives.retain(|(id, _)| Some(id.as_str()) != data["id"].as_str()),
+                    "drive_always_allow" => t.always_allow = data["on"].as_bool().unwrap_or(false),
                     _ => {}
                 }
             }
@@ -487,6 +531,9 @@ pub fn run() -> std::io::Result<()> {
             post(WM_BROKER_LOST);
             return;
         }
+        if let Ok(st) = call("status", json!({})) {
+            view().always_allow = st["drive_always_allow"].as_bool().unwrap_or(false);
+        }
         for act in act_rx {
             eprintln!("w3bs-desktop tray: action {act:?}");
             let r = match &act {
@@ -502,6 +549,8 @@ pub fn run() -> std::io::Result<()> {
                 Act::Stop => call("stop", json!({"reason": "stopped from the tray"})),
                 Act::Emergency => call("session.event", json!({"event": "emergency_stop"})),
                 Act::Decide(id, ok) => call("approvals.decide", json!({"approval": id, "approve": ok})),
+                Act::Drive(id, decision) => call("drive.decide", json!({"drive": id, "decision": decision})),
+                Act::AlwaysAllow(on) => call("drive.always_allow", json!({"on": on})),
                 // The control app, signed in with a one-time link minted on this connection.
                 Act::OpenPanel => call("control.login", json!({"via": "tray"})).and_then(|v| {
                     crate::control_web::open_url(v["url"].as_str().unwrap_or_default()).map(|_| Value::Null).map_err(|e| format!("{e}; run `w3bs-desktop control --open`"))

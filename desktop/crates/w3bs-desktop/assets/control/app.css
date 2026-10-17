@@ -151,6 +151,7 @@ dd { margin: 4px 0 0; font-size: 14px; overflow-wrap: anywhere; }
 .banner { margin: 0 0 18px; padding: 14px 16px; border: 1px solid var(--line); border-left: 3px solid var(--orange); background: var(--paper); }
 .banner p { color: var(--ink); font-size: 14px; }
 .banner-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 10px; font-size: 13px; }
+.always-allow { display: flex; align-items: center; gap: 8px; margin: 0 0 18px; font-size: 13px; color: var(--ink); }
 
 /* pills */
 .pill {
