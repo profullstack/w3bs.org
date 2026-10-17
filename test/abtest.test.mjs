@@ -378,6 +378,11 @@ test('ab: bucketing follows the weights; statistics helpers', () => {
     bucketVariant('secret', 'x', 1, 'p1', variants).id,
   );
   assert.equal(wilson(0, 0), null);
+  // Regression: at 0 successes floating point put the lower bound just above 0 (CI, PR #107).
+  for (const n of [1, 7, 20, 23, 41, 1000]) {
+    assert.equal(wilson(0, n)[0], 0);
+    assert.equal(wilson(n, n)[1], 1);
+  }
   const [lo, hi] = wilson(50, 100);
   assert.ok(Math.abs(lo - 0.4038) < 0.001 && Math.abs(hi - 0.5962) < 0.001);
   assert.equal(twoProportionP(0, 0, 1, 1), null);
