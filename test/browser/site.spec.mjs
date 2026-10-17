@@ -23,6 +23,13 @@ test('homepage navigation, code tabs and narrow layouts work', async ({ page }, 
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Fleet is free.');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: `artifacts/pricing-${testInfo.project.name}.png`, fullPage: true });
+  await page.goto('/ab-testing');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('A/B tests that');
+  await expect(page.getByRole('link', { name: /Create a free account/ })).toHaveAttribute(
+    'href',
+    '/signup?next=%2Fab-testing',
+  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.goto('/');
   await page.getByRole('navigation').getByRole('link', { name: 'Standards' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Common ground.');

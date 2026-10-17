@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { W3bsError, parseUri, validateManifest, verifyManifest, compareVersions } from './core.mjs';
 import { ACCOUNT_SCHEMA, createAccounts } from './accounts.mjs';
 import { FLEET_SCHEMA, createFleet } from './fleet.mjs';
+import { ABTEST_SCHEMA, createAbTest } from './abtest.mjs';
 import { SOCIAL_SCHEMA, createSocial } from './social.mjs';
 import { EVENT_SCHEMA, createEvents } from './events.mjs';
 
@@ -38,6 +39,7 @@ async function openSqlite(path) {
   db.exec(SCHEMA.sqlite);
   db.exec(ACCOUNT_SCHEMA.sqlite);
   db.exec(FLEET_SCHEMA.sqlite);
+  db.exec(ABTEST_SCHEMA.sqlite);
   db.exec(SOCIAL_SCHEMA.sqlite);
   db.exec(EVENT_SCHEMA.sqlite);
   const bind = (target) => ({
@@ -90,6 +92,7 @@ async function openPostgres(connectionString) {
   await pool.query(SCHEMA.postgres);
   await pool.query(ACCOUNT_SCHEMA.postgres);
   await pool.query(FLEET_SCHEMA.postgres);
+  await pool.query(ABTEST_SCHEMA.postgres);
   await pool.query(SOCIAL_SCHEMA.postgres);
   await pool.query(EVENT_SCHEMA.postgres);
   return {
@@ -373,6 +376,7 @@ export async function openStore({
     latestScan,
     accounts,
     fleet: createFleet(db, { events }),
+    abtest: createAbTest(db),
     events,
     social: createSocial(db),
     trust,

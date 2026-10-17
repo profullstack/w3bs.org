@@ -178,6 +178,81 @@ pub fn human(r: &OperationResult) {
             println!("Reports: {}", serde_json::to_string_pretty(&d["info"]).unwrap_or_default());
             return;
         }
+        "ab.ls" => {
+            let list = r.data["experiments"].as_array().cloned().unwrap_or_default();
+            if list.is_empty() {
+                println!("No experiments yet. Make one: w3bs ab new <id> --variant control --variant b");
+                return;
+            }
+            let rows = list
+                .iter()
+                .map(|x| {
+                    let variants = x["variants"].as_array().map(|v| v.iter().map(|v| s(&v["id"])).collect::<Vec<_>>().join(", ")).unwrap_or_default();
+                    vec![s(&x["slug"]), s(&x["state"]), s(&x["unit"]), variants, s(&x["name"])]
+                })
+                .collect();
+            table(&["ID", "STATE", "UNIT", "VARIANTS", "NAME"], rows);
+            return;
+        }
+        "ab.new" | "ab.state" => {
+            let x = &r.data["experiment"];
+            println!("{} is {}. {}/ab-testing/{}", s(&x["slug"]), s(&x["state"]), s(&r.data["origin"]), s(&x["slug"]));
+            if x["state"] == "draft" {
+                println!("Start it with: w3bs ab start {}", s(&x["slug"]));
+            }
+            return;
+        }
+        "ab.show" => {
+            let res = &r.data["results"];
+            let x = &res["experiment"];
+            println!("{} ({}) · {} · unit {}", s(&x["name"]), s(&x["slug"]), s(&x["state"]), s(&res["unit"]));
+            let pct = |v: &Value| v.as_f64().map(|f| format!("{:.1}%", f * 100.0)).unwrap_or_else(|| "no data".into());
+            let rows = res["variants"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+                .iter()
+                .map(|v| {
+                    let ci = v["interval95"].as_array().map(|i| format!("{}-{}", pct(&i[0]), pct(&i[1]))).unwrap_or_default();
+                    let vs = if v["vsControl"].is_null() {
+                        String::new()
+                    } else {
+                        let d = v["vsControl"]["difference"].as_f64().unwrap_or(0.0) * 100.0;
+                        let p = v["vsControl"]["pValue"].as_f64().map(|p| if p < 0.001 { " p<0.001".into() } else { format!(" p={p:.3}") }).unwrap_or_default();
+                        format!("{d:+.1} pts{p}")
+                    };
+                    vec![s(&v["id"]), s(&v["weight"]), s(&v["assigned"]), s(&v["exposed"]), s(&v["converted"]), pct(&v["conversionRate"]), ci, vs]
+                })
+                .collect();
+            table(&["VARIANT", "WEIGHT", "ASSIGNED", "EXPOSED", "CONVERTED", "RATE", "95%", "VS CONTROL"], rows);
+            let f = &res["floors"];
+            println!(
+                "Floors {}: {} per variant, {}s running (so far {}s).",
+                if f["met"] == true { "met" } else { "not met" },
+                s(&f["minimumEligiblePerVariant"]),
+                s(&f["minimumObservationSeconds"]),
+                s(&f["observedSeconds"])
+            );
+            println!("{}", s(&res["note"]));
+            return;
+        }
+        "ab.assign" => {
+            let a = &r.data["assignment"];
+            if a["variant"].is_null() {
+                println!("{}", s(&a["reason"]));
+            } else {
+                println!("{} -> {} {}{}", s(&a["participant"]), s(&a["variant"]), a["parameters"], if a["new"] == true { " (new)" } else { "" });
+            }
+            return;
+        }
+        "ab.export" => {
+            println!("{}", serde_json::to_string_pretty(&r.data["document"]).unwrap_or_default());
+            return;
+        }
+        "ab.rm" => {
+            println!("Deleted {}.", s(&r.data["slug"]));
+            return;
+        }
         "fleet.ls" => {
             let list = r.data["machines"].as_array().cloned().unwrap_or_default();
             if list.is_empty() {
