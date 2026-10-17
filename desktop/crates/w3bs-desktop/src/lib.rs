@@ -112,8 +112,9 @@ enum Cmd {
     },
     /// Tray/menu-bar native control (StatusNotifierItem on Linux, a menu-bar item on macOS) with an emergency-stop shortcut; quitting disables access
     Tray {
-        /// Wait up to this many seconds for the broker to come up (login items start together)
-        #[arg(long, value_name = "SECONDS", default_value_t = 0)]
+        /// Wait up to this many seconds for the broker to come up (login items start together).
+        /// Defaults to 60 so a session autostart that predates the flag still waits.
+        #[arg(long, value_name = "SECONDS", default_value_t = 60)]
         wait_for_broker: u64,
     },
     /// Show the layer state

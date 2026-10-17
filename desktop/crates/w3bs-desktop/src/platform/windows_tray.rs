@@ -406,7 +406,7 @@ fn broker_hotkey() -> Option<String> {
 pub fn run() -> std::io::Result<()> {
     adl_windows::win::init_dpi_awareness();
     let ep = paths::control_socket();
-    let stream = crate::transport::connect_waiting(&ep, crate::transport::BROKER_START_WAIT).map_err(|e| std::io::Error::new(e.kind(), format!("{ep}: {e} (waited {}s); start the broker with `w3bs desktop daemon`", crate::transport::BROKER_START_WAIT.as_secs())))?;
+    let stream = crate::transport::connect(&ep).map_err(|e| std::io::Error::new(e.kind(), format!("{ep}: {e}; start the broker with `w3bs desktop daemon`")))?;
     let mut writer = stream.try_clone_box()?;
     let reader = BufReader::new(stream);
     let (act_tx, act_rx) = mpsc::channel::<Act>();
