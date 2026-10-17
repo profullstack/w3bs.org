@@ -398,6 +398,9 @@ enum AbCmd {
         /// Who is eligible, in words
         #[arg(long, value_name = "TEXT")]
         eligible: Option<String>,
+        /// What a conversion means, e.g. signup-completed (default: conversion)
+        #[arg(long, value_name = "GOAL")]
+        goal: Option<String>,
         #[command(flatten)]
         a: Api,
     },
@@ -876,8 +879,8 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
 async fn run_ab(cmd: AbCmd) -> (&'static str, w3bs_core::Result<OperationResult>) {
     match cmd {
         AbCmd::Ls { a } => ("ab.ls", account("ab.ls", &a, |o| async move { ab::ls(&o).await }).await),
-        AbCmd::New { id, variants, name, unit, days, min, eligible, a } => {
-            let x = ab::NewExperiment { slug: id, name, variants, unit, days, min, eligible };
+        AbCmd::New { id, variants, name, unit, days, min, eligible, goal, a } => {
+            let x = ab::NewExperiment { slug: id, name, variants, unit, days, min, eligible, goal };
             ("ab.new", account("ab.new", &a, |o| async move { ab::new(&o, x).await }).await)
         }
         AbCmd::Show { id, a } => ("ab.show", account("ab.show", &a, |o| async move { ab::show(&o, &id).await }).await),

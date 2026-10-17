@@ -205,7 +205,7 @@ pub fn human(r: &OperationResult) {
         "ab.show" => {
             let res = &r.data["results"];
             let x = &res["experiment"];
-            println!("{} ({}) · {} · unit {}", s(&x["name"]), s(&x["slug"]), s(&x["state"]), s(&res["unit"]));
+            println!("{} ({}) · {} · unit {} · goal {}", s(&x["name"]), s(&x["slug"]), s(&x["state"]), s(&res["unit"]), s(&x["goal"]));
             let pct = |v: &Value| v.as_f64().map(|f| format!("{:.1}%", f * 100.0)).unwrap_or_else(|| "no data".into());
             let rows = res["variants"]
                 .as_array()
