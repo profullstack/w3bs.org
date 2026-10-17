@@ -2324,10 +2324,10 @@
   "repository": "https://github.com/profullstack/w3bs.org/tree/main/training",
   "license": "MIT",
   "agentic": true,
-  "latest_version": "0.2.4",
+  "latest_version": "0.2.5",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://w3bs.org/training/install.sh | sh",
-  "evidence": "w3bs.org/training/install.sh 200 (text/x-shellscript); GitHub release training-v0.2.4 with 5 archives + SHA256SUMS; installed from w3bs.org in a clean ubuntu:24.04 container; hosted workspace answers an authenticated w3bs login session",
+  "evidence": "w3bs.org/training/install.sh 200 (text/x-shellscript); GitHub release training-v0.2.5 with 5 archives + SHA256SUMS; installed from w3bs.org in a clean ubuntu:24.04 container; hosted workspace answers an authenticated w3bs login session",
   "publisher": "profullstack"
  },
  {
