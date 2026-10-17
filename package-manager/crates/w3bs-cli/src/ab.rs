@@ -1,4 +1,4 @@
-//! `w3bs ab`: your A/B tests on w3bs.org/ab-testing (OpenABTest 0.1 draft).
+//! `w3bs ab`: your A/B tests on w3bs.org/ab-testing (OpenABTest 0.2 draft).
 //!
 //! Every command uses the account from `w3bs login`: list, create, start, pause, resume,
 //! close and delete experiments, read their results, export the OpenABTest manifest and

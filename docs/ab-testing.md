@@ -1,7 +1,7 @@
 # W3BS A/B testing
 
 Hosted A/B testing at [w3bs.org/ab-testing](https://w3bs.org/ab-testing), built on the open
-[OpenABTest 0.1 draft](https://logicsrc.com/docs/openabtest). You define an experiment, your
+[OpenABTest 0.2 draft](https://logicsrc.com/docs/openabtest). You define an experiment, your
 server asks w3bs.org which variant each participant gets, and reports what they saw and did.
 Results count unique participants per variant. Nothing names a winner for you.
 
@@ -10,12 +10,12 @@ keys.
 
 ## The model
 
-| Thing | What it is |
-| --- | --- |
+| Thing      | What it is                                                                                                                                                                                                                                      |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Experiment | An id (`checkout-button`), a name, a randomization unit (user, account, session, device or custom), two or more variants with integer weights and JSON parameters, a window and a minimum sample per variant. The first variant is the control. |
-| Assignment | The first `assign` call for a participant picks a variant and stores it. Every later call returns the stored one, on any server, forever. |
-| Exposure | You showed the participant their variant, on a named surface. |
-| Conversion | The goal happened. Once per participant unless you send distinct `conversionId`s. Optionally carries a value (`valueMinor` + `currency`) or a full OpenABTest `price` for purchases. |
+| Assignment | The first `assign` call for a participant picks a variant and stores it. Every later call returns the stored one, on any server, forever.                                                                                                       |
+| Exposure   | You showed the participant their variant, on a named surface.                                                                                                                                                                                   |
+| Conversion | The goal happened. Once per participant unless you send distinct `conversionId`s. Optionally carries a value (`valueMinor` + `currency`) or a full OpenABTest `price` for purchases.                                                            |
 
 States: `draft` (editable, enrolls nobody), `running`, `paused` (no new participants; existing
 assignments are still returned and events still recorded), `closed` (terminal). Starting fixes
@@ -77,7 +77,10 @@ a hash. Emails are refused.
 const ab = (path, body) =>
   fetch(`https://w3bs.org/api/ab/${path}`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${process.env.W3BS_AB_KEY}`, 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: `Bearer ${process.env.W3BS_AB_KEY}`,
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ experiment: 'checkout-button', ...body }),
   }).then((r) => r.json());
 
@@ -86,7 +89,12 @@ const color = parameters?.color ?? 'blue'; // null when not enrolled: the defaul
 // ...render, then:
 await ab('exposure', { participant: user.id, surface: 'checkout' });
 // ...on purchase:
-await ab('conversion', { participant: user.id, conversionId: order.id, valueMinor: order.total, currency: 'USD' });
+await ab('conversion', {
+  participant: user.id,
+  conversionId: order.id,
+  valueMinor: order.total,
+  currency: 'USD',
+});
 ```
 
 Assignment is a server decision by design: do not call these endpoints from a browser with your
@@ -116,31 +124,32 @@ z-test p-value.
 
 ## Export: OpenABTest
 
-- `GET /api/ab/experiments/<id>/manifest.json`: the experiment as an OpenABTest 0.1 manifest
-  (`cohort.purchaseScope: custom`, `metrics.primary: conversion-rate`).
-- `GET /api/ab/experiments/<id>/events.json`: `{ manifest, events, omitted, truncated }`, the
-  eligibility, assignment, exposure and conversion events as OpenABTest event documents
-  (`producerId: w3bs.org`), newest 50,000.
+- `GET /api/ab/experiments/<id>/manifest.json`: the experiment as an OpenABTest 0.2 manifest
+  (`metrics.primary: conversion-rate`, `metrics.conversion: unique-participants-with-goal`,
+  `metrics.goal` = the experiment's goal, `metrics.profit: none`).
+- `GET /api/ab/experiments/<id>/events.json`: `{ manifest, events, truncated }`, the eligibility,
+  assignment, exposure and conversion events as OpenABTest event documents
+  (`producerId: w3bs.org`), newest 50,000. A conversion sent with a `price` exports as a
+  purchase; any other conversion exports as a goal conversion, with its value when you sent one.
 
-Both validate with `@logicsrc/validators` 0.3.0 (the test suite checks every exported document).
-OpenABTest 0.1 defines a conversion as a purchase with a price, so conversions sent without a
-`price` stay in the W3BS results but are left out of the event export and counted in
-`omitted.conversionsWithoutPrice`.
+Both validate with `@logicsrc/validators` 0.5.0 (the test suite checks every exported document).
+Each experiment has a goal id (default `conversion`; set it when you create the experiment, e.g.
+`signup-completed`).
 
 ## Owner API
 
 Session cookie or a `w3bs login` bearer.
 
-| Method | Path | |
-| --- | --- | --- |
-| GET | `/api/ab/experiments` | your experiments |
-| POST | `/api/ab/experiments` | create a draft: `name`, `slug`, `unit`, `variants: [{id, weight, parameters}]`, optional `eligibilityRule`, `days`, `startsAt`, `endsAt`, `minimumEligiblePerVariant`, `minimumObservationDays` |
-| GET | `/api/ab/experiments/<id>` | results |
-| PATCH | `/api/ab/experiments/<id>` | edit a draft |
-| POST | `/api/ab/experiments/<id>/state` | `{"state":"running"\|"paused"\|"closed"}` |
-| DELETE | `/api/ab/experiments/<id>` | delete it with its assignments and events |
-| GET/POST | `/api/ab/keys` | list, make (`{"name"}`; the key is shown once) |
-| DELETE | `/api/ab/keys/<key id>` | revoke |
+| Method   | Path                             |                                                                                                                                                                                                         |
+| -------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET      | `/api/ab/experiments`            | your experiments                                                                                                                                                                                        |
+| POST     | `/api/ab/experiments`            | create a draft: `name`, `slug`, `unit`, `goal`, `variants: [{id, weight, parameters}]`, optional `eligibilityRule`, `days`, `startsAt`, `endsAt`, `minimumEligiblePerVariant`, `minimumObservationDays` |
+| GET      | `/api/ab/experiments/<id>`       | results                                                                                                                                                                                                 |
+| PATCH    | `/api/ab/experiments/<id>`       | edit a draft                                                                                                                                                                                            |
+| POST     | `/api/ab/experiments/<id>/state` | `{"state":"running"\|"paused"\|"closed"}`                                                                                                                                                               |
+| DELETE   | `/api/ab/experiments/<id>`       | delete it with its assignments and events                                                                                                                                                               |
+| GET/POST | `/api/ab/keys`                   | list, make (`{"name"}`; the key is shown once)                                                                                                                                                          |
+| DELETE   | `/api/ab/keys/<key id>`          | revoke                                                                                                                                                                                                  |
 
 ## From the terminal
 

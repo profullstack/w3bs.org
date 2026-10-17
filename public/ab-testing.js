@@ -55,6 +55,7 @@ if (globalThis.document) {
           slug: data.get('slug'),
           unit: data.get('unit'),
           eligibilityRule: data.get('eligibilityRule') || undefined,
+          goal: data.get('goal') || undefined,
           variants: parseVariants(String(data.get('variants') ?? '')),
           minimumEligiblePerVariant: Number(data.get('minimumEligiblePerVariant') || 100),
           days,
