@@ -81,6 +81,8 @@ Write-Host "== explorer running: $([bool]$explorer)"
 # ---------------------------------------------------------------- daemon
 $daemon = Start-Process -FilePath $Bin -ArgumentList 'daemon', '--adapter', 'native' -RedirectStandardError (Join-Path $Work 'daemon.err') -RedirectStandardOutput (Join-Path $Work 'daemon.out') -NoNewWindow -PassThru
 check (until { (W status).code -eq 0 }) "daemon --adapter native answers on its named pipe"
+# The person at this runner said "Always allow" (the drive prompt has its own conformance tests).
+check ((W drive always-allow on).v.drive_always_allow -eq $true) "drive always-allow on (no drive prompt for this run)"
 $st = W status
 check ($st.v.state -eq 'disabled' -and $st.v.adapter -eq 'windows-native') "fresh start is Disabled on windows-native" $st.raw
 $doc = W doctor

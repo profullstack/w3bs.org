@@ -43,6 +43,7 @@ import Shell from 'gi://Shell';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 import * as KeyboardManager from 'resource:///org/gnome/shell/misc/keyboardManager.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
@@ -600,7 +601,8 @@ class AdlIndicator extends PanelMenu.Button {
     _init(ext) {
         super._init(0.5, 'Agentic Desktop Layer', false);
         this._ext = ext;
-        this._view = {up: false, state: '', reason: null, lease: null, approvals: new Map(), code: null, note: null};
+        this._view = {up: false, state: '', reason: null, lease: null, approvals: new Map(), drives: new Map(), alwaysAllow: false, code: null, note: null};
+        this._driveNotes = new Map();
         this._names = new Map();
 
         const box = new St.BoxLayout({style_class: 'panel-status-menu-box'});
@@ -625,6 +627,12 @@ class AdlIndicator extends PanelMenu.Button {
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         this._toggleItem = this._action('', () => this._toggle());
         this._confirmItem = this._action('', () => this._confirmPending());
+        // Agents asking to drive: Allow, Deny, Postpone, Always allow.
+        this._driveSection = new PopupMenu.PopupMenuSection();
+        this.menu.addMenuItem(this._driveSection);
+        this._alwaysItem = new PopupMenu.PopupSwitchMenuItem("Always allow agents to drive (I'm away)", false);
+        this._alwaysItem.connect('toggled', (_it, on) => this._run('drive.always_allow', {on}));
+        this.menu.addMenuItem(this._alwaysItem);
         this._approvalSection = new PopupMenu.PopupMenuSection();
         this.menu.addMenuItem(this._approvalSection);
         this._approvalItems = new Map();
@@ -656,11 +664,23 @@ class AdlIndicator extends PanelMenu.Button {
         this._view.up = true;
         this._view.note = null;
         this._render();
+        // State the broker had before this connection: always-allow and requests still waiting.
+        oneShot('status', {}).then(st => {
+            this.event('drive_always_allow', {on: !!st?.drive_always_allow});
+        }).catch(() => {});
+        oneShot('drive.list', {}).then(list => {
+            for (const d of list ?? []) {
+                if (d.status === 'pending')
+                    this.event('drive_requested', d);
+            }
+        }).catch(() => {});
     }
 
     down() {
         Object.assign(this._view, {up: false, state: '', reason: null, lease: null, code: null});
         this._view.approvals.clear();
+        for (const id of [...this._view.drives.keys()])
+            this._dropDrive(id);
         this._render();
     }
 
@@ -675,6 +695,8 @@ class AdlIndicator extends PanelMenu.Button {
             if (v.state !== 'enabled') {
                 v.lease = null;
                 v.approvals.clear();
+                for (const id of [...v.drives.keys()])
+                    this._dropDrive(id);
             }
             break;
         case 'enable_requested':
@@ -693,6 +715,18 @@ class AdlIndicator extends PanelMenu.Button {
             break;
         case 'approval_decided':
             v.approvals.delete(data?.id);
+            break;
+        case 'drive_requested':
+            if (data?.id) {
+                v.drives.set(data.id, {name: data.agent_name ?? '', description: data.description ?? ''});
+                this._notifyDrive(data.id, data.agent_name ?? '', data.description ?? '');
+            }
+            break;
+        case 'drive_decided':
+            this._dropDrive(data?.id);
+            break;
+        case 'drive_always_allow':
+            v.alwaysAllow = !!data?.on;
             break;
         default:
             return;
@@ -813,6 +847,44 @@ class AdlIndicator extends PanelMenu.Button {
         this._run('approvals.decide', {approval: id, approve});
     }
 
+    _drive(id, decision) {
+        this._run('drive.decide', {drive: id, decision});
+    }
+
+    _dropDrive(id) {
+        this._view.drives.delete(id);
+        const n = this._driveNotes.get(id);
+        this._driveNotes.delete(id);
+        try {
+            n?.destroy();
+        } catch (_e) {}
+    }
+
+    // A pop-up with the four answers, like the tray's notification on KDE. The menu has the same
+    // choices if the notification cannot be shown. Agent text is set as plain text.
+    _notifyDrive(id, name, description) {
+        if (this._driveNotes.has(id))
+            return;
+        try {
+            const source = MessageTray.getSystemSource();
+            const n = new MessageTray.Notification({
+                source,
+                title: `${name} wants to drive your desktop`,
+                body: description ? `Task: ${description}` : 'It will move the pointer and type until its task ends.',
+                urgency: MessageTray.Urgency.CRITICAL,
+                resident: true,
+            });
+            n.addAction('Allow', () => this._drive(id, 'allow'));
+            n.addAction('Deny', () => this._drive(id, 'deny'));
+            n.addAction('Postpone 10 min', () => this._drive(id, 'postpone'));
+            n.addAction('Always allow', () => this._drive(id, 'always_allow'));
+            source.addNotification(n);
+            this._driveNotes.set(id, n);
+        } catch (e) {
+            console.warn(`Agentic Desktop Layer: drive prompt notification failed: ${e.message}`);
+        }
+    }
+
     _note(text) {
         this._view.note = text;
         this._render();
@@ -831,14 +903,14 @@ class AdlIndicator extends PanelMenu.Button {
     _render() {
         const v = this._view;
         const enabled = v.up && v.state === 'enabled';
-        const attention = v.approvals.size > 0 || v.code !== null || v.state === 'blocked';
+        const attention = v.approvals.size > 0 || v.drives.size > 0 || v.code !== null || v.state === 'blocked';
         let icon = 'changes-prevent-symbolic', short = 'Off';
         if (!v.up) {
             icon = 'action-unavailable-symbolic';
             short = 'No broker';
         } else if (attention) {
             icon = 'dialog-warning-symbolic';
-            short = v.approvals.size > 0 ? `${enabled ? 'On' : 'Off'}, approval` : (v.state === 'blocked' ? 'Blocked' : 'Confirm');
+            short = v.drives.size > 0 ? 'Agent asking' : v.approvals.size > 0 ? `${enabled ? 'On' : 'Off'}, approval` : (v.state === 'blocked' ? 'Blocked' : 'Confirm');
         } else if (enabled) {
             icon = v.lease ? 'input-mouse-symbolic' : 'changes-allow-symbolic';
             short = v.lease ? 'On, active' : 'On';
@@ -857,6 +929,8 @@ class AdlIndicator extends PanelMenu.Button {
             a11y += `; agent ${this._name(v.lease.agent)} is controlling input`;
         if (v.approvals.size)
             a11y += `; ${v.approvals.size} approval(s) waiting`;
+        if (v.drives.size)
+            a11y += `; ${v.drives.size} agent(s) asking to drive`;
         this.accessible_name = a11y;
 
         this._statusItem.label.text = `Status: ${this.stateText()}`;
@@ -875,6 +949,23 @@ class AdlIndicator extends PanelMenu.Button {
         this._agentsMenu.visible = v.up;
         this._activityMenu.visible = v.up;
         this._quitItem.visible = v.up;
+
+        this._alwaysItem.visible = v.up;
+        if (this._alwaysItem.state !== v.alwaysAllow)
+            this._alwaysItem.setToggleState(v.alwaysAllow);
+        const driveIds = [...v.drives.keys()].join(',');
+        if (driveIds !== this._driveIds) {
+            this._driveIds = driveIds;
+            this._driveSection.removeAll();
+            for (const [id, d] of v.drives) {
+                const text = d.description ? `${d.name} wants to drive: ${d.description}` : `${d.name} wants to drive`;
+                this._driveSection.addMenuItem(new PopupMenu.PopupMenuItem(text, {reactive: false, can_focus: false}));
+                this._action('    Allow', () => this._drive(id, 'allow'), this._driveSection);
+                this._action('    Deny', () => this._drive(id, 'deny'), this._driveSection);
+                this._action('    Postpone 10 min', () => this._drive(id, 'postpone'), this._driveSection);
+                this._action('    Always allow', () => this._drive(id, 'always_allow'), this._driveSection);
+            }
+        }
 
         // Rebuild the approvals only when the set changes, so keyboard focus is not lost.
         const ids = [...v.approvals.keys()].join(',');

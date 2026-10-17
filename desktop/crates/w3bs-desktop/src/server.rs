@@ -325,6 +325,13 @@ fn control(b: &Arc<Broker>, c: &mut Conn, req: &Request) -> Result<Value> {
         "tasks.cancel" => to(b.cancel_task(&str_param(p, "task")?, None)?),
         "approvals.list" => to(b.approvals()),
         "approvals.decide" => to(b.decide_approval(&peer, &str_param(p, "approval")?, p.get("approve").and_then(Value::as_bool).unwrap_or(false))?),
+        "drive.list" => to(b.drive_requests()),
+        // Allow, deny, postpone (optional `postpone_ms`) or always_allow an agent's turn at the desktop.
+        "drive.decide" => {
+            let decision: DriveDecision = params(p.get("decision").unwrap_or(&Value::Null))?;
+            to(b.decide_drive(&peer, &str_param(p, "drive")?, decision, p.get("postpone_ms").and_then(Value::as_u64))?)
+        }
+        "drive.always_allow" => to(b.set_drive_always_allow(&peer, p.get("on").and_then(Value::as_bool).unwrap_or(false))?),
         "audit.export" => to(b.audit.export()),
         "audit.delete" => Ok(json!({"files_deleted": b.audit.delete_all()})),
         "audit.recent" => to(b.audit.recent(p.get("limit").and_then(Value::as_u64).unwrap_or(20).min(500) as usize)),

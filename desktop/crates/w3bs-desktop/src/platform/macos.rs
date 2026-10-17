@@ -60,6 +60,8 @@ mod menubar {
         Stop,
         Emergency,
         Decide(String, bool),
+        Drive(String, &'static str),
+        AlwaysAllow(bool),
         Permissions,
         OpenPanel,
         Shortcut(String),
@@ -77,6 +79,9 @@ mod menubar {
         reason: Option<String>,
         lease: Option<(String, String)>,
         approvals: Vec<(String, String)>,
+        /// Agents waiting to drive: (request id, text).
+        drives: Vec<(String, String)>,
+        always_allow: bool,
         pending_code: Option<String>,
         note: Option<String>,
         shortcut: Option<String>,
@@ -115,12 +120,21 @@ mod menubar {
                     if self.state != "enabled" {
                         self.lease = None;
                         self.approvals.clear();
+                        self.drives.clear();
                     }
                 }
                 Some("enable_requested") => self.pending_code = data["code"].as_str().map(Into::into),
                 Some("lease") => self.lease = data.as_object().map(|l| (v["agent_name"].as_str().unwrap_or("").into(), l["task"].as_str().unwrap_or("").into())),
                 Some("approval_requested") => self.approvals.push((data["id"].as_str().unwrap_or("").into(), format!("{} wants: {}", v["agent_name"].as_str().unwrap_or(""), data["summary"].as_str().unwrap_or("")))),
                 Some("approval_decided") => self.approvals.retain(|(id, _)| Some(id.as_str()) != data["id"].as_str()),
+                Some("drive_requested") => {
+                    let (name, desc) = (data["agent_name"].as_str().unwrap_or(""), data["description"].as_str().unwrap_or(""));
+                    let id = data["id"].as_str().unwrap_or("").to_string();
+                    self.drives.retain(|(d, _)| *d != id);
+                    self.drives.push((id, if desc.is_empty() { format!("{name} wants to drive") } else { format!("{name} wants to drive: {desc}") }));
+                }
+                Some("drive_decided") => self.drives.retain(|(id, _)| Some(id.as_str()) != data["id"].as_str()),
+                Some("drive_always_allow") => self.always_allow = data["on"].as_bool().unwrap_or(false),
                 _ => {}
             }
         }
@@ -244,6 +258,18 @@ mod menubar {
             if let Some(code) = &v.pending_code {
                 self.add(&menu, &mut acts, &format!("Confirm the enable request from a terminal (code {code})"), Some(Act::ConfirmPending));
             }
+            if !v.drives.is_empty() {
+                sep(&menu);
+                for (id, text) in &v.drives {
+                    self.add(&menu, &mut acts, text, None);
+                    self.add(&menu, &mut acts, "    Allow", Some(Act::Drive(id.clone(), "allow")));
+                    self.add(&menu, &mut acts, "    Deny", Some(Act::Drive(id.clone(), "deny")));
+                    self.add(&menu, &mut acts, "    Postpone 10 min", Some(Act::Drive(id.clone(), "postpone")));
+                    self.add(&menu, &mut acts, "    Always allow", Some(Act::Drive(id.clone(), "always_allow")));
+                }
+            }
+            let always = if v.always_allow { "✓ Always allow agents to drive (I'm away)" } else { "Always allow agents to drive (I'm away)" };
+            self.add(&menu, &mut acts, always, Some(Act::AlwaysAllow(!v.always_allow)));
             if !v.approvals.is_empty() {
                 sep(&menu);
                 for (id, summary) in &v.approvals {
@@ -261,7 +287,7 @@ mod menubar {
             }
             iv.item.setMenu(Some(&menu));
             if let Some(b) = iv.item.button(mtm) {
-                let attention = if v.lease.is_some() || !v.approvals.is_empty() || v.pending_code.is_some() { " !" } else { "" };
+                let attention = if v.lease.is_some() || !v.approvals.is_empty() || !v.drives.is_empty() || v.pending_code.is_some() { " !" } else { "" };
                 b.setTitle(&NSString::from_str(&format!("Agents: {}{attention}", v.state_word())));
                 b.setToolTip(Some(&NSString::from_str(&format!("Agentic Desktop Layer: {}", v.state_text()))));
             }
@@ -331,6 +357,9 @@ mod menubar {
             if !ok {
                 return;
             }
+            if let Ok(st) = call("status", json!({})) {
+                let _ = ui_tx.send(Ui::Event(json!({"event": "drive_always_allow", "data": {"on": st["drive_always_allow"]}})));
+            }
             for act in act_rx {
                 let r = match &act {
                     Act::Enable => call("enable.request", json!({})).and_then(|c| match c["code"].as_str() {
@@ -343,6 +372,8 @@ mod menubar {
                     // The broker's own emergency-stop event: disables, and is audited as such.
                     Act::Emergency => call("session.event", json!({"event": "emergency_stop"})),
                     Act::Decide(id, ok) => call("approvals.decide", json!({"approval": id, "approve": ok})),
+                    Act::Drive(id, decision) => call("drive.decide", json!({"drive": id, "decision": decision})),
+                    Act::AlwaysAllow(on) => call("drive.always_allow", json!({"on": on})),
                     Act::Permissions => call("doctor", json!({"prompt": true})).map(|d| {
                         let checks: Vec<String> = d["checks"].as_array().into_iter().flatten().filter(|c| c["check"].as_str().is_some_and(|n| n.starts_with("macos_") && n != "macos_input_monitoring")).map(|c| format!("{}: {}", c["check"].as_str().unwrap_or("").trim_start_matches("macos_"), if c["ok"] == true { "ok" } else { "missing" })).collect();
                         json!(checks.join(", "))

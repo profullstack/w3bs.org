@@ -38,7 +38,7 @@ type Events = std::sync::mpsc::Receiver<String>;
 fn setup() -> (Broker, Arc<Mutex<String>>, Events) {
     let report = Arc::new(Mutex::new(REPORT.to_string()));
     let a = WithKWin::new(MockDesktop::new(), KWinObserver::new(Box::new(Canned(report.clone()))));
-    let b = Broker::new(Arc::new(a), AgentStore::memory(), Audit::memory(), Config { pace_ms: 0, ..Config::default() });
+    let b = Broker::new(Arc::new(a), AgentStore::memory(), Audit::memory(), Config { pace_ms: 0, drive_prompt: false, ..Config::default() });
     // A native control must be listening before a human can enable.
     let (tx, rx) = std::sync::mpsc::channel();
     b.subscribe(tx, true);

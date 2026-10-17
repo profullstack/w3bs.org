@@ -54,7 +54,8 @@ pub const AGENT_METHODS: &[&str] = &[
 pub const CONTROL_METHODS: &[&str] = &[
     "status", "capabilities", "doctor", "enable.request", "enable.confirm", "disable", "stop", "takeover",
     "agents.add", "agents.list", "agents.update", "agents.revoke", "agents.remove", "tasks.list",
-    "tasks.inspect", "tasks.cancel", "approvals.list", "approvals.decide", "audit.export", "audit.delete",
+    "tasks.inspect", "tasks.cancel", "approvals.list", "approvals.decide", "drive.list", "drive.decide",
+    "drive.always_allow", "audit.export", "audit.delete",
     "audit.recent", "session.event", "subscribe", "control.login", "native.shortcut",
     "training.status", "training.apps", "training.start", "training.pause", "training.resume", "training.mark",
     "training.explain", "training.finish", "training.discard", "training.forget", "training.handoff",

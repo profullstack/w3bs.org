@@ -9,6 +9,8 @@ mod client;
 mod control;
 mod control_web;
 #[cfg(target_os = "linux")]
+mod drive_notify;
+#[cfg(target_os = "linux")]
 mod gnome_ext;
 mod http_mcp;
 mod mcp;
@@ -101,7 +103,7 @@ enum Cmd {
         mcp_http: Option<String>,
     },
     /// Terminal native control: shows state, enable codes and approvals; quitting disables access
-    #[command(long_about = "Terminal native control: the on/off switch for agent access, in a terminal.\n\nRun it, then type a command and press Enter:\n  enable            turn agent access on (your desktop may ask for permission the first time)\n  disable           turn it off\n  stop              cancel all agent activity but stay enabled\n  approvals         list requests waiting for you\n  approve <id>      allow one request; deny <id> refuses it\n  confirm           confirm an enable request started from another terminal\n  tasks, status     what agents are doing\n  open              open the control app in your browser\n  quit              leave (this also turns agent access off)\n\nKeep it open while agents work. The tray icon or GNOME panel menu does the same thing.\n\nWith --open it does not start the terminal control: it opens the control app (agents, tasks,\napprovals, activity) in your browser with a one-time sign-in link and exits. Closing the app\ndoes not turn agent access off; its Quit and disable button does.")]
+    #[command(long_about = "Terminal native control: the on/off switch for agent access, in a terminal.\n\nRun it, then type a command and press Enter:\n  enable            turn agent access on (your desktop may ask for permission the first time)\n  disable           turn it off\n  stop              cancel all agent activity but stay enabled\n  approvals         list requests waiting for you\n  approve <id>      allow one request; deny <id> refuses it\n  allow | deny      answer an agent asking to drive (the latest; add its id to pick one)\n  postpone [min]    ask again later (10 minutes, or the minutes given)\n  always            allow every agent without asking; `always off` turns asking back on\n  confirm           confirm an enable request started from another terminal\n  tasks, status     what agents are doing\n  open              open the control app in your browser\n  quit              leave (this also turns agent access off)\n\nKeep it open while agents work. The tray icon or GNOME panel menu does the same thing.\n\nWith --open it does not start the terminal control: it opens the control app (agents, tasks,\napprovals, activity) in your browser with a one-time sign-in link and exits. Closing the app\ndoes not turn agent access off; its Quit and disable button does.")]
     Control {
         /// Open the control app in your browser (one-time sign-in link, valid 60 s) and exit
         #[arg(long)]
@@ -142,6 +144,9 @@ enum Cmd {
     /// Human approvals for requests that need them
     #[command(subcommand)]
     Approvals(ApprovalsCmd),
+    /// Agents asking to drive this desktop: allow, deny, postpone, or always allow (away from the desk)
+    #[command(subcommand)]
+    Drive(DriveCmd),
     /// Inspect and cancel tasks
     #[command(subcommand)]
     Tasks(TasksCmd),
@@ -354,6 +359,30 @@ enum ApprovalsCmd {
 }
 
 #[derive(Subcommand)]
+enum DriveCmd {
+    /// Agents waiting for your answer, and the answers you gave
+    List,
+    /// Let this agent drive for its current task
+    Allow { id: String },
+    /// Refuse this agent for its current task
+    Deny { id: String },
+    /// Ask again later; until then the agent is told to wait
+    Postpone {
+        id: String,
+        /// Minutes to wait before asking again (1-240)
+        #[arg(long, default_value_t = 10)]
+        minutes: u64,
+    },
+    /// Allow this request and every later one without asking, until `always-allow off`
+    Always { id: String },
+    /// Turn "always allow" on (you are away) or off (ask before every agent drives)
+    AlwaysAllow {
+        #[arg(value_parser = ["on", "off"])]
+        state: String,
+    },
+}
+
+#[derive(Subcommand)]
 enum TasksCmd {
     List,
     Inspect { id: String },
@@ -553,12 +582,33 @@ fn agent_client(auth: &AgentAuth) -> Result<Client> {
     Ok(c)
 }
 
+/// Take the input lease, waiting (bounded) while the person at the desktop answers the drive
+/// prompt, so an agent's first click does not fail just because nobody has looked yet.
+/// `W3BS_DESKTOP_DRIVE_WAIT_S` sets the wait (default 120, 0 = do not wait).
+pub(crate) fn acquire_lease(c: &mut Client, task: &str, ttl_ms: Option<&Value>) -> Result<Value> {
+    let wait = std::env::var("W3BS_DESKTOP_DRIVE_WAIT_S").ok().and_then(|v| v.parse::<u64>().ok()).unwrap_or(120);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(wait);
+    let mut said = false;
+    loop {
+        match c.call("lease.acquire", json!({"task": task, "ttl_ms": ttl_ms})) {
+            Err(e) if e.code == ErrorCode::ApprovalRequired && e.details.get("drive_request_id").is_some() && std::time::Instant::now() < deadline => {
+                if !said {
+                    eprintln!("w3bs desktop: waiting for the person at the desktop to allow this agent to drive (Allow, Deny, Postpone or Always allow)");
+                    said = true;
+                }
+                std::thread::sleep(std::time::Duration::from_secs(2));
+            }
+            r => return r,
+        }
+    }
+}
+
 /// One CLI input command = begin task, take lease, run one batch, end task.
 fn run_input(auth: &AgentAuth, what: &str, window: Option<String>, actions: Vec<Value>) -> Result<Value> {
     let mut c = agent_client(auth)?;
     let task = c.call("task.begin", json!({"description": format!("cli: {what}")}))?;
     let id = task["id"].as_str().unwrap_or_default().to_string();
-    let result = c.call("lease.acquire", json!({"task": id})).and_then(|_| c.call("input", json!({"task": id, "target": {"window": window}, "actions": actions})));
+    let result = acquire_lease(&mut c, &id, None).and_then(|_| c.call("input", json!({"task": id, "target": {"window": window}, "actions": actions})));
     let outcome = match &result {
         Ok(r) if r["outcome"] == "completed" => "completed",
         Ok(_) => "failed",
@@ -625,6 +675,12 @@ fn status_line(v: &Value) -> String {
         s += &format!(" ({r})");
     }
     s += &format!("\nAdapter: {}  Agents: {}  Pending approvals: {}", v["adapter"].as_str().unwrap_or(""), v["agents"], v["pending_approvals"]);
+    if v["pending_drive_requests"].as_u64().unwrap_or(0) > 0 {
+        s += &format!("\nAgents asking to drive: {} (w3bs desktop drive list)", v["pending_drive_requests"]);
+    }
+    if v["drive_always_allow"].as_bool().unwrap_or(false) {
+        s += "\nDrive prompt: off, always allow is on (w3bs desktop drive always-allow off)";
+    }
     match v["lease"].as_object() {
         Some(l) => s += &format!("\nInput lease: agent {} task {}", l["agent"].as_str().unwrap_or(""), l["task"].as_str().unwrap_or("")),
         None => s += "\nInput lease: free",
@@ -781,6 +837,22 @@ fn run_with(cli: Cli) {
                 ApprovalsCmd::List => c.call("approvals.list", json!({})),
                 ApprovalsCmd::Approve { id } => c.call("approvals.decide", json!({"approval": id, "approve": true})),
                 ApprovalsCmd::Deny { id } => c.call("approvals.decide", json!({"approval": id, "approve": false})),
+            }
+        }
+        Cmd::Drive(d) => {
+            let mut c = control_client()?;
+            let decide = |id: &str, decision: &str| json!({"drive": id, "decision": decision});
+            match d {
+                DriveCmd::List => c.call("drive.list", json!({})),
+                DriveCmd::Allow { id } => c.call("drive.decide", decide(&id, "allow")),
+                DriveCmd::Deny { id } => c.call("drive.decide", decide(&id, "deny")),
+                DriveCmd::Postpone { id, minutes } => {
+                    let mut p = decide(&id, "postpone");
+                    p["postpone_ms"] = json!(minutes.clamp(1, 240) * 60_000);
+                    c.call("drive.decide", p)
+                }
+                DriveCmd::Always { id } => c.call("drive.decide", decide(&id, "always_allow")),
+                DriveCmd::AlwaysAllow { state } => c.call("drive.always_allow", json!({"on": state == "on"})),
             }
         }
         Cmd::Tasks(t) => {

@@ -42,6 +42,15 @@ pub struct Config {
     pub stop_wait_ms: u64,
     /// Desktop Training Mode recorder settings.
     pub training: crate::recorder::TrainingConfig,
+    /// Ask the person before an agent takes the input lease ("drive prompt"). Off on
+    /// non-desktop instances (`enabled_by_default`), where nobody is there to answer.
+    pub drive_prompt: bool,
+    /// How long a drive prompt waits for an answer before it lapses (the agent then asks again).
+    pub drive_request_ttl_ms: u64,
+    /// Default "Postpone", and how long "Deny" holds before the agent may ask again.
+    pub drive_postpone_ms: u64,
+    /// "Allow" lasts while the agent keeps driving; this long without a lease and it asks again.
+    pub drive_idle_ms: u64,
 }
 
 impl Default for Config {
@@ -57,6 +66,10 @@ impl Default for Config {
             max_tasks_per_agent: 8,
             stop_wait_ms: 1_000,
             training: crate::recorder::TrainingConfig::default(),
+            drive_prompt: true,
+            drive_request_ttl_ms: 10 * 60_000,
+            drive_postpone_ms: 10 * 60_000,
+            drive_idle_ms: 10 * 60_000,
         }
     }
 }
@@ -126,6 +139,7 @@ struct Inner {
     lease: Option<Lease>,
     tasks: HashMap<String, Task>,
     approvals: HashMap<String, ApprovalInfo>,
+    drive: HashMap<String, DriveRequest>,
     captures: HashMap<String, CaptureMeta>,
     held: Vec<(Held, u64)>,
     challenge: Option<(String, u64)>,
@@ -171,6 +185,7 @@ impl Broker {
                 lease: None,
                 tasks: HashMap::new(),
                 approvals: HashMap::new(),
+                drive: HashMap::new(),
                 captures: HashMap::new(),
                 held: vec![],
                 challenge: None,
@@ -417,6 +432,13 @@ impl Broker {
                 a.status = ApprovalStatus::Expired;
                 report.approvals_withdrawn += 1;
             }
+            // Stop cancels every task, so every drive answer is moot; a new task asks again.
+            let withdrawn: Vec<String> = g.drive.values().filter(|d| d.status == DriveStatus::Pending).map(|d| d.id.clone()).collect();
+            report.approvals_withdrawn += withdrawn.len();
+            g.drive.clear();
+            for id in withdrawn {
+                Self::broadcast(&mut g, &json!({"v": SCHEMA_VERSION, "event": "drive_decided", "data": {"id": id, "status": DriveStatus::Expired}}));
+            }
             g.captures.clear();
         }
         report.streams_closed = self.adapter.close_streams();
@@ -530,6 +552,8 @@ impl Broker {
             lease: g.lease.as_ref().filter(|l| l.info.expires_at_ms > now_ms()).map(|l| l.info.clone()),
             running_tasks: g.tasks.values().filter(|t| t.info.state == TaskState::Running).map(|t| t.info.clone()).collect(),
             pending_approvals: g.approvals.values().filter(|a| a.status == ApprovalStatus::Pending).count(),
+            pending_drive_requests: g.drive.values().filter(|d| d.status == DriveStatus::Pending && d.expires_at_ms > now_ms()).count(),
+            drive_always_allow: self.store.drive_always_allow(),
             agents: self.store.list().iter().filter(|a| !a.revoked).count(),
             version: env!("CARGO_PKG_VERSION").into(),
         }
@@ -850,12 +874,166 @@ impl Broker {
             && l.info.expires_at_ms > now && l.info.generation == lease_gen && (l.info.agent != p.agent || l.info.task != task) {
                 return Err(AdlError::new(ErrorCode::Busy, "another task holds the desktop input lease").with_details(json!({"holder": l.info.agent, "expires_at_ms": l.info.expires_at_ms})));
             }
+        let auto = self.drive_gate(&mut g, p, task, now)?;
         let info = LeaseInfo { id: random_id("lease", 8), agent: p.agent.clone(), task: task.into(), expires_at_ms: now + ttl, generation: lease_gen };
         g.lease = Some(Lease { info: info.clone() });
         Self::broadcast(&mut g, &json!({"v": SCHEMA_VERSION, "event": "lease", "data": info}));
         drop(g);
-        self.audit.log("lease.acquire", Some(&p.agent), Some(task), "allowed", "", json!({"ttl_ms": ttl}));
+        self.audit.log("lease.acquire", Some(&p.agent), Some(task), "allowed", "", json!({"ttl_ms": ttl, "drive": if auto { "always_allow" } else { "allowed" }}));
         Ok(info)
+    }
+
+    // ---------------------------------------------------------------- drive prompt
+
+    fn drive_prompt_on(&self) -> bool {
+        self.cfg.drive_prompt && !self.cfg.enabled_by_default
+    }
+
+    /// Before an agent drives, the person is asked: Allow, Deny, Postpone or Always allow. One
+    /// request per agent: "Allow" lasts while the agent keeps driving (see `drive_idle_ms`), so a
+    /// CLI that begins a task per command is asked once, not per click. Returns whether the lease
+    /// was granted by "Always allow" (no prompt).
+    fn drive_gate(&self, g: &mut MutexGuard<'_, Inner>, p: &Principal, task: &str, now: u64) -> Result<bool> {
+        if !self.drive_prompt_on() {
+            return Ok(false);
+        }
+        if self.store.drive_always_allow() {
+            return Ok(true);
+        }
+        let idle = self.cfg.drive_idle_ms;
+        let existing = g.drive.values().find(|d| d.agent == p.agent).map(|d| d.id.clone());
+        if let Some(id) = &existing {
+            let d = g.drive.get_mut(id).unwrap();
+            let until = d.until_ms.unwrap_or(0);
+            match d.status {
+                DriveStatus::Allowed if until > now => {
+                    d.until_ms = Some(now + idle);
+                    return Ok(false);
+                }
+                DriveStatus::Denied if until > now => {
+                    return Err(AdlError::denied("the person at the desktop declined to let this agent drive").with_details(json!({"drive_request_id": id, "retry_after_ms": until - now})));
+                }
+                DriveStatus::Postponed if until > now => {
+                    return Err(AdlError::new(ErrorCode::Busy, "the person postponed this agent's turn; try lease.acquire again later")
+                        .with_details(json!({"drive_request_id": id, "retry_after_ms": until - now})));
+                }
+                DriveStatus::Pending if d.expires_at_ms > now => {
+                    // Show what it wants to do now.
+                    if let Some(t) = g.tasks.get(task) {
+                        let desc = t.info.description.clone();
+                        let d = g.drive.get_mut(id).unwrap();
+                        d.task = task.into();
+                        d.description = desc;
+                    }
+                    return Err(Self::drive_wait_error(id));
+                }
+                _ => {}
+            }
+        }
+        // New, lapsed, idle too long, or the postponement/denial is over: ask (again).
+        let agent_name = self.store.get(&p.agent).map(|a| a.name).unwrap_or_else(|| p.agent.clone());
+        let description = g.tasks.get(task).map(|t| t.info.description.clone()).unwrap_or_default();
+        let d = DriveRequest {
+            id: existing.unwrap_or_else(|| random_id("drive", 8)),
+            agent: p.agent.clone(),
+            agent_name,
+            task: task.into(),
+            description,
+            status: DriveStatus::Pending,
+            created_at_ms: now,
+            expires_at_ms: now + self.cfg.drive_request_ttl_ms,
+            until_ms: None,
+        };
+        let id = d.id.clone();
+        Self::broadcast(g, &json!({"v": SCHEMA_VERSION, "event": "drive_requested", "data": d}));
+        g.drive.insert(id.clone(), d);
+        self.audit.log("lease.acquire", Some(&p.agent), Some(task), "approval_required", "", json!({"drive_request": id}));
+        Err(Self::drive_wait_error(&id))
+    }
+
+    fn drive_wait_error(id: &str) -> AdlError {
+        AdlError::new(ErrorCode::ApprovalRequired, "the person at the desktop must allow this agent to drive; retry lease.acquire after they answer")
+            .with_details(json!({"drive_request_id": id}))
+    }
+
+    /// An allowed agent that keeps driving keeps its allowance.
+    fn drive_touch(&self, g: &mut MutexGuard<'_, Inner>, agent: &str, now: u64) {
+        let idle = self.cfg.drive_idle_ms;
+        if let Some(d) = g.drive.values_mut().find(|d| d.agent == agent && d.status == DriveStatus::Allowed) {
+            d.until_ms = Some(now + idle);
+        }
+    }
+
+    pub fn drive_requests(&self) -> Vec<DriveRequest> {
+        let now = now_ms();
+        let mut g = self.lock();
+        for d in g.drive.values_mut() {
+            if d.status == DriveStatus::Pending && d.expires_at_ms <= now {
+                d.status = DriveStatus::Expired;
+            }
+        }
+        let mut v: Vec<_> = g.drive.values().cloned().collect();
+        v.sort_by_key(|d| d.created_at_ms);
+        v
+    }
+
+    /// The person answers a drive prompt. `postpone_ms` only applies to Postpone.
+    pub fn decide_drive(&self, peer: &Peer, id: &str, decision: DriveDecision, postpone_ms: Option<u64>) -> Result<DriveRequest> {
+        self.require_human(peer, "drive.decide")?;
+        let now = now_ms();
+        if decision == DriveDecision::AlwaysAllow {
+            self.store.set_drive_always_allow(true)?;
+        }
+        let mut g = self.lock();
+        let d = g.drive.get_mut(id).ok_or_else(|| AdlError::not_found(format!("no drive request {id}")))?;
+        if d.status != DriveStatus::Pending || d.expires_at_ms <= now {
+            // "Always allow" still took effect above; only the per-request answer is refused.
+            if decision != DriveDecision::AlwaysAllow {
+                return Err(AdlError::invalid(format!("drive request is {:?}", d.status).to_lowercase()));
+            }
+        }
+        match decision {
+            DriveDecision::Allow | DriveDecision::AlwaysAllow => {
+                d.status = DriveStatus::Allowed;
+                d.until_ms = Some(now + self.cfg.drive_idle_ms);
+            }
+            DriveDecision::Deny => {
+                d.status = DriveStatus::Denied;
+                d.until_ms = Some(now + self.cfg.drive_postpone_ms);
+            }
+            DriveDecision::Postpone => {
+                let ms = postpone_ms.unwrap_or(self.cfg.drive_postpone_ms).clamp(60_000, 4 * 3_600_000);
+                d.status = DriveStatus::Postponed;
+                d.until_ms = Some(now + ms);
+            }
+        }
+        let info = d.clone();
+        Self::broadcast(&mut g, &json!({"v": SCHEMA_VERSION, "event": "drive_decided", "data": {"id": id, "status": info.status, "until_ms": info.until_ms}}));
+        if decision == DriveDecision::AlwaysAllow {
+            // Everyone else waiting gets the desktop too, without another prompt.
+            let others: Vec<String> = g.drive.values().filter(|o| o.id != id && o.status == DriveStatus::Pending).map(|o| o.id.clone()).collect();
+            let idle = self.cfg.drive_idle_ms;
+            for o in others {
+                let od = g.drive.get_mut(&o).unwrap();
+                od.status = DriveStatus::Allowed;
+                od.until_ms = Some(now + idle);
+                Self::broadcast(&mut g, &json!({"v": SCHEMA_VERSION, "event": "drive_decided", "data": {"id": o, "status": DriveStatus::Allowed}}));
+            }
+            Self::broadcast(&mut g, &json!({"v": SCHEMA_VERSION, "event": "drive_always_allow", "data": {"on": true}}));
+        }
+        drop(g);
+        let decision_name = serde_json::to_value(decision).unwrap();
+        self.audit.log("drive.decide", Some(&info.agent), Some(&info.task), if decision == DriveDecision::Deny { "denied" } else { "approved" }, "", json!({"decision": decision_name}));
+        Ok(info)
+    }
+
+    /// Turn "Always allow" on (away from the desk) or off (ask again before every agent drives).
+    pub fn set_drive_always_allow(&self, peer: &Peer, on: bool) -> Result<Status> {
+        self.require_human(peer, "drive.always_allow")?;
+        self.store.set_drive_always_allow(on)?;
+        self.broadcast_event("drive_always_allow", json!({"on": on}));
+        self.audit.log("drive.always_allow", None, None, "allowed", "", json!({"on": on}));
+        Ok(self.status())
     }
 
     pub fn lease_renew(&self, p: &Principal, ttl_ms: Option<u64>) -> Result<LeaseInfo> {
@@ -865,7 +1043,9 @@ impl Broker {
         let l = g.lease.as_mut().filter(|l| l.info.agent == p.agent && l.info.generation == lease_gen && l.info.expires_at_ms > now_ms());
         let l = l.ok_or_else(|| AdlError::denied("this agent does not hold a valid lease"))?;
         l.info.expires_at_ms = now_ms() + ttl;
-        Ok(l.info.clone())
+        let info = l.info.clone();
+        self.drive_touch(&mut g, &p.agent, now_ms());
+        Ok(info)
     }
 
     pub fn lease_release(&self, p: &Principal) -> Result<()> {

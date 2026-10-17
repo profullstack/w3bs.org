@@ -444,6 +444,7 @@ fn state(web: &Web, csrf: &str, addr: SocketAddr) -> Value {
         "status": status,
         "pending_enable": pending.map(|(code, exp)| json!({"code": code, "expires_at_ms": exp})),
         "approvals": b.approvals(),
+        "drive": b.drive_requests(),
         "training": b.training_status(),
         "agents": b.store.list(),
         "tasks": tasks,
@@ -501,6 +502,12 @@ fn action(web: &Web, body: &Value, pid: Option<u32>, key: &str) -> Result<(Value
             let approve = str_of(body, "action")? == "approve";
             to(&b.decide_approval(&peer, str_of(body, "approval")?, approve)?)
         }
+        // An agent asking to drive: allow | deny | postpone (optional postpone_ms) | always_allow.
+        "drive" => {
+            let decision: DriveDecision = serde_json::from_value(body.get("decision").cloned().unwrap_or(Value::Null)).map_err(|_| AdlError::invalid("decision must be allow, deny, postpone or always_allow"))?;
+            to(&b.decide_drive(&peer, str_of(body, "drive")?, decision, body.get("postpone_ms").and_then(Value::as_u64))?)
+        }
+        "always_allow" => to(&b.set_drive_always_allow(&peer, body.get("on").and_then(Value::as_bool).unwrap_or(false))?),
         "agent_update" => {
             let a = b.store.resolve(str_of(body, "agent")?)?;
             if a.revoked {
@@ -597,7 +604,7 @@ mod tests {
     fn setup() -> SocketAddr {
         static ADDR: OnceLock<SocketAddr> = OnceLock::new();
         *ADDR.get_or_init(|| {
-            let cfg = Config { pace_ms: 0, require_native_control: false, ..Config::default() };
+            let cfg = Config { pace_ms: 0, require_native_control: false, drive_prompt: false, ..Config::default() };
             let broker = Arc::new(Broker::new(Arc::new(adl_broker::mock::MockDesktop::new()), AgentStore::memory(), Audit::memory(), cfg));
             init(broker);
             crate::http_mcp::spawn("127.0.0.1:0".parse().unwrap(), true).unwrap()

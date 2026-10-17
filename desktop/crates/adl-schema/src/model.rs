@@ -243,6 +243,50 @@ pub struct ApprovalInfo {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum DriveStatus {
+    /// Waiting for the person at the desktop.
+    Pending,
+    /// The agent may drive until `until_ms`, which moves on each time it takes or renews the lease.
+    Allowed,
+    /// Refused until `until_ms` (`lease.acquire` answers `denied`); then it may ask again.
+    Denied,
+    /// Asked again after `until_ms`; until then `lease.acquire` answers `busy`.
+    Postponed,
+    Expired,
+}
+
+/// A person's answer to "this agent wants to drive your desktop".
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DriveDecision {
+    Allow,
+    Deny,
+    Postpone,
+    /// Allow this and every later request without asking, until turned off (for when nobody is at the desk).
+    AlwaysAllow,
+}
+
+/// An agent asking to take the input lease, shown to the person before it gets the desktop. One per
+/// agent: the answer covers every task it runs while the answer lasts.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DriveRequest {
+    pub id: String,
+    pub agent: String,
+    /// The agent's display name.
+    pub agent_name: String,
+    /// The task it is asking for (the latest, if it asked again).
+    pub task: String,
+    /// The task's own description (agent-supplied text; render as text only).
+    pub description: String,
+    pub status: DriveStatus,
+    pub created_at_ms: u64,
+    pub expires_at_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub until_ms: Option<u64>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Outcome {
     Completed,
     Cancelled,
@@ -304,6 +348,12 @@ pub struct Status {
     pub lease: Option<LeaseInfo>,
     pub running_tasks: Vec<TaskInfo>,
     pub pending_approvals: usize,
+    /// Agents waiting for the person to let them drive.
+    #[serde(default)]
+    pub pending_drive_requests: usize,
+    /// Drive requests are allowed without asking (the person is away).
+    #[serde(default)]
+    pub drive_always_allow: bool,
     pub agents: usize,
     pub version: String,
 }

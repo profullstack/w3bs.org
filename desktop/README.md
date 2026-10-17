@@ -141,6 +141,35 @@ $B doctor                  # gnome_shell_extension: ok once it is loaded
 Without it the portal backend still types and clicks, but window listing is unsupported and
 targeted input is refused.
 
+## Drive prompt
+
+Before an agent takes the pointer and keyboard, the person at the desktop is asked:
+**"<agent> wants to drive your desktop"**, with the task's description and four answers.
+
+| Answer | What it does |
+| --- | --- |
+| **Allow** | The agent drives. The answer lasts while it keeps working (every lease extends it) and lapses after 10 minutes without one, so a CLI that starts a task per command is asked once, not per click. |
+| **Deny** | The agent is refused for 10 minutes (`denied`, with `retry_after_ms`), then may ask again. |
+| **Postpone** | "Not now": the agent is told `busy` with `retry_after_ms` (10 minutes by default, 1 minute to 4 hours) and asked again after. |
+| **Always allow** | For when you are away from the desk: this and every later request is allowed without asking, until you turn it off. It is saved with your agent grants. |
+
+The prompt pops up as a desktop notification with those four buttons (KDE Plasma tray; the GNOME
+panel extension), and is in the tray, panel and macOS menu bar menus, the Windows tray menu (with a
+balloon tip), the control app and `w3bs desktop control`. Each surface also has the **Always allow
+agents to drive (I'm away)** switch. From a terminal:
+
+```bash
+w3bs desktop drive list
+w3bs desktop drive allow <id>        # also: deny <id>, postpone <id> --minutes 30, always <id>
+w3bs desktop drive always-allow on   # off: ask before every agent drives again
+```
+
+Agents wait for the answer: MCP `task_begin` and the CLI input commands retry for up to two
+minutes (`W3BS_DESKTOP_DRIVE_WAIT_S`), then report `approval_required` with the `drive_request_id`.
+Only the human answers: agents' process trees are refused on every drive method. Stop all agent
+activity forgets every answer, so agents ask again. Non-desktop instances
+(`--enabled-by-default`) have nobody to ask and skip the prompt.
+
 ## Control app
 
 A local, installable web app with everything the tray has and more: status (Disabled, Enabling,
@@ -274,6 +303,8 @@ enable` skips the code; disable and the interlocks still work. Never use it on a
   holds) and nothing stays held after its batch.
 - **Targets are validated**: every point names its coordinate space; screenshot points die with
   the layout generation; a covered target or a focus change stops the batch (`target_stale`).
+- **Agents ask before they drive** (the drive prompt above): Allow, Deny, Postpone or Always allow,
+  answered only by the human; Stop forgets every answer.
 - **Approvals bind the exact request** (agent, task, target, argument digest, expiry); agent input
   is suspended while one is pending; the agent surface has no enable/grant/approve methods.
 - **Audit is metadata only** (7-day default retention): never screenshots, typed text or bodies.

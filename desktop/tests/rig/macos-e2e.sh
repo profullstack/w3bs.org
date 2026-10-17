@@ -45,6 +45,8 @@ echo "== broker"
 "$B" daemon --adapter native >"$OUT/daemon.log" 2>&1 &
 PIDS+=($!)
 wait_for 10 test -S "$OUT/run/control.sock" || { bad "daemon did not start"; cat "$OUT/daemon.log"; exit 1; }
+# The person at this runner said "Always allow" (the drive prompt has its own conformance tests).
+"$B" --json drive always-allow on | grep -q '"drive_always_allow": true' && ok "drive always-allow on" || bad "drive always-allow on failed"
 "$B" doctor --json >"$OUT/doctor.json"
 python3 - "$OUT/doctor.json" <<'PY'
 import json, sys

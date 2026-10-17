@@ -114,7 +114,7 @@ fn interlocks() {
 fn broker_with_vela_disables_on_lock_and_compositor_loss() {
     let f = fake();
     let v = Arc::new(VelaAdapter::new(f.path.clone()));
-    let b = Broker::new(v.clone(), AgentStore::memory(), Audit::memory(), Config { pace_ms: 0, ..Config::default() });
+    let b = Broker::new(v.clone(), AgentStore::memory(), Audit::memory(), Config { pace_ms: 0, drive_prompt: false, ..Config::default() });
     let (tx, _rx) = std::sync::mpsc::channel();
     b.subscribe(tx, true);
     let c = b.enable_request(&human()).unwrap();

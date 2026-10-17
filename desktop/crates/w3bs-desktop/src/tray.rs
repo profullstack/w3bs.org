@@ -13,7 +13,7 @@ use crate::paths;
 use adl_schema::rpc::{Request, Response};
 use adl_schema::SCHEMA_VERSION;
 use ksni::blocking::TrayMethods;
-use ksni::menu::{MenuItem, StandardItem, SubMenu};
+use ksni::menu::{CheckmarkItem, MenuItem, StandardItem, SubMenu};
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
 use std::sync::mpsc;
@@ -26,6 +26,10 @@ enum Act {
     Stop,
     Emergency,
     Decide(String, bool),
+    /// Answer a drive prompt: request id and `allow` | `deny` | `postpone` | `always_allow`.
+    Drive(String, &'static str),
+    /// Turn "Always allow" on or off.
+    AlwaysAllow(bool),
     OpenPanel,
     /// Open the control app at its Training section ("Start training…", "Training options…").
     OpenTraining,
@@ -45,6 +49,12 @@ impl From<crate::shortcut::Emergency> for Act {
     }
 }
 
+impl From<crate::drive_notify::DriveAnswer> for Act {
+    fn from(a: crate::drive_notify::DriveAnswer) -> Self {
+        Act::Drive(a.0, a.1)
+    }
+}
+
 /// (id, name, mode label, capabilities) of an active agent.
 type AgentRow = (String, String, String, String);
 
@@ -54,6 +64,10 @@ struct View {
     reason: Option<String>,
     lease: Option<(String, String)>,
     approvals: Vec<(String, String)>,
+    /// Agents waiting to drive: (request id, "<agent> wants to drive: <task>").
+    drives: Vec<(String, String)>,
+    /// The person chose "Always allow": no drive prompts.
+    always_allow: bool,
     pending_code: Option<String>,
     note: Option<String>,
     shortcut: Option<String>,
@@ -184,7 +198,7 @@ impl ksni::Tray for DesktopTray {
         ksni::Category::SystemServices
     }
     fn status(&self) -> ksni::Status {
-        if self.view.lease.is_some() || !self.view.approvals.is_empty() || self.view.pending_code.is_some() {
+        if self.view.lease.is_some() || !self.view.approvals.is_empty() || !self.view.drives.is_empty() || self.view.pending_code.is_some() {
             ksni::Status::NeedsAttention
         } else {
             ksni::Status::Active
@@ -203,6 +217,12 @@ impl ksni::Tray for DesktopTray {
         }
         if !self.view.approvals.is_empty() {
             d += &format!("\n{} approval(s) waiting; agent input is paused", self.view.approvals.len());
+        }
+        if !self.view.drives.is_empty() {
+            d += &format!("\n{} agent(s) asking to drive", self.view.drives.len());
+        }
+        if self.view.always_allow {
+            d += "\nAlways allow is on: agents drive without asking";
         }
         d += &format!("\nTraining: {}", self.training_text());
         ksni::ToolTip { title: "Agentic Desktop Layer".into(), description: d, ..Default::default() }
@@ -252,6 +272,28 @@ impl ksni::Tray for DesktopTray {
         }
         if let Some(code) = &self.view.pending_code {
             m.push(item(format!("Confirm the enable request from a terminal (code {code})"), "dialog-ok", tx, Act::ConfirmPending));
+        }
+        if !self.view.drives.is_empty() {
+            m.push(MenuItem::Separator);
+            for (id, text) in &self.view.drives {
+                m.push(label(lit(text)));
+                m.push(item("    Allow", "dialog-ok", tx, Act::Drive(id.clone(), "allow")));
+                m.push(item("    Deny", "dialog-cancel", tx, Act::Drive(id.clone(), "deny")));
+                m.push(item("    Postpone 10 min", "chronometer", tx, Act::Drive(id.clone(), "postpone")));
+                m.push(item("    Always allow", "security-low", tx, Act::Drive(id.clone(), "always_allow")));
+            }
+        }
+        {
+            let (tx, on) = (tx.clone(), self.view.always_allow);
+            m.push(
+                CheckmarkItem {
+                    label: "Always allow agents to drive (I'm away)".into(),
+                    checked: on,
+                    activate: Box::new(move |_| drop(tx.send(Act::AlwaysAllow(!on)))),
+                    ..Default::default()
+                }
+                .into(),
+            );
         }
         if !self.view.approvals.is_empty() {
             m.push(MenuItem::Separator);
@@ -316,6 +358,7 @@ pub fn run() -> std::io::Result<()> {
     let (act_tx, act_rx) = mpsc::channel::<Act>();
     let (resp_tx, resp_rx) = mpsc::channel::<Response>();
     let (ev_tx, ev_rx) = mpsc::channel::<Value>();
+    let ev_tx_replay = ev_tx.clone();
 
     std::thread::spawn(move || {
         for line in reader.lines().map_while(Result::ok) {
@@ -332,6 +375,9 @@ pub fn run() -> std::io::Result<()> {
 
     let tray = DesktopTray { view: View::default(), tx: act_tx.clone() };
     let handle = tray.spawn().map_err(|e| std::io::Error::other(format!("no StatusNotifierItem host ({e}); on GNOME enable the AppIndicator extension, or use `w3bs desktop control`")))?;
+
+    // Drive prompts also pop up as a notification with the four answers as buttons.
+    let notifier = crate::drive_notify::Notifier::new(act_tx.clone()).map_err(|e| eprintln!("w3bs-desktop tray: no notification server ({e}); drive prompts are in the tray menu only")).ok();
 
     // Events update the view.
     {
@@ -351,12 +397,30 @@ pub fn run() -> std::io::Result<()> {
                         if t.view.state != "enabled" {
                             t.view.lease = None;
                             t.view.approvals.clear();
+                            t.view.drives.clear();
                         }
                     }
                     Some("enable_requested") => t.view.pending_code = data["code"].as_str().map(Into::into),
                     Some("lease") => t.view.lease = data.as_object().map(|l| (who.clone(), l["task"].as_str().unwrap_or("").into())),
                     Some("approval_requested") => t.view.approvals.push((data["id"].as_str().unwrap_or("").into(), format!("{who} wants: {}", data["summary"].as_str().unwrap_or("")))),
                     Some("approval_decided") => t.view.approvals.retain(|(id, _)| Some(id.as_str()) != data["id"].as_str()),
+                    Some("drive_requested") => {
+                        let id = data["id"].as_str().unwrap_or("").to_string();
+                        let (name, desc) = (data["agent_name"].as_str().unwrap_or(""), data["description"].as_str().unwrap_or(""));
+                        if let Some(n) = &notifier {
+                            n.show(&id, name, desc);
+                        }
+                        t.view.drives.retain(|(d, _)| *d != id);
+                        t.view.drives.push((id, if desc.is_empty() { format!("{name} wants to drive") } else { format!("{name} wants to drive: {desc}") }));
+                    }
+                    Some("drive_decided") => {
+                        let id = data["id"].as_str().unwrap_or("");
+                        if let Some(n) = &notifier {
+                            n.close(id);
+                        }
+                        t.view.drives.retain(|(d, _)| d != id);
+                    }
+                    Some("drive_always_allow") => t.view.always_allow = data["on"].as_bool().unwrap_or(false),
                     Some("training") => t.view.training = data.clone(),
                     _ => {}
                 });
@@ -382,6 +446,15 @@ pub fn run() -> std::io::Result<()> {
     call("subscribe", json!({"native_control": true})).map_err(std::io::Error::other)?;
     if let Ok(v) = call("training.status", json!({})) {
         handle.update(|t| t.view.training = v);
+    }
+    if let Ok(v) = call("status", json!({})) {
+        handle.update(|t| t.view.always_allow = v["drive_always_allow"].as_bool().unwrap_or(false));
+    }
+    // Requests made before this tray started still need an answer.
+    if let Ok(v) = call("drive.list", json!({})) {
+        for d in v.as_array().into_iter().flatten().filter(|d| d["status"] == "pending") {
+            let _ = ev_tx_replay.send(json!({"event": "drive_requested", "data": d}));
+        }
     }
 
     // Agents and recent activity change without broker events; refresh them on a second
@@ -447,6 +520,8 @@ pub fn run() -> std::io::Result<()> {
             // The broker's own emergency-stop event: disables, and is audited as such.
             Act::Emergency => call("session.event", json!({"event": "emergency_stop"})),
             Act::Decide(id, ok) => call("approvals.decide", json!({"approval": id, "approve": ok})),
+            Act::Drive(id, decision) => call("drive.decide", json!({"drive": id, "decision": decision})),
+            Act::AlwaysAllow(on) => call("drive.always_allow", json!({"on": on})),
             // A one-time sign-in link minted on this (the native control's) connection.
             Act::OpenPanel => call("control.login", json!({"via": "tray"})).and_then(|v| {
                 let url = v["url"].as_str().unwrap_or_default();
