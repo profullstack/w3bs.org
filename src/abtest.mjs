@@ -233,7 +233,11 @@ export function wilson(successes, n) {
   const denom = 1 + (z * z) / n;
   const centre = (p + (z * z) / (2 * n)) / denom;
   const half = (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / denom;
-  return [Math.max(0, centre - half), Math.min(1, centre + half)];
+  // At 0 or n successes the bound is exactly 0 or 1; floating point would put it a hair inside.
+  return [
+    successes === 0 ? 0 : Math.max(0, centre - half),
+    successes === n ? 1 : Math.min(1, centre + half),
+  ];
 }
 // Two-sided p-value of a pooled two-proportion z-test against the first variant.
 export function twoProportionP(c1, n1, c2, n2) {
