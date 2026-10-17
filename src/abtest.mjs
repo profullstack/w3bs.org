@@ -1,4 +1,4 @@
-// W3BS A/B testing: hosted OpenABTest 0.1-draft experiments (logicsrc.com/docs/openabtest).
+// W3BS A/B testing: hosted OpenABTest 0.2-draft experiments (logicsrc.com/docs/openabtest).
 //
 // An owner defines an experiment (variants, weights, window) on w3bs.org/ab-testing. Their
 // server calls `assign` with an opaque participant id and an `ab_` key; the first call picks
@@ -91,6 +91,8 @@ export function cleanDefinition(input = {}, previous = {}) {
   const name = text(source.name, 120);
   if (!name) throw fail('INVALID_EXPERIMENT', 'Give the experiment a name.');
   const unit = UNITS.includes(source.unit) ? source.unit : 'user';
+  // The goal a conversion stands for (OpenABTest 0.2 metrics.goal), e.g. signup-completed.
+  const goal = opaqueId(text(source.goal, 128) || 'conversion', 'goal');
   const rule =
     text(source.eligibilityRule, 1000) ||
     'Every participant the experiment owner sends to assign while the experiment runs.';
@@ -150,6 +152,7 @@ export function cleanDefinition(input = {}, previous = {}) {
     name,
     unit,
     eligibilityRule: rule,
+    goal,
     variants,
     startsAt,
     endsAt,
@@ -168,7 +171,7 @@ export function toManifest(row) {
     d.endsAt ??
     new Date(Date.parse(startsAt) + (d.days ?? AB_LIMITS.defaultDays) * 86400000).toISOString();
   return {
-    openabtest: '0.1-draft',
+    openabtest: '0.2-draft',
     id: row.slug,
     revision: 1,
     name: d.name,
@@ -186,8 +189,11 @@ export function toManifest(row) {
     metrics: {
       primary: 'conversion-rate',
       denominator: 'unique-eligible-participants',
-      conversion: 'unique-participants-with-confirmed-purchase',
-      profit: 'reconciled-net-retained-profit',
+      // OpenABTest 0.2 goal conversions: a conversion is the experiment's goal, and a
+      // purchase (sent with a price) is one way of reaching it. W3BS reconciles no profit.
+      conversion: 'unique-participants-with-goal',
+      goal: d.goal ?? 'conversion',
+      profit: 'none',
       minimumEligiblePerVariant: d.minimumEligiblePerVariant,
       minimumObservationSeconds: Math.round(d.minimumObservationDays * 86400),
       winnerPolicy: 'manual-review',
@@ -273,6 +279,7 @@ export function createAbTest(db) {
       name: manifest.name,
       state: row.state,
       unit: manifest.assignment.unit,
+      goal: manifest.metrics.goal,
       variants: manifest.variants,
       window:
         row.state === 'draft' && !JSON.parse(row.definition).startsAt ? null : manifest.window,
@@ -636,7 +643,7 @@ export function createAbTest(db) {
       // A purchase: the OpenABTest price block, checked by the reference validator.
       price = input.price;
       const check = validate('openabtest-event', {
-        openabtest: '0.1-draft',
+        openabtest: '0.2-draft',
         id,
         producerId: PRODUCER_ID,
         manifestId: row.slug,
@@ -776,24 +783,28 @@ export function createAbTest(db) {
       `SELECT * FROM ab_events WHERE experiment_id = ? ORDER BY at, id LIMIT ${AB_LIMITS.eventsExport}`,
       [row.id],
     );
+    const manifest = toManifest(row);
     const events = [];
-    let withoutPrice = 0;
     for (const r of rows) {
-      // OpenABTest 0.1 conversions are purchases with a price; goal-only conversions stay
-      // in the W3BS results and are counted here instead.
-      if (r.kind === 'conversion' && !r.price) {
-        withoutPrice++;
-        continue;
-      }
       const bound = { assignmentId: r.assignment_id, variantId: r.variant_id };
+      // A purchase carries its price; any other conversion is the experiment's goal.
+      const converted = () =>
+        r.price
+          ? { price: JSON.parse(r.price) }
+          : {
+              goal: manifest.metrics.goal,
+              ...(r.value_minor === null || r.value_minor === undefined
+                ? {}
+                : { value: { currency: r.currency, amountMinor: Number(r.value_minor) } }),
+            };
       const payload = {
         eligibility: () => ({ cohortId: 'eligible', eligible: true }),
         assignment: () => ({ cohortId: 'eligible', ...bound }),
         exposure: () => ({ ...bound, offerId: r.offer_id, surface: r.surface }),
-        conversion: () => ({ ...bound, conversionId: r.conversion_id, price: JSON.parse(r.price) }),
+        conversion: () => ({ ...bound, conversionId: r.conversion_id, ...converted() }),
       }[r.kind]();
       events.push({
-        openabtest: '0.1-draft',
+        openabtest: '0.2-draft',
         id: r.id,
         producerId: PRODUCER_ID,
         manifestId: row.slug,
@@ -804,12 +815,7 @@ export function createAbTest(db) {
         payload,
       });
     }
-    return {
-      manifest: toManifest(row),
-      events,
-      omitted: { conversionsWithoutPrice: withoutPrice },
-      truncated: rows.length >= AB_LIMITS.eventsExport,
-    };
+    return { manifest, events, truncated: rows.length >= AB_LIMITS.eventsExport };
   }
 
   return {

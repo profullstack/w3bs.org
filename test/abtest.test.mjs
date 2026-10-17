@@ -57,6 +57,7 @@ const EXPERIMENT = {
     { id: 'green', weight: 1, parameters: { color: 'green' } },
   ],
   minimumEligiblePerVariant: 5,
+  goal: 'purchase-completed',
   days: 14,
 };
 
@@ -109,6 +110,7 @@ for (const backend of backends) {
         (await t.json('/api/ab/experiments', { cookie: alice, body: { ...EXPERIMENT, ...body } }))
           .status;
       assert.equal(await bad({ slug: 'Has Spaces' }), 400);
+      assert.equal(await bad({ goal: 'has spaces' }), 400);
       assert.equal(await bad({ variants: [EXPERIMENT.variants[0]] }), 400);
       assert.equal(await bad({ variants: [EXPERIMENT.variants[0], EXPERIMENT.variants[0]] }), 400);
       assert.equal(
@@ -319,22 +321,31 @@ for (const backend of backends) {
       assert.equal((await assign('p-0')).body.variant, variants['p-0']);
       assert.equal((await assign('new-person')).body.variant, null);
 
-      // The export is valid OpenABTest 0.1.
+      // The export is valid OpenABTest 0.2, goal conversions included.
       const { body: manifest } = await t.json('/api/ab/experiments/checkout-button/manifest.json', {
         cookie: alice,
       });
       const checked = validate('openabtest-manifest', manifest);
       assert.ok(checked.ok, JSON.stringify(checked.errors));
       assert.equal(manifest.state, 'paused');
+      assert.equal(manifest.openabtest, '0.2-draft');
+      assert.equal(manifest.metrics.goal, 'purchase-completed');
       const { body: exported } = await t.json('/api/ab/experiments/checkout-button/events.json', {
         cookie: alice,
       });
-      assert.equal(exported.omitted.conversionsWithoutPrice, 2);
       const kinds = exported.events.reduce(
         (m, ev) => ({ ...m, [ev.kind]: (m[ev.kind] ?? 0) + 1 }),
         {},
       );
-      assert.deepEqual(kinds, { eligibility: 41, assignment: 41, exposure: 4, conversion: 1 });
+      assert.deepEqual(kinds, { eligibility: 41, assignment: 41, exposure: 4, conversion: 3 });
+      const goals = exported.events.filter((ev) => ev.payload.goal);
+      assert.equal(goals.length, 2, 'goal conversions are exported, not omitted');
+      assert.ok(goals.every((ev) => ev.payload.goal === 'purchase-completed' && !ev.payload.price));
+      assert.deepEqual(goals.find((ev) => ev.participantId === 'p-0').payload.value, {
+        currency: 'USD',
+        amountMinor: 4900,
+      });
+      assert.equal(exported.events.filter((ev) => ev.payload.price).length, 1);
       for (const ev of exported.events) {
         const result = validate('openabtest-event', ev);
         assert.ok(result.ok, `${ev.kind}: ${JSON.stringify(result.errors)}`);

@@ -1,7 +1,7 @@
 # W3BS A/B testing
 
 Hosted A/B testing at [w3bs.org/ab-testing](https://w3bs.org/ab-testing), built on the open
-[OpenABTest 0.1 draft](https://logicsrc.com/docs/openabtest). You define an experiment, your
+[OpenABTest 0.2 draft](https://logicsrc.com/docs/openabtest). You define an experiment, your
 server asks w3bs.org which variant each participant gets, and reports what they saw and did.
 Results count unique participants per variant. Nothing names a winner for you.
 
@@ -116,16 +116,17 @@ z-test p-value.
 
 ## Export: OpenABTest
 
-- `GET /api/ab/experiments/<id>/manifest.json`: the experiment as an OpenABTest 0.1 manifest
-  (`cohort.purchaseScope: custom`, `metrics.primary: conversion-rate`).
-- `GET /api/ab/experiments/<id>/events.json`: `{ manifest, events, omitted, truncated }`, the
-  eligibility, assignment, exposure and conversion events as OpenABTest event documents
-  (`producerId: w3bs.org`), newest 50,000.
+- `GET /api/ab/experiments/<id>/manifest.json`: the experiment as an OpenABTest 0.2 manifest
+  (`metrics.primary: conversion-rate`, `metrics.conversion: unique-participants-with-goal`,
+  `metrics.goal` = the experiment's goal, `metrics.profit: none`).
+- `GET /api/ab/experiments/<id>/events.json`: `{ manifest, events, truncated }`, the eligibility,
+  assignment, exposure and conversion events as OpenABTest event documents
+  (`producerId: w3bs.org`), newest 50,000. A conversion sent with a `price` exports as a
+  purchase; any other conversion exports as a goal conversion, with its value when you sent one.
 
-Both validate with `@logicsrc/validators` 0.3.0 (the test suite checks every exported document).
-OpenABTest 0.1 defines a conversion as a purchase with a price, so conversions sent without a
-`price` stay in the W3BS results but are left out of the event export and counted in
-`omitted.conversionsWithoutPrice`.
+Both validate with `@logicsrc/validators` 0.5.0 (the test suite checks every exported document).
+Each experiment has a goal id (default `conversion`; set it when you create the experiment, e.g.
+`signup-completed`).
 
 ## Owner API
 
@@ -134,7 +135,7 @@ Session cookie or a `w3bs login` bearer.
 | Method | Path | |
 | --- | --- | --- |
 | GET | `/api/ab/experiments` | your experiments |
-| POST | `/api/ab/experiments` | create a draft: `name`, `slug`, `unit`, `variants: [{id, weight, parameters}]`, optional `eligibilityRule`, `days`, `startsAt`, `endsAt`, `minimumEligiblePerVariant`, `minimumObservationDays` |
+| POST | `/api/ab/experiments` | create a draft: `name`, `slug`, `unit`, `goal`, `variants: [{id, weight, parameters}]`, optional `eligibilityRule`, `days`, `startsAt`, `endsAt`, `minimumEligiblePerVariant`, `minimumObservationDays` |
 | GET | `/api/ab/experiments/<id>` | results |
 | PATCH | `/api/ab/experiments/<id>` | edit a draft |
 | POST | `/api/ab/experiments/<id>/state` | `{"state":"running"\|"paused"\|"closed"}` |
