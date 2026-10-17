@@ -86,6 +86,7 @@ pub struct NewExperiment {
     pub days: Option<u32>,
     pub min: Option<u32>,
     pub eligible: Option<String>,
+    pub goal: Option<String>,
 }
 
 pub async fn new(origin: &str, x: NewExperiment) -> Result<Value> {
@@ -102,6 +103,9 @@ pub async fn new(origin: &str, x: NewExperiment) -> Result<Value> {
     }
     if let Some(m) = x.min {
         body["minimumEligiblePerVariant"] = json!(m);
+    }
+    if let Some(g) = x.goal {
+        body["goal"] = json!(g);
     }
     if let Some(e) = x.eligible {
         body["eligibilityRule"] = json!(e);
