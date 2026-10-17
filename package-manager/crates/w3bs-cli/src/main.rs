@@ -1,6 +1,7 @@
 //! `w3bs`: the W3BS command line. One binary for every W3BS surface; the package
 //! manager is the first app, W3BS resources (the w3bs:// registry) the second.
 
+mod ab;
 mod auth;
 mod desktop;
 mod fleet;
@@ -35,7 +36,10 @@ Apps:
              w3bs fleet screen on     let the fleet owner watch this desktop (VNC, view only)
              w3bs fleet view <m>      watch a machine's desktop in the browser
              w3bs fleet desktop start a headless Kubuntu desktop (Docker) for AI agents, shared there
-             w3bs fleet --help        status, agent, leave, rm";
+             w3bs fleet --help        status, agent, leave, rm
+  ab         w3bs ab ls               your A/B tests on w3bs.org/ab-testing (OpenABTest)
+             w3bs ab new <id> --variant a --variant b   then start, show, pause, close
+             w3bs ab --help           assign, resume, export, rm";
 
 const AFTER_HELP: &str = "\
 Every command takes --json for one versioned result object on stdout.
@@ -365,6 +369,93 @@ enum ResCmd {
 }
 
 #[derive(Subcommand, Clone)]
+enum AbCmd {
+    /// List your experiments
+    #[command(visible_alias = "list")]
+    Ls {
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Create a draft experiment. The first --variant is the control.
+    New {
+        /// Experiment id your server sends (lowercase letters, digits, dashes)
+        id: String,
+        /// id, id:weight, id={"json":"parameters"} or id:weight={...}; at least two
+        #[arg(long = "variant", value_name = "VARIANT", required = true)]
+        variants: Vec<String>,
+        /// Display name (default: the id)
+        #[arg(long)]
+        name: Option<String>,
+        /// Randomization unit: user, account, session, device or custom
+        #[arg(long)]
+        unit: Option<String>,
+        /// How long it runs once started, in days (default 30)
+        #[arg(long)]
+        days: Option<u32>,
+        /// Participants per variant before the result is worth reading (default 100)
+        #[arg(long = "min", value_name = "N")]
+        min: Option<u32>,
+        /// Who is eligible, in words
+        #[arg(long, value_name = "TEXT")]
+        eligible: Option<String>,
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Results per variant: assigned, exposed, converted, rate with a 95% interval
+    Show {
+        id: String,
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Start a draft (fixes its window); it then enrolls participants
+    Start {
+        id: String,
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Stop enrolling new participants; existing assignments still answer
+    Pause {
+        id: String,
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Resume a paused experiment
+    Resume {
+        id: String,
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Close for good (cannot be reopened)
+    Close {
+        id: String,
+        #[command(flatten)]
+        a: Api,
+    },
+    /// The variant a participant gets, as your server would ask for it (sticky)
+    Assign {
+        id: String,
+        /// Opaque participant id (an internal id or a hash, never an email)
+        participant: String,
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Print the OpenABTest manifest, or with --events the event export, as JSON
+    Export {
+        id: String,
+        #[arg(long)]
+        events: bool,
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Delete an experiment with its assignments and events
+    Rm {
+        id: String,
+        #[command(flatten)]
+        a: Api,
+    },
+}
+
+#[derive(Subcommand, Clone)]
 enum FleetCmd {
     /// Add this machine to your fleet with a one-time token from w3bs.org/fleet, and start
     /// its agent as a systemd service
@@ -615,6 +706,9 @@ enum Cmd {
     /// Your machines on w3bs.org/fleet: join this one, run its agent, list and act on all
     #[command(subcommand)]
     Fleet(FleetCmd),
+    /// Your A/B tests on w3bs.org/ab-testing: create, start, read results, export OpenABTest
+    #[command(subcommand)]
+    Ab(AbCmd),
 
     // The CLI itself.
     /// Check this machine's W3BS state, trust and environment
@@ -761,6 +855,7 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
         Err(Cmd::Logout { a }) => ("logout", account("logout", &a, |o| async move { auth::logout(&o).await }).await),
         Err(Cmd::Whoami { a }) => ("whoami", account("whoami", &a, |o| async move { auth::whoami(&o).await }).await),
         Err(Cmd::Fleet(f)) => run_fleet(f).await,
+        Err(Cmd::Ab(c)) => run_ab(c).await,
         Err(Cmd::SelfCmd(s)) => {
             let (layout, mk) = match engine_factory(&out) {
                 Ok(x) => x,
@@ -775,6 +870,23 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
         }
         Err(Cmd::External(_)) => unreachable!("external commands exec before the runtime starts"),
         Err(_) => unreachable!("every command is dispatched"),
+    }
+}
+
+async fn run_ab(cmd: AbCmd) -> (&'static str, w3bs_core::Result<OperationResult>) {
+    match cmd {
+        AbCmd::Ls { a } => ("ab.ls", account("ab.ls", &a, |o| async move { ab::ls(&o).await }).await),
+        AbCmd::New { id, variants, name, unit, days, min, eligible, a } => {
+            let x = ab::NewExperiment { slug: id, name, variants, unit, days, min, eligible };
+            ("ab.new", account("ab.new", &a, |o| async move { ab::new(&o, x).await }).await)
+        }
+        AbCmd::Show { id, a } => ("ab.show", account("ab.show", &a, |o| async move { ab::show(&o, &id).await }).await),
+        AbCmd::Start { id, a } | AbCmd::Resume { id, a } => ("ab.state", account("ab.state", &a, |o| async move { ab::set_state(&o, &id, "running").await }).await),
+        AbCmd::Pause { id, a } => ("ab.state", account("ab.state", &a, |o| async move { ab::set_state(&o, &id, "paused").await }).await),
+        AbCmd::Close { id, a } => ("ab.state", account("ab.state", &a, |o| async move { ab::set_state(&o, &id, "closed").await }).await),
+        AbCmd::Assign { id, participant, a } => ("ab.assign", account("ab.assign", &a, |o| async move { ab::assign(&o, &id, &participant).await }).await),
+        AbCmd::Export { id, events, a } => ("ab.export", account("ab.export", &a, |o| async move { ab::export(&o, &id, events).await }).await),
+        AbCmd::Rm { id, a } => ("ab.rm", account("ab.rm", &a, |o| async move { ab::rm(&o, &id).await }).await),
     }
 }
 

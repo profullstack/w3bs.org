@@ -17,6 +17,7 @@ import { mountSocial, socialConfig } from './social-routes.mjs';
 import { createMailer } from './mail.mjs';
 import { createHostedTraining } from '../training/hosted.mjs';
 import { mountTraining } from '../training/hosted-routes.mjs';
+import { mountAbTest } from './abtest-routes.mjs';
 
 export function createApp({
   store,
@@ -32,7 +33,10 @@ export function createApp({
   socialFetch = fetch,
   // W3BS Training workspaces need PostgreSQL and a master key (W3BS_TRAINING_MASTER_KEY, from the
   // vault); without them /training/app and /api/v1/training answer "not enabled".
-  training = { databaseUrl: process.env.DATABASE_URL, masterKey: process.env.W3BS_TRAINING_MASTER_KEY },
+  training = {
+    databaseUrl: process.env.DATABASE_URL,
+    masterKey: process.env.W3BS_TRAINING_MASTER_KEY,
+  },
 } = {}) {
   if (!store) throw new Error('createApp requires an opened store; use startServer or openStore.');
   const app = express();
@@ -119,6 +123,14 @@ export function createApp({
         signup: `${origin}/signup`,
         oauth: `${origin}/.well-known/oauth-authorization-server`,
         userinfo: `${origin}/api/me`,
+      },
+      abTesting: {
+        format: 'https://logicsrc.com/docs/openabtest',
+        guide: `${origin}/docs/ab-testing.md`,
+        assign: `${origin}/api/ab/assign`,
+        exposure: `${origin}/api/ab/exposure`,
+        conversion: `${origin}/api/ab/conversion`,
+        experiments: `${origin}/api/ab/experiments`,
       },
       specs: `${origin}/specs`,
       surfaces: {
@@ -259,6 +271,7 @@ export function createApp({
   // WebSocket upgrades (fleet screens) skip Express; startServer hands them to this.
   app.locals.fleet = mountFleet(app, { store, origin, helpers });
   mountSocial(app, { store, helpers, config: social, fetchImpl: socialFetch });
+  mountAbTest(app, { store, origin, helpers });
   const hostedTraining =
     training?.databaseUrl && training?.masterKey
       ? createHostedTraining(training)
@@ -284,7 +297,7 @@ export function createApp({
     res
       .type('application/xml')
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/pricing', '/packages', '/specs', '/browse', '/prompts', '/desktop', '/training', '/social', '/governance', '/developers', '/signup', '/terms', '/privacy'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/pricing', '/packages', '/specs', '/browse', '/prompts', '/desktop', '/training', '/ab-testing', '/social', '/governance', '/developers', '/signup', '/terms', '/privacy'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
       ),
   );
   app.get('/docs/:file', (req, res) => {
