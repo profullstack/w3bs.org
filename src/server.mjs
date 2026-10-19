@@ -19,6 +19,7 @@ import { createMailer } from './mail.mjs';
 import { createHostedTraining } from '../training/hosted.mjs';
 import { mountTraining } from '../training/hosted-routes.mjs';
 import { mountAbTest } from './abtest-routes.mjs';
+import { mountTasks } from './tasks-routes.mjs';
 import { mountPublishing } from './publishing-routes.mjs';
 import { mountInstallLinks } from './install-links.mjs';
 import { mountRegistryFront } from './registry-front.mjs';
@@ -292,6 +293,7 @@ export function createApp({
   app.locals.fleet = mountFleet(app, { store, origin, helpers });
   mountSocial(app, { store, helpers, config: social, fetchImpl: socialFetch });
   mountAbTest(app, { store, origin, helpers });
+  mountTasks(app, { store, origin, helpers });
   mountPublishing(app, { store, helpers });
   mountInstallLinks(app, { store, origin, mailer, helpers });
   mountRegistryFront(app);
@@ -300,7 +302,13 @@ export function createApp({
       ? createHostedTraining(training)
       : { configured: false, forUser: async () => null, close: async () => {} };
   app.locals.training = hostedTraining;
-  mountTraining(app, { helpers, hosted: hostedTraining, origin });
+  const publishedTasks = store.tasksFor(origin);
+  mountTraining(app, {
+    helpers,
+    hosted: hostedTraining,
+    origin,
+    publishTask: (userId, payload) => publishedTasks.publish(userId, payload),
+  });
   app.use(
     '/assets',
     express.static(resolve(ROOT, 'public'), { maxAge: '1h', index: false, fallthrough: false }),
@@ -320,7 +328,7 @@ export function createApp({
     res
       .type('application/xml')
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/pricing', '/packages', '/packages/publish', '/specs', '/browse', '/prompts', '/desktop', '/training', '/os', '/ab-testing', '/social', '/governance', '/developers', '/signup', '/terms', '/privacy'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/pricing', '/packages', '/packages/publish', '/specs', '/browse', '/prompts', '/desktop', '/training', '/tasks', '/workflows', '/os', '/ab-testing', '/social', '/governance', '/developers', '/signup', '/terms', '/privacy'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
       ),
   );
   app.get('/docs/:file', (req, res) => {

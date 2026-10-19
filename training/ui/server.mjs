@@ -20,7 +20,17 @@ const same = (a, b) => {
   return x.length === y.length && timingSafeEqual(x, y);
 };
 
-export function createLocalApp(service, { user = 'local-user', launchTtlMs = 60000 } = {}) {
+// Publish from the local app with the session `w3bs login` saved, to W3BS_API or w3bs.org.
+async function publishWithLogin(task, _req, { workflow }) {
+  const { accessToken, publishTask } = await import('../core/remote.mjs');
+  const origin = new URL(process.env.W3BS_API ?? 'https://w3bs.org').origin;
+  return publishTask(origin, task, { token: await accessToken(origin), workflow });
+}
+
+export function createLocalApp(
+  service,
+  { user = 'local-user', launchTtlMs = 60000, publish = publishWithLogin } = {},
+) {
   const app = express();
   app.disable('x-powered-by');
   const launch = {
@@ -77,26 +87,18 @@ export function createLocalApp(service, { user = 'local-user', launchTtlMs = 600
     res.redirect(303, '/');
   });
 
-  app.get('/assets/app.css', (_req, res) =>
-    res.type('css').send(APP_CSS),
-  );
-  app.get('/assets/app.js', (_req, res) =>
-    res.type('js').send(APP_JS),
-  );
-  app.get('/assets/mark.svg', (_req, res) =>
-    res.type('svg').send(MARK_SVG),
-  );
+  app.get('/assets/app.css', (_req, res) => res.type('css').send(APP_CSS));
+  app.get('/assets/app.js', (_req, res) => res.type('js').send(APP_JS));
+  app.get('/assets/mark.svg', (_req, res) => res.type('svg').send(MARK_SVG));
 
   app.use('/api', (req, res, next) => {
     if (!human(req))
-      return res
-        .status(401)
-        .json({
-          error: {
-            code: 'HUMAN_SESSION_REQUIRED',
-            message: 'Open this app with `w3bs training open`.',
-          },
-        });
+      return res.status(401).json({
+        error: {
+          code: 'HUMAN_SESSION_REQUIRED',
+          message: 'Open this app with `w3bs training open`.',
+        },
+      });
     next();
   });
   app.get('/api/v1/training/events', (req, res) => {
@@ -115,14 +117,11 @@ export function createLocalApp(service, { user = 'local-user', launchTtlMs = 600
     trainingRouter(service, {
       actorFor: () => ({ kind: 'human', id: user }),
       onChange: (kind) => listeners.forEach((send) => send(kind)),
+      publish,
     }),
   );
   app.get(/^\/(?!api\/).*/, (req, res) => {
-    if (!human(req))
-      return res
-        .status(401)
-        .type('html')
-        .send(LOCKED_HTML);
+    if (!human(req)) return res.status(401).type('html').send(LOCKED_HTML);
     res.type('html').send(INDEX_HTML);
   });
   return {

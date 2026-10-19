@@ -538,6 +538,54 @@ const views = {
       runHint.hidden = false;
       toast(`Exported ${filename}`);
     });
+    // Publishing makes the task public on w3bs.org/tasks; window titles stay home by default.
+    const publishBox = h('div', { class: 'notice publish-box', hidden: true });
+    const keepTitles = h('input', { type: 'checkbox', id: 'publish-titles' });
+    const workflowName = h('input', {
+      id: 'publish-workflow',
+      maxlength: '200',
+      placeholder: 'Workflow (optional), e.g. Release a package',
+    });
+    const publishResult = h('p', { class: 'muted', hidden: true });
+    const publish = run(async () => {
+      const result = await api(`/episodes/${id}/publish`, {
+        method: 'POST',
+        body: {
+          window_titles: keepTitles.checked,
+          workflow: workflowName.value.trim() || undefined,
+        },
+      });
+      publishResult.replaceChildren(
+        'Published: ',
+        h('a', { href: result.url, target: '_blank', rel: 'noopener' }, result.url),
+        result.workflow ? ' · in ' : '',
+        result.workflow
+          ? h('a', { href: result.workflow.url, target: '_blank', rel: 'noopener' }, 'the workflow')
+          : '',
+        '. Unpublish there, or with ',
+        h('code', {}, `w3bs training unpublish ${result.id}`),
+        '.',
+      );
+      publishResult.hidden = false;
+      toast(result.republished ? 'Republished' : 'Published');
+    });
+    publishBox.append(
+      h('strong', {}, 'Publish to w3bs.org/tasks'),
+      h(
+        'p',
+        {},
+        'Anyone can read the goal, your explanation, the app names and the steps. No screenshots, coordinates or typed text leave this computer. Deleting the task here does not unpublish it.',
+      ),
+      h(
+        'label',
+        { for: 'publish-titles' },
+        keepTitles,
+        ' Keep window titles (they can show addresses, subjects and order numbers)',
+      ),
+      workflowName,
+      h('button', { class: 'primary', onclick: publish }, 'Publish'),
+      publishResult,
+    );
     return [
       h('p', {}, h('a', { href: '#/sessions' }, '← Sessions')),
       h('h1', {}, String(body.goal.value)),
@@ -565,9 +613,21 @@ const views = {
           },
           'Export as moshscript',
         ),
+        h(
+          'button',
+          {
+            disabled: !runnable,
+            title: runnable
+              ? 'Publish this task as an OpenTask on w3bs.org/tasks, with a moshscript to run it'
+              : 'Mark the result complete first: only reviewed, successful tasks publish',
+            onclick: () => (publishBox.hidden = !publishBox.hidden),
+          },
+          'Publish to w3bs.org/tasks…',
+        ),
         runnable ? null : h('span', { class: 'muted' }, 'Mark the result complete to export.'),
       ),
       runHint,
+      publishBox,
       open.length
         ? h(
             'div',

@@ -23,7 +23,7 @@ const wrap = (fn) => async (req, res) => {
 // are capped at uploadLimit.
 export function trainingRouter(
   service,
-  { actorFor, onChange = () => {}, hosted = false, uploadLimit = '512mb' },
+  { actorFor, onChange = () => {}, hosted = false, uploadLimit = '512mb', publish },
 ) {
   const router = express.Router();
   const json = express.json({ limit: '1mb', strict: true });
@@ -124,6 +124,27 @@ export function trainingRouter(
         'x-w3bs-export': JSON.stringify({ export_id: result.export_id, run: result.run }),
       });
       res.end(result.script);
+    }),
+  );
+  // Publish to w3bs.org/tasks. `publish(task, req, { workflow })` sends it: over the network
+  // from the local app, straight into the site's store from the hosted one.
+  router.post(
+    '/episodes/:id/publish',
+    json,
+    wrap(async (req) => {
+      if (!publish)
+        throw Object.assign(new Error('Publishing is not available here.'), {
+          code: 'PUBLISH_UNAVAILABLE',
+          status: 501,
+        });
+      const body = req.body ?? {};
+      const workflow = typeof body.workflow === 'string' ? body.workflow.trim().slice(0, 200) : '';
+      const result = await req.svc.publishTask(req.params.id, a(req), {
+        windowTitles: body.window_titles === true,
+        destination: 'https://w3bs.org/tasks',
+      });
+      onChange('exports', req);
+      return { export_id: result.export_id, ...(await publish(result.task, req, { workflow })) };
     }),
   );
   router.post(

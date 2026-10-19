@@ -5,6 +5,7 @@ import { W3bsError, parseUri, validateManifest, verifyManifest, compareVersions 
 import { ACCOUNT_SCHEMA, createAccounts } from './accounts.mjs';
 import { FLEET_SCHEMA, createFleet } from './fleet.mjs';
 import { ABTEST_SCHEMA, createAbTest } from './abtest.mjs';
+import { TASKS_SCHEMA, createTasks } from './tasks.mjs';
 import { SOCIAL_SCHEMA, createSocial } from './social.mjs';
 import { EVENT_SCHEMA, createEvents } from './events.mjs';
 import { PUBLISHING_SCHEMA, createPublishing } from './publishing.mjs';
@@ -41,6 +42,7 @@ async function openSqlite(path) {
   db.exec(ACCOUNT_SCHEMA.sqlite);
   db.exec(FLEET_SCHEMA.sqlite);
   db.exec(ABTEST_SCHEMA.sqlite);
+  db.exec(TASKS_SCHEMA.sqlite);
   db.exec(SOCIAL_SCHEMA.sqlite);
   db.exec(EVENT_SCHEMA.sqlite);
   db.exec(PUBLISHING_SCHEMA.sqlite);
@@ -95,6 +97,7 @@ async function openPostgres(connectionString) {
   await pool.query(ACCOUNT_SCHEMA.postgres);
   await pool.query(FLEET_SCHEMA.postgres);
   await pool.query(ABTEST_SCHEMA.postgres);
+  await pool.query(TASKS_SCHEMA.postgres);
   await pool.query(SOCIAL_SCHEMA.postgres);
   await pool.query(EVENT_SCHEMA.postgres);
   await pool.query(PUBLISHING_SCHEMA.postgres);
@@ -416,6 +419,8 @@ export async function openStore({
     accounts,
     fleet: createFleet(db, { events }),
     abtest: createAbTest(db),
+    // Published OpenTasks and OpenWorkflows; their documents carry the site's origin.
+    tasksFor: (origin) => createTasks(db, { origin }),
     events,
     social: createSocial(db),
     publishing,
