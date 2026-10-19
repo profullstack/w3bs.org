@@ -47,7 +47,7 @@ pub fn human(r: &OperationResult) {
         eprintln!("error: {} ({})", e.message, e.code);
         if e.code == "PUBLISHER_KEY_CHANGED" {
             eprintln!("hint: check with the publisher that the key change is genuine before using --accept-new-key");
-        } else if r.result == Overall::ApprovalRequired {
+        } else if r.result == Overall::ApprovalRequired && r.operation != "open" {
             eprintln!("hint: re-run interactively, or add --yes (and a pre-provisioned trust root for new repositories)");
         }
         return;
@@ -121,6 +121,30 @@ pub fn human(r: &OperationResult) {
                 }
             } else {
                 println!("Not signed in to {}", s(&r.data["origin"]));
+            }
+            return;
+        }
+        "open" => {
+            println!("Opened a terminal window ({}) to confirm installing {}.", s(&r.data["terminal"]), s(&r.data["package"]));
+            return;
+        }
+        "handler.install" | "handler.uninstall" | "handler.status" => {
+            let d = &r.data;
+            let place = if d["desktop_file"].is_null() { s(&d["app"]) } else { s(&d["desktop_file"]) };
+            match r.operation.as_str() {
+                "handler.install" => println!("Registered the w3bs:// handler: {place}"),
+                "handler.uninstall" if d["removed"] == true => println!("Removed the w3bs:// handler: {place}"),
+                "handler.uninstall" => println!("The w3bs:// handler was not installed ({place})."),
+                _ => println!("Handler: {}", if d["installed"] == true { place } else { "not installed (run `w3bs handler install`)".into() }),
+            }
+            if r.operation != "handler.uninstall" {
+                if !d["exec"].is_null() {
+                    println!("Runs: {} open <link>", s(&d["exec"]).trim_end_matches(" open %u"));
+                }
+                println!("Default for w3bs:// links: {}", if d["default"].is_null() { "none".into() } else { s(&d["default"]) });
+                if d["installed"] == true && d["registered"] != true {
+                    println!("warning: another application, or none, is the default for w3bs:// links");
+                }
             }
             return;
         }
