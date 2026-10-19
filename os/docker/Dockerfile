@@ -47,8 +47,14 @@ LABEL org.opencontainers.image.title="W3BS OS server" \
       org.opencontainers.image.source="https://github.com/profullstack/w3bs.org" \
       org.opencontainers.image.licenses="MIT"
 RUN apk add --no-cache zsh zsh-vcs bash ca-certificates curl git openssh-client-default nodejs npm \
-      tini tzdata procps less \
+      tini tzdata procps less caddy \
     && adduser -D -u 1000 -s /bin/zsh w3bs
+# Caddy is the W3BS OS web server (docs/os-prd.md): automatic HTTPS, IPv6 by default. The
+# Caddyfile only imports /etc/caddy/sites/*, the same layout as the ISO install, so tools
+# add a site by dropping one file there. Installed, not started: run `caddy run` yourself.
+RUN mkdir -p /etc/caddy/sites \
+    && printf 'import /etc/caddy/sites/*\n' > /etc/caddy/Caddyfile \
+    && chown w3bs:w3bs /etc/caddy/sites
 COPY --from=rust /usr/local/bin/w3bs /usr/local/bin/w3bs
 COPY registry/FINGERPRINT /usr/share/w3bs-os/FINGERPRINT
 COPY os/docker/init.sh /usr/local/bin/w3bs-os-init
@@ -58,6 +64,11 @@ RUN printf 'export PATH="$HOME/.local/bin:$PATH"\n' > /etc/profile.d/w3bs.sh \
     && cat /etc/zsh/zshrc.w3bs >> /etc/zsh/zshrc && rm /etc/zsh/zshrc.w3bs \
     && chmod 0755 /usr/local/bin/w3bs-os-init /usr/share/w3bs-os \
     && chmod 0644 /usr/share/w3bs-os/FINGERPRINT
+# /etc/w3bs-os-release: what `w3bs os status` reports and `w3bs os upgrade` keeps current.
+ARG W3BS_OS_VERSION=0.1.0
+RUN rel=$(cat /etc/alpine-release) \
+    && printf 'ID=w3bs-os\nNAME="W3BS OS"\nVERSION=%s\nEDITION=docker-server\nALPINE=%s\nALPINE_BRANCH=v%s\nHOME_URL=https://w3bs.org/os\n' \
+       "$W3BS_OS_VERSION" "$rel" "$(echo "$rel" | cut -d. -f1,2)" > /etc/w3bs-os-release
 ENV LANG=C.UTF-8 SHELL=/bin/zsh PATH=/home/w3bs/.local/bin:$PATH
 USER w3bs
 WORKDIR /home/w3bs
@@ -73,7 +84,8 @@ RUN apk add --no-cache kwin plasma-desktop plasma-workspace konsole breeze breez
       libkscreen kscreen xdg-desktop-portal xdg-desktop-portal-kde pipewire wireplumber dbus \
       dbus-x11 flatpak mesa-dri-gallium mesa-egl mesa-gbm font-noto font-noto-cjk font-noto-emoji \
       chromium libcap-setcap pixman libjpeg-turbo linux-pam \
-    && (setcap -r /usr/bin/kwin_wayland 2>/dev/null || true)
+    && (setcap -r /usr/bin/kwin_wayland 2>/dev/null || true) \
+    && sed -i 's/^EDITION=.*/EDITION=docker-desktop/' /etc/w3bs-os-release
 COPY --from=w0vncserver /usr/local/bin/w0vncserver /usr/local/bin/vncpasswd /usr/local/bin/
 COPY --from=rust /usr/local/bin/w3bs-desktop /usr/local/bin/w3bs-desktop
 COPY os/docker/session.sh /usr/local/bin/w3bs-os-session

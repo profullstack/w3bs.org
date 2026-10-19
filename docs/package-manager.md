@@ -114,6 +114,45 @@ The very first script runs as you before W3BS can verify anything, and any check
 
 `XDG_*` variables are honoured. `W3BS_HOME=<dir>` relocates everything. No daemon, no background updates, no telemetry.
 
+## Updating W3BS OS (w3bs os update / upgrade)
+
+W3BS OS is Alpine Linux, so a running machine is kept current over the network. You do not reinstall the ISO for a new release: the ISO is only for new installs.
+
+```sh
+w3bs os status                    # edition, Alpine release and branch, newest branch, pending updates, reboot needed
+w3bs os update                    # apk update + apk upgrade, then w3bs self update and w3bs update
+w3bs os update --os-only          # only the Alpine packages
+w3bs os upgrade --dry-run         # show the dist-upgrade plan to the next Alpine branch
+w3bs os upgrade                   # do it (asks y/N; --yes for scripts)
+w3bs os upgrade --resume          # continue an interrupted upgrade
+w3bs os upgrade --rollback        # put the old repositories back (see below)
+```
+
+The privileged steps run through `doas` (W3BS OS puts your user in `wheel`) or `sudo` when `w3bs` is not root. `w3bs` never asks for or stores a password: the prompt you see is doas's or sudo's. With `--json` or `--non-interactive` they are called with `-n`, so a missing rule fails instead of hanging.
+
+**Updates** (`w3bs os update`) stay on the current Alpine branch: security and bug-fix releases of the packages you have, then the `w3bs` CLI (when it manages itself; a CLI baked into an image is left alone) and your W3BS packages. It reports whether a reboot is needed: the running kernel's modules are gone once a new kernel is installed.
+
+**Upgrades** (`w3bs os upgrade`) move to the next Alpine stable branch (Alpine releases one every six months, for example v3.23 to v3.24). The newest branch comes from `dl-cdn.alpinelinux.org/alpine/latest-stable/`. W3BS can hold back a branch it has not qualified yet with `https://w3bs.org/os/channel.json` (`{"alpine_max":"v3.24"}`); `status` then shows the newer branch as held, and `--ignore-policy` upgrades anyway. The rules:
+
+- The default target is the next branch after the current one. `--to vX.Y` names one; skipping a branch needs `--allow-skip`. Downgrades and unreleased branches are refused.
+- `edge` (Alpine's rolling development branch) only with `--to edge --yes`.
+- Preflight: at least 1 GB free on `/`, a readable apk database (`apk fix --simulate`), the target branch's index reachable on your mirror, and no unfinished upgrade.
+- The plan lists every change before anything happens: the snapshot, the repositories backup, each `/etc/apk/repositories` line before and after (lines that are not Alpine branch lines, such as local repositories, other distributions' repositories and `edge` lines, are kept as they are and listed), and the apk steps.
+
+The steps, each recorded in the journal `/var/lib/w3bs-os/upgrade.json`:
+
+1. If `/` is btrfs, a read-only snapshot `/.snapshots/w3bs-pre-upgrade-<from>-<time>` (`btrfs subvolume snapshot -r`; `--no-snapshot` skips it).
+2. Back up `/etc/apk/repositories` to `/etc/apk/repositories.bak-<from>`.
+3. `apk add -u alpine-keys`, so the new branch's signing keys are trusted.
+4. Rewrite every `/vX.Y/` and `/latest-stable/` repository line, commented ones included, to the new branch.
+5. `apk update`, `apk add -u apk-tools`, `apk upgrade --available`.
+6. Update `ALPINE`, `ALPINE_BRANCH` (and `VERSION` when the channel file names one) in `/etc/w3bs-os-release`.
+7. Verify: `/etc/alpine-release` is on the new branch and report anything `apk upgrade --available` would still change.
+
+If a step fails, `w3bs` stops, says which step, exits non-zero and never reports success. Fix the cause and run `w3bs os upgrade --resume`, which continues from the failed step. `w3bs os upgrade --rollback` restores the saved repositories file; it does not downgrade packages. To get the whole system back, boot the pre-upgrade snapshot (or make it the default subvolume and reboot); `w3bs` does not roll back a running root itself. Reboot after an upgrade that installed a new kernel.
+
+In a container (the Docker editions), `update` and `upgrade` work, but the kernel is the host's and no snapshot is taken; pulling or rebuilding a newer image is the usual route there. `/etc/w3bs-os-release` holds `ID=w3bs-os`, `VERSION`, `EDITION` (`iso`, `docker-server` or `docker-desktop`), `ALPINE` and `ALPINE_BRANCH`. On plain Alpine, `w3bs os` works the same and says the machine is not W3BS OS.
+
 ## Publishers
 
 There are two ways to be in `w3bs`:

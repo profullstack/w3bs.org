@@ -6,3 +6,31 @@ zstyle ':vcs_info:git:*' formats ' %b'
 precmd() { vcs_info }
 setopt prompt_subst
 PROMPT='%F{208}w3bs%f %F{blue}%~%f%F{242}${vcs_info_msg_0_}%f %# '
+
+# History. zsh's own defaults keep 30 lines in memory and write nothing (SAVEHIST=0, no
+# HISTFILE), so every new shell started empty. ~/.zsh_history survives as long as the home
+# directory does: mount a volume on it (docker run -v w3bs-home:/home/w3bs ...) to keep it
+# across containers.
+HISTFILE=${HISTFILE:-$HOME/.zsh_history}
+HISTSIZE=50000
+SAVEHIST=50000
+setopt extended_history share_history hist_ignore_dups \
+  hist_ignore_space hist_reduce_blanks hist_verify
+
+# Keys. Alpine's zsh binds no arrow keys, so Up and Down did nothing; only Ctrl+P/N walked
+# history. Up/Down search history by what is already typed; Home/End/Delete and Ctrl+Left/Right
+# behave as in any terminal. Both the CSI and the application-mode (SS3) sequences are bound,
+# plus whatever terminfo reports.
+autoload -Uz up-line-or-beginning-search down-line-or-beginning-search
+zle -N up-line-or-beginning-search
+zle -N down-line-or-beginning-search
+bindkey -e
+w3bs_bind() { local w=$1; shift; local k; for k in "$@"; do [[ -n $k ]] && bindkey "$k" $w; done; }
+w3bs_bind up-line-or-beginning-search   '^[[A' '^[OA' "${terminfo[kcuu1]}"
+w3bs_bind down-line-or-beginning-search '^[[B' '^[OB' "${terminfo[kcud1]}"
+w3bs_bind beginning-of-line '^[[H' '^[OH' '^[[1~' "${terminfo[khome]}"
+w3bs_bind end-of-line       '^[[F' '^[OF' '^[[4~' "${terminfo[kend]}"
+w3bs_bind delete-char       '^[[3~' "${terminfo[kdch1]}"
+w3bs_bind backward-word     '^[[1;5D' '^[[5D'
+w3bs_bind forward-word      '^[[1;5C' '^[[5C'
+unfunction w3bs_bind

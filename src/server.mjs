@@ -23,6 +23,7 @@ import { mountTasks } from './tasks-routes.mjs';
 import { mountPublishing } from './publishing-routes.mjs';
 import { mountInstallLinks } from './install-links.mjs';
 import { mountRegistryFront } from './registry-front.mjs';
+import { createBrowser } from './browse.mjs';
 
 export function createApp({
   store,
@@ -36,6 +37,8 @@ export function createApp({
     : undefined,
   social = socialConfig(),
   socialFetch = fetch,
+  // /browse and /api/browse: Moshpit names over DoH, pit.world gateways, discovery documents.
+  browser = createBrowser(),
   // W3BS Training workspaces need PostgreSQL and a master key (W3BS_TRAINING_MASTER_KEY, from the
   // vault); without them /training/app and /api/v1/training answer "not enabled".
   training = {
@@ -128,6 +131,7 @@ export function createApp({
       resolution: `${origin}/api/resolve`,
       manifest: `${origin}/api/manifest`,
       search: `${origin}/api/search`,
+      browse: `${origin}/api/browse`,
       mcp: `${origin}/mcp`,
       schemas: [`${origin}/schemas/manifest.json`],
       trust: `${origin}/api/trust`,
@@ -186,6 +190,11 @@ export function createApp({
   app.get('/api/manifest', async (req, res) =>
     res.json((await store.inspect(req.query.uri)).manifest),
   );
+  // What /browse shows, as JSON: a W3BS URI, a Moshpit name, a pit.world URL or an https URL.
+  const browse = (q) => browser.resolve(q, { inspect: (uri) => store.inspect(uri) });
+  app.get('/api/browse', async (req, res) => res.json(await browse(String(req.query.q ?? ''))));
+  // POST { q } is what the stdio MCP server (src/mcp-stdio.mjs) calls, as for the operations.
+  app.post('/api/browse', async (req, res) => res.json(await browse(String(req.body?.q ?? ''))));
   app.get('/api/packages', async (req, res) => {
     const args = { query: String(req.query.q || '') };
     if (req.query.agentic === 'true' || req.query.agentic === 'false')
@@ -257,7 +266,7 @@ export function createApp({
     }
   }
   app.post('/mcp', async (req, res, next) => {
-    const server = createMcp((name, args) => invoke(req, name, args));
+    const server = createMcp((name, args) => invoke(req, name, args), { browse });
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
@@ -358,11 +367,16 @@ export function createApp({
   });
   app.get(/.*/, async (req, res, next) => {
     try {
-      res
-        .type('html')
-        .send(
-          await renderPage({ path: req.path, host: req.hostname, query: req.query, store, origin }),
-        );
+      res.type('html').send(
+        await renderPage({
+          path: req.path,
+          host: req.hostname,
+          query: req.query,
+          store,
+          origin,
+          browser,
+        }),
+      );
     } catch (error) {
       next(error);
     }

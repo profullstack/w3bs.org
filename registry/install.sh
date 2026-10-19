@@ -20,8 +20,6 @@
 # Options are passed straight to `w3bs install`, e.g.  ... | sh -s -- --version 1.2.3 --pin
 # Environment: W3BS_YES=1 approves without prompting (requires the fingerprints below);
 #              W3BS_HOME, W3BS_BIN_DIR relocate the install.
-#              W3BS_LIBC=gnu|musl overrides the C library detected on Linux (musl on Alpine
-#              and postmarketOS gets the static musl build).
 #
 # Nothing runs until the last line, so a truncated download does nothing.
 
@@ -34,33 +32,14 @@ w3bs_main() {
   MANAGER_REPO_URL='https://w3bs.org/repo/'
   MANAGER_FINGERPRINT='sha256:48d521f7610117c95cc782982e5c05b641b18bdfa8e48b36a634186133bc766f'
   MANAGER_DOWNLOAD_BASE='https://github.com/profullstack/w3bs.org/releases/download'
-  MANAGER_VERSION='0.1.14'
-  MANAGER_SHA256S='x86_64-unknown-linux-gnu=4fc359325387794e9f706d3a4b50dbfef35d7060de90235955c6a2d2b9bb469c aarch64-unknown-linux-gnu=37a83f273b4ffb0265fac9f7e7c06bd504cbebd4c34f0360ddcd75d3bf955789 x86_64-apple-darwin=de1219c977b44a13ffd85ed6520ca5eb58633dfa2a589a1fb6e118c334e8bdd7 aarch64-apple-darwin=1e0041bc7012b0b6725143f440f880b726cd3d418b8c7e7b1e7c560f9cbb1b44'
+  MANAGER_VERSION='0.1.15'
+  MANAGER_SHA256S='x86_64-unknown-linux-gnu=6b2cf1b17191ec6ac2f5784b8a0229263d8a5b7bea903b40c1f4bb101f50703a aarch64-unknown-linux-gnu=184238913fa4d6d01d226b2289f410c622e40d8dfeda92612a328916c9900167 x86_64-unknown-linux-musl=1cb701dee155ab272bf8aac3999708d03e7a5e2597501f592c5398b1f10011e2 aarch64-unknown-linux-musl=1412ea869289004b8a4aa9c4424be773a895b18117a9c019afb6189d18482149 x86_64-apple-darwin=3065f595539e0d74134ce50138502ae217a93019bbcf9de703bd936542c7ddab aarch64-apple-darwin=180aaed69454d285ffa3a6e2661c6768f5038aae4d8803e9254c9eab80e4536f'
 
   say() { printf '%s\n' "$*" >&2; }
   die() { say "w3bs installer: $*"; exit "${2:-4}"; }
 
-  # musl (Alpine, postmarketOS) or glibc. ldd names its C library; without ldd, a glibc libc.so.6
-  # wins over a musl loader (Debian's `musl` package adds one; Alpine's gcompat fakes the glibc
-  # loader, not libc.so.6). W3BS_LIBC=gnu|musl overrides.
-  linux_libc() {
-    case "${W3BS_LIBC:-}" in gnu | musl) echo "$W3BS_LIBC"; return ;; esac
-    v="$(ldd --version 2>&1 || true)"
-    case "$v" in
-      *musl*) echo musl; return ;;
-      *GNU* | *GLIBC* | *glibc*) echo gnu; return ;;
-    esac
-    for f in /lib/*-linux-gnu/libc.so.6 /lib64/libc.so.6 /usr/lib64/libc.so.6 /usr/lib/libc.so.6; do
-      [ -e "$f" ] && { echo gnu; return; }
-    done
-    for f in /lib/ld-musl-*.so.1; do
-      [ -e "$f" ] && { echo musl; return; }
-    done
-    echo gnu
-  }
-
   case "$(uname -s)" in
-    Linux) os="unknown-linux-$(linux_libc)" ;;
+    Linux) os=unknown-linux-gnu ;;
     Darwin) os=apple-darwin ;;
     *) die "unsupported operating system $(uname -s); W3BS supports Linux and macOS" ;;
   esac

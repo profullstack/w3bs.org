@@ -269,6 +269,68 @@ pub fn human(r: &OperationResult) {
             println!("Reports: {}", serde_json::to_string_pretty(&d["info"]).unwrap_or_default());
             return;
         }
+        "os.status" => {
+            let d = &r.data;
+            if d["w3bs_os"] == true {
+                println!("W3BS OS {} ({})", s(&d["version"]), s(&d["edition"]));
+            } else {
+                println!("Not W3BS OS (no {})", crate::os::RELEASE_FILE);
+            }
+            println!("Alpine: {} on branch {} ({})", s(&d["alpine"]["release"]), s(&d["alpine_branch"]), s(&d["alpine"]["arch"]));
+            println!("Newest branch: {}{}", s(&d["newest_branch"]), d["qualified_max"].as_str().map(|m| format!(" (W3BS has qualified up to {m})")).unwrap_or_default());
+            let up = &d["upgrade"];
+            if let Some(b) = up["available"].as_str() {
+                println!("Upgrade available: {b}  (w3bs os upgrade)");
+            } else if let Some(h) = up["held"].as_str() {
+                println!("Upgrade: {h} is released, held: {}", s(&up["reason"]));
+            } else {
+                println!("Upgrade: none (on the newest branch)");
+            }
+            println!("Pending updates: {}{}", s(&d["pending_updates"]), if d["pending_updates"].as_u64().unwrap_or(0) > 0 { "  (w3bs os update)" } else { "" });
+            let k = &d["kernel"];
+            if k["applies"] == false {
+                println!("Kernel: {} (container: the host's kernel)", s(&k["running"]));
+            } else {
+                println!("Kernel: running {}, installed {}{}", s(&k["running"]), k["installed"].as_array().map(|a| a.iter().map(s).collect::<Vec<_>>().join(", ")).unwrap_or_default(), if d["reboot_needed"] == true { " (reboot needed)" } else { "" });
+            }
+            if let Some(st) = d["journal"]["state"].as_str() {
+                println!("Last upgrade: {} -> {} ({st})", s(&d["journal"]["from"]), s(&d["journal"]["to"]));
+            }
+            println!("w3bs {}", s(&d["w3bs_version"]));
+            return;
+        }
+        "os.update" | "os.upgrade" => {
+            let d = &r.data;
+            if let Some(m) = d["message"].as_str() {
+                println!("{m}");
+                return;
+            }
+            if d["dry_run"] == true {
+                println!("Plan (dry run, nothing changed):");
+                for l in d["plan"].as_array().cloned().unwrap_or_default() {
+                    println!("  {}", s(&l));
+                }
+                return;
+            }
+            for st in d["steps"].as_array().cloned().unwrap_or_default() {
+                let detail = match &st["detail"] {
+                    Value::Array(a) if a.len() > 3 => format!("{} items", a.len()),
+                    Value::Null => String::new(),
+                    Value::String(x) if x.is_empty() => String::new(),
+                    v => s(v),
+                };
+                println!("{:<18} {:<8} {detail}", s(&st["step"]), s(&st["status"]));
+            }
+            if d["action"] == "rollback" {
+                println!("Restored {}.", s(&d["restored"]));
+                println!("{}", s(&d["next"]));
+            } else if r.operation == "os.upgrade" {
+                println!("Upgraded {} -> {} (Alpine {}).", s(&d["from"]), s(&d["to"]), s(&d["alpine"]));
+            } else {
+                println!("Updated (Alpine {}).", s(&d["alpine"]));
+            }
+            return;
+        }
         "ab.ls" => {
             let list = r.data["experiments"].as_array().cloned().unwrap_or_default();
             if list.is_empty() {
@@ -537,7 +599,10 @@ pub fn human(r: &OperationResult) {
                 })
                 .collect(),
         );
-    } else if matches!(r.operation.as_str(), "update" | "outdated" | "dist-upgrade") {
+    } else if matches!(r.operation.as_str(), "update" | "outdated" | "dist-upgrade") && r.data.get("manager_update").is_none() {
         println!("Everything is up to date.");
+    }
+    if let Some(n) = r.data.get("manager_update").and_then(|v| v.as_str()) {
+        println!("{n}");
     }
 }

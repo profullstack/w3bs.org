@@ -13,6 +13,12 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+# One publish per ref, newest push wins. Without it two pushes 27 s apart (2026-10-19) built
+# side by side and the OLDER commit finished last, re-tagging :server with w3bs 0.1.13 over
+# 0.1.14 for ~13 min: `w3bs dist-upgrade` was an unknown command in a freshly pulled image.
+concurrency:
+  group: os-docker-${{ github.ref }}
+  cancel-in-progress: true
 env:
   IMAGE: ghcr.io/profullstack/w3bs-os
 jobs:
@@ -32,6 +38,15 @@ jobs:
             w3bs repo list | grep -q "$(cat /usr/share/w3bs-os/FINGERPRINT)"
             w3bs install hqtui --yes >/dev/null
             hqtui --version'
+      - name: the shell keeps history and Up walks it
+        run: |
+          docker run --rm -t w3bs-os:server zsh -lic '
+            set -e
+            [[ $HISTFILE == $HOME/.zsh_history && $SAVEHIST -ge 10000 ]]
+            [[ $(bindkey "^[[A") == *up-line-or-beginning-search ]]
+            [[ $(bindkey "^[OA") == *up-line-or-beginning-search ]]
+            print -s "w3bs update"; fc -W
+            grep -q "w3bs update" $HISTFILE'
 
   build:
     if: github.event_name != 'pull_request'

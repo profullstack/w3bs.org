@@ -10,6 +10,13 @@ docker run -it --rm w3bs.org/os:server
 w3bs install hqtui          # any package on w3bs.org/packages
 ```
 
+To keep your shell history (`~/.zsh_history`, Up arrow and `history`) and installed packages
+across runs, give the home directory a volume:
+
+```sh
+docker run -it --rm -v w3bs-home:/home/w3bs w3bs.org/os:server
+```
+
 Alpine stable, zsh with a git-aware prompt, the `w3bs` CLI (built for musl), git, curl,
 OpenSSH client and Node. The official W3BS repository is added on first start, pinned to its
 root fingerprint. Runs as user `w3bs` (uid 1000).
@@ -42,6 +49,16 @@ and connect over MCP. `os/docker/check-desktop.sh` is the acceptance check: an a
 clicks Konsole, types a command that runs, takes a 1920x1080 screenshot, and is refused once
 access is disabled.
 
+## Updating
+
+Both images carry `/etc/w3bs-os-release` (`ID=w3bs-os`, `VERSION`, `EDITION=docker-server` or
+`docker-desktop`, `ALPINE`, `ALPINE_BRANCH`). Inside a container, `w3bs os status` shows the
+Alpine branch, the newest one and pending updates; run as root (`docker exec -u 0 <container> w3bs os update`) it
+applies package updates, and `w3bs os upgrade` moves to the next Alpine branch. For containers the usual
+route is still to pull or rebuild the newer image; the kernel is the host's either way. See
+[Updating W3BS OS](../../docs/package-manager.md#updating-w3bs-os-w3bs-os-update--upgrade).
+Build a different version label with `--build-arg W3BS_OS_VERSION=0.2.0`.
+
 ## Build
 
 ```sh
@@ -51,3 +68,14 @@ docker buildx build -f os/docker/Dockerfile --target desktop -t w3bs-os:desktop 
 
 The `w3bs` CLI and `w3bs-desktop` are compiled from this checkout for musl (their release
 binaries are glibc builds). `os/docker/Dockerfile.dockerignore` lists what the build reads.
+
+## Web server
+
+Both images include **Caddy**, the W3BS OS web server: virtual hosts, reverse proxies and
+static sites, with automatic HTTPS and IPv6 by default. `/etc/caddy/Caddyfile` only imports
+`/etc/caddy/sites/*`, so a site is one file:
+
+```sh
+docker run -d --name web -p 80:80 -p 443:443 -v w3bs-caddy:/data --user root \
+  w3bs.org/os:server sh -c "echo 'example.com { reverse_proxy app:3000 }' > /etc/caddy/sites/example && caddy run --config /etc/caddy/Caddyfile"
+```
