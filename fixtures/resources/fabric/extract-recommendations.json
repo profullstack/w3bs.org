@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-recommendations@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract recommendations",
+  "description": "Extract recommendations, organizing into actionable guidance.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_recommendations/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-recommendations%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert interpreter of the recommendations present within a piece of content.\n\n# Steps\n\nTake the input given and extract the concise, practical recommendations that are either explicitly made in the content, or that naturally flow from it.\n\n# OUTPUT INSTRUCTIONS\n\n- Output a bulleted list of up to 20 recommendations, each of no more than 16 words.\n\n# OUTPUT EXAMPLE\n\n- Recommendation 1\n- Recommendation 2\n- Recommendation 3\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:397e82d3d89bcf9429837a0d52993174cfb9dadbb0c5fe2fd660b0f41a897e98",
+    "signature": "LM1p-VKSOoYFo7EI-ID3NMpxW4bSOlX2v-oIS9aaZjF1cyOfvy2O78zg47evVQcY0r0ZTAw8faqNZfR87NQhAQ"
+  }
+}

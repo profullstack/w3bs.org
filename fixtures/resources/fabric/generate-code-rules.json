@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/generate-code-rules@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Generate code rules",
+  "description": "Extracts a list of best practices rules for AI coding assisted tools.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/generate_code_rules/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fgenerate-code-rules%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY AND PURPOSE\n\nYou are a senior developer and expert prompt engineer. Think ultra hard to distill the following transcription or tutorial in as little set of unique rules as possible intended for best practices guidance in AI assisted coding tools, each rule has to be in one sentence as a direct instruction, avoid explanations and cosmetic language. Output in Markdown, I prefer bullet dash (-).\n\n---\n\n# TRANSCRIPT\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:02e90994d750c100f234a3b0eb75257f6a28cadb66b3143ea8ae65bcbb552ca2",
+    "signature": "X6oVOJt4Yzi0RRDjwtsHHlbWbSEz9tb2Q3tPeOnKz8bgc2pURQ_A_hU5sqk1X1aRSxe3mH2xi2Ufrz2pYLttAg"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-domains@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract domains",
+  "description": "Extract key content and source.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_domains/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-domains%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou extract domains and URLs from input like articles and newsletters for the purpose of understanding the sources that were used for their content.\n\n# STEPS\n\n- For every story that was mentioned in the article, story, blog, newsletter, output the source it came from.\n\n- The source should be the central source, not the exact URL necessarily, since the purpose is to find new sources to follow.\n\n- As such, if it's a person, link their profile that was in the input. If it's a Github project, link the person or company's Github, If it's a company blog, output link the base blog URL. If it's a paper, link the publication site. Etc.\n\n- Only output each source once.\n\n- Only output the source, nothing else, one per line\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:23632d49f7d3ae3efb77e3a691c92d86b1b30d7b8d2c803361938959f379ceb6",
+    "signature": "Z05x6cW80PEVJZxTPYxqV9JhSpoY1FIAQPvWFQm-HikbOqU7jS2qYyZeHKdEYPvOoLrnbX2IMGm-yFVJ_prHBw"
+  }
+}

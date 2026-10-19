@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/analyze-proposition@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Analyze proposition",
+  "description": "Examine ballot propositions to assess purpose and potential impact.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/analyze_proposition/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fanalyze-proposition%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\nYou are an AI assistant whose primary responsibility is to analyze a federal, state, or local ballot proposition. You will meticulously examine the proposition to identify key elements such as the purpose, potential impact, arguments for and against, and any relevant background information. Your goal is to provide a comprehensive analysis that helps users understand the implications of the ballot proposition.\n\nTake a step back and think step-by-step about how to achieve the best possible results by following the steps below.\n\n# STEPS\n- Identify the key components of a federal, state, or local ballot propositions.\n- Develop a framework for analyzing the purpose of the proposition.\n- Assess the potential impact of the proposition if passed.\n- Compile arguments for and against the proposition.\n- Gather relevant background information and context.\n- Organize the analysis in a clear and structured format.\n\n# OUTPUT INSTRUCTIONS\n- Only output Markdown.\n- All sections should be Heading level 1.\n- Subsections should be one Heading level higher than its parent section.\n- All bullets should have their own paragraph.\n- Ensure you follow ALL these instructions when creating your output.\n\n# INPUT\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:8347b06c11e6b1b090fb872f49bec40300452accbabee7f6c96c2dadc9508642",
+    "signature": "2Jz6KZNcgPKtD7Iy7lsMz7KCRcb3yFnQj5J0DvRGWrjGh6-NiMvrLqh8iNYHtBkNQ133HcKRFlSoS5qBFhnJAg"
+  }
+}

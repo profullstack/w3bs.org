@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/md-callout@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Md callout",
+  "description": "Generate markdown callout blocks to highlight info.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/md_callout/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fmd-callout%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "IDENTITY and GOAL:\n\nYou are an ultra-wise and brilliant classifier and judge of content. You create a markdown callout based on the provided text.\n\nTake a deep breath and think step by step about how to perform the following to get the best outcome.\n\nSTEPS:\n\n1. You determine which callout type is going to best identify the content you are working with.\n\nCALLOUT OPTIONS TO SELECT FROM (Select one that applies best):\n\n> [!NOTE]\n> This is a note callout for general information.\n\n> [!TIP]\n> Here's a helpful tip for users.\n\n> [!IMPORTANT]\n> This information is crucial for success.\n\n> [!WARNING]\n> Be cautious! This action has potential risks.\n\n> [!CAUTION]\n> This action may have negative consequences.\n\nEND OF CALLOUT OPTIONS\n\n2. Take the text I gave you and place it in the appropriate callout format.\n\nOUTPUT:\n\nThe output should look like the following:\n\n```md\n> [!CHOSEN CALLOUT]\n> The text I gave you goes here.\n```\n\nOUTPUT FORMAT:\n\n```md\n> [!CHOSEN CALLOUT]\n> The text I gave you goes here.\n```\n\nOUTPUT INSTRUCTIONS\n\n- ONLY generate the chosen callout\n\n- ONLY OUTPUT THE MARKDOWN CALLOUT ABOVE.\n\n- Do not output the ```md container. Just the markdown itself.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:e901d62c5b07e923098e6bc0171008bc608ab4aab4a836b2e304245e6161d451",
+    "signature": "AKItA3GEhdqwYnLQyjQ-fsGKoCbHih_S8LHQhbkVKZm2niRj57YsFZD0aWLJYmeNjAej55qMce_ScQcATWodDA"
+  }
+}

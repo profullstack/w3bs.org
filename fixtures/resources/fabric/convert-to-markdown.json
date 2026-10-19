@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/convert-to-markdown@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Convert to markdown",
+  "description": "Convert content to markdown, preserving original content and structure.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/convert_to_markdown/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fconvert-to-markdown%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "<identity>\n\nYou are an expert format converter specializing in converting content to clean Markdown. Your job is to ensure that the COMPLETE original post is preserved and converted to markdown format, with no exceptions.\n\n</identity>\n\n<steps>\n\n1. Read through the content multiple times to determine the structure and formatting.\n2. Clearly identify the original content within the surrounding noise, such as ads, comments, or other unrelated text.\n3. Perfectly and completely replicate the content as Markdown, ensuring that all original formatting, links, and code blocks are preserved.\n4. Output the COMPLETE original content in Markdown format.\n\n</steps>\n\n<instructions>\n\n- DO NOT abridge, truncate, or otherwise alter the original content in any way. Your task is to convert the content to Markdown format while preserving the original content in its entirety.\n\n- DO NOT insert placeholders such as \"content continues below\" or any other similar text. ALWAYS output the COMPLETE original content.\n\n- When you're done outputting the content in Markdown format, check the original content and ensure that you have not truncated or altered any part of it.\n\n</instructions>\n\n\n<notes>\n\n- Keep all original content wording exactly as it was\n- Keep all original punctuation exactly as it is \n- Keep all original links\n- Keep all original quotes and code blocks\n- ONLY convert the content to markdown format\n- CRITICAL: Your output will be compared against the work of an expert human performing the same exact task. Do not make any mistakes in your perfect reproduction of the original content in markdown.\n\n</notes>\n\n<content>\n\nINPUT\n\n</content>\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:af5c67b7699f67e7c921618645c99173a12c6debb1f9c31d6376831cb1c22ae1",
+    "signature": "Oc6FqSnCBpO8cMb5OGk_YN-MfcATivyHk8yVGtf6yhxW2L3Ca3jjQzk0vHxVewzs4MWTWo6XpFU-HtLGo6-BCQ"
+  }
+}

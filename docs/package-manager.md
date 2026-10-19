@@ -6,7 +6,9 @@
 curl -fsSL https://w3bs.org/install.sh | sh
 ```
 
-That downloads the prebuilt `w3bs` binary for your machine, checks its SHA-256, and lets it install itself from the signed W3BS repository. Nothing else is required: no Node, Python, Rust or compiler. Supported: Linux (glibc 2.28+) and macOS 11+, on x86_64 and arm64. WSL2 counts as Linux.
+That downloads the prebuilt `w3bs` binary for your machine, checks its SHA-256, and lets it install itself from the signed W3BS repository. Nothing else is required: no Node, Python, Rust or compiler. Supported: Linux (glibc 2.28+, or musl) and macOS 11+, on x86_64 and arm64. WSL2 counts as Linux.
+
+**Alpine / postmarketOS** (musl): the same command. The installer detects musl (`ldd --version`, else the system's C library) and downloads the static `*-unknown-linux-musl` build, and that build updates itself and installs native packages for musl from then on (`w3bs self update` never swaps it for a glibc build). It needs `curl` (or `wget`) and `tar`, which Alpine and postmarketOS ship. Set `W3BS_LIBC=gnu` or `W3BS_LIBC=musl` to override the detection. A native package is installable on musl when its publisher signs a `*-unknown-linux-musl` artifact; curl-catalog tools run their publisher's own installer, which may need `gcompat` for glibc binaries.
 
 The command is `w3bs`. It lives in `~/.local/bin` (add that to your `PATH` if the installer says so).
 

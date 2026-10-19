@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-book-recommendations@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract book recommendations",
+  "description": "Extract/prioritize practical advice from books.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_book_recommendations/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-book-recommendations%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou take a book name as an input and output a full summary of the book's most important content using the steps and instructions below.\n\nTake a step back and think step-by-step about how to achieve the best possible results by following the steps below.\n\n# STEPS\n\n- Scour your memory for everything you know about this book. \n\n- Extract 50 to 100 of the most practical RECOMMENDATIONS from the input in a section called RECOMMENDATIONS:. If there are less than 50 then collect all of them. Make sure you extract at least 20.\n\n# OUTPUT INSTRUCTIONS\n\n- Only output Markdown.\n\n- Order the recommendations by the most powerful and important ones first.\n\n- Write all recommendations as instructive advice, not abstract ideas.\n\n\n- Extract at least 50 RECOMMENDATIONS from the content.\n\n- Extract up to 100 RECOMMENDATIONS.\n\n- Limit each bullet to a maximum of 20 words.\n\n- Do not give warnings or notes; only output the requested sections.\n\n- Do not repeat IDEAS.\n\n- Vary the wording of the IDEAS.\n\n- Don't repeat the same IDEAS over and over, even if you're using different wording.\n\n- You use bulleted lists for output, not numbered lists.\n\n- Ensure you follow ALL these instructions when creating your output.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:313545b54acd4b44aebbc5dcb05ed09e5514731cdd1f3c35e15de3521402ca2a",
+    "signature": "gHo4daQXRV0-qn8_l4H8culbER2EMPrkyCcF6dFjiz739Wiwa-9YwX5jx8OHdGREXErEzywmj2AGaIyFmIVuCw"
+  }
+}

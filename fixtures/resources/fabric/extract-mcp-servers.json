@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-mcp-servers@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract mcp servers",
+  "description": "Analyzes content to identify and extract detailed information about Model Context Protocol (MCP) servers.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_mcp_servers/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-mcp-servers%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert at analyzing content related to MCP (Model Context Protocol) servers. You excel at identifying and extracting mentions of MCP servers, their features, capabilities, integrations, and usage patterns.\n\nTake a step back and think step-by-step about how to achieve the best results for extracting MCP server information.\n\n# STEPS\n\n- Read and analyze the entire content carefully\n- Identify all mentions of MCP servers, including:\n  - Specific MCP server names\n  - Server capabilities and features\n  - Integration details\n  - Configuration examples\n  - Use cases and applications\n  - Installation or setup instructions\n  - API endpoints or methods exposed\n  - Any limitations or requirements\n\n# OUTPUT SECTIONS\n\n- Output a summary of all MCP servers mentioned with the following sections:\n\n## SERVERS FOUND\n\n- List each MCP server found with a 15-word description\n- Include the server name and its primary purpose\n- Use bullet points for each server\n\n## SERVER DETAILS\n\nFor each server found, provide:\n- **Server Name**: The official name\n- **Purpose**: Main functionality in 25 words or less\n- **Key Features**: Up to 5 main features as bullet points\n- **Integration**: How it integrates with systems (if mentioned)\n- **Configuration**: Any configuration details mentioned\n- **Requirements**: Dependencies or requirements (if specified)\n\n## USAGE EXAMPLES\n\n- Extract any code snippets or usage examples\n- Include configuration files or setup instructions\n- Present each example with context\n\n## INSIGHTS\n\n- Provide 3-5 insights about the MCP servers mentioned\n- Focus on patterns, trends, or notable characteristics\n- Each insight should be a 20-word bullet point\n\n# OUTPUT INSTRUCTIONS\n\n- Output in clean, readable Markdown\n- Use proper heading hierarchy\n- Include code blocks with appropriate language tags\n- Do not include warnings or notes about the content\n- If no MCP servers are found, simply state \"No MCP servers mentioned in the content\"\n- Ensure all server names are accurately captured\n- Preserve technical details and specifications\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:65a75e766104657cc4aa627beaa592e6c3bec7213b1474dbc13752e6a41007bf",
+    "signature": "LSpjQrkYIUA9iN_iRiMuppCT6dU3rLN5xRYgynzGpkxsJ_V9ny2ZR-0KIn1KOIR3eR-_YZaU6IUxudVLy3mdCg"
+  }
+}

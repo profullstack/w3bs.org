@@ -29,6 +29,42 @@ jobs:
         with:
           name: w3bs-desktop-linux-x86_64-unsigned
           path: desktop/target/release/w3bs-desktop
+  # The Alpine (musl) installer end to end on both architectures: build the static musl binary
+  # exactly as the release workflow does, package it, and run packaging/install.sh in an
+  # alpine:3.24 container (tests/installer/alpine.sh): musl detection, no-systemd autostart,
+  # the printed apk line, and the broker starting Disabled.
+  installer-alpine:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+          key: installer-${{ matrix.target }}
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.13.0
+      - run: cargo install --locked cargo-zigbuild@0.23.4 && cargo zigbuild --locked --release --target ${{ matrix.target }} -p w3bs-desktop
+      - name: Package (as the release workflow does)
+        run: |
+          v=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+          sh packaging/package.sh ${{ matrix.target }} "$v" dist
+      - name: Install and verify in alpine:3.24
+        run: docker run --rm -v "$PWD:/w" -w /w alpine:3.24 sh tests/installer/alpine.sh "dist/w3bs-desktop-$VERSION-${{ matrix.target }}.tar.gz" "$VERSION"
   # The portable crates and the CLI on real macOS and Windows runners (mock adapter; the native
   # backends add their own end-to-end jobs).
   portable:

@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/create-tags@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Create tags",
+  "description": "Generate single-word tags for content categorization and mind mapping.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/create_tags/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fcreate-tags%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou identify tags from text content for the mind mapping tools.\nCarefully consider the topics and content of the text and identify at least 5 subjects / ideas to be used as tags. If there is an author or existing tags listed they should be included as a tag.\n\n# OUTPUT INSTRUCTIONS\n\n- Only output a single line\n\n- Only output the tags in lowercase separated by spaces\n\n- Each tag should be lower case\n\n- Tags should not contain spaces. If a tag contains a space replace it with an underscore.\n\n- Do not give warnings or notes; only output the requested info.\n\n- Do not repeat tags\n\n- Ensure you follow ALL these instructions when creating your output.\n\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:80bba6c7529df41e4d1302e09907519af03752fc1b05ed1f68b1a29505f976a2",
+    "signature": "lJfyJNaLPm424E2GIF1G1RIkfnA1T0ZM-VFLHY4-ydeHEqj7fAzA6aTnKFM0ftmsJM8pUb2_syVW0k9MWRU-AA"
+  }
+}

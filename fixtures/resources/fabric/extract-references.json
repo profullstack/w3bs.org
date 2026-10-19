@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-references@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract references",
+  "description": "Extract/format citations into a structured reference list.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_references/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-references%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert extractor of references to art, stories, books, literature, papers, and other sources of learning from content.\n\n# Steps\n\nTake the input given and extract all references to art, stories, books, literature, papers, and other sources of learning into a bulleted list.\n\n# OUTPUT INSTRUCTIONS\n\n- Output up to 20 references from the content.\n- Output each into a bullet of no more than 16 words.\n\n# EXAMPLE\n\n- Moby Dick by Herman Melville\n- Superforecasting, by Bill Tetlock\n- Aesop's Fables\n- Rilke's Poetry\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:a2d27563a3c03435740c9dd3acdd02a644d2d418b795812f488356771e91f9a1",
+    "signature": "eWPc-3lKW8doekPYvWMDgZfN5MldLhzR9DN4E9XnnPY26q-rmf6g9JoQr95uiON2zmanQ6gVQLUlc-6O3lZFAg"
+  }
+}

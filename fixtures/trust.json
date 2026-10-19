@@ -7,6 +7,12 @@
       "namespace": "w3bs",
       "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEApUtCLhkRs70WwiPeUkAuc0QOK77gW+nYghmYr9qsZTY=\n-----END PUBLIC KEY-----\n",
       "revoked": false
+    },
+    {
+      "id": "w3bs-fabric-1",
+      "namespace": "fabric",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA0pHncHx/gD075OWKZ41Hxt2gRQzBlscXfWKb69I5R90=\n-----END PUBLIC KEY-----\n",
+      "revoked": false
     }
   ]
 }
