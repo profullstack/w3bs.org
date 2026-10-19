@@ -1,4 +1,5 @@
-// Refresh `latest_version` in catalog/catalog.json from each entry's GitHub releases.
+// Refresh `latest_version` in catalog/catalog.json from each entry's GitHub releases, and
+// from npm for entries that name their package (`"npm": "@scope/name"`); the higher wins.
 //
 //   bun scripts/catalog-versions.mjs            update catalog/catalog.json in place
 //   bun scripts/catalog-versions.mjs --check    print what would change; exit 1 if anything is stale
@@ -51,25 +52,41 @@ function releases(slug, tries = 3) {
   }
 }
 
+async function npmLatest(name) {
+  try {
+    const res = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2F')}/latest`, { signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) return { error: `HTTP ${res.status}` };
+    return { version: (await res.json()).version };
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
 const catalog = JSON.parse(readFileSync(FILE, 'utf8'));
 const cache = new Map();
 let changed = 0;
 for (const entry of catalog) {
   // A publisher-signed release (W3BS-SIGN-1) fixes its own version; only a new signature moves it.
   if (entry.signed) continue;
+  const candidates = [];
   const slug = (entry.repository || '').match(/^https:\/\/github\.com\/([^/]+\/[^/#?]+?)(?:\.git)?\/?$/i)?.[1];
-  if (!slug) continue;
-  if (!cache.has(slug)) cache.set(slug, releases(slug));
-  const tags = cache.get(slug);
-  if (tags.error) {
-    console.error(`skip   ${entry.id}: ${slug}: ${tags.error}`);
-    continue;
+  if (slug) {
+    if (!cache.has(slug)) cache.set(slug, releases(slug));
+    const tags = cache.get(slug);
+    if (tags.error) console.error(`skip   ${entry.id}: ${slug}: ${tags.error}`);
+    else {
+      const names = [...new Set([entry.name, ...(entry.commands || [])])];
+      candidates.push(...tags.map((t) => tagVersion(t, names)).filter(Boolean));
+    }
   }
-  const names = [...new Set([entry.name, ...(entry.commands || [])])];
-  const best = tags
-    .map((t) => tagVersion(t, names))
-    .filter(Boolean)
-    .sort((a, b) => cmp(parse(b), parse(a)))[0];
+  // Tools whose installer wraps an npm package often publish there without a GitHub
+  // release; `npm` in the entry names the package the installer installs.
+  if (entry.npm) {
+    const v = await npmLatest(entry.npm);
+    if (v.error) console.error(`skip   ${entry.id}: npm ${entry.npm}: ${v.error}`);
+    else if (parse(v.version)) candidates.push(v.version);
+  }
+  const best = candidates.sort((a, b) => cmp(parse(b), parse(a)))[0];
   if (!best) continue;
   const current = parse(entry.latest_version);
   if (current && cmp(parse(best), current) < 0) {

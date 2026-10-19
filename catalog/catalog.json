@@ -153,7 +153,8 @@
     "vendor": "Profullstack",
     "install": "curl -fsSL https://sh1pt.com/install.sh | sh",
     "evidence": "npm view @profullstack/sh1pt; sh1pt.com/install.sh 200; examples: https://github.com/profullstack/sh1pt (README 'CLI surface' + packages/cli/src/commands/{init,build,ship}.ts)",
-    "publisher": "profullstack"
+    "publisher": "profullstack",
+    "npm": "@profullstack/sh1pt"
   },
   {
     "id": "logicsrc.com/logicsrc",
@@ -223,7 +224,8 @@
     "vendor": "Profullstack",
     "install": "curl -fsSL https://openmcp.logicsrc.com/install.sh | sh",
     "evidence": "npm view @logicsrc/openmcp; installer 200; examples: /home/anthony/src/logicsrc/openmcp/README.md (Use one, Run a catalog)",
-    "publisher": "profullstack"
+    "publisher": "profullstack",
+    "npm": "@logicsrc/openmcp"
   },
   {
     "id": "agenticjobs.work/agenticjobs",
@@ -466,7 +468,7 @@
     "repository": "https://github.com/profullstack/threatcrush",
     "license": "MIT",
     "agentic": false,
-    "latest_version": "0.13.28",
+    "latest_version": "0.13.48",
     "vendor": "Profullstack",
     "install": "curl -fsSL https://threatcrush.com/install.sh | sh",
     "evidence": "npm view @profullstack/threatcrush; installer 200; examples: /home/anthony/src/profullstack/threatcrush/README.md",
@@ -576,7 +578,8 @@
     "vendor": "Profullstack",
     "install": "curl -fsSL https://rssamplifier.com/install.sh | sh",
     "evidence": "npm view @profullstack/rssamplifier; installer 200; examples: https://github.com/profullstack/rssamplifier.com (README 'CLI' + apps/cli/README.md, apps/cli/src/index.js)",
-    "publisher": "profullstack"
+    "publisher": "profullstack",
+    "npm": "@profullstack/rssamplifier"
   },
   {
     "id": "wx93.me/wx93",
@@ -709,11 +712,12 @@
     "repository": "https://github.com/profullstack/smshub",
     "license": "MIT",
     "agentic": true,
-    "latest_version": "1.4.0",
+    "latest_version": "1.6.0",
     "vendor": "Profullstack",
     "install": "curl -fsSL https://smshub.dev/cli/install.sh | sh",
     "evidence": "https://smshub.dev/cli/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: https://github.com/profullstack/smshub/blob/main/cli/README.md",
-    "publisher": "profullstack"
+    "publisher": "profullstack",
+    "npm": "@profullstack/smshub"
   },
   {
     "id": "pairux.com/pairux",
@@ -985,7 +989,8 @@
     "vendor": "Profullstack",
     "install": "curl -fsSL https://crawlproof.com/install.sh | sh",
     "evidence": "https://crawlproof.com/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: https://github.com/profullstack/crawlproof.com (README 'CLI' + packages/cli/README.md, packages/cli/src/cli.ts)",
-    "publisher": "profullstack"
+    "publisher": "profullstack",
+    "npm": "@profullstack/crawlproof"
   },
   {
     "id": "qrypt.chat/qryptchat",
@@ -1060,11 +1065,12 @@
     "repository": "https://github.com/profullstack/readm3",
     "license": "MIT",
     "agentic": false,
-    "latest_version": "0.14.0",
+    "latest_version": "0.15.0",
     "vendor": "Profullstack",
     "install": "curl -fsSL https://readm3.com/install.sh | sh",
     "evidence": "https://readm3.com/install.sh 200, installed from a clean env (no Node) 2026-10-13; 0.14.0 via `w3bs install` from a clean HOME 2026-10-19; examples: /home/anthony/src/profullstack/readm3/README.md",
-    "publisher": "profullstack"
+    "publisher": "profullstack",
+    "npm": "@profullstack/readm3"
   },
   {
     "id": "hdtilt.com/hdtilt",
@@ -1883,7 +1889,8 @@
     "vendor": "Continue",
     "install": "curl -fsSL https://raw.githubusercontent.com/continuedev/continue/main/extensions/cli/scripts/install.sh | bash",
     "evidence": "npm view @continuedev/cli; examples: https://github.com/continuedev/continue/blob/main/extensions/cli/README.md",
-    "publisher": "third-party"
+    "publisher": "third-party",
+    "npm": "@continuedev/cli"
   },
   {
     "id": "factory.ai/droid",
@@ -1980,7 +1987,7 @@
     "repository": "https://github.com/mistralai/mistral-vibe",
     "license": "Apache-2.0",
     "agentic": true,
-    "latest_version": "2.26.1",
+    "latest_version": "3.0.0",
     "vendor": "Mistral AI",
     "install": "curl -LsSf https://mistral.ai/vibe/install.sh | bash",
     "evidence": "https://github.com/mistralai/mistral-vibe README; https://pypi.org/pypi/mistral-vibe/json; examples: https://github.com/mistralai/mistral-vibe (README)",
