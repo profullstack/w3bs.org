@@ -42,6 +42,16 @@ and connect over MCP. `os/docker/check-desktop.sh` is the acceptance check: an a
 clicks Konsole, types a command that runs, takes a 1920x1080 screenshot, and is refused once
 access is disabled.
 
+## Updating
+
+Both images carry `/etc/w3bs-os-release` (`ID=w3bs-os`, `VERSION`, `EDITION=docker-server` or
+`docker-desktop`, `ALPINE`, `ALPINE_BRANCH`). Inside a container, `w3bs os status` shows the
+Alpine branch, the newest one and pending updates; run as root (`docker exec -u 0 <container> w3bs os update`) it
+applies package updates, and `w3bs os upgrade` moves to the next Alpine branch. For containers the usual
+route is still to pull or rebuild the newer image; the kernel is the host's either way. See
+[Updating W3BS OS](../../docs/package-manager.md#updating-w3bs-os-w3bs-os-update--upgrade).
+Build a different version label with `--build-arg W3BS_OS_VERSION=0.2.0`.
+
 ## Build
 
 ```sh
