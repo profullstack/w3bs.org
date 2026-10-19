@@ -2304,10 +2304,10 @@
     "repository": "https://github.com/profullstack/w3bs.org/tree/main/desktop",
     "license": "Apache-2.0",
     "agentic": true,
-    "latest_version": "0.5.0",
+    "latest_version": "0.5.1",
     "vendor": "Profullstack",
     "install": "curl -fsSL https://w3bs.org/desktop/install.sh | sh",
-    "evidence": "w3bs.org/desktop/install.sh 200 (text/x-shellscript); GitHub release desktop-v0.5.0 with 5 archives + SHA256SUMS; installer verified on ubuntu:24.04, macos-latest and windows-latest CI; Training Mode verified on the KDE Plasma rig (73/73)",
+    "evidence": "w3bs.org/desktop/install.sh 200 (text/x-shellscript); GitHub release desktop-v0.5.1 with 7 archives (incl. x86_64/aarch64 musl for Alpine and Nura) + SHA256SUMS; installer verified on ubuntu:24.04, macos-latest and windows-latest CI; Training Mode verified on the KDE Plasma rig (73/73)",
     "publisher": "profullstack"
   },
   {
