@@ -38,6 +38,8 @@ async function load() {
     sha256: x.sha256,
     size: human(x.size),
     preview: Boolean(x.preview),
+    torrentUrl: https(x.torrentUrl) && x.torrentUrl.endsWith('.torrent') ? x.torrentUrl : null,
+    magnet: /^magnet:\?xt=urn:btih:[0-9a-f]{40}&/i.test(x.magnet ?? '') ? x.magnet : null,
   };
 }
 

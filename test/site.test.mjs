@@ -176,6 +176,8 @@ test('/os offers only what exists: Docker now, the ISO from the newest os-v* rel
       sha256: sha,
       size: 1459617792,
       preview: true,
+      torrentUrl: `${dl}/w3bs-os-0.1.0-x86_64.iso.torrent`,
+      magnet: `magnet:?xt=urn:btih:${'a'.repeat(40)}&dn=w3bs-os-0.1.0-x86_64.iso`,
     };
     resetOsReleaseCache();
     const live = await (await fetch(`${t.base}/os`)).text();
@@ -183,8 +185,10 @@ test('/os offers only what exists: Docker now, the ISO from the newest os-v* rel
     assert.match(live, /Download the ISO \(1\.46 GB\)/);
     assert.match(live, new RegExp(sha));
     assert.match(live, /PCS, INTEL MACS AND VPS SERVERS · ISO 0\.1\.0-preview · PREVIEW/);
-    assert.equal(live.match(/Download the ISO/g).length, 1, "one ISO, one button");
+    assert.equal(live.match(/Download the ISO/g).length, 1, 'one ISO, one button');
     assert.match(live, /APPLE SILICON MACS/);
+    assert.match(live, /href="[^"]*\.iso\.torrent">\.torrent<\/a>/);
+    assert.match(live, /href="magnet:\?xt=urn:btih:a{40}/);
     const prd = await fetch(`${t.base}/docs/os-prd.md`);
     assert.equal(prd.status, 200);
     assert.match(await prd.text(), /^# W3BS OS Product Requirements/);
