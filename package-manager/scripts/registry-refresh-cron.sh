@@ -28,7 +28,7 @@ git -C "$repo" worktree add -q -b "$branch" "$wt" origin/main
 trap 'git -C "$repo" worktree remove --force "$wt" 2>/dev/null || true' EXIT
 
 cd "$wt"
-bun scripts/catalog-versions.mjs || echo "catalog version refresh failed; signing the catalog as it is"
+bun install --frozen-lockfile >/dev/null && bun scripts/catalog-versions.mjs --scan || echo "catalog version refresh failed; signing the catalog as it is"
 package-manager/scripts/publish-manager.sh --refresh
 git update-index -q --really-refresh || true
 if git diff --quiet -- registry catalog && [ -z "$(git ls-files --others --exclude-standard registry)" ]; then

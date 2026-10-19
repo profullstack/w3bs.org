@@ -2,6 +2,11 @@
 //
 //   bun scripts/catalog-versions.mjs            update catalog/catalog.json in place
 //   bun scripts/catalog-versions.mjs --check    print what would change; exit 1 if anything is stale
+//   bun scripts/catalog-versions.mjs --scan     ThreatCrush-scan each new release first; hold it
+//                                               back when it is flagged or cannot be scanned
+//
+// The registry refresh uses --scan: the catalog PR merges only when the package scan is
+// green, so one flagged release must not block every other bump and the TUF re-sign.
 //
 // `w3bs install` and `w3bs update` compare `<command> --version` against latest_version and
 // skip the publisher's installer when it is already current, so a stale value hides real
@@ -18,6 +23,7 @@ import { resolve } from 'node:path';
 const ROOT = resolve(import.meta.dirname, '..');
 const FILE = resolve(ROOT, 'catalog/catalog.json');
 const check = process.argv.includes('--check');
+const scan = process.argv.includes('--scan') && !check ? (await import('../src/scan.mjs')).scanPackage : null;
 
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 const parse = (v) => (v || '').replace(/^v/i, '').match(SEMVER)?.slice(1).map(Number) ?? null;
@@ -69,6 +75,13 @@ for (const entry of catalog) {
     continue;
   }
   if (current && cmp(parse(best), current) === 0) continue;
+  if (scan) {
+    const result = await scan({ ...entry, latest_version: best }).catch((error) => ({ status: 'error', error: error.message }));
+    if (result.status !== 'passed') {
+      console.error(`held   ${entry.id}: ${best} scan ${result.status}${result.error ? ` (${result.error})` : ''}; staying on ${entry.latest_version ?? '-'}`);
+      continue;
+    }
+  }
   console.log(`bump   ${entry.id}: ${entry.latest_version ?? '-'} -> ${best}`);
   entry.latest_version = best;
   changed++;
