@@ -3015,5 +3015,44 @@
   "install": "curl -fsSL https://typeheard.com/install.sh | sh",
   "evidence": "npm view @profullstack/typeheard version = 0.1.0; typeheard.com/install.sh 200 (installs @profullstack/typeheard with bun or npm); examples: @profullstack/typeheard README and src/cli.js usage",
   "publisher": "profullstack"
+ },
+ {
+  "id": "ad.network.pit.world/adnetwork",
+  "name": "adnetwork",
+  "commands": [
+   "adnetwork"
+  ],
+  "examples": [
+   {
+    "run": "adnetwork run https://example.com --daily 5",
+    "does": "Advertise a page: the ad is written from it and runs at about $0.20 a click"
+   },
+   {
+    "run": "adnetwork fund 25 usdc_sol",
+    "does": "Add ad budget in crypto: prints the address and exact amount"
+   },
+   {
+    "run": "adnetwork site example.com",
+    "does": "Earn from a site: prints the tag to paste"
+   },
+   {
+    "run": "adnetwork withdraw example.com",
+    "does": "Send a site's earnings to its USDC wallet"
+   },
+   {
+    "run": "adnetwork mcp",
+    "does": "MCP server for agents"
+   }
+  ],
+  "description": "Run ads, or earn from your site, in crypto, with ad.network. Advertisers paste a link and a daily budget; publishers paste one tag and add a wallet. Also a TUI and an MCP server; ads by crawlproof, payments by CoinPay.",
+  "homepage": "https://ad.network.pit.world",
+  "repository": "https://github.com/moshcoder/ad.network",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "0.1.3",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://ad.network.pit.world/install.sh | sh",
+  "evidence": "npm view @profullstack/adnetwork version = 0.1.3; ad.network.pit.world/install.sh 200 text/x-shellscript (installs @profullstack/adnetwork with bun); examples: moshcoder/ad.network README and src/cli.ts HELP",
+  "publisher": "profullstack"
  }
 ]
