@@ -47,7 +47,7 @@ pub fn human(r: &OperationResult) {
         eprintln!("error: {} ({})", e.message, e.code);
         if e.code == "PUBLISHER_KEY_CHANGED" {
             eprintln!("hint: check with the publisher that the key change is genuine before using --accept-new-key");
-        } else if r.result == Overall::ApprovalRequired && r.operation != "open" {
+        } else if r.result == Overall::ApprovalRequired && r.operation != "open" && e.code != "NEEDS_ROOT" {
             eprintln!("hint: re-run interactively, or add --yes (and a pre-provisioned trust root for new repositories)");
         }
         return;
@@ -298,6 +298,12 @@ pub fn human(r: &OperationResult) {
             }
             println!("w3bs {}", s(&d["w3bs_version"]));
             return;
+        }
+        "os.setup" => {
+            let d = &r.data;
+            if d["dry_run"] == true {
+                println!("Would run: {}", s(&d["command_line"]));
+            }
         }
         "os.update" | "os.upgrade" => {
             let d = &r.data;

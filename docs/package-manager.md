@@ -153,6 +153,27 @@ If a step fails, `w3bs` stops, says which step, exits non-zero and never reports
 
 In a container (the Docker editions), `update` and `upgrade` work, but the kernel is the host's and no snapshot is taken; pulling or rebuilding a newer image is the usual route there. `/etc/w3bs-os-release` holds `ID=w3bs-os`, `VERSION`, `EDITION` (`iso`, `docker-server` or `docker-desktop`), `ALPINE` and `ALPINE_BRANCH`. On plain Alpine, `w3bs os` works the same and says the machine is not W3BS OS.
 
+## Setting up a W3BS OS box (w3bs os setup)
+
+`w3bs os setup` is the W3BS way to set up a box's accounts and services, and to keep them in shape afterwards. It runs `root-w3bs-os`, the setup script from the catalog package `profullstack.com/root-w3bs-os`, as root, with your arguments passed through unchanged.
+
+```sh
+w3bs os setup -- anthony preshy --groups wheel   # create or refresh these users, add them to wheel
+w3bs os setup -- --refresh                       # re-apply the services and settings
+w3bs os setup -- mounts                          # any root-w3bs-os subcommand: mount, umount, mounts, share, groups, sandbox, confine
+w3bs os setup --print -- anthony                 # show the exact command; run nothing
+```
+
+What it does:
+
+1. Finds `root-w3bs-os` on PATH, in `~/.local/bin` or in `/usr/local/sbin`. When it is missing, it installs `profullstack.com/root-w3bs-os` exactly as `w3bs install profullstack.com/root-w3bs-os` would: the publisher signature is checked and the plan asks y/N (`--yes` approves, `--dry-run` only plans). The package puts the command in `/usr/local/sbin` when installed as root, else in `~/.local/bin`.
+2. When it is installed and the catalog has a newer release, it updates it first (like `w3bs update profullstack.com/root-w3bs-os`). `--no-update` skips this. If the update fails, it says so and runs the installed copy.
+3. Runs it as root: directly when you are root, else through `doas` (W3BS OS), else `sudo`. With none of them it stops with exit code 3. Prompts from the script and from doas or sudo reach your terminal; w3bs never asks for, passes or stores a password. The script's exit code is `w3bs`'s exit code.
+
+Put the script's arguments after `--`. Without `--` they still pass through, as long as none of them is one of w3bs's own flags (`--yes`, `--dry-run`, `--print`, `--no-update`, `--force`, `--json`, `--non-interactive`, `--quiet`, `--verbose`). With `--json`, stdout carries the result (including `command_line` and `exit_code`) and the script's output goes to stderr.
+
+It is for W3BS OS and Alpine Linux and refuses anything else (`--force` runs it anyway; the script refuses a non-Alpine system itself). On Ubuntu, use `root-ubuntu.sh` from [profullstack/cli-tools](https://github.com/profullstack/cli-tools) instead.
+
 ## Publishers
 
 There are two ways to be in `w3bs`:
