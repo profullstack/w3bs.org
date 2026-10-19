@@ -4,6 +4,7 @@
 mod ab;
 mod auth;
 mod desktop;
+mod distupgrade;
 mod fleet;
 mod publish;
 mod screen;
@@ -159,6 +160,18 @@ struct UpdateArgs {
     /// Reinstall even when the package is already current (pins still hold)
     #[arg(long, conflicts_with_all = ["version", "channel"])]
     force: bool,
+    /// Accept a publisher signing key this machine has not seen for a package's namespace
+    #[arg(long)]
+    accept_new_key: bool,
+    #[command(flatten)]
+    m: Mutate,
+}
+
+#[derive(Args, Clone)]
+struct DistUpgradeArgs {
+    /// Permit incompatible (major, or 0.x minor) W3BS package updates; pins still hold
+    #[arg(long)]
+    allow_major: bool,
     /// Accept a publisher signing key this machine has not seen for a package's namespace
     #[arg(long)]
     accept_new_key: bool,
@@ -739,6 +752,9 @@ enum Cmd {
     Install(InstallArgs),
     /// Update everything, or the named packages (shortcut for `w3bs pkg update`)
     Update(UpdateArgs),
+    /// Upgrade the whole machine: the system packages (apk, apt, dnf, pacman, zypper or brew),
+    /// then every W3BS package and the w3bs CLI
+    DistUpgrade(DistUpgradeArgs),
     /// List installed packages (shortcut for `w3bs pkg list`)
     List,
     /// Search packages (shortcut for `w3bs pkg search`)
@@ -971,6 +987,29 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
         }
         Err(Cmd::Logout { a }) => ("logout", account("logout", &a, |o| async move { auth::logout(&o).await }).await),
         Err(Cmd::Whoami { a }) => ("whoami", account("whoami", &a, |o| async move { auth::whoami(&o).await }).await),
+        Err(Cmd::DistUpgrade(DistUpgradeArgs { allow_major, accept_new_key, m })) => {
+            let (_, mk) = match engine_factory(&out) {
+                Ok(x) => x,
+                Err(e) => return ("startup", Err(e)),
+            };
+            let tty = Tty { out: out.clone() };
+            let system = match distupgrade::system(m.yes, m.dry_run, |p| tty.confirm(p), |msg| tty.progress(msg)) {
+                Ok(v) => v,
+                Err(e) => return ("dist-upgrade", Err(e)),
+            };
+            // Approving the system step approves the whole upgrade; when it was skipped, the
+            // package step asks for itself.
+            let m = Mutate { yes: m.yes || system["status"] == "upgraded", dry_run: m.dry_run };
+            let r = mk(&m).update(UpdateRequest { packages: vec![], all: true, version: None, channel: None, allow_major, force: false, accept_new_key }).await;
+            (
+                "dist-upgrade",
+                r.map(|mut res| {
+                    res.operation = "dist-upgrade".into();
+                    res.data["system"] = system;
+                    res
+                }),
+            )
+        }
         Err(Cmd::Fleet(f)) => run_fleet(f).await,
         Err(Cmd::Ab(c)) => run_ab(c).await,
         Err(Cmd::Publish(c)) => run_publish(c).await,
