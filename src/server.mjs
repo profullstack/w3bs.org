@@ -18,6 +18,7 @@ import { createMailer } from './mail.mjs';
 import { createHostedTraining } from '../training/hosted.mjs';
 import { mountTraining } from '../training/hosted-routes.mjs';
 import { mountAbTest } from './abtest-routes.mjs';
+import { mountPublishing } from './publishing-routes.mjs';
 
 export function createApp({
   store,
@@ -272,6 +273,7 @@ export function createApp({
   app.locals.fleet = mountFleet(app, { store, origin, helpers });
   mountSocial(app, { store, helpers, config: social, fetchImpl: socialFetch });
   mountAbTest(app, { store, origin, helpers });
+  mountPublishing(app, { store, helpers });
   const hostedTraining =
     training?.databaseUrl && training?.masterKey
       ? createHostedTraining(training)
@@ -297,7 +299,7 @@ export function createApp({
     res
       .type('application/xml')
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/pricing', '/packages', '/specs', '/browse', '/prompts', '/desktop', '/training', '/os', '/ab-testing', '/social', '/governance', '/developers', '/signup', '/terms', '/privacy'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/pricing', '/packages', '/packages/publish', '/specs', '/browse', '/prompts', '/desktop', '/training', '/os', '/ab-testing', '/social', '/governance', '/developers', '/signup', '/terms', '/privacy'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
       ),
   );
   app.get('/docs/:file', (req, res) => {

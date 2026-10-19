@@ -55,6 +55,8 @@ const catalog = JSON.parse(readFileSync(FILE, 'utf8'));
 const cache = new Map();
 let changed = 0;
 for (const entry of catalog) {
+  // A publisher-signed release (W3BS-SIGN-1) fixes its own version; only a new signature moves it.
+  if (entry.signed) continue;
   const slug = (entry.repository || '').match(/^https:\/\/github\.com\/([^/]+\/[^/#?]+?)(?:\.git)?\/?$/i)?.[1];
   if (!slug) continue;
   if (!cache.has(slug)) cache.set(slug, releases(slug));

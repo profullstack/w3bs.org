@@ -29,6 +29,8 @@ trap 'git -C "$repo" worktree remove --force "$wt" 2>/dev/null || true' EXIT
 
 cd "$wt"
 bun install --frozen-lockfile >/dev/null && bun scripts/catalog-versions.mjs --scan || echo "catalog version refresh failed; signing the catalog as it is"
+# Publisher-signed releases from w3bs.org/packages/publish (W3BS-SIGN-1), each re-verified.
+bun scripts/catalog-signed.mjs || echo "signed release merge failed; signing the catalog without new ones"
 package-manager/scripts/publish-manager.sh --refresh
 git update-index -q --really-refresh || true
 if git diff --quiet -- registry catalog && [ -z "$(git ls-files --others --exclude-standard registry)" ]; then

@@ -7,6 +7,7 @@ import { FLEET_SCHEMA, createFleet } from './fleet.mjs';
 import { ABTEST_SCHEMA, createAbTest } from './abtest.mjs';
 import { SOCIAL_SCHEMA, createSocial } from './social.mjs';
 import { EVENT_SCHEMA, createEvents } from './events.mjs';
+import { PUBLISHING_SCHEMA, createPublishing } from './publishing.mjs';
 
 export const ROOT = fileURLToPath(new URL('../', import.meta.url));
 
@@ -42,6 +43,7 @@ async function openSqlite(path) {
   db.exec(ABTEST_SCHEMA.sqlite);
   db.exec(SOCIAL_SCHEMA.sqlite);
   db.exec(EVENT_SCHEMA.sqlite);
+  db.exec(PUBLISHING_SCHEMA.sqlite);
   const bind = (target) => ({
     all: async (sql, params = []) => target.prepare(sql).all(...params),
     get: async (sql, params = []) => target.prepare(sql).get(...params),
@@ -95,6 +97,7 @@ async function openPostgres(connectionString) {
   await pool.query(ABTEST_SCHEMA.postgres);
   await pool.query(SOCIAL_SCHEMA.postgres);
   await pool.query(EVENT_SCHEMA.postgres);
+  await pool.query(PUBLISHING_SCHEMA.postgres);
   return {
     ...bind(pool),
     dialect: 'postgres',
@@ -121,6 +124,7 @@ export async function openStore({
   path = resolve(process.env.W3BS_DATA_DIR || resolve(ROOT, '.local/data'), 'registry.sqlite'),
   trustStore,
   seed = true,
+  publishingOptions,
 } = {}) {
   const trust =
     trustStore ??
@@ -316,13 +320,39 @@ export async function openStore({
     const { findings, fingerprint, ...summary } = scan;
     return detail ? { ...summary, findings: findings || [] } : summary;
   };
+  // The curated catalog plus signed releases (src/publishing.mjs, W3BS-SIGN-1). A signed
+  // release of a curated package takes over its version and installer; the curated
+  // description, examples and evidence stay.
+  const publishing = createPublishing(db, publishingOptions);
+  async function allEntries() {
+    const curated = (await db.all('SELECT entry FROM packages ORDER BY id')).map((row) =>
+      JSON.parse(row.entry),
+    );
+    const signed = new Map((await publishing.catalogEntries()).map((entry) => [entry.id, entry]));
+    const merged = curated.map((entry) => {
+      const release = signed.get(entry.id);
+      if (!release) {
+        // Signed in the file, but no longer served (its key was revoked): not signed now.
+        if (!entry.signed) return entry;
+        const { signed: _withdrawn, ...rest } = entry;
+        return rest;
+      }
+      signed.delete(entry.id);
+      return {
+        ...entry,
+        latest_version: release.latest_version,
+        install: release.install,
+        signed: release.signed,
+      };
+    });
+    return [...merged, ...signed.values()].sort((a, b) => a.id.localeCompare(b.id));
+  }
   async function packages(query = '', { agentic, publisher } = {}) {
     if (typeof query !== 'string' || query.length > 200)
       throw new W3bsError('INVALID_QUERY', 'Search is limited to 200 characters.');
     const q = query.toLowerCase();
     const scans = await latestScans();
-    return (await db.all('SELECT entry FROM packages ORDER BY id'))
-      .map((row) => JSON.parse(row.entry))
+    return (await allEntries())
       .filter(
         (item) =>
           (agentic === undefined || Boolean(item.agentic) === agentic) &&
@@ -338,9 +368,9 @@ export async function openStore({
       }));
   }
   async function packageById(id) {
-    const row = await db.get('SELECT entry FROM packages WHERE id = ?', [id]);
-    if (!row) throw new W3bsError('NOT_FOUND', `No package ${id} in the catalog.`, 404);
-    const { evidence, ...item } = JSON.parse(row.entry);
+    const found = (await allEntries()).find((entry) => entry.id === id);
+    if (!found) throw new W3bsError('NOT_FOUND', `No package ${id} in the catalog.`, 404);
+    const { evidence, ...item } = found;
     return {
       ...item,
       w3bs: `w3bs install ${item.id}`,
@@ -379,6 +409,7 @@ export async function openStore({
     abtest: createAbTest(db),
     events,
     social: createSocial(db),
+    publishing,
     trust,
     dialect: db.dialect,
     close: () => db.close(),
