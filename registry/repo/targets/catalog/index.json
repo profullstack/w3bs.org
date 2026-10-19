@@ -565,7 +565,7 @@
     {
       "id": "hdtilt.com/hdtilt",
       "name": "hdtilt",
-      "description": "Open source IPTV player for M3U, Xtream Codes and XMLTV with web, CLI, TUI and MCP interfaces.",
+      "description": "Open source TiviMate-style IPTV player for M3U, Xtream Codes and XMLTV: web/PWA, desktop app (AppImage, deb, dmg, exe), CLI, TUI, MCP and a JSON API.",
       "commands": [
         "hdtilt"
       ],
