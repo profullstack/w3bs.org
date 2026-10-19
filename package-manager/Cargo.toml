@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/w3bs-schema", "crates/w3bs-core", "crates/w3bs-cli", "crates/w3bs-publish"]
 
 [workspace.package]
-version = "0.1.9"
+version = "0.1.10"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/profullstack/w3bs.org"

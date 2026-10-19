@@ -6,7 +6,7 @@ use crate::db::{self, PackageRow, ScriptedRow};
 use crate::error::{Error, Kind, Result};
 use crate::fsutil;
 use crate::repo::LoadedRepo;
-use crate::{archive, now};
+use crate::{archive, now, probe};
 use semver::Version;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -453,7 +453,7 @@ impl Engine {
             for c in &changes {
                 let (from, to) = match c {
                     Change::Native(p) => (p.from.as_ref().map(|f| f.active_version.clone()), Some(p.manifest.release.version.to_string())),
-                    Change::Script(_) => (None, None),
+                    Change::Script(s) => (s.from.as_ref().and_then(|f| probe::installed_version(&f.commands, &self.layout.bin_dir)), None),
                 };
                 res.packages.push(outcome(&c.id(), from.as_deref(), to.as_deref(), Status::Planned, None));
             }
@@ -467,10 +467,20 @@ impl Engine {
                     let st = if p.from.is_some() { Status::Updated } else { Status::Installed };
                     outcome(&id, p.from.as_ref().map(|f| f.active_version.as_str()), Some(&p.manifest.release.version.to_string()), st, None)
                 }),
-                Change::Script(s) => self.apply_script(s, txn).await.map(|_| {
-                    let st = if s.from.is_some() { Status::Updated } else { Status::Installed };
-                    outcome(&id, None, None, st, Some("ran the publisher's curl installer".into()))
-                }),
+                Change::Script(s) => {
+                    // W3BS does not own these files, so ask the tool itself, before and after.
+                    let bin = self.layout.bin_dir.clone();
+                    let before = s.from.as_ref().and_then(|f| probe::installed_version(&f.commands, &bin));
+                    self.apply_script(s, txn).await.map(|_| {
+                        let after = probe::installed_version(&s.entry.commands, &bin);
+                        let (st, reason) = match (&s.from, &before, &after) {
+                            (None, _, _) => (Status::Installed, "ran the publisher's curl installer"),
+                            (Some(_), Some(b), Some(a)) if a == b => (Status::Current, "re-ran the publisher's curl installer; no newer version"),
+                            (Some(_), _, _) => (Status::Updated, "ran the publisher's curl installer"),
+                        };
+                        outcome(&id, before.as_deref(), after.as_deref(), st, Some(reason.into()))
+                    })
+                }
             };
             match r {
                 Ok(o) => {
@@ -853,6 +863,15 @@ impl Engine {
         let mut res = OperationResult::new("outdated");
         self.begin_read()?;
         let changes = self.plan_updates(&UpdateRequest { all: true, ..Default::default() }, &mut res).await?;
+        // The installed version of each curl tool, probed in parallel.
+        let scripted: Vec<Vec<String>> = changes
+            .iter()
+            .filter_map(|c| match c {
+                Change::Script(s) => Some(s.from.as_ref().map(|f| f.commands.clone()).unwrap_or_default()),
+                Change::Native(_) => None,
+            })
+            .collect();
+        let mut probed = probe::installed_versions(&scripted, &self.layout.bin_dir).into_iter();
         for c in changes {
             match c {
                 Change::Native(p) => res.packages.push(outcome(
@@ -862,7 +881,10 @@ impl Engine {
                     Status::Planned,
                     Some("eligible".into()),
                 )),
-                Change::Script(s) => res.packages.push(outcome(&s.entry.id.to_string(), None, None, Status::Unknown, Some("curl-installed; `w3bs update` re-runs its installer".into()))),
+                Change::Script(s) => {
+                    let installed = probed.next().flatten();
+                    res.packages.push(outcome(&s.entry.id.to_string(), installed.as_deref(), None, Status::Unknown, Some("curl-installed; `w3bs update` re-runs its installer".into())))
+                }
             }
         }
         res.settle();
