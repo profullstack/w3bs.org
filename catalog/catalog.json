@@ -1060,10 +1060,10 @@
   "repository": "https://github.com/profullstack/readm3",
   "license": "MIT",
   "agentic": false,
-  "latest_version": "0.13.0",
+  "latest_version": "0.14.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://readm3.com/install.sh | sh",
-  "evidence": "https://readm3.com/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/readm3/README.md",
+  "evidence": "https://readm3.com/install.sh 200, installed from a clean env (no Node) 2026-10-13; 0.14.0 via `w3bs install` from a clean HOME 2026-10-19; examples: /home/anthony/src/profullstack/readm3/README.md",
   "publisher": "profullstack"
  },
  {
