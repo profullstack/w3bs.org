@@ -91,12 +91,15 @@ The server accepts the release only when all hold:
 
 1. The signature verifies, with namespace `w3bs-release@w3bs.org`, over the JCS bytes of `statement`.
 2. The signing key is registered to the caller's account for the package's namespace, is not revoked, and the domain proof (§2) still lists it.
-3. The package namespace is not owned by another account. The first verified account owns it; further maintainers are added by the owner.
+3. The package namespace is owned by the caller: the first account whose key the domain lists becomes its owner. (Additional maintainer accounts are a later addition.)
 4. The version has not been published before. Releases are immutable.
-5. The server fetches `installer.url` and its sha256 equals `installer.sha256`.
-6. The package is not a reserved catalog identity owned by a different publisher in `catalog/catalog.json`.
+5. The server fetches `installer.url` (https, public addresses only, no redirects, at most 2 MiB) and its sha256 equals `installer.sha256`.
 
-Accepted releases appear on w3bs.org/packages with the signing fingerprint and are served at `GET /api/publish/releases/<namespace>/<name>` (all versions) and `GET /api/publish/catalog.json` (the latest release of every package, the input to the registry's signed catalog).
+Domain proof is the authority for a namespace, including one already listed in the curated `catalog/catalog.json`: a signed release of a curated package takes over its version and install line, and keeps the curated description, examples and evidence.
+
+Accepted releases appear on w3bs.org/packages with the signing fingerprint and are served at `GET /api/publish/releases/<namespace>/<name>[/<version>]` and `GET /api/publish/catalog.json` (the newest unrevoked, non-prerelease release of every package, each as a catalog entry with a `signed` object: `statement`, `signature`, `public_key`, `fingerprint`).
+
+The registry's daily refresh (`scripts/catalog-signed.mjs`) re-verifies every signature itself, so a compromised web server cannot add a release, then merges the entries into `catalog/catalog.json` and signs the catalog into `/repo`.
 
 ## 6 Installation
 
@@ -109,7 +112,7 @@ A client installing a signed release:
 
 ## 7 Revocation
 
-The account owner revokes a key on w3bs.org. Releases signed by a revoked key stay visible but are marked revoked, and clients refuse to install them. Removing the key from the domain proof stops new releases but does not revoke old ones.
+The account owner revokes a key on w3bs.org (`DELETE /api/publish/keys/<fingerprint>` or `w3bs publish key revoke`). Releases signed by a revoked key are marked revoked at once on w3bs.org, and leave the signed catalog that clients install from at the registry's next refresh (daily). Removing the key from the domain proof stops new releases but does not revoke old ones.
 
 ## 8 Security notes
 
