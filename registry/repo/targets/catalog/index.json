@@ -251,7 +251,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.13.28"
+      "latest_version": "0.13.48"
     },
     {
       "id": "coinpayportal.com/coinpay",
@@ -379,7 +379,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "1.4.0"
+      "latest_version": "1.6.0"
     },
     {
       "id": "pairux.com/pairux",
@@ -560,7 +560,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.14.0"
+      "latest_version": "0.15.0"
     },
     {
       "id": "hdtilt.com/hdtilt",
@@ -1056,7 +1056,7 @@
       "vendor": "Mistral AI",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "2.26.1"
+      "latest_version": "3.0.0"
     },
     {
       "id": "openhands.dev/openhands-cli",
@@ -1598,6 +1598,468 @@
       "license": "MIT",
       "agentic": true,
       "latest_version": "0.1.2"
+    },
+    {
+      "id": "hqtui.com/hqtui-demo-typescript",
+      "name": "hqtui-demo-typescript",
+      "description": "The HQTUI ten-screen terminal dashboard demo, built natively in TypeScript from hqtui main.",
+      "commands": [
+        "hqtui-demo-typescript"
+      ],
+      "install": {
+        "url": "https://hqtui.com/demo/typescript.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://hqtui.com",
+      "repository": "https://github.com/profullstack/hqtui",
+      "vendor": "hqtui.com",
+      "license": "MIT",
+      "agentic": false,
+      "latest_version": "0.10.3",
+      "signed": {
+        "statement": {
+          "commands": [
+            "hqtui-demo-typescript"
+          ],
+          "created_at": "2026-10-19T17:00:07Z",
+          "description": "The HQTUI ten-screen terminal dashboard demo, built natively in TypeScript from hqtui main.",
+          "homepage": "https://hqtui.com",
+          "install": "curl -fsSL https://hqtui.com/demo/typescript.sh | sh",
+          "installer": {
+            "sha256": "0a7cf3281a46dbccee608e09c96b0089aa5dfa94d1e413caedb0f9ebb4217f6c",
+            "url": "https://hqtui.com/demo/typescript.sh"
+          },
+          "license": "MIT",
+          "name": "hqtui-demo-typescript",
+          "package": "hqtui.com/hqtui-demo-typescript",
+          "repository": "https://github.com/profullstack/hqtui",
+          "type": "w3bs-release/1",
+          "version": "0.10.3"
+        },
+        "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgB7PiqDm5239Snm8NURiWwSS8Tu\n+f3LIM9gv2RmXV6ogAAAAVdzNicy1yZWxlYXNlQHczYnMub3JnAAAAAAAAAAZzaGE1MTIA\nAABTAAAAC3NzaC1lZDI1NTE5AAAAQJCXGIR+i718QNUkB5mt7M1JBu0UC4TQcA8w4Z8d3D\nxSjGfZf+mXi+EHUj+XTqcYPIcPQw6c58cAVlni7aFyBA8=\n-----END SSH SIGNATURE-----",
+        "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAez4qg5udt/Up5vDVEYlsEkvE7vn9yyDPYL9kZl1eqI",
+        "fingerprint": "SHA256:npzZn9uzA1DcUWJB5tYYlPS821edxaOcTGUeQkrJTDw"
+      }
+    },
+    {
+      "id": "hqtui.com/hqtui-demo-rust",
+      "name": "hqtui-demo-rust",
+      "description": "The HQTUI ten-screen terminal dashboard demo, built natively in Rust from hqtui main.",
+      "commands": [
+        "hqtui-demo-rust"
+      ],
+      "install": {
+        "url": "https://hqtui.com/demo/rust.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://hqtui.com",
+      "repository": "https://github.com/profullstack/hqtui",
+      "vendor": "hqtui.com",
+      "license": "MIT",
+      "agentic": false,
+      "latest_version": "0.10.3",
+      "signed": {
+        "statement": {
+          "commands": [
+            "hqtui-demo-rust"
+          ],
+          "created_at": "2026-10-19T17:00:08Z",
+          "description": "The HQTUI ten-screen terminal dashboard demo, built natively in Rust from hqtui main.",
+          "homepage": "https://hqtui.com",
+          "install": "curl -fsSL https://hqtui.com/demo/rust.sh | sh",
+          "installer": {
+            "sha256": "ca64fdee0cb38fd9f754ba1e7dfe8d7ae50b178702379df7885d277811b1082d",
+            "url": "https://hqtui.com/demo/rust.sh"
+          },
+          "license": "MIT",
+          "name": "hqtui-demo-rust",
+          "package": "hqtui.com/hqtui-demo-rust",
+          "repository": "https://github.com/profullstack/hqtui",
+          "type": "w3bs-release/1",
+          "version": "0.10.3"
+        },
+        "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgB7PiqDm5239Snm8NURiWwSS8Tu\n+f3LIM9gv2RmXV6ogAAAAVdzNicy1yZWxlYXNlQHczYnMub3JnAAAAAAAAAAZzaGE1MTIA\nAABTAAAAC3NzaC1lZDI1NTE5AAAAQCKLHT6y8G/O7I2lU/sKlTO1F/sZdetb+54UgFFZ2T\nig2mClPPaHnUXUM5qJz+h/sITHzfqPonwvb9YpUInMpwU=\n-----END SSH SIGNATURE-----",
+        "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAez4qg5udt/Up5vDVEYlsEkvE7vn9yyDPYL9kZl1eqI",
+        "fingerprint": "SHA256:npzZn9uzA1DcUWJB5tYYlPS821edxaOcTGUeQkrJTDw"
+      }
+    },
+    {
+      "id": "hqtui.com/hqtui-demo-go",
+      "name": "hqtui-demo-go",
+      "description": "The HQTUI ten-screen terminal dashboard demo, built natively in Go from hqtui main.",
+      "commands": [
+        "hqtui-demo-go"
+      ],
+      "install": {
+        "url": "https://hqtui.com/demo/go.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://hqtui.com",
+      "repository": "https://github.com/profullstack/hqtui",
+      "vendor": "hqtui.com",
+      "license": "MIT",
+      "agentic": false,
+      "latest_version": "0.10.3",
+      "signed": {
+        "statement": {
+          "commands": [
+            "hqtui-demo-go"
+          ],
+          "created_at": "2026-10-19T17:00:08Z",
+          "description": "The HQTUI ten-screen terminal dashboard demo, built natively in Go from hqtui main.",
+          "homepage": "https://hqtui.com",
+          "install": "curl -fsSL https://hqtui.com/demo/go.sh | sh",
+          "installer": {
+            "sha256": "e41814ade0a75e7293750d76332d0589859eaf0b4522583729ad4062b6578ba9",
+            "url": "https://hqtui.com/demo/go.sh"
+          },
+          "license": "MIT",
+          "name": "hqtui-demo-go",
+          "package": "hqtui.com/hqtui-demo-go",
+          "repository": "https://github.com/profullstack/hqtui",
+          "type": "w3bs-release/1",
+          "version": "0.10.3"
+        },
+        "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgB7PiqDm5239Snm8NURiWwSS8Tu\n+f3LIM9gv2RmXV6ogAAAAVdzNicy1yZWxlYXNlQHczYnMub3JnAAAAAAAAAAZzaGE1MTIA\nAABTAAAAC3NzaC1lZDI1NTE5AAAAQGaTU8zR7uCNtyMK1ur8JBNdliCEJvVHLNiqMOoMU3\nsaRxALqlXip6CoXDC6/e47GTPdffw88BdKTYNdIws7uwg=\n-----END SSH SIGNATURE-----",
+        "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAez4qg5udt/Up5vDVEYlsEkvE7vn9yyDPYL9kZl1eqI",
+        "fingerprint": "SHA256:npzZn9uzA1DcUWJB5tYYlPS821edxaOcTGUeQkrJTDw"
+      }
+    },
+    {
+      "id": "hqtui.com/hqtui-demo-python",
+      "name": "hqtui-demo-python",
+      "description": "The HQTUI ten-screen terminal dashboard demo, built natively in Python from hqtui main.",
+      "commands": [
+        "hqtui-demo-python"
+      ],
+      "install": {
+        "url": "https://hqtui.com/demo/python.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://hqtui.com",
+      "repository": "https://github.com/profullstack/hqtui",
+      "vendor": "hqtui.com",
+      "license": "MIT",
+      "agentic": false,
+      "latest_version": "0.10.3",
+      "signed": {
+        "statement": {
+          "commands": [
+            "hqtui-demo-python"
+          ],
+          "created_at": "2026-10-19T17:00:09Z",
+          "description": "The HQTUI ten-screen terminal dashboard demo, built natively in Python from hqtui main.",
+          "homepage": "https://hqtui.com",
+          "install": "curl -fsSL https://hqtui.com/demo/python.sh | sh",
+          "installer": {
+            "sha256": "c4a797c25a2897d64a00de066dc841fe449482be62a9836fd0c30cae377a4cf3",
+            "url": "https://hqtui.com/demo/python.sh"
+          },
+          "license": "MIT",
+          "name": "hqtui-demo-python",
+          "package": "hqtui.com/hqtui-demo-python",
+          "repository": "https://github.com/profullstack/hqtui",
+          "type": "w3bs-release/1",
+          "version": "0.10.3"
+        },
+        "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgB7PiqDm5239Snm8NURiWwSS8Tu\n+f3LIM9gv2RmXV6ogAAAAVdzNicy1yZWxlYXNlQHczYnMub3JnAAAAAAAAAAZzaGE1MTIA\nAABTAAAAC3NzaC1lZDI1NTE5AAAAQIM9YxCeHKXAIbFsYL7P+r72F3xkqAoPHgUMOB/rSW\nYI/czO/gk5G7oNxii/eDyX4sv5FkSiK6Iwcw4ZJU2pzAU=\n-----END SSH SIGNATURE-----",
+        "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAez4qg5udt/Up5vDVEYlsEkvE7vn9yyDPYL9kZl1eqI",
+        "fingerprint": "SHA256:npzZn9uzA1DcUWJB5tYYlPS821edxaOcTGUeQkrJTDw"
+      }
+    },
+    {
+      "id": "hqtui.com/hqtui-demo-zig",
+      "name": "hqtui-demo-zig",
+      "description": "The HQTUI ten-screen terminal dashboard demo, built natively in Zig from hqtui main.",
+      "commands": [
+        "hqtui-demo-zig"
+      ],
+      "install": {
+        "url": "https://hqtui.com/demo/zig.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://hqtui.com",
+      "repository": "https://github.com/profullstack/hqtui",
+      "vendor": "hqtui.com",
+      "license": "MIT",
+      "agentic": false,
+      "latest_version": "0.10.3",
+      "signed": {
+        "statement": {
+          "commands": [
+            "hqtui-demo-zig"
+          ],
+          "created_at": "2026-10-19T17:00:09Z",
+          "description": "The HQTUI ten-screen terminal dashboard demo, built natively in Zig from hqtui main.",
+          "homepage": "https://hqtui.com",
+          "install": "curl -fsSL https://hqtui.com/demo/zig.sh | sh",
+          "installer": {
+            "sha256": "c89f6e47dfbc0fd036447ba82fc7dffd3da299940db8729716a538dee6ec2185",
+            "url": "https://hqtui.com/demo/zig.sh"
+          },
+          "license": "MIT",
+          "name": "hqtui-demo-zig",
+          "package": "hqtui.com/hqtui-demo-zig",
+          "repository": "https://github.com/profullstack/hqtui",
+          "type": "w3bs-release/1",
+          "version": "0.10.3"
+        },
+        "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgB7PiqDm5239Snm8NURiWwSS8Tu\n+f3LIM9gv2RmXV6ogAAAAVdzNicy1yZWxlYXNlQHczYnMub3JnAAAAAAAAAAZzaGE1MTIA\nAABTAAAAC3NzaC1lZDI1NTE5AAAAQO4E8Gl85FsvuW1DbnfFfEyfwnbgosfSNmPeRzk8da\nSsHAWzXdpADu5tIm5e4dEi2+/hcBHbY8l8oCneruTWFwI=\n-----END SSH SIGNATURE-----",
+        "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAez4qg5udt/Up5vDVEYlsEkvE7vn9yyDPYL9kZl1eqI",
+        "fingerprint": "SHA256:npzZn9uzA1DcUWJB5tYYlPS821edxaOcTGUeQkrJTDw"
+      }
+    },
+    {
+      "id": "hqtui.com/hqtui-demo-cpp",
+      "name": "hqtui-demo-cpp",
+      "description": "The HQTUI ten-screen terminal dashboard demo, built natively in C++ from hqtui main.",
+      "commands": [
+        "hqtui-demo-cpp"
+      ],
+      "install": {
+        "url": "https://hqtui.com/demo/cpp.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://hqtui.com",
+      "repository": "https://github.com/profullstack/hqtui",
+      "vendor": "hqtui.com",
+      "license": "MIT",
+      "agentic": false,
+      "latest_version": "0.10.3",
+      "signed": {
+        "statement": {
+          "commands": [
+            "hqtui-demo-cpp"
+          ],
+          "created_at": "2026-10-19T17:00:10Z",
+          "description": "The HQTUI ten-screen terminal dashboard demo, built natively in C++ from hqtui main.",
+          "homepage": "https://hqtui.com",
+          "install": "curl -fsSL https://hqtui.com/demo/cpp.sh | sh",
+          "installer": {
+            "sha256": "ede1cce9c485a5df1968900cd124b5ce08a28d993e91bac18785e1525eaf7d89",
+            "url": "https://hqtui.com/demo/cpp.sh"
+          },
+          "license": "MIT",
+          "name": "hqtui-demo-cpp",
+          "package": "hqtui.com/hqtui-demo-cpp",
+          "repository": "https://github.com/profullstack/hqtui",
+          "type": "w3bs-release/1",
+          "version": "0.10.3"
+        },
+        "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgB7PiqDm5239Snm8NURiWwSS8Tu\n+f3LIM9gv2RmXV6ogAAAAVdzNicy1yZWxlYXNlQHczYnMub3JnAAAAAAAAAAZzaGE1MTIA\nAABTAAAAC3NzaC1lZDI1NTE5AAAAQB2p/1cz4JmuGYYjZaN7l5AgC/BJ9Ul4y9PUQ+ccfK\nKGnhX6gdeXd5f4XuJtSCL2Tw4yf08BqRSin/fx7ZhAFQ0=\n-----END SSH SIGNATURE-----",
+        "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAez4qg5udt/Up5vDVEYlsEkvE7vn9yyDPYL9kZl1eqI",
+        "fingerprint": "SHA256:npzZn9uzA1DcUWJB5tYYlPS821edxaOcTGUeQkrJTDw"
+      }
+    },
+    {
+      "id": "hqtui.com/hqtui-demo-ruby",
+      "name": "hqtui-demo-ruby",
+      "description": "The HQTUI ten-screen terminal dashboard demo, built natively in Ruby from hqtui main.",
+      "commands": [
+        "hqtui-demo-ruby"
+      ],
+      "install": {
+        "url": "https://hqtui.com/demo/ruby.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://hqtui.com",
+      "repository": "https://github.com/profullstack/hqtui",
+      "vendor": "hqtui.com",
+      "license": "MIT",
+      "agentic": false,
+      "latest_version": "0.10.3",
+      "signed": {
+        "statement": {
+          "commands": [
+            "hqtui-demo-ruby"
+          ],
+          "created_at": "2026-10-19T17:00:10Z",
+          "description": "The HQTUI ten-screen terminal dashboard demo, built natively in Ruby from hqtui main.",
+          "homepage": "https://hqtui.com",
+          "install": "curl -fsSL https://hqtui.com/demo/ruby.sh | sh",
+          "installer": {
+            "sha256": "fdb6de9779c5913ed83d71b09c0d271c7dc1a2af3b83f33b5a64630445ced4c5",
+            "url": "https://hqtui.com/demo/ruby.sh"
+          },
+          "license": "MIT",
+          "name": "hqtui-demo-ruby",
+          "package": "hqtui.com/hqtui-demo-ruby",
+          "repository": "https://github.com/profullstack/hqtui",
+          "type": "w3bs-release/1",
+          "version": "0.10.3"
+        },
+        "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgB7PiqDm5239Snm8NURiWwSS8Tu\n+f3LIM9gv2RmXV6ogAAAAVdzNicy1yZWxlYXNlQHczYnMub3JnAAAAAAAAAAZzaGE1MTIA\nAABTAAAAC3NzaC1lZDI1NTE5AAAAQLthMbPzLGKro5Ns1/jieICYrTneTlqal3ncGzN0Yx\nFeNHHq0NC7q6rJUYeObob7NLzcgQe82TVH3voLOEloqA8=\n-----END SSH SIGNATURE-----",
+        "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAez4qg5udt/Up5vDVEYlsEkvE7vn9yyDPYL9kZl1eqI",
+        "fingerprint": "SHA256:npzZn9uzA1DcUWJB5tYYlPS821edxaOcTGUeQkrJTDw"
+      }
+    },
+    {
+      "id": "hqtui.com/hqtui-demo-php",
+      "name": "hqtui-demo-php",
+      "description": "The HQTUI ten-screen terminal dashboard demo, built natively in PHP from hqtui main.",
+      "commands": [
+        "hqtui-demo-php"
+      ],
+      "install": {
+        "url": "https://hqtui.com/demo/php.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://hqtui.com",
+      "repository": "https://github.com/profullstack/hqtui",
+      "vendor": "hqtui.com",
+      "license": "MIT",
+      "agentic": false,
+      "latest_version": "0.10.3",
+      "signed": {
+        "statement": {
+          "commands": [
+            "hqtui-demo-php"
+          ],
+          "created_at": "2026-10-19T17:00:10Z",
+          "description": "The HQTUI ten-screen terminal dashboard demo, built natively in PHP from hqtui main.",
+          "homepage": "https://hqtui.com",
+          "install": "curl -fsSL https://hqtui.com/demo/php.sh | sh",
+          "installer": {
+            "sha256": "894a3fcdd03d41e36eb20b31702bca04ede8dff0c7561619e2c429bf047ebd59",
+            "url": "https://hqtui.com/demo/php.sh"
+          },
+          "license": "MIT",
+          "name": "hqtui-demo-php",
+          "package": "hqtui.com/hqtui-demo-php",
+          "repository": "https://github.com/profullstack/hqtui",
+          "type": "w3bs-release/1",
+          "version": "0.10.3"
+        },
+        "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgB7PiqDm5239Snm8NURiWwSS8Tu\n+f3LIM9gv2RmXV6ogAAAAVdzNicy1yZWxlYXNlQHczYnMub3JnAAAAAAAAAAZzaGE1MTIA\nAABTAAAAC3NzaC1lZDI1NTE5AAAAQInr8L8sle79BaRDFlbngHotB4v3Xqvc8th5HiXE9V\n5eUZ+STTKvc6lBdrzW2BOinIn2VFfpoHgW9dDIwV+HKgg=\n-----END SSH SIGNATURE-----",
+        "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAez4qg5udt/Up5vDVEYlsEkvE7vn9yyDPYL9kZl1eqI",
+        "fingerprint": "SHA256:npzZn9uzA1DcUWJB5tYYlPS821edxaOcTGUeQkrJTDw"
+      }
+    },
+    {
+      "id": "hqtui.com/hqtui-demo-perl",
+      "name": "hqtui-demo-perl",
+      "description": "The HQTUI ten-screen terminal dashboard demo, built natively in Perl from hqtui main.",
+      "commands": [
+        "hqtui-demo-perl"
+      ],
+      "install": {
+        "url": "https://hqtui.com/demo/perl.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://hqtui.com",
+      "repository": "https://github.com/profullstack/hqtui",
+      "vendor": "hqtui.com",
+      "license": "MIT",
+      "agentic": false,
+      "latest_version": "0.10.3",
+      "signed": {
+        "statement": {
+          "commands": [
+            "hqtui-demo-perl"
+          ],
+          "created_at": "2026-10-19T17:00:11Z",
+          "description": "The HQTUI ten-screen terminal dashboard demo, built natively in Perl from hqtui main.",
+          "homepage": "https://hqtui.com",
+          "install": "curl -fsSL https://hqtui.com/demo/perl.sh | sh",
+          "installer": {
+            "sha256": "34c6190dc6daf29bd43543f5d235ccd6a2e3561c82b1a13cfe11b0f3ed8184cd",
+            "url": "https://hqtui.com/demo/perl.sh"
+          },
+          "license": "MIT",
+          "name": "hqtui-demo-perl",
+          "package": "hqtui.com/hqtui-demo-perl",
+          "repository": "https://github.com/profullstack/hqtui",
+          "type": "w3bs-release/1",
+          "version": "0.10.3"
+        },
+        "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgB7PiqDm5239Snm8NURiWwSS8Tu\n+f3LIM9gv2RmXV6ogAAAAVdzNicy1yZWxlYXNlQHczYnMub3JnAAAAAAAAAAZzaGE1MTIA\nAABTAAAAC3NzaC1lZDI1NTE5AAAAQPif0q+8zfGPK25ZJAJA2lRrUCSoyu+RjYXIqIRfS8\n32Mn8YE9PBd04X4KH6sHIytqJ4kBFD/MWjP9B91haDnQ8=\n-----END SSH SIGNATURE-----",
+        "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAez4qg5udt/Up5vDVEYlsEkvE7vn9yyDPYL9kZl1eqI",
+        "fingerprint": "SHA256:npzZn9uzA1DcUWJB5tYYlPS821edxaOcTGUeQkrJTDw"
+      }
+    },
+    {
+      "id": "hqtui.com/hqtui-demo-nim",
+      "name": "hqtui-demo-nim",
+      "description": "The HQTUI ten-screen terminal dashboard demo, built natively in Nim from hqtui main.",
+      "commands": [
+        "hqtui-demo-nim"
+      ],
+      "install": {
+        "url": "https://hqtui.com/demo/nim.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://hqtui.com",
+      "repository": "https://github.com/profullstack/hqtui",
+      "vendor": "hqtui.com",
+      "license": "MIT",
+      "agentic": false,
+      "latest_version": "0.10.3",
+      "signed": {
+        "statement": {
+          "commands": [
+            "hqtui-demo-nim"
+          ],
+          "created_at": "2026-10-19T17:00:11Z",
+          "description": "The HQTUI ten-screen terminal dashboard demo, built natively in Nim from hqtui main.",
+          "homepage": "https://hqtui.com",
+          "install": "curl -fsSL https://hqtui.com/demo/nim.sh | sh",
+          "installer": {
+            "sha256": "75307e5fe07675f51436591715d0e66dbcb7897bc3928b497b14e5ff295e9227",
+            "url": "https://hqtui.com/demo/nim.sh"
+          },
+          "license": "MIT",
+          "name": "hqtui-demo-nim",
+          "package": "hqtui.com/hqtui-demo-nim",
+          "repository": "https://github.com/profullstack/hqtui",
+          "type": "w3bs-release/1",
+          "version": "0.10.3"
+        },
+        "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgB7PiqDm5239Snm8NURiWwSS8Tu\n+f3LIM9gv2RmXV6ogAAAAVdzNicy1yZWxlYXNlQHczYnMub3JnAAAAAAAAAAZzaGE1MTIA\nAABTAAAAC3NzaC1lZDI1NTE5AAAAQNTb3lK2JTxW3ZMq84F5xKBE8gcmman2NiiSZw0MRj\nF5eqYU4NAYeYnd/tGOMq+xDp8whfS98lNOia2qvLoDYgs=\n-----END SSH SIGNATURE-----",
+        "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAez4qg5udt/Up5vDVEYlsEkvE7vn9yyDPYL9kZl1eqI",
+        "fingerprint": "SHA256:npzZn9uzA1DcUWJB5tYYlPS821edxaOcTGUeQkrJTDw"
+      }
+    },
+    {
+      "id": "hqtui.com/hqtui-demo-cobol",
+      "name": "hqtui-demo-cobol",
+      "description": "The HQTUI ten-screen terminal dashboard demo, built natively in COBOL from hqtui main.",
+      "commands": [
+        "hqtui-demo-cobol"
+      ],
+      "install": {
+        "url": "https://hqtui.com/demo/cobol.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://hqtui.com",
+      "repository": "https://github.com/profullstack/hqtui",
+      "vendor": "hqtui.com",
+      "license": "MIT",
+      "agentic": false,
+      "latest_version": "0.10.3",
+      "signed": {
+        "statement": {
+          "commands": [
+            "hqtui-demo-cobol"
+          ],
+          "created_at": "2026-10-19T17:00:12Z",
+          "description": "The HQTUI ten-screen terminal dashboard demo, built natively in COBOL from hqtui main.",
+          "homepage": "https://hqtui.com",
+          "install": "curl -fsSL https://hqtui.com/demo/cobol.sh | sh",
+          "installer": {
+            "sha256": "cbb471e653884899ad58d6a1c68fb9ee63677c1e97d8cc50cb5f4103b4ba1707",
+            "url": "https://hqtui.com/demo/cobol.sh"
+          },
+          "license": "MIT",
+          "name": "hqtui-demo-cobol",
+          "package": "hqtui.com/hqtui-demo-cobol",
+          "repository": "https://github.com/profullstack/hqtui",
+          "type": "w3bs-release/1",
+          "version": "0.10.3"
+        },
+        "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgB7PiqDm5239Snm8NURiWwSS8Tu\n+f3LIM9gv2RmXV6ogAAAAVdzNicy1yZWxlYXNlQHczYnMub3JnAAAAAAAAAAZzaGE1MTIA\nAABTAAAAC3NzaC1lZDI1NTE5AAAAQEXWMlMToIeUI7rDUV10Xdb+ZmEzKyHzARshEqEhYd\nonqSmcQooIRTHkYy2Trvd6CA1L00jYdS5bJXesY7qJnAs=\n-----END SSH SIGNATURE-----",
+        "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAez4qg5udt/Up5vDVEYlsEkvE7vn9yyDPYL9kZl1eqI",
+        "fingerprint": "SHA256:npzZn9uzA1DcUWJB5tYYlPS821edxaOcTGUeQkrJTDw"
+      }
     }
   ]
 }
