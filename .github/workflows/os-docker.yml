@@ -108,3 +108,49 @@ jobs:
           digest=$(docker buildx imagetools inspect "$IMAGE:${{ matrix.target }}" --format '{{.Manifest.Digest}}')
           cosign sign --yes "$IMAGE@$digest"
           echo "$IMAGE:${{ matrix.target }} = $IMAGE@$digest (signed)" >> "$GITHUB_STEP_SUMMARY"
+
+  # GHCR packages of this org stay private (org policy), so the images are also served from
+  # w3bs.org (`docker pull w3bs.org/os:server`, src/registry-front.mjs): every manifest and
+  # blob is copied into the public release `os-images` as `sha256-<hex>`, with tags.json
+  # mapping each tag to its index digest.
+  mirror:
+    needs: publish
+    runs-on: ubuntu-latest
+    concurrency: os-images-mirror
+    permissions:
+      contents: write
+      packages: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: imjasonh/setup-crane@v0.4
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | crane auth login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Copy manifests and blobs into the os-images release
+        run: |
+          set -euo pipefail
+          gh release view os-images >/dev/null 2>&1 || gh release create os-images --latest=false \
+            --title "W3BS OS images (registry store)" \
+            --notes "Blobs and manifests behind docker pull w3bs.org/os:<tag> (served by w3bs.org/v2/). Not a software release."
+          gh release view os-images --json assets -q '.assets[].name' > have.txt || true
+          mkdir -p out
+          put() { # digest, file
+            name="${1/:/-}"
+            grep -qx "$name" have.txt && return 0
+            mv "$2" "out/$name" && gh release upload os-images "out/$name" && echo "$name" >> have.txt && rm -f "out/$name"
+          }
+          gh release download os-images --pattern tags.json --output tags.json 2>/dev/null || echo '{}' > tags.json
+          for tag in server desktop; do
+            index=$(crane digest "$IMAGE:$tag")
+            crane manifest "$IMAGE@$index" > m.json && put "$index" m.json
+            for child in $(crane manifest "$IMAGE@$index" | jq -r '.manifests[].digest'); do
+              crane manifest "$IMAGE@$child" > m.json && put "$child" m.json
+              for blob in $(crane manifest "$IMAGE@$child" | jq -r '.config.digest, .layers[].digest'); do
+                grep -qx "${blob/:/-}" have.txt || { crane blob "$IMAGE@$blob" > b.bin && put "$blob" b.bin; }
+              done
+            done
+            jq --arg t "$tag" --arg d "$index" '.[$t] = $d' tags.json > t.json && mv t.json tags.json
+            echo "w3bs.org/os:$tag -> $index" >> "$GITHUB_STEP_SUMMARY"
+          done
+          gh release upload os-images tags.json --clobber
