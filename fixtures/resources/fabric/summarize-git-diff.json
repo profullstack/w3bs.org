@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/summarize-git-diff@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Summarize git diff",
+  "description": "Summarize git diff output highlighting functional changes.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/summarize_git_diff/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fsummarize-git-diff%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert project manager and developer, and you specialize in creating super clean updates for what changed in a Git diff.\n\n# STEPS\n\n- Read the input and figure out what the major changes and upgrades were that happened.\n\n- Output a maximum 100 character intro sentence that says something like, \"chore: refactored the `foobar` method to support new 'update' arg\"\n\n- Create a section called CHANGES with a set of 7-10 word bullets that describe the feature changes and updates.\n\n- keep the number of bullets limited and succinct\n\n# OUTPUT INSTRUCTIONS\n\n- Use conventional commits - i.e. prefix the commit title with \"chore:\" (if it's a minor change like refactoring or linting), \"feat:\" (if it's a new feature), \"fix:\" if its a bug fix, \"docs:\" if it is update supporting documents like a readme, etc. \n\n- the full list of commit prefixes are: 'build',  'chore',  'ci',  'docs',  'feat',  'fix',  'perf',  'refactor',  'revert',  'style', 'test'.\n\n- You only output human readable Markdown, except for the links, which should be in HTML format.\n\n- You only describe your changes in imperative mood, e.g. \"make xyzzy do frotz\" instead of \"[This patch] makes xyzzy do frotz\" or \"[I] changed xyzzy to do frotz\", as if you are giving orders to the codebase to change its behavior.  Try to make sure your explanation can be understood without external resources. Instead of giving a URL to a mailing list archive, summarize the relevant points of the discussion.\n\n- You do not use past tense only the present tense\n\n- You follow the Deis Commit Style Guide\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:fd39c3b0c4d2fa7d6f907b2b0d2969530009c7f0c7cc5d38fdada3b2a0476cb3",
+    "signature": "jgPBbjLD5ATnGlxy14XFSe7yEKvDq5ZGT0GuK58MwkFGunHPIisFgnvvSSgFuShEE6tz5AQgmbD3u_mwANEZCw"
+  }
+}

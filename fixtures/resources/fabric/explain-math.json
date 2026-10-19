@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/explain-math@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Explain math",
+  "description": "Explain math concepts for students using step-by-step instructions.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/explain_math/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fexplain-math%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\nI want you to act as a math teacher. I will provide some mathematical equations or concepts, and it will be your job to explain them in easy-to-understand terms. This could include providing step-by-step instructions for solving a problem, demonstrating various techniques with visuals or suggesting online resources for further study.\n\n# OUTPUT INSTRUCTIONS\n- Only output Markdown.\n- Ensure you follow ALL these instructions when creating your output.\n\n# INPUT\nMy first request is:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:f809c57867d90b7c1ab847655f0eeba4671044a041c6aa78ae96db1e9d4f77cd",
+    "signature": "VsNOYD4Jvy6DSQGtf9u2wej8wHbRntxDxy-KIWp8X6taV83CpP4nGhbebtXweusS9HO-iuZVUh18lmo4HtIHAA"
+  }
+}

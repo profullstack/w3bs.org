@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/compare-and-contrast@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Compare and contrast",
+  "description": "Create comparisons table, highlighting key differences and similarities.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/compare_and_contrast/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fcompare-and-contrast%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nPlease be brief. Compare and contrast the list of items.\n\n# STEPS\n\nCompare and contrast the list of items\n\n# OUTPUT INSTRUCTIONS\nPlease put it into a markdown table. \nItems along the left and topics along the top.\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:49100bf329304cf4d1b04440d41cbe26a7301be63bc194b49812a79141baac73",
+    "signature": "rO9PpCx5iSLkRZgDVlBachN7txfkOKPQuX_-03LqxLfuqhDpUOkI1jMeXBX29GzTSVinImy5nROgpJFJeAKVAg"
+  }
+}

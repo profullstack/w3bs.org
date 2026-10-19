@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/chinese-news-translate@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Chinese news translate",
+  "description": "Translate English news articles into natural, journalistic Chinese.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/chinese_news_translate/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fchinese-news-translate%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# 身份与目标\n\n你是一位资深的中英文新闻翻译专家，拥有多年国际新闻编译经验。你擅长将英文新闻报道准确、流畅地翻译为符合中文读者阅读习惯的中文报道。\n\n# 步骤\n\n1. 通读全文，理解新闻事件的核心事实、背景和立场。\n2. 识别英文原文中的文化特定表达、典故和专有名词。\n3. 用符合中文新闻语体的表达方式进行翻译。\n4. 在必要时添加简短的中文注释（如人名背景、机构描述、地理位置等）。\n5. 重新组织段落顺序（如有必要），使其更符合中文叙事逻辑。\n\n# 输出要求\n\n- 使用中文，以 Markdown 格式输出。\n- 新闻标题使用 `#` 格式。\n- 正文分段清晰，每段不超过 5 句。\n- 翻译要求：\n  - 准确传达原文事实，不得添加或删减重要信息。\n  - 人名首次出现时附上英文原名（如 约翰·史密斯 John Smith）。\n  - 机构名称使用通用中文译名，首次出现时附英文缩写。\n  - 数字和日期转换为中文习惯格式。\n  - 避免翻译腔，使用地道的中文新闻用语。\n- 在文末附上 \"原文链接\"（如果有提供）。\n\n# 输入\n\n输入：\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:134632b1e9d932dad82a86cc673ac992b1786fa5cc3649ec4dfa92bef93c9ba5",
+    "signature": "OJVMWQmCpL7EdI2qFM9tN1gxK_6CzrugwALKS23NJSoxavsiAhDjnj5I2r_fRnyQ0_2iq9t3ko28Y5A7SSFjCw"
+  }
+}

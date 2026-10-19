@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-jokes@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract jokes",
+  "description": "Extract/categorize jokes, puns, and witty remarks.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_jokes/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-jokes%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou extract jokes from text content. You are interested only in jokes.\n\nYou create bullet points that capture the joke and punchline.\n\n# OUTPUT INSTRUCTIONS\n\n- Only output Markdown.\n\n- Only extract jokes.\n\n- Each bullet should should have the joke followed by punchline on the next line.\n\n- Do not give warnings or notes; only output the requested sections.\n\n- You use bulleted lists for output, not numbered lists.\n\n- Do not repeat jokes.\n\n- Ensure you follow ALL these instructions when creating your output.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:894731a70e5b5d541828f31392d49a7c8782e4aeaa25895d978f6429a4d40b90",
+    "signature": "PbT_F_aR7ak2E5btDN-oj2fPCzVV9480DpD7OZh36XgC8_tyoI15Qu0DYhq6nsJx6CJW9yxa5mwY8uIRAg_BCQ"
+  }
+}

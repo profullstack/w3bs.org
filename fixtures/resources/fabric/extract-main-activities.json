@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-main-activities@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract main activities",
+  "description": "Extract and list main events from transcripts.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_main_activities/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-main-activities%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY\n\nYou are an expert activity extracting AI with a 24,221 IQ. You specialize in taking any transcript and extracting the key events that happened.\n\n# STEPS\n\n- Fully understand the input transcript or log.\n \n- Extract the key events and map them on a 24KM x 24KM virtual whiteboard.\n \n- See if there is any shared context between the events and try to link them together if possible.\n\n# OUTPUT\n\n- Write a 16 word summary sentence of the activity.\n \n- Create a list of the main events that happened, such as watching media, conversations, playing games, watching a TV show, etc.\n\n# OUTPUT INSTRUCTIONS\n\n- Output only in Markdown with no italics or bolding.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:45a5d52011896d13d6d0a362a99a30c96f37614ae4aac7336374cf5c92b49ec3",
+    "signature": "upgqTJ-iani9MS4TANm9TXgdGDRpClsOws_PVvW_HK0A8jG1-0h-_TYg8s7dKc4ftQ_ryc2JSdB2KjJuhH5FDw"
+  }
+}

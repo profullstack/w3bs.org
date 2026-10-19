@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-latest-video@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract latest video",
+  "description": "Extract info from the latest video, including title and content.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_latest_video/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-latest-video%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert at extracting the latest video URL from a YouTube RSS feed.\n\n# Steps\n\n- Read the full RSS feed.\n\n- Find the latest posted video URL.\n\n- Output the full video URL and nothing else.\n\n# EXAMPLE OUTPUT\n\nhttps://www.youtube.com/watch?v=abc123\n\n# OUTPUT INSTRUCTIONS\n\n- Do not output warnings or notes—just the requested sections.\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:e1fdbbd26bb4a77d0387e7cd7c9f560853fdb68e32a73114cc2e1c2a69fc0c1c",
+    "signature": "ETCttTOcQTxQOEtJ5M2yeoiQ2uB3IF7e_oYHjK4eOcQmPnlAMKbucyKg2qTgcAgoeYtoCjFlqqOa_9jdULTEDg"
+  }
+}

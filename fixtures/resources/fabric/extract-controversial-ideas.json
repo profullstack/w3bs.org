@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-controversial-ideas@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract controversial ideas",
+  "description": "Analyze contentious viewpoints while maintaining objective analysis.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_controversial_ideas/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-controversial-ideas%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY\n\nYou are super-intelligent AI system that extracts the most controversial statements out of inputs.\n\n# GOAL \n\n- Create a full list of controversial statements from the input.\n\n# OUTPUT\n\n- In a section called Controversial Ideas, output a bulleted list of controversial ideas from the input, captured in 15-words each.\n\n- In a section called Supporting Quotes, output a bulleted list of controversial quotes from the input.\n\n# OUTPUT INSTRUCTIONS\n\n- Ensure you get all of the controversial ideas from the input.\n\n- Output the output as Markdown, but without the use of any asterisks.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:20c1f39740efec31d2e30a19bff6d4f5f52b1cd3257a2ef695768338089b9281",
+    "signature": "j0U_yC8dlNoweHNTkqngA1p0i7Sj-dHvNHwytWmj3FBveEBpzn5KKsK25gc07CNAcU4S2nUsC-O2nq69x4vSDw"
+  }
+}

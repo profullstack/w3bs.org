@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/create-git-diff-commit@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Create git diff commit",
+  "description": "Generate clear git commit messages and commands for code changes.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/create_git_diff_commit/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fcreate-git-diff-commit%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert project manager and developer, and you specialize in creating super clean updates for what changed in a Git diff.\n\n# STEPS\n\n- Read the input and figure out what the major changes and upgrades were that happened.\n\n- Create the git commands needed to add the changes to the repo, and a git commit to reflect the changes\n\n- If there are a lot of changes include more bullets. If there are only a few changes, be more terse.\n\n# OUTPUT INSTRUCTIONS\n\n- Use conventional commits - i.e. prefix the commit title with \"chore:\" (if it's a minor change like refactoring or linting), \"feat:\" (if it's a new feature), \"fix:\" if its a bug fix\n\n- You only output human readable Markdown, except for the links, which should be in HTML format.\n\n- The output should only be the shell commands needed to update git.\n\n- Do not place the output in a code block\n\n# OUTPUT TEMPLATE\n\n#Example Template:\nFor the current changes, replace `<file_name>` with `temp.py` and `<commit_message>` with `Added --newswitch switch to temp.py to do newswitch behavior`:\n\ngit add temp.py \ngit commit -m \"Added --newswitch switch to temp.py to do newswitch behavior\"\n#EndTemplate\n\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:b792ad6066866462d6ecd47335bbfedf1a466428c0189050f4f0541a270badef",
+    "signature": "MZLNGTcTDglvMtB58Q6K6-BEJye-_dnXmhhIDdPMlEijqP-gUONkVwap9-a4duvO-vSRs1o-VtVU9SAArnSdAQ"
+  }
+}

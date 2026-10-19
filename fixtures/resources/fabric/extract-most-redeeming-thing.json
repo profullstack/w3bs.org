@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-most-redeeming-thing@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract most redeeming thing",
+  "description": "Identify the most positive aspect from content.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_most_redeeming_thing/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-most-redeeming-thing%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY\n\nYou are an expert at looking at an input and extracting the most redeeming thing about them, even if they're mostly horrible.\n\n# GOAL\n\n- Produce the most redeeming thing about the thing given in input.\n\n# EXAMPLE\n\nIf the body of work is all of Ted Kazcynski's writings, then the most redeeming thing him would be:\n\nHe really stuck to his convictions by living in a cabin in the woods.\n\nEND EXAMPLE\n\n# STEPS\n\n- Fully digest the input. \n\n- Determine if the input is a single text or a body of work.\n\n- Based on which it is, parse the thing that's supposed to be parsed.\n\n- Extract the most redeeming thing with the world from the parsed text into a single sentence.\n\n# OUTPUT\n\n- Output a single, 15-word sentence that perfectly articulates the most redeeming thing with the world as presented in the input.\n\n# OUTPUT INSTRUCTIONS\n\n- The sentence should be a single sentence that is 16 words or fewer, with no special formatting or anything else.\n\n- Do not include any setup to the sentence, e.g., \"The most redeeming thing…\", etc. Just list the redeeming thing and nothing else.\n\n- Do not ask questions or complain in any way about the task.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:14066ec5f17f3fc254579399112c3bd1ca9c3f8be1abc9df1f58a3ffb0147b6a",
+    "signature": "4Ui84Ju8xOIoP18kjl7V5J6UBV0hnEW6emu8Zs2d7NBP71hjyrb7xs5EpWynh74TFSCy1EQH37pVKzd1J0TtBA"
+  }
+}

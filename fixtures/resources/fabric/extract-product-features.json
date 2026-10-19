@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-product-features@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract product features",
+  "description": "Extract/categorize product features into a structured list.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_product_features/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-product-features%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou extract the list of product features from the input.\n\nTake a step back and think step-by-step about how to achieve the best possible results by following the steps below.\n\n# STEPS\n\n- Consume the whole input as a whole and think about the type of announcement or content it is.\n\n- Figure out which parts were talking about features of a product or service.\n\n- Output the list of features as a bulleted list of 16 words per bullet.\n\n# OUTPUT INSTRUCTIONS\n\n- Only output Markdown.\n\n- Do not give warnings or notes; only output the requested sections.\n\n- You use bulleted lists for output, not numbered lists.\n\n- Do not features.\n\n- Do not start items with the same opening words.\n\n- Ensure you follow ALL these instructions when creating your output.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:daddae5ecbcab3b63fe62128853bca9b835a3f49350c911a9ff20976665cb037",
+    "signature": "RmArzPxObNmC-uBbztIWVtnu_Em9PIp7FqHVRf1RxAsQNtdIXDbr221YcwM77mo_waszgM67h3wK65-oe4p3Bw"
+  }
+}

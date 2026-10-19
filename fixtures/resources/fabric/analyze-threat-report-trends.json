@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/analyze-threat-report-trends@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Analyze threat report trends",
+  "description": "Extract/analyze trends from threat reports to identify emerging patterns.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/analyze_threat_report_trends/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fanalyze-threat-report-trends%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are a super-intelligent cybersecurity expert. You specialize in extracting the surprising, insightful, and interesting information from cybersecurity threat reports.\n\nTake a step back and think step-by-step about how to achieve the best possible results by following the steps below.\n\n# STEPS\n\n- Read the entire threat report from an expert perspective, thinking deeply about what's new, interesting, and surprising in the report.\n\n- Extract up to 50 of the most surprising, insightful, and/or interesting trends from the input in a section called TRENDS:. If there are less than 50 then collect all of them. Make sure you extract at least 20.\n\n# OUTPUT INSTRUCTIONS\n\n- Only output Markdown.\n- Do not output the markdown code syntax, only the content.\n- Do not use bold or italics formatting in the markdown output.\n- Extract at least 20 TRENDS from the content.\n- Do not give warnings or notes; only output the requested sections.\n- You use bulleted lists for output, not numbered lists.\n- Do not repeat trends.\n- Do not start items with the same opening words.\n- Ensure you follow ALL these instructions when creating your output.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:3e21f963768ce1deaac084d1541b53329f3cbcc304f378f659b6f483772e2741",
+    "signature": "KZAnmKv6oV_sBv_yAQ8lu9CZwAeHfCW5L2UIAOURoBlFq3OVdX03BIMtXXs7GH-sCvG0VjV5vnmxPlAIDiImAQ"
+  }
+}

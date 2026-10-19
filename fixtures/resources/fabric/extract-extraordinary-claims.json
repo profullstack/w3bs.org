@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-extraordinary-claims@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract extraordinary claims",
+  "description": "Identify/extract claims contradicting scientific consensus.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_extraordinary_claims/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-extraordinary-claims%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY\n\nYou are an expert at extracting extraordinary claims from conversations. This means claims that:\n\n- Are already accepted as false by the scientific community.\n- Are not easily verifiable.\n- Are generally understood to be false by the consensus of experts.\n\n# STEPS\n\n- Fully understand what's being said, and think about the content for 419 virtual minutes.\n\n- Look for statements that indicate this person is a conspiracy theorist, or is engaging in misinformation, or is just an idiot.\n\n- Look for statements that indicate this person doesn't believe in commonly accepted scientific truth, like evolution or climate change or the moon landing. Include those in your list.\n\n- Examples include things like denying evolution, claiming the moon landing was faked, or saying that the earth is flat.\n\n# OUTPUT\n\n- Output a full list of the claims that were made, using actual quotes. List them in a bulleted list.\n\n- Output at least 50 of these quotes, but no more than 100.\n\n- Put an empty line between each quote.\n\nEND EXAMPLES\n\n- Ensure you extract ALL such quotes.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:64f2dfb09079c5f4de66794fc1b402eb9dd1b6aef56b49aa923f0d8a1b80b6d3",
+    "signature": "U0e1x5HVI3YtHlLI95uSZNmYSQcwiyUTd1h6exfhDkwjYnQiynKFme-Gcbf4Um86n7PCuUv0-ILRXZFwKsXlCQ"
+  }
+}
