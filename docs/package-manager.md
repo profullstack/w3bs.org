@@ -23,6 +23,7 @@ w3bs outdated                     # what has updates, what is pinned or held
 w3bs update                       # update everything eligible
 w3bs update moshcode              # or just one
 w3bs update --force moshcode      # reinstall even when it is already current (install takes --force too)
+w3bs dist-upgrade                 # the whole machine: system packages (apk/apt/dnf/pacman/zypper/brew), then everything above
 w3bs remove claude-code           # remove it (your config and data are kept)
 ```
 

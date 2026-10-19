@@ -184,6 +184,24 @@ pub fn human(r: &OperationResult) {
             }
             return;
         }
+        "dist-upgrade" => {
+            let sys = &r.data["system"];
+            let provider = sys["provider"].as_str().unwrap_or("system");
+            match sys["status"].as_str() {
+                Some("upgraded") => println!("System packages ({provider}) upgraded."),
+                Some("planned") => {
+                    println!("Would upgrade the system packages ({provider}):");
+                    for c in sys["commands"].as_array().into_iter().flatten() {
+                        println!("  {}", s(c));
+                    }
+                }
+                Some("done") => {}
+                _ => println!("System packages: skipped."),
+            }
+            if let Some(n) = sys["note"].as_str() {
+                eprintln!("note: {n}");
+            }
+        }
         "fleet.desktop.start" => {
             let d = &r.data;
             println!("The Kubuntu desktop is running (container {}, {})", s(&d["container"]), s(&d["image"]));
@@ -513,7 +531,7 @@ pub fn human(r: &OperationResult) {
                 })
                 .collect(),
         );
-    } else if matches!(r.operation.as_str(), "update" | "outdated") {
+    } else if matches!(r.operation.as_str(), "update" | "outdated" | "dist-upgrade") {
         println!("Everything is up to date.");
     }
 }
