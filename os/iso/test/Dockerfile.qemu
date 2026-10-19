@@ -1,0 +1,8 @@
+# QEMU + OVMF test runner for the W3BS OS ISO (used when the host has no qemu installed).
+#   docker build -t w3bs-os-qemu -f os/iso/test/Dockerfile.qemu os/iso/test
+FROM debian:trixie-slim
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+       qemu-system-x86 qemu-utils ovmf python3 python3-pil kmod ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /work

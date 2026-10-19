@@ -1,0 +1,13 @@
+*
+!package-manager/Cargo.toml
+!package-manager/Cargo.lock
+!package-manager/crates/**
+!package-manager/bootstrap/**
+!desktop/Cargo.toml
+!desktop/Cargo.lock
+!desktop/crates/**
+!desktop/gnome-extension/**
+!desktop/packaging/kubuntu/**
+!fixtures/trust.json
+!fixtures/resources/**
+**/target

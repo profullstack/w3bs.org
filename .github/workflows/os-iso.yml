@@ -1,0 +1,95 @@
+# W3BS OS network installer ISO (os/iso/). On every merge to main that touches the ISO's
+# inputs (or by hand): build w3bs-os-<VERSION>.<run>-x86_64.iso, run the full install test
+# (os-install-test.yml: SeaBIOS + OVMF, CD-ROM attach, virtio disk, install, reboot, serial
+# checks, LUKS), and only if every test passes publish release os-v<VERSION>.<run> with the
+# ISO and SHA256SUMS (not prerelease, not the repo's "Latest", which the w3bs CLI uses), then
+# point os-latest/latest.json at it for w3bs.org/os.
+name: os-iso
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "os/iso/**"
+      - "os/docker/zshrc"
+      - "os/docker/init.sh"
+      - "package-manager/crates/**"
+      - "package-manager/Cargo.lock"
+      - "desktop/crates/**"
+      - "desktop/Cargo.lock"
+      - "registry/FINGERPRINT"
+      - ".github/workflows/os-iso.yml"
+      - ".github/workflows/os-install-test.yml"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish the release after the tests pass"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: os-iso
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          base=$(tr -d ' \n' < os/iso/VERSION)
+          echo "$base" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "bad os/iso/VERSION: $base"; exit 1; }
+          echo "version=$base.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: version
+    uses: ./.github/workflows/os-install-test.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+
+  publish:
+    needs: [version, test]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: os-iso-image
+          path: iso
+      - name: Release os-v${{ needs.version.outputs.version }} and os-latest/latest.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          V: ${{ needs.version.outputs.version }}
+        run: |
+          set -eu
+          tag="os-v$V"
+          iso="w3bs-os-$V-x86_64.iso"
+          echo "$iso" | grep -Eq '^w3bs-os-[0-9A-Za-z._+-]+\.iso$'
+          (cd iso && sha256sum -c SHA256SUMS)
+          size=$(stat -c %s "iso/$iso")
+          [ "$size" -lt 2000000000 ]
+          sha=$(sha256sum "iso/$iso" | cut -d' ' -f1)
+          notes="W3BS OS $V network installer for x86_64 PCs and VPSes (UEFI and BIOS; Secure Boot must be off).
+          Alpine Linux 3.24 based. The desktop and other packages download during the install, so a wired network (DHCP) is required.
+          Passed the QEMU install test (SeaBIOS + OVMF, CD-ROM, virtio disk, install, reboot, LUKS2) in run ${{ github.run_id }}.
+          Write it to USB with dd, Ventoy or balenaEtcher, or attach it as a VPS virtual DVD: see os/iso/README.md.
+          sha256 $sha"
+          gh release create "$tag" --target "$GITHUB_SHA" --latest=false \
+            --title "W3BS OS $V (network installer)" --notes "$notes" \
+            "iso/$iso" iso/SHA256SUMS
+          base="https://github.com/$GH_REPO/releases/download/$tag"
+          printf '{"version":"%s","name":"%s","url":"%s/%s","sumsUrl":"%s/SHA256SUMS","sha256":"%s","size":%s,"preview":false,"release":"%s"}\n' \
+            "$V" "$iso" "$base" "$iso" "$base" "$sha" "$size" "$tag" > latest.json
+          cat latest.json
+          python3 -c 'import json; json.load(open("latest.json"))'
+          gh release view os-latest >/dev/null 2>&1 || gh release create os-latest --latest=false --prerelease \
+            --title "W3BS OS latest pointer" --notes "latest.json points at the newest tested W3BS OS ISO release."
+          gh release upload os-latest latest.json --clobber
+          echo "Published $tag ($size bytes, sha256 $sha)" >> "$GITHUB_STEP_SUMMARY"

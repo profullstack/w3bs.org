@@ -1,0 +1,712 @@
+#!/bin/sh
+# w3bs-os-install: the W3BS OS text installer (network installer, v0.1). docs/os-prd.md §4.
+#
+# Wraps Alpine's setup-alpine with an answer file and W3BS defaults: keyboard, timezone and
+# hostname prompts with defaults, DHCP networking, the largest internal disk erased after a
+# typed confirmation, LUKS2 encryption on by default, a "sys" install, a zsh user in wheel
+# with doas, KDE Plasma, the w3bs CLI and the Agentic Desktop Layer (agent access OFF).
+#
+#   w3bs-os-install                                interactive
+#   w3bs-os-install --defaults --disk /dev/sda --yes   unattended (still prompts for passwords
+#                                                  on a terminal unless the files below are given)
+#
+# Passwords are never written to the log or the saved install profile. Any failure exits
+# non-zero and says so; the installer never reports a partial install as a success.
+set -u
+# Files the installer writes are world-readable unless chmod-ed otherwise; a umask leaked
+# from the build host once left /etc 0770 and nobody but root could log in.
+umask 022
+
+PROG=w3bs-os-install
+OS_VERSION=$(cat /usr/share/w3bs-os/VERSION 2>/dev/null || echo 0.1.0)
+WORK=/run/w3bs-os-install
+LOG=/var/log/w3bs-os-install.log
+TARGET=/mnt/w3bs-target
+REPO_URL=https://w3bs.org/repo/
+
+usage() {
+	cat <<EOF
+usage: $PROG [options]
+
+W3BS OS $OS_VERSION network installer. Packages are downloaded from the Alpine mirrors
+during the install, so a wired network connection (DHCP) is required.
+
+options:
+  --defaults              accept the default for every question that has one
+  --disk DEV              install to DEV (default: the largest internal disk)
+  --yes                   do not ask for the typed erase confirmation (needed with --defaults
+                          for a fully unattended run; the disk is still shown first)
+  --no-encrypt            do not encrypt the disk (default: LUKS2 full-disk encryption)
+  --desktop NAME          plasma (default), gnome, xfce or none
+  --hostname NAME         default: w3bs
+  --timezone ZONE         default: UTC (for example America/Los_Angeles)
+  --keymap "LAYOUT VAR"   default: "us us"
+  --user NAME             default: w3bs (or the preset users); repeat for more users, all in
+                          wheel (admin via doas)
+  --fullname "NAME"       the first user's full name; default: W3BS User
+  --password-file FILE    read the users' password from the first line of FILE
+  --authorized-keys NAME=FILE
+                          SSH public keys for NAME (a user above, or root); repeatable.
+                          Turns on sshd: keys only, no password logins over SSH
+  --root-password-file FILE
+                          give root a password (otherwise root has none: SSH key or doas only)
+  --ssh                   install and start sshd even without keys
+  --passphrase-file FILE  read the disk passphrase from the first line of FILE
+  --no-reboot             do not offer to reboot at the end
+  --serial-console        also use the first serial port (ttyS0, 115200) as a console and
+                          login on the installed system (servers, VMs, automated tests)
+  -h, --help              show this help
+
+Secure Boot must be off: Alpine has no Microsoft-signed shim.
+EOF
+}
+
+# --- output helpers ---------------------------------------------------------------------
+say() { printf '%s\n' "$*"; }
+log() { printf '%s %s\n' "$(date '+%F %T')" "$*" >>"$LOG" 2>/dev/null; }
+step() { printf '\n==> %s\n' "$*"; log "STEP $*"; }
+fail() {
+	printf '\n%s: INSTALL FAILED: %s\n' "$PROG" "$1" >&2
+	printf 'W3BS OS was NOT installed completely. Details: %s\n' "$LOG" >&2
+	log "FAILED: $1"
+	cleanup
+	exit "${2:-1}"
+}
+
+cleanup() {
+	[ -n "${CLEANED:-}" ] && return 0
+	CLEANED=1
+	[ -n "${SHIM:-}" ] && rm -f "$SHIM"
+	if [ -d "$TARGET" ]; then
+		for m in dev/pts dev proc sys boot/efi boot ""; do
+			mountpoint -q "$TARGET/$m" 2>/dev/null && umount -l "$TARGET/$m" 2>/dev/null
+		done
+	fi
+	command -v vgchange >/dev/null 2>&1 && vgchange -an vg0 >/dev/null 2>&1
+	for m in w3bsroot root; do
+		[ -e "/dev/mapper/$m" ] && cryptsetup close "$m" >/dev/null 2>&1
+	done
+	if [ -f "$WORK/luks.key" ]; then
+		# The keyfile is in RAM (tmpfs); overwrite then remove.
+		dd if=/dev/zero of="$WORK/luks.key" bs=1 count=512 conv=notrunc 2>/dev/null
+		rm -f "$WORK/luks.key"
+	fi
+	rm -f "$WORK/user.pass"
+}
+trap 'fail "interrupted" 130' INT TERM
+
+# --- prompts ----------------------------------------------------------------------------
+ask() { # ask VAR "Question" default
+	_var=$1 _q=$2 _def=$3
+	if [ -n "$DEFAULTS" ]; then
+		eval "$_var=\$_def"
+		return
+	fi
+	printf '%s [%s]: ' "$_q" "$_def"
+	read -r _ans || fail "no input"
+	[ -n "$_ans" ] || _ans=$_def
+	eval "$_var=\$_ans"
+}
+
+read_secret() { # read_secret VAR "Prompt"
+	_var=$1
+	[ -t 0 ] || fail "a password is needed but there is no terminal; use --password-file / --passphrase-file"
+	while :; do
+		printf '%s: ' "$2"
+		stty -echo; read -r _s1; _rc=$?; stty echo; printf '\n'
+		[ $_rc -eq 0 ] || fail "no input"
+		printf '%s (again): ' "$2"
+		stty -echo; read -r _s2; stty echo; printf '\n'
+		if [ -z "$_s1" ]; then say "It cannot be empty."; continue; fi
+		if [ "$_s1" != "$_s2" ]; then say "They do not match; try again."; continue; fi
+		[ ${#_s1} -ge "${3:-1}" ] || { say "Use at least ${3:-1} characters."; continue; }
+		break
+	done
+	eval "$_var=\$_s1"
+	_s1= _s2=
+}
+
+read_secret_file() { # read_secret_file VAR FILE
+	[ -r "$2" ] || fail "cannot read $2"
+	_line=$(head -n 1 "$2")
+	[ -n "$_line" ] || fail "$2 is empty"
+	eval "$1=\$_line"
+	_line=
+}
+
+# --- disks ------------------------------------------------------------------------------
+disk_bytes() { echo $(( $(cat "/sys/block/${1#/dev/}/size" 2>/dev/null || echo 0) * 512 )); }
+human() { awk -v b="$1" 'BEGIN { if (b >= 1e12) printf "%.1f TB", b/1e12; else printf "%.1f GB", b/1e9 }'; }
+disk_model() {
+	_d=${1#/dev/}
+	_m="$(cat /sys/block/$_d/device/vendor 2>/dev/null) $(cat /sys/block/$_d/device/model 2>/dev/null)"
+	_m=$(echo "$_m" | tr -s ' ' | sed 's/^ //; s/ $//')
+	echo "${_m:-unknown model}"
+}
+
+# The disk the live system booted from (never offered as a target).
+boot_media_disk() {
+	for mnt in /media/cdrom /media/usb $(awk '$2 ~ /^\/media\// { print $2 }' /proc/mounts); do
+		[ -e "$mnt/.boot_repository" ] || [ -d "$mnt/apks" ] || continue
+		dev=$(awk -v m="$mnt" '$2 == m { print $1 }' /proc/mounts | head -n1)
+		[ -n "$dev" ] || continue
+		d=$(basename "$(readlink -f "$dev")")
+		if [ -e "/sys/class/block/$d/partition" ]; then
+			d=$(basename "$(readlink -f "/sys/class/block/$d/..")")
+		fi
+		echo "$d"
+	done
+}
+
+internal_disks() {
+	_boot=$(boot_media_disk)
+	for p in /sys/block/*; do
+		d=${p##*/}
+		case "$d" in loop*|ram*|sr*|zram*|dm-*|md*|fd*|nbd*) continue ;; esac
+		[ "$(cat "$p/removable" 2>/dev/null)" = 1 ] && continue
+		[ "$(cat "$p/size" 2>/dev/null || echo 0)" -gt 0 ] || continue
+		case " $_boot " in *" $d "*) continue ;; esac
+		echo "$d"
+	done
+}
+
+largest_disk() {
+	best= bestsz=0
+	for d in $(internal_disks); do
+		sz=$(disk_bytes "$d")
+		if [ "$sz" -gt "$bestsz" ]; then best=$d bestsz=$sz; fi
+	done
+	[ -n "$best" ] && echo "/dev/$best"
+}
+
+wired_interfaces() {
+	for p in /sys/class/net/*; do
+		i=${p##*/}
+		[ "$i" = lo ] && continue
+		[ -e "$p/device" ] || continue
+		[ -d "$p/wireless" ] && continue
+		echo "$i"
+	done
+}
+
+# --- arguments --------------------------------------------------------------------------
+DEFAULTS= DISK= YES= ENCRYPT=1 DESKTOP= HOSTNAME_= TIMEZONE= KEYMAP= USERS= FULLNAME=
+PASSWORD_FILE= PASSPHRASE_FILE= NO_REBOOT= SERIAL= ROOT_PASSWORD_FILE= SSH= KEY_ARGS=
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--defaults) DEFAULTS=1 ;;
+		--disk) DISK=${2:-}; shift ;;
+		--yes) YES=1 ;;
+		--no-encrypt) ENCRYPT= ;;
+		--encrypt) ENCRYPT=1 ;;
+		--desktop) DESKTOP=${2:-}; shift ;;
+		--hostname) HOSTNAME_=${2:-}; shift ;;
+		--timezone) TIMEZONE=${2:-}; shift ;;
+		--keymap) KEYMAP=${2:-}; shift ;;
+		--user) USERS="$USERS ${2:-}"; shift ;;
+		--authorized-keys) KEY_ARGS="$KEY_ARGS ${2:-}"; shift ;;
+		--root-password-file) ROOT_PASSWORD_FILE=${2:-}; shift ;;
+		--ssh) SSH=1 ;;
+		--fullname) FULLNAME=${2:-}; shift ;;
+		--password-file) PASSWORD_FILE=${2:-}; shift ;;
+		--passphrase-file) PASSPHRASE_FILE=${2:-}; shift ;;
+		--no-reboot) NO_REBOOT=1 ;;
+		--serial-console) SERIAL=1 ;;
+		-h|--help) usage; exit 0 ;;
+		*) usage >&2; printf '\n%s: unknown option %s\n' "$PROG" "$1" >&2; exit 2 ;;
+	esac
+	shift
+done
+
+[ "$(id -u)" = 0 ] || { echo "$PROG: run as root (the live system logs in as root)" >&2; exit 1; }
+mkdir -p "$WORK" && chmod 700 "$WORK" || { echo "$PROG: cannot create $WORK" >&2; exit 1; }
+: >"$LOG" && chmod 600 "$LOG"
+# SSH public keys per account in $WORK/keys/NAME: the build-time preset first, then
+# --authorized-keys (which replaces the preset's keys for that name).
+PRESET=/usr/share/w3bs-os/preset
+mkdir -p "$WORK/keys"
+if [ -d "$PRESET/keys" ]; then
+	for f in "$PRESET"/keys/*; do [ -f "$f" ] && cp "$f" "$WORK/keys/${f##*/}"; done
+fi
+for kv in $KEY_ARGS; do
+	name=${kv%%=*} file=${kv#*=}
+	[ "$name" != "$kv" ] && [ -n "$name" ] || { echo "$PROG: --authorized-keys takes NAME=FILE, not $kv" >&2; exit 2; }
+	grep -Eq '^[^#]*(ssh-|ecdsa-|sk-)' "$file" 2>/dev/null || { echo "$PROG: $file has no SSH public keys" >&2; exit 2; }
+	cp "$file" "$WORK/keys/$name"
+done
+if [ -z "$(echo $USERS)" ] && [ -f "$PRESET/users" ]; then USERS=$(grep -Ev '^[[:space:]]*(#|$)' "$PRESET/users" | tr '\n' ' '); fi
+log "$PROG $OS_VERSION started: defaults=${DEFAULTS:-0} disk=${DISK:-auto} yes=${YES:-0} encrypt=${ENCRYPT:-0} desktop=${DESKTOP:-default}"
+
+[ -e /etc/w3bs-os/live ] || fail "this is not the W3BS OS live system (no /etc/w3bs-os/live); refusing to repartition a running install"
+for c in setup-alpine setup-disk setup-desktop blkid; do
+	command -v "$c" >/dev/null 2>&1 || fail "missing $c on the live system"
+done
+[ -x /usr/local/bin/w3bs ] && [ -x /usr/local/bin/w3bs-desktop ] || fail "the w3bs binaries are missing from the live system"
+
+cat <<EOF
+
+  W3BS OS $OS_VERSION installer (network installer)
+  -------------------------------------------------
+  Installs Alpine Linux $(cat /etc/alpine-release 2>/dev/null) with W3BS defaults. Packages
+  (including the desktop) are downloaded during the install: a wired network is required.
+  Secure Boot must be off. Nothing is written to any disk until you confirm the review.
+
+EOF
+
+# --- questions --------------------------------------------------------------------------
+if [ -z "$KEYMAP" ]; then ask KEYMAP "Keyboard layout and variant (see /usr/share/bkeymaps)" "us us"; fi
+set -- $KEYMAP
+[ $# -eq 2 ] || fail "keymap must be \"LAYOUT VARIANT\", for example \"us us\" or \"de de-nodeadkeys\""
+[ -f "/usr/share/bkeymaps/$1/$2.bmap.gz" ] || fail "unknown keymap $KEYMAP (see /usr/share/bkeymaps)"
+
+if [ -z "$TIMEZONE" ]; then ask TIMEZONE "Timezone" "UTC"; fi
+[ -f "/usr/share/zoneinfo/$TIMEZONE" ] || fail "unknown timezone $TIMEZONE (see /usr/share/zoneinfo)"
+
+if [ -z "$HOSTNAME_" ]; then ask HOSTNAME_ "Hostname" "w3bs"; fi
+echo "$HOSTNAME_" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
+	|| fail "invalid hostname $HOSTNAME_ (lower-case letters, digits and -, up to 63 characters)"
+
+if [ -z "$(echo $USERS)" ]; then ask USERS "Your user name (more than one: separate with spaces)" "w3bs"; fi
+set -- $USERS
+USERS="$*" USERNAME=$1
+for u in $USERS; do
+echo "$u" | grep -Eq '^[a-z_][a-z0-9_-]{0,31}$' || fail "invalid user name $u"
+case "$u" in root|bin|daemon|adm|lp|sync|shutdown|halt|mail|news|uucp|operator|man|postmaster|cron|ftp|sshd|at|squid|xfs|games|cyrus|vpopmail|ntp|smmsp|guest|nobody|sddm|gdm|lightdm|messagebus|polkitd)
+	fail "$u is a system account name" ;;
+esac
+done
+for f in "$WORK"/keys/*; do
+	[ -f "$f" ] || continue
+	case " root $USERS " in *" ${f##*/} "*) ;; *) fail "SSH keys given for ${f##*/}, which is not root or a user being created" ;; esac
+	SSH=1
+done
+if [ -z "$FULLNAME" ]; then ask FULLNAME "Full name" "W3BS User"; fi
+case "$FULLNAME" in *:*) fail "the full name cannot contain ':'" ;; esac
+
+if [ -z "$DESKTOP" ]; then ask DESKTOP "Desktop (plasma, gnome, xfce, none)" "plasma"; fi
+case "$DESKTOP" in plasma|gnome|xfce|none) ;; *) fail "unknown desktop $DESKTOP (plasma, gnome, xfce or none)" ;; esac
+
+if [ -z "$DISK" ]; then
+	if [ -n "$DEFAULTS" ]; then
+		DISK=$(largest_disk) || true
+	else
+		say ""
+		say "Internal disks:"
+		for d in $(internal_disks); do say "  /dev/$d  $(human "$(disk_bytes "$d")")  $(disk_model "$d")"; done
+		ask DISK "Disk to ERASE and install to" "$(largest_disk)"
+	fi
+fi
+[ -n "$DISK" ] || fail "no internal disk found"
+case "$DISK" in /dev/*) ;; *) DISK=/dev/$DISK ;; esac
+[ -b "$DISK" ] || fail "$DISK is not a block device"
+[ -e "/sys/block/${DISK#/dev/}" ] || fail "$DISK is a partition or not a whole disk; give the whole disk (for example /dev/sda)"
+case " $(boot_media_disk) " in *" ${DISK#/dev/} "*) fail "$DISK holds the running installer media" ;; esac
+DISK_BYTES=$(disk_bytes "$DISK")
+[ "$DISK_BYTES" -ge 8000000000 ] || fail "$DISK is $(human "$DISK_BYTES"); W3BS OS needs at least 8 GB (20 GB or more with a desktop)"
+
+if [ -z "$DEFAULTS" ] && [ -n "$ENCRYPT" ]; then
+	ask _enc "Encrypt the disk with LUKS2 (recommended)? yes/no" "yes"
+	case "$_enc" in n|no|N|NO|No) ENCRYPT= ;; esac
+fi
+
+# Passwords: from files (unattended) or typed; never echoed, logged or saved in the profile.
+# A user with SSH keys and no password file under --defaults gets no password: SSH key login
+# only (the console then needs root's password or another user's).
+mkdir -p "$WORK/pass"
+for u in $USERS; do
+	if [ -n "$PASSWORD_FILE" ]; then read_secret_file _p "$PASSWORD_FILE"
+	elif [ -n "$DEFAULTS" ] && [ -s "$WORK/keys/$u" ]; then _p=
+	else read_secret _p "Password for $u" 1; fi
+	printf '%s' "$_p" >"$WORK/pass/$u"; _p=
+done
+ROOT_PASS=
+[ -n "$ROOT_PASSWORD_FILE" ] && read_secret_file ROOT_PASS "$ROOT_PASSWORD_FILE"
+if [ -n "$ENCRYPT" ]; then
+	if [ -n "$PASSPHRASE_FILE" ]; then read_secret_file LUKS_PASS "$PASSPHRASE_FILE"
+	else
+		say "The disk passphrase is asked at every boot. If you lose it, the data cannot be recovered."
+		read_secret LUKS_PASS "Disk encryption passphrase" 8
+	fi
+	[ ${#LUKS_PASS} -ge 8 ] || fail "the disk passphrase must be at least 8 characters"
+fi
+
+IFACES=$(wired_interfaces)
+[ -n "$IFACES" ] || fail "no wired network interface found; v0.1 installs need Ethernet (Wi-Fi setup is not in this installer yet)"
+
+if [ -d /sys/firmware/efi ]; then BOOTMODE=UEFI; else BOOTMODE=BIOS; fi
+
+# --- review -----------------------------------------------------------------------------
+cat <<EOF
+
+  Review: nothing has been written yet
+  ------------------------------------
+  Target disk     $DISK  $(human "$DISK_BYTES")  $(disk_model "$DISK")
+                  ALL DATA ON THIS DISK WILL BE ERASED. Partitions now on it:
+$(lsblk -no NAME,SIZE,FSTYPE,LABEL "$DISK" 2>/dev/null | sed 's/^/                    /' || true)
+  Layout          ${BOOTMODE}: boot partition + $( [ -n "$ENCRYPT" ] && echo "LUKS2-encrypted LVM (swap + ext4 root)" || echo "swap + ext4 root" )
+  Encryption      $( [ -n "$ENCRYPT" ] && echo "LUKS2 (passphrase asked at boot)" || echo "OFF" )
+  Hostname        $HOSTNAME_
+  Keyboard        $KEYMAP
+  Timezone        $TIMEZONE
+  Network         DHCP on $(echo $IFACES)
+  Users           $USERS (zsh, admin via doas/wheel)$(for u in $USERS; do [ -s "$WORK/keys/$u" ] && printf ', %s: %s SSH key(s)' "$u" "$(grep -Ec '(ssh-|ecdsa-|sk-)' "$WORK/keys/$u")"; [ -s "$WORK/pass/$u" ] || printf ', %s: no password' "$u"; done)
+  Root            $( [ -n "$ROOT_PASS" ] && echo "password set" || echo "no password")$( [ -s "$WORK/keys/root" ] && echo ", $(grep -Ec '(ssh-|ecdsa-|sk-)' "$WORK/keys/root") SSH key(s)")
+  SSH             $( [ -n "$SSH" ] && echo "sshd on: keys only, no password logins" || echo "off")
+  Desktop         $DESKTOP$( [ "$DESKTOP" = plasma ] && echo " (KDE Plasma, SDDM)")
+  W3BS            w3bs CLI and w3bs-desktop in /usr/local/bin; W3BS repo added at first login
+  Agent access    Agentic Desktop Layer installed, agent access OFF until you turn it on
+  Web server      Caddy, enabled, no sites (add them in /etc/caddy/sites/)
+  Serial console  $( [ -n "$SERIAL" ] && echo "ttyS0 115200 (console and login)" || echo "off" )
+  Packages        downloaded from the Alpine CDN mirror (network installer)
+
+EOF
+if [ -n "$YES" ]; then
+	say "--yes given: erasing $DISK without a typed confirmation."
+else
+	[ -t 0 ] || fail "no terminal for the erase confirmation; pass --yes to confirm in advance"
+	printf 'Type the disk name %s to erase it and install, or anything else to cancel: ' "$DISK"
+	read -r _confirm || fail "no input"
+	[ "$_confirm" = "$DISK" ] || { say "Cancelled; nothing was written."; log "cancelled at review"; cleanup; exit 3; }
+fi
+log "confirmed erase of $DISK ($DISK_BYTES bytes)"
+
+# --- install the base system with setup-alpine ------------------------------------------
+step "Installing the base system (setup-alpine) to $DISK"
+INTERFACES="auto lo
+iface lo inet loopback
+"
+for i in $IFACES; do
+	INTERFACES="${INTERFACES}
+auto $i
+iface $i inet dhcp
+"
+done
+DISKOPTS="-m sys"
+[ -n "$ENCRYPT" ] && DISKOPTS="$DISKOPTS -e -L"
+DISKOPTS="$DISKOPTS $DISK"
+cat >"$WORK/answers" <<EOF
+KEYMAPOPTS="$KEYMAP"
+HOSTNAMEOPTS="$HOSTNAME_"
+DEVDOPTS=mdev
+INTERFACESOPTS="$INTERFACES"
+TIMEZONEOPTS="$TIMEZONE"
+PROXYOPTS=none
+APKREPOSOPTS="-1 -c"
+USEROPTS=none
+SSHDOPTS=none
+NTPOPTS=chrony
+DISKOPTS="$DISKOPTS"
+LBUOPTS=none
+APKCACHEOPTS=none
+EOF
+log "answer file:"; cat "$WORK/answers" >>"$LOG"
+
+# setup-disk runs cryptsetup interactively; this shim feeds it the passphrase from a keyfile
+# in RAM so it is typed once, never passed on a command line, and never logged.
+# It is /usr/local/sbin/cryptsetup on the live system (RAM), not a directory prepended to
+# PATH: setup-alpine sources /etc/profile, which resets PATH, and /usr/local/sbin is first
+# in that PATH. The shim finds the real cryptsetup outside /usr/local; cleanup removes it.
+SHIM=/usr/local/sbin/cryptsetup
+REAL_CRYPTSETUP=$(command -v cryptsetup || echo /sbin/cryptsetup)
+if [ -n "$ENCRYPT" ]; then
+	(umask 077; printf '%s' "$LUKS_PASS" >"$WORK/luks.key")
+	cat >"$SHIM" <<EOF
+#!/bin/sh
+real=\$(PATH=/usr/sbin:/sbin:/usr/bin:/bin command -v cryptsetup)
+case "\$1" in
+	luksFormat)
+		shift
+		# --verify-passphrase is for typed passphrases; the key file is already verified.
+		for a do shift; [ "\$a" = --verify-passphrase ] || set -- "\$@" "\$a"; done
+		exec "\$real" luksFormat --key-file "$WORK/luks.key" "\$@" ;;
+	open|luksOpen) exec "\$real" "\$@" --key-file "$WORK/luks.key" ;;
+	*) exec "\$real" "\$@" ;;
+esac
+EOF
+	chmod 700 "$SHIM"
+fi
+
+rm -f "$WORK/rc"
+KOPTS=quiet
+[ -n "$SERIAL" ] && KOPTS="quiet console=ttyS0,115200 console=tty0"
+( ERASE_DISKS="$DISK" KERNELOPTS="$KOPTS" setup-alpine -e -f "$WORK/answers" </dev/null 2>&1; echo $? >"$WORK/rc" ) \
+	| tee -a "$LOG"
+rc=$(cat "$WORK/rc" 2>/dev/null || echo 1)
+[ "$rc" = 0 ] || fail "setup-alpine/setup-disk exited with status $rc"
+
+# --- find and mount the installed system ------------------------------------------------
+step "Mounting the installed system"
+mkdir -p "$TARGET"
+mountpoint -q "$TARGET" && umount -l "$TARGET"
+ROOTDEV=
+if [ -n "$ENCRYPT" ]; then
+	LUKSDEV=
+	for p in $(lsblk -lnpo NAME "$DISK"); do
+		[ "$(blkid -o value -s TYPE "$p" 2>/dev/null)" = crypto_LUKS ] && LUKSDEV=$p
+	done
+	[ -n "$LUKSDEV" ] || fail "no LUKS partition was created on $DISK"
+	cryptsetup luksDump "$LUKSDEV" 2>/dev/null | grep -q '^Version:[[:space:]]*2' || fail "$LUKSDEV is not LUKS2"
+	[ -e /dev/mapper/root ] || "$REAL_CRYPTSETUP" open "$LUKSDEV" w3bsroot --key-file "$WORK/luks.key" \
+		|| fail "cannot unlock $LUKSDEV"
+	vgchange -ay vg0 >/dev/null 2>&1
+	[ -e /dev/vg0/lv_root ] && ROOTDEV=/dev/vg0/lv_root
+else
+	for p in $(lsblk -lnpo NAME "$DISK"); do
+		[ "$p" = "$DISK" ] && continue
+		[ "$(blkid -o value -s TYPE "$p" 2>/dev/null)" = ext4 ] || continue
+		if mount -o ro "$p" "$TARGET" 2>/dev/null; then
+			[ -f "$TARGET/etc/alpine-release" ] && ROOTDEV=$p
+			umount "$TARGET"
+			[ -n "$ROOTDEV" ] && break
+		fi
+	done
+fi
+[ -n "$ROOTDEV" ] || fail "cannot find the installed root filesystem on $DISK"
+mount "$ROOTDEV" "$TARGET" || fail "cannot mount $ROOTDEV"
+[ -f "$TARGET/etc/alpine-release" ] && [ -f "$TARGET/etc/fstab" ] || fail "$ROOTDEV does not hold an installed system"
+# Mount /boot (and /boot/efi if any) from the target's fstab.
+awk '$2 ~ /^\/boot/ { print $1, $2, $3 }' "$TARGET/etc/fstab" | sort -k2 | while read -r spec mp fstype; do
+	case "$spec" in
+		UUID=*) dev=$(blkid -U "${spec#UUID=}" 2>/dev/null) ;;
+		LABEL=*) dev=$(blkid -L "${spec#LABEL=}" 2>/dev/null) ;;
+		*) dev=$spec ;;
+	esac
+	[ -n "$dev" ] && mkdir -p "$TARGET$mp" && mount -t "$fstype" "$dev" "$TARGET$mp" \
+		|| { echo "cannot mount $spec ($dev) on $mp" >>"$LOG"; exit 1; }
+	echo "mounted $dev on $mp" >>"$LOG"
+done || fail "cannot mount the boot partition"
+for m in dev proc sys; do mount --bind "/$m" "$TARGET/$m" || fail "cannot bind /$m"; done
+mountpoint -q "$TARGET/dev/pts" || mount --bind /dev/pts "$TARGET/dev/pts" 2>/dev/null
+cp /etc/resolv.conf "$TARGET/etc/resolv.conf" 2>/dev/null
+in_target() { chroot "$TARGET" /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root TERM="${TERM:-linux}" "$@"; }
+
+# setup-disk copies the live /etc; a build-host umask once made it (and the overlay's
+# directories) 0770. Directories with group but not other access are that leak, not intent.
+fix_modes() {
+	find "$TARGET/etc" "$TARGET/usr/local" "$TARGET/usr/share/w3bs-os" -xdev -type d -perm -g+x ! -perm -o+x \
+		-exec chmod o+rx {} + 2>/dev/null
+	for f in etc/hostname etc/motd etc/inittab etc/network/interfaces etc/apk/world etc/apk/repositories \
+		'etc/profile.d/*' 'etc/w3bs-os/*' etc/zsh/zshrc 'usr/share/w3bs-os/*' 'usr/local/bin/*'; do
+		for g in "$TARGET"/$f; do [ -f "$g" ] && chmod o+r "$g"; done
+	done
+	chmod 0755 "$TARGET" "$TARGET/etc"
+}
+fix_modes
+
+# --- user, shell, admin -----------------------------------------------------------------
+step "Creating users $USERS (zsh, wheel/doas)"
+in_target apk add --no-progress zsh zsh-vcs doas >>"$LOG" 2>&1 || fail "cannot install zsh/doas"
+grep -qx /bin/zsh "$TARGET/etc/shells" || echo /bin/zsh >>"$TARGET/etc/shells"
+install_keys() { # install_keys NAME HOME
+	[ -s "$WORK/keys/$1" ] || return 0
+	mkdir -p "$TARGET$2/.ssh"
+	grep -E '^[^#]*(ssh-|ecdsa-|sk-)' "$WORK/keys/$1" >"$TARGET$2/.ssh/authorized_keys"
+	chmod 700 "$TARGET$2/.ssh" && chmod 600 "$TARGET$2/.ssh/authorized_keys"
+	in_target chown -R "$1:" "$2/.ssh" || fail "cannot install the SSH keys for $1"
+}
+first=1
+for u in $USERS; do
+	fn=$u
+	[ -n "$first" ] && fn=${FULLNAME:-$u}
+	[ "$fn" = w3bs ] && fn="W3BS User"
+	first=
+	in_target adduser -D -s /bin/zsh -g "$fn" "$u" >>"$LOG" 2>&1 || fail "cannot create user $u"
+	for g in wheel audio video input netdev plugdev; do
+		grep -q "^$g:" "$TARGET/etc/group" || in_target addgroup -S "$g" >/dev/null 2>&1
+		in_target addgroup "$u" "$g" >>"$LOG" 2>&1 || fail "cannot add $u to $g"
+	done
+	# An empty ~/.zshrc so zsh does not start its new-user wizard; the W3BS prompt is global.
+	[ -e "$TARGET/home/$u/.zshrc" ] || printf '# Your zsh settings. W3BS OS defaults are in /etc/zsh/zshrc.\n' >"$TARGET/home/$u/.zshrc"
+	in_target chown "$u:$u" "/home/$u/.zshrc"
+	if [ -s "$WORK/pass/$u" ]; then
+		printf '%s:%s\n' "$u" "$(cat "$WORK/pass/$u")" | in_target chpasswd >/dev/null 2>&1 || fail "cannot set the password for $u"
+	else
+		# "*" = no password but not locked: sshd refuses key logins to "!" (locked) accounts.
+		printf '%s:*\n' "$u" | in_target chpasswd -e >/dev/null 2>&1 || fail "cannot clear the password for $u"
+	fi
+	install_keys "$u" "/home/$u"
+done
+rm -rf "$WORK/pass"
+mkdir -p "$TARGET/etc/doas.d"
+echo "permit persist :wheel" >"$TARGET/etc/doas.d/20-wheel.conf"
+chmod 0755 "$TARGET/etc/doas.d"
+# The live root account has no password. Installed: the given password, or none ("*": doas,
+# or SSH keys when given; never an empty password).
+if [ -n "$ROOT_PASS" ]; then
+	printf 'root:%s\n' "$ROOT_PASS" | in_target chpasswd >/dev/null 2>&1 || fail "cannot set root's password"
+	ROOT_PASS=
+else
+	printf 'root:*\n' | in_target chpasswd -e >/dev/null 2>&1 || fail "cannot clear root's password"
+fi
+install_keys root /root
+if [ -n "$SSH" ]; then
+	step "Installing sshd (keys only)"
+	in_target apk add --no-progress openssh-server >>"$LOG" 2>&1 || fail "cannot install openssh-server"
+	in_target ssh-keygen -A >>"$LOG" 2>&1 || fail "cannot generate the SSH host keys"
+	mkdir -p "$TARGET/etc/ssh/sshd_config.d"
+	grep -q '^Include /etc/ssh/sshd_config.d/\*.conf' "$TARGET/etc/ssh/sshd_config" \
+		|| sed -i '1i Include /etc/ssh/sshd_config.d/*.conf' "$TARGET/etc/ssh/sshd_config"
+	printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\nPermitRootLogin prohibit-password\n' \
+		>"$TARGET/etc/ssh/sshd_config.d/10-w3bs-os.conf"
+	in_target rc-update add sshd default >>"$LOG" 2>&1 || fail "cannot enable sshd"
+fi
+
+# --- desktop ----------------------------------------------------------------------------
+if [ "$DESKTOP" != none ]; then
+	step "Installing the $DESKTOP desktop (setup-desktop $DESKTOP; this downloads about 1-2 GB)"
+	# setup-desktop runs `rc-update add SERVICE` without a runlevel, meaning "the current one":
+	# in this chroot OpenRC has no state and that is sysinit, so sddm, dbus and elogind would
+	# start before the system is up. Say the current runlevel is default while it runs.
+	mkdir -p "$TARGET/run/openrc" && echo default >"$TARGET/run/openrc/softlevel"
+	in_target setup-desktop "$DESKTOP" </dev/null 2>&1 | tee -a "$LOG"
+	rm -f "$TARGET/run/openrc/softlevel"
+	for svc in dbus elogind sddm gdm lightdm greetd; do
+		if [ -L "$TARGET/etc/runlevels/sysinit/$svc" ]; then
+			in_target rc-update del "$svc" sysinit >>"$LOG" 2>&1
+			in_target rc-update add "$svc" default >>"$LOG" 2>&1 || fail "cannot move $svc to the default runlevel"
+		fi
+	done
+	# setup-desktop installs a meta package's dependencies, not the meta package itself.
+	case "$DESKTOP" in
+		plasma) want="plasma-workspace sddm"; dm=sddm ;;
+		gnome) want="gnome-shell gdm"; dm=gdm ;;
+		xfce) want="xfce4-session lightdm"; dm=lightdm ;;
+	esac
+	for p in $want; do
+		in_target apk info -e "$p" >/dev/null 2>&1 || fail "setup-desktop $DESKTOP did not install $p"
+	done
+	[ -L "$TARGET/etc/runlevels/default/$dm" ] || fail "the display manager $dm is not enabled"
+	[ -L "$TARGET/etc/runlevels/default/dbus" ] || fail "dbus is not in the default runlevel"
+fi
+
+# --- W3BS -------------------------------------------------------------------------------
+step "Installing Caddy (the default web server; no sites yet)"
+in_target apk add --no-progress caddy >>"$LOG" 2>&1 || fail "cannot install caddy"
+mkdir -p "$TARGET/etc/caddy/sites"
+cat >"$TARGET/etc/caddy/Caddyfile" <<'EOF' || fail "cannot write /etc/caddy/Caddyfile"
+# W3BS OS: Caddy runs with no sites. Add one file per site in /etc/caddy/sites/, for example
+#   example.com {
+#   	reverse_proxy 127.0.0.1:3000
+#   }
+# then: doas rc-service caddy reload
+import /etc/caddy/sites/*
+EOF
+chmod 0755 "$TARGET/etc/caddy" "$TARGET/etc/caddy/sites" && chmod 0644 "$TARGET/etc/caddy/Caddyfile"
+in_target caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >>"$LOG" 2>&1 || fail "the Caddy configuration does not load"
+in_target rc-update add caddy default >>"$LOG" 2>&1 || fail "cannot enable caddy"
+
+step "Installing w3bs and the Agentic Desktop Layer"
+mkdir -p "$TARGET/usr/local/bin" "$TARGET/usr/share/w3bs-os" "$TARGET/etc/w3bs-os"
+install -m 0755 /usr/local/bin/w3bs /usr/local/bin/w3bs-desktop "$TARGET/usr/local/bin/" || fail "cannot copy the w3bs binaries"
+install -m 0644 /usr/share/w3bs-os/FINGERPRINT /usr/share/w3bs-os/VERSION "$TARGET/usr/share/w3bs-os/" || fail "cannot copy the repository fingerprint"
+install -m 0755 /usr/share/w3bs-os/first-login.sh "$TARGET/usr/share/w3bs-os/first-login.sh" || fail "cannot copy first-login.sh"
+install -m 0644 /usr/share/w3bs-os/w3bs.sh "$TARGET/etc/profile.d/w3bs.sh" || fail "cannot install /etc/profile.d/w3bs.sh"
+if ! grep -q 'W3BS OS' "$TARGET/etc/zsh/zshrc" 2>/dev/null; then
+	cat /usr/share/w3bs-os/zshrc >>"$TARGET/etc/zsh/zshrc" || fail "cannot configure zsh"
+fi
+if [ "$DESKTOP" != none ]; then
+	mkdir -p "$TARGET/etc/xdg/autostart"
+	# The broker always starts with agent access Disabled; the tray is the switch.
+	# Never --enabled-by-default on a desktop install.
+	install -m 0644 /usr/share/w3bs-os/w3bs-desktop.desktop /usr/share/w3bs-os/w3bs-desktop-tray.desktop \
+		"$TARGET/etc/xdg/autostart/" || fail "cannot install the desktop layer autostart entries"
+	grep -q -- '--enabled-by-default' "$TARGET"/etc/xdg/autostart/w3bs-desktop*.desktop \
+		&& fail "refusing: an autostart entry would enable agent access by default"
+fi
+in_target /usr/local/bin/w3bs --version >>"$LOG" 2>&1 || fail "w3bs does not run on the installed system"
+in_target /usr/local/bin/w3bs-desktop --version >>"$LOG" 2>&1 || fail "w3bs-desktop does not run on the installed system"
+
+# --- remove live-only configuration that setup-disk copied over -------------------------
+step "Finishing"
+rm -f "$TARGET/usr/local/sbin/cryptsetup" "$TARGET/etc/profile.d/w3bs-os-live.sh" "$TARGET/usr/local/sbin/w3bs-os-install" \
+	"$TARGET/usr/local/sbin/w3bs-os-serial-getty" "$TARGET/etc/w3bs-os/live" "$TARGET/etc/motd.w3bs-live"
+install -m 0644 /usr/share/w3bs-os/inittab.installed "$TARGET/etc/inittab" || fail "cannot write /etc/inittab"
+if [ -n "$SERIAL" ]; then
+	sed -i 's|^#ttyS0::|ttyS0::|' "$TARGET/etc/inittab"
+	grep -qx ttyS0 "$TARGET/etc/securetty" 2>/dev/null || echo ttyS0 >>"$TARGET/etc/securetty"
+	grep -q '^ttyS0::' "$TARGET/etc/inittab" || fail "cannot enable the serial login"
+fi
+install -m 0644 /usr/share/w3bs-os/motd "$TARGET/etc/motd"
+printf 'W3BS_OS_VERSION=%s\nALPINE_VERSION=%s\n' "$OS_VERSION" "$(cat "$TARGET/etc/alpine-release")" >"$TARGET/etc/w3bs-os/release"
+# Read by `w3bs os status|update|upgrade`.
+BASE_VERSION=$(cat /usr/share/w3bs-os/BASE_VERSION 2>/dev/null || echo "$OS_VERSION")
+ALPINE_BRANCH=v$(cut -d. -f1,2 "$TARGET/etc/alpine-release")
+cat >"$TARGET/etc/w3bs-os-release" <<EOF || fail "cannot write /etc/w3bs-os-release"
+ID=w3bs-os
+NAME="W3BS OS"
+VERSION=$BASE_VERSION
+BUILD=$OS_VERSION
+EDITION=iso
+ALPINE=$ALPINE_BRANCH
+EOF
+# The reusable, nonsecret install profile (docs/os-prd.md §4).
+cat >"$TARGET/etc/w3bs-os/install-profile" <<EOF
+# W3BS OS install profile (nonsecret choices only). Installed $(date -u '+%FT%TZ')
+profile_version=1
+w3bs_os_version=$OS_VERSION
+boot_mode=$BOOTMODE
+keymap="$KEYMAP"
+timezone=$TIMEZONE
+hostname=$HOSTNAME_
+user=$USERNAME
+users="$USERS"
+ssh=$( [ -n "$SSH" ] && echo keys-only || echo off )
+shell=zsh
+desktop=$DESKTOP
+encrypt=$( [ -n "$ENCRYPT" ] && echo luks2 || echo none )
+serial_console=$( [ -n "$SERIAL" ] && echo ttyS0 || echo off )
+agent_access=off
+EOF
+
+# --- verify -----------------------------------------------------------------------------
+step "Verifying the installed system"
+fix_modes
+for d in / /etc /usr /usr/lib /lib /bin /usr/bin /usr/local/bin; do
+	[ "$(stat -c %A "$TARGET$d" | cut -c8-10)" = r-x ] || fail "$d on the installed system is $(stat -c %a "$TARGET$d"), not world-readable"
+done
+for u in $USERS; do
+	shell=$(awk -F: -v u="$u" '$1 == u { print $7 }' "$TARGET/etc/passwd")
+	[ "$shell" = /bin/zsh ] || fail "$u's shell is '$shell', not /bin/zsh"
+	# Start the user's own shell as the user: catches anything only root can read.
+	in_target su "$u" -c 'exit 0' >>"$LOG" 2>&1 || fail "$u cannot start a shell (see $LOG)"
+	in_target su "$u" -c '/usr/local/bin/w3bs --version' >>"$LOG" 2>&1 || fail "$u cannot run w3bs"
+	in_target id -nG "$u" | tr ' ' '\n' | grep -qx wheel || fail "$u is not in wheel"
+done
+awk -F: '$1 == "root" { print $2 }' "$TARGET/etc/shadow" | grep -q '^$' && fail "root has an empty password"
+if [ -n "$SSH" ]; then
+	in_target /usr/sbin/sshd -t >>"$LOG" 2>&1 || fail "the sshd configuration does not load"
+	in_target /usr/sbin/sshd -T 2>/dev/null | grep -qx 'passwordauthentication no' || fail "sshd still allows password logins"
+fi
+if [ "$BOOTMODE" = UEFI ]; then
+	find "$TARGET/boot" -maxdepth 4 -ipath '*/efi/*' -iname '*.efi' >>"$LOG" 2>&1
+	[ -n "$(find "$TARGET/boot" -maxdepth 4 -ipath '*/efi/*' -iname '*.efi' 2>/dev/null)" ] || fail "no EFI bootloader was installed"
+fi
+grep -qx ID=w3bs-os "$TARGET/etc/w3bs-os-release" || fail "/etc/w3bs-os-release is missing"
+[ -L "$TARGET/etc/runlevels/default/caddy" ] || fail "caddy is not enabled"
+[ -z "$SSH" ] || [ -L "$TARGET/etc/runlevels/default/sshd" ] || fail "sshd is not enabled"
+ls "$TARGET"/boot/vmlinuz-* >/dev/null 2>&1 || fail "no kernel in /boot"
+ls "$TARGET"/boot/initramfs-* >/dev/null 2>&1 || fail "no initramfs in /boot"
+if [ -n "$ENCRYPT" ]; then
+	grep -q cryptroot= "$TARGET"/boot/grub/grub.cfg "$TARGET"/boot/extlinux.conf "$TARGET"/etc/update-extlinux.conf "$TARGET"/etc/default/grub 2>/dev/null \
+		|| fail "the bootloader is not configured to unlock the encrypted root"
+	grep -q cryptsetup "$TARGET/etc/mkinitfs/mkinitfs.conf" || fail "the initramfs has no cryptsetup support"
+fi
+cp "$LOG" "$TARGET/var/log/w3bs-os-install.log" 2>/dev/null && chmod 600 "$TARGET/var/log/w3bs-os-install.log"
+sync
+cleanup
+trap - INT TERM
+
+cat <<EOF
+
+  W3BS OS $OS_VERSION is installed on $DISK.
+  Remove the installer media and reboot.$( [ -n "$ENCRYPT" ] && printf '\n  You will be asked for the disk passphrase at boot.')
+  Log in as $USERNAME. Agent access stays OFF until you turn it on from the tray.
+
+EOF
+log "SUCCESS"
+if [ -z "$NO_REBOOT" ] && [ -z "$DEFAULTS" ] && [ -t 0 ]; then
+	printf 'Reboot now? [Y/n] '
+	read -r _r || _r=n
+	case "$_r" in n*|N*) ;; *) reboot ;; esac
+fi
+exit 0
