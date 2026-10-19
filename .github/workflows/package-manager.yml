@@ -38,6 +38,19 @@ jobs:
           cargo run -q --bin w3bs-publish -- init "$RUNNER_TEMP/cat" >/dev/null
           cargo run -q --bin w3bs-publish -- catalog "$RUNNER_TEMP/cat" ../catalog/catalog.json
 
+  # `w3bs os status|update|upgrade` on a real Alpine container: v3.23 -> v3.24 over the network.
+  os-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build w3bs for musl in an Alpine container
+        working-directory: .
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src/package-manager alpine:3.24 sh -c \
+            'apk add --no-cache rust cargo build-base cmake perl pkgconf linux-headers >/dev/null \
+             && cargo build --locked --release --bin w3bs && install -m 0755 target/release/w3bs /src/w3bs-musl'
+      - run: tests/os-upgrade-e2e.sh ../w3bs-musl
+
   # The static musl build (Alpine, postmarketOS) on both architectures, built as the release
   # does, run in alpine:3.24: it reports the musl platform, trusts the official repository over
   # TLS, and the bootstrap installer picks the musl triple there.

@@ -6,6 +6,7 @@ mod auth;
 mod desktop;
 mod distupgrade;
 mod fleet;
+mod os;
 mod handler;
 mod link;
 mod publish;
@@ -45,6 +46,9 @@ Apps:
              w3bs fleet desktop start a headless Kubuntu desktop (Docker) for AI agents, shared there
              w3bs fleet desktop password  ask for a VNC password on its screen page
              w3bs fleet --help        status, agent, leave, rm
+  os         w3bs os status           W3BS OS edition, Alpine branch, pending updates, reboot
+             w3bs os update           apk upgrade + w3bs self update + w3bs update
+             w3bs os upgrade          dist-upgrade to the next Alpine branch (no ISO reinstall)
   ab         w3bs ab ls               your A/B tests on w3bs.org/ab-testing (OpenABTest)
              w3bs ab new <id> --variant a --variant b   then start, show, pause, close
              w3bs ab --help           assign, resume, export, rm
@@ -765,6 +769,43 @@ enum SelfCmd {
     },
 }
 
+#[derive(Subcommand, Clone)]
+enum OsCmd {
+    /// Edition, Alpine release and branch, newest branch, pending updates, reboot needed
+    Status,
+    /// apk update + apk upgrade, then `w3bs self update` and `w3bs update`
+    Update {
+        /// Only the Alpine packages; skip the w3bs CLI and W3BS packages
+        #[arg(long)]
+        os_only: bool,
+        #[command(flatten)]
+        m: Mutate,
+    },
+    /// Dist-upgrade to the next Alpine stable branch over the network (no ISO reinstall)
+    Upgrade {
+        /// Target branch (default: the next stable branch after the current one)
+        #[arg(long, value_name = "vX.Y|edge")]
+        to: Option<String>,
+        /// Allow skipping more than one stable branch
+        #[arg(long)]
+        allow_skip: bool,
+        /// Upgrade past the newest branch W3BS has qualified (w3bs.org/os/channel.json)
+        #[arg(long)]
+        ignore_policy: bool,
+        /// Do not take a btrfs snapshot of / first
+        #[arg(long)]
+        no_snapshot: bool,
+        /// Continue an interrupted upgrade from its journal
+        #[arg(long, conflicts_with_all = ["to", "rollback"])]
+        resume: bool,
+        /// Restore the repositories from before the upgrade (boot the snapshot to restore packages)
+        #[arg(long, conflicts_with_all = ["to", "resume"])]
+        rollback: bool,
+        #[command(flatten)]
+        m: Mutate,
+    },
+}
+
 #[derive(Subcommand)]
 enum Cmd {
     // Packages: the first app.
@@ -881,6 +922,9 @@ enum Cmd {
     /// Sign package releases with your SSH key (W3BS-SIGN-1): register keys, publish releases
     #[command(subcommand)]
     Publish(PublishCmd),
+    /// W3BS OS (Alpine Linux): status, package updates and network dist-upgrades
+    #[command(subcommand)]
+    Os(OsCmd),
 
     // The CLI itself.
     /// Check this machine's W3BS state, trust and environment
@@ -1063,6 +1107,7 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
         Err(Cmd::Fleet(f)) => run_fleet(f).await,
         Err(Cmd::Ab(c)) => run_ab(c).await,
         Err(Cmd::Publish(c)) => run_publish(c).await,
+        Err(Cmd::Os(c)) => run_os(c, out).await,
         Err(Cmd::Open { url, no_terminal }) => run_open(&url, no_terminal, out).await,
         Err(Cmd::Handler(h)) => {
             let (op, r) = match h {
@@ -1096,6 +1141,19 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
         }
         Err(Cmd::External(_)) => unreachable!("external commands exec before the runtime starts"),
         Err(_) => unreachable!("every command is dispatched"),
+    }
+}
+
+async fn run_os(cmd: OsCmd, out: Output) -> (&'static str, w3bs_core::Result<OperationResult>) {
+    let ni = out.non_interactive || out.json;
+    let ui = Tty { out };
+    match cmd {
+        OsCmd::Status => ("os.status", os::status().await),
+        OsCmd::Update { os_only, m } => ("os.update", os::update(&os::UpdateOpts { yes: m.yes, dry_run: m.dry_run, os_only, non_interactive: ni }, &ui)),
+        OsCmd::Upgrade { to, allow_skip, ignore_policy, no_snapshot, resume, rollback, m } => (
+            "os.upgrade",
+            os::upgrade(&os::UpgradeOpts { to, allow_skip, ignore_policy, no_snapshot, resume, rollback, yes: m.yes, dry_run: m.dry_run, non_interactive: ni }, &ui).await,
+        ),
     }
 }
 

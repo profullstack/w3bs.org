@@ -58,6 +58,11 @@ RUN printf 'export PATH="$HOME/.local/bin:$PATH"\n' > /etc/profile.d/w3bs.sh \
     && cat /etc/zsh/zshrc.w3bs >> /etc/zsh/zshrc && rm /etc/zsh/zshrc.w3bs \
     && chmod 0755 /usr/local/bin/w3bs-os-init /usr/share/w3bs-os \
     && chmod 0644 /usr/share/w3bs-os/FINGERPRINT
+# /etc/w3bs-os-release: what `w3bs os status` reports and `w3bs os upgrade` keeps current.
+ARG W3BS_OS_VERSION=0.1.0
+RUN rel=$(cat /etc/alpine-release) \
+    && printf 'ID=w3bs-os\nNAME="W3BS OS"\nVERSION=%s\nEDITION=docker-server\nALPINE=%s\nALPINE_BRANCH=v%s\nHOME_URL=https://w3bs.org/os\n' \
+       "$W3BS_OS_VERSION" "$rel" "$(echo "$rel" | cut -d. -f1,2)" > /etc/w3bs-os-release
 ENV LANG=C.UTF-8 SHELL=/bin/zsh PATH=/home/w3bs/.local/bin:$PATH
 USER w3bs
 WORKDIR /home/w3bs
@@ -73,7 +78,8 @@ RUN apk add --no-cache kwin plasma-desktop plasma-workspace konsole breeze breez
       libkscreen kscreen xdg-desktop-portal xdg-desktop-portal-kde pipewire wireplumber dbus \
       dbus-x11 flatpak mesa-dri-gallium mesa-egl mesa-gbm font-noto font-noto-cjk font-noto-emoji \
       chromium libcap-setcap pixman libjpeg-turbo linux-pam \
-    && (setcap -r /usr/bin/kwin_wayland 2>/dev/null || true)
+    && (setcap -r /usr/bin/kwin_wayland 2>/dev/null || true) \
+    && sed -i 's/^EDITION=.*/EDITION=docker-desktop/' /etc/w3bs-os-release
 COPY --from=w0vncserver /usr/local/bin/w0vncserver /usr/local/bin/vncpasswd /usr/local/bin/
 COPY --from=rust /usr/local/bin/w3bs-desktop /usr/local/bin/w3bs-desktop
 COPY os/docker/session.sh /usr/local/bin/w3bs-os-session
