@@ -74,6 +74,7 @@ const specs = [
 function header(active) {
   return `<a class="skip" href="#main">Skip to content</a><header class="header"><a class="wordmark" href="/mission" aria-label="W3BS home"><img src="/assets/mark.svg" alt="" width="28" height="28">w3bs<span class="wordmark-dot">.</span></a><nav aria-label="Main navigation">${[
     ['/packages', 'Packages'],
+    ['/os', 'OS'],
     ['/specs', 'Standards'],
     ['/browse', 'Browse'],
     ['/prompts', 'Prompts'],
@@ -555,6 +556,7 @@ export async function renderPage({ path, host, query, store, origin }) {
     description =
       'W3BS OS: a lightweight Alpine Linux-based OS for containers, servers, desktops and phones, with KDE, zsh, the full Profullstack suite and an agent-operable desktop. Specification stage; Docker editions come first.';
     content = osPage();
+    active = '/os';
   } else if (path === '/training') {
     title = 'W3BS Training';
     description =
@@ -587,6 +589,13 @@ function osInstall() {
     routes.push(
       `<article><span class="card-index">DOCKER · AVAILABLE</span><h3>Run it in a container.</h3><p>The server image is Alpine with zsh and the <code>w3bs</code> CLI. The desktop image adds KDE Plasma and the Agentic Desktop Layer, with agent access off until you turn it on.</p>${code(`docker run -it --rm ${docker}:server`)}${code(`sudo modprobe vkms   # a virtual display, no GPU needed\ndocker run -d --name w3bs-desktop --restart unless-stopped \\\n  -v /dev/dri:/dev/dri --device-cgroup-rule 'c 226:* rwm' --group-add video \\\n  --shm-size 512m -e W3BS_VNC_PASSWORD=change-me -p 5900:5900 ${docker}:desktop`)}<p class="muted">Then connect a VNC viewer to port 5900. The container finds the vkms card itself, and binding <code>/dev/dri</code> (not one <code>cardN</code>) keeps it starting after a reboot renumbers the cards. <a class="inline-link" href="https://github.com/profullstack/w3bs.org/tree/main/os/docker" rel="noopener">All options</a>.</p></article>`,
     );
+  const vpsSteps =
+    'Upload the ISO in your provider\u2019s panel (on netcup: Media \u203a DVD drive, upload by FTP, pick it under Own DVDs and turn on DVD boot), boot the server from it, open the provider\u2019s web console and run <code>w3bs-os-install</code>. KVM servers with virtio disks, BIOS or UEFI, are what we test on.';
+  routes.push(
+    iso
+      ? `<article><span class="card-index">VPS AND CLOUD SERVERS \u00b7 ISO ${e(iso.version)}</span><h3>Install on a VPS.</h3><p>${vpsSteps}</p><p><a class="button primary" href="${e(iso.url)}">Download the ISO (${e(iso.size)})</a></p>${code(`curl -fLO ${iso.url}\nsha256sum w3bs-os-${iso.version}-x86_64.iso   # ${iso.sha256}`)}</article>`
+      : `<article><span class="card-index">VPS AND CLOUD SERVERS \u00b7 ${docker ? 'DOCKER NOW, ISO COMING' : 'COMING'}</span><h3>Run it on a VPS.</h3><p>${docker ? `Today: on any Linux VPS with Docker, run the server image above, or the desktop image and watch it from <a class="inline-link" href="/fleet">Fleet</a>.` : ''} Once the installer ISO passes its checks, it installs on any VPS that lets you mount your own ISO: ${vpsSteps.charAt(0).toLowerCase()}${vpsSteps.slice(1)}</p>${docker ? code(`docker run -it --rm ${docker}:server`) : ''}</article>`,
+  );
   routes.push(
     iso
       ? `<article><span class="card-index">PCS AND MACS · NETWORK INSTALLER ${e(iso.version)}</span><h3>Install on a PC or Intel Mac.</h3><p>Write the ISO to a USB stick, boot from it with Secure Boot off, and run <code>w3bs-os-install</code>: KDE, zsh, encrypted disk and the desktop layer by default, with one review screen before anything is written. Packages download during the install.</p><p><a class="button primary" href="${e(iso.url)}">Download the ISO (${e(iso.size)})</a></p>${code(`sha256sum w3bs-os-${iso.version}-x86_64.iso   # ${iso.sha256}\nsudo dd if=w3bs-os-${iso.version}-x86_64.iso of=/dev/sdX bs=4M status=progress oflag=sync`)}</article>`
