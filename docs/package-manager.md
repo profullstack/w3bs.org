@@ -63,6 +63,36 @@ The first time you add a repository you are shown its root fingerprint and asked
 
 `w3bs install atlas` only looks in repositories you have added. If two of them offer `atlas`, W3BS stops and asks you to name one. It never guesses.
 
+## Install links (w3bs://)
+
+A package can be installed from a link sent by email, SMS or posted anywhere:
+
+```text
+w3bs://install/<namespace>/<name>              e.g. w3bs://install/pairux.com/pairux
+w3bs://install/<namespace>/<name>?channel=beta
+https://w3bs.org/i/<namespace>/<name>          the same, as a web link
+```
+
+```sh
+w3bs open 'w3bs://install/pairux.com/pairux'   # what the browser runs for you
+w3bs handler install                            # let the browser hand w3bs:// links to `w3bs open`
+w3bs handler status                             # is it registered, and which app is the default
+w3bs handler uninstall
+```
+
+A link never installs anything silently. `w3bs open` runs the ordinary `w3bs install` for the package the link names: it shows the plan, including whether the release is `signed by SHA256:…` (the publisher's W3BS-SIGN-1 key) or `unsigned`, and asks `[y/N]`. There is no `--yes` for links, and `--json`/`--non-interactive` are refused (exit 3). A link carries only the package identity and an optional channel, so a forged or altered link can at most propose a real package from a repository you already trust.
+
+Links are parsed strictly, before anything else happens. Refused (exit 2, `BAD_INSTALL_LINK`): any scheme or host other than lowercase `w3bs://install/` and `https://w3bs.org/i/`, anything but exactly `<namespace>/<name>` (no `..`, `.`, empty or extra segments; one trailing `/` is tolerated), any query other than a single `channel=<name>`, percent-encoding, fragments, whitespace and control characters, and identities the normal identity rules reject. `w3bs://<type>/…` resource URIs are for `w3bs resolve`, and `w3bs://os` is handled by w3bs.org/i/os.
+
+A browser starts the handler without a terminal. When `w3bs open` has no terminal on stdin it opens one and continues there, keeping the window open afterwards ("Press Enter to close"): on Linux the first of `xdg-terminal-exec`, `$TERMINAL`, konsole, gnome-terminal, kgx, xfce4-terminal, alacritty, kitty, foot and xterm that is installed (only in a desktop session, `DISPLAY` or `WAYLAND_DISPLAY`); on macOS Terminal. The new window receives the link rebuilt from the validated identity, passed as an argument, never through shell text. With no terminal to open, or with `--no-terminal`, it refuses with exit 3 and tells you the `w3bs install` command to run instead.
+
+`w3bs handler install` is opt-in (the installer only prints the hint on a desktop):
+
+- **Linux:** writes `~/.local/share/applications/w3bs-url-handler.desktop` (`$XDG_DATA_HOME` is honoured; hidden, `Exec=<absolute path to w3bs> open %u`, `MimeType=x-scheme-handler/w3bs;`), runs `xdg-mime default w3bs-url-handler.desktop x-scheme-handler/w3bs` and `update-desktop-database` when present. `status` reports `xdg-mime query default x-scheme-handler/w3bs`; `uninstall` removes the file and the association from `mimeapps.list`.
+- **macOS:** builds `~/Applications/W3BS URL Handler.app`, a tiny AppleScript applet (macOS hands URLs to apps as Apple Events, not as arguments) that declares the `w3bs` URL scheme and passes the link to `w3bs open`, and registers it with Launch Services (`lsregister -f`).
+
+The handler runs the stable `w3bs` in `~/.local/bin` when it exists, so it keeps working across `w3bs self update`. Every subcommand takes `--json`.
+
 ### About `curl | sh`
 
 The very first script runs as you before W3BS can verify anything, and any checksum inside it arrives from the same server. That is the trust you place in a publisher's website, the same as any curl installer. To look first: `curl -fsSL https://w3bs.org/install.sh -o install.sh && less install.sh && sh install.sh`. In CI, prefer download-then-run so a failed download cannot look like success.

@@ -124,6 +124,10 @@ w3bs_main() {
       say "Until then, run it as:  $bin/w3bs update"
       ;;
   esac
+  # On a desktop, offer (never register silently) the handler for w3bs:// install links.
+  if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] || { [ "$(uname -s)" = Darwin ] && [ -z "${SSH_CONNECTION:-}" ]; }; then
+    say "Open w3bs:// install links from your browser (asks before every install):  w3bs handler install"
+  fi
 }
 
 w3bs_main "$@"
