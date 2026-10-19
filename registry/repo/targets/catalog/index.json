@@ -215,7 +215,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.16.2"
+      "latest_version": "0.16.3"
     },
     {
       "id": "nixamp.com/nixamp",
@@ -1243,7 +1243,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.2.5"
+      "latest_version": "0.2.6"
     },
     {
       "id": "submitfleet.com/submitfleet",
