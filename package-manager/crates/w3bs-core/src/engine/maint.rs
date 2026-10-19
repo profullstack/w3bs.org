@@ -7,6 +7,7 @@ use crate::db;
 use crate::error::{Error, Result};
 use crate::fsutil;
 use crate::layout::Layout;
+use crate::probe;
 use serde_json::json;
 use std::collections::BTreeSet;
 use w3bs_schema::result::{OperationResult, Overall};
@@ -49,9 +50,11 @@ impl Engine {
                 })
             })
             .collect();
-        items.extend(scripted.iter().map(|s| {
+        // A curl tool's version is whatever the tool itself reports; W3BS does not own its files.
+        let versions = probe::installed_versions(&scripted.iter().map(|s| s.commands.clone()).collect::<Vec<_>>(), &self.layout.bin_dir);
+        items.extend(scripted.iter().zip(versions).map(|(s, version)| {
             json!({
-                "id": s.package_id, "kind": "curl", "version": null, "channel": null, "pinned": null,
+                "id": s.package_id, "kind": "curl", "version": version, "channel": null, "pinned": null,
                 "repository": s.repo_alias, "commands": s.commands, "owner": "publisher-installer",
                 "installer": format!("curl -fsSL {} | {}", s.install_url, s.shell), "updated_at": s.updated_at,
             })

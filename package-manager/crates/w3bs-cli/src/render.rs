@@ -364,7 +364,11 @@ pub fn human(r: &OperationResult) {
                 &["PACKAGE", "VERSION", "CHANNEL", "PINNED", "SOURCE", "COMMANDS"],
                 pkgs.iter()
                     .map(|p| {
-                        let ver = if p["kind"] == "curl" { "(curl)".into() } else { s(&p["version"]) };
+                        let ver = match (p["kind"].as_str(), p["version"].as_str()) {
+                            (Some("curl"), Some(v)) => format!("{v} (curl)"),
+                            (Some("curl"), None) => "(curl)".into(),
+                            _ => s(&p["version"]),
+                        };
                         let cmds = p["commands"].as_array().map(|a| a.iter().map(s).collect::<Vec<_>>().join(",")).unwrap_or_default();
                         vec![s(&p["id"]), ver, s(&p["channel"]), s(&p["pinned"]), s(&p["repository"]), cmds]
                     })

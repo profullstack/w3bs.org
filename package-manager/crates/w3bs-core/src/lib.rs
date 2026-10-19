@@ -10,6 +10,7 @@ pub mod error;
 pub mod fsutil;
 pub mod layout;
 pub mod lock;
+pub mod probe;
 pub mod repo;
 pub mod resources;
 pub mod transport;
