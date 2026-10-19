@@ -3015,5 +3015,48 @@
   "install": "curl -fsSL https://typeheard.com/install.sh | sh",
   "evidence": "npm view @profullstack/typeheard version = 0.1.0; typeheard.com/install.sh 200 (installs @profullstack/typeheard with bun or npm); examples: @profullstack/typeheard README and src/cli.js usage",
   "publisher": "profullstack"
+ },
+ {
+  "id": "built.indie.pit.world/builtindie",
+  "name": "builtindie",
+  "commands": [
+   "builtindie"
+  ],
+  "examples": [
+   {
+    "run": "builtindie launch yourproduct.com",
+    "does": "Launch a product: logo, screenshots, video and socials read from its homepage"
+   },
+   {
+    "run": "builtindie top week",
+    "does": "This week's top launches"
+   },
+   {
+    "run": "builtindie vote linear",
+    "does": "Upvote a launch"
+   },
+   {
+    "run": "builtindie claim yourproduct",
+    "does": "Print the DNS TXT record that proves it is yours, then check it"
+   },
+   {
+    "run": "builtindie",
+    "does": "Today's board in a TUI"
+   },
+   {
+    "run": "builtindie mcp",
+    "does": "MCP server: launch, search and upvote from an agent"
+   }
+  ],
+  "description": "built.indie from the terminal: launch your indie product with one URL, browse and upvote the daily board, claim and edit your listing. Also a TUI and an MCP server.",
+  "homepage": "https://built.indie.pit.world",
+  "repository": "https://github.com/moshcoder/built.indie",
+  "license": "MIT",
+  "agentic": true,
+  "latest_version": "0.1.2",
+  "vendor": "Profullstack",
+  "install": "curl -fsSL https://built.indie.pit.world/install.sh | sh",
+  "evidence": "npm view @profullstack/builtindie version = 0.1.2; built.indie.pit.world/install.sh 200 text/x-sh (installs @profullstack/builtindie with bun or npm), verified by a clean-HOME install running builtindie top; examples: README and src/cli.ts HELP",
+  "publisher": "profullstack"
  }
 ]
