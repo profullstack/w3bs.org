@@ -6,6 +6,7 @@ import { W3bsError } from './core.mjs';
 import { FLEET_LIMITS } from './fleet.mjs';
 import { TTL } from './accounts.mjs';
 import { buildSuite } from './os-suite.mjs';
+import { latestOsIso } from './os-releases.mjs';
 
 const e = (value) =>
   String(value ?? '').replace(
@@ -555,7 +556,7 @@ export async function renderPage({ path, host, query, store, origin }) {
     title = 'W3BS OS';
     description =
       'W3BS OS: a lightweight Alpine Linux-based OS for containers, servers, desktops and phones, with KDE, zsh, the full Profullstack suite and an agent-operable desktop. Specification stage; Docker editions come first.';
-    content = osPage();
+    content = await osPage();
     active = '/os';
   } else if (path === '/training') {
     title = 'W3BS Training';
@@ -578,11 +579,11 @@ export async function renderPage({ path, host, query, store, origin }) {
 // has passed its checks; until then the page says it is coming instead of offering a link.
 export const OS_RELEASES = {
   docker: 'w3bs.org/os', // server + desktop images (built and cosign-signed in CI, served by w3bs.org/v2)
-  iso: null, // { version, url, sha256, size } for the x86-64 installer ISO
+  // iso: read live from the newest os-v* GitHub release (src/os-releases.mjs)
   musl: false, // `curl -fsSL https://w3bs.org/install.sh | sh` works on Alpine and Nura
 };
-function osInstall() {
-  const { docker, iso, musl } = OS_RELEASES;
+function osInstall(iso) {
+  const { docker, musl } = OS_RELEASES;
   const code = (text) => `<pre class="instructions">${e(text)}</pre>`;
   const routes = [];
   if (docker)
@@ -593,12 +594,12 @@ function osInstall() {
     'Upload the ISO in your provider\u2019s panel (on netcup: Media \u203a DVD drive, upload by FTP, pick it under Own DVDs and turn on DVD boot), boot the server from it, open the provider\u2019s web console and run <code>w3bs-os-install</code>. KVM servers with virtio disks, BIOS or UEFI, are what we test on.';
   routes.push(
     iso
-      ? `<article><span class="card-index">VPS AND CLOUD SERVERS \u00b7 ISO ${e(iso.version)}</span><h3>Install on a VPS.</h3><p>${vpsSteps}</p><p><a class="button primary" href="${e(iso.url)}">Download the ISO (${e(iso.size)})</a></p>${code(`curl -fLO ${iso.url}\nsha256sum w3bs-os-${iso.version}-x86_64.iso   # ${iso.sha256}`)}</article>`
+      ? `<article><span class="card-index">VPS AND CLOUD SERVERS \u00b7 ISO ${e(iso.version)}${iso.preview ? ' \u00b7 PREVIEW' : ''}</span><h3>Install on a VPS.</h3><p>${vpsSteps}</p><p><a class="button primary" href="${e(iso.url)}">Download the ISO (${e(iso.size)})</a></p>${code(`curl -fLO ${iso.url}\ncurl -fLO ${iso.sumsUrl} && sha256sum -c SHA256SUMS`)}${iso.preview ? '<p class="muted">Preview build: its automated install test is still running. Use it on a server you can wipe.</p>' : ''}</article>`
       : `<article><span class="card-index">VPS AND CLOUD SERVERS \u00b7 ${docker ? 'DOCKER NOW, ISO COMING' : 'COMING'}</span><h3>Run it on a VPS.</h3><p>${docker ? `Today: on any Linux VPS with Docker, run the server image above, or the desktop image and watch it from <a class="inline-link" href="/fleet">Fleet</a>.` : ''} Once the installer ISO passes its checks, it installs on any VPS that lets you mount your own ISO: ${vpsSteps.charAt(0).toLowerCase()}${vpsSteps.slice(1)}</p>${docker ? code(`docker run -it --rm ${docker}:server`) : ''}</article>`,
   );
   routes.push(
     iso
-      ? `<article><span class="card-index">PCS AND MACS · NETWORK INSTALLER ${e(iso.version)}</span><h3>Install on a PC or Intel Mac.</h3><p>Write the ISO to a USB stick, boot from it with Secure Boot off, and run <code>w3bs-os-install</code>: KDE, zsh, encrypted disk and the desktop layer by default, with one review screen before anything is written. Packages download during the install.</p><p><a class="button primary" href="${e(iso.url)}">Download the ISO (${e(iso.size)})</a></p>${code(`sha256sum w3bs-os-${iso.version}-x86_64.iso   # ${iso.sha256}\nsudo dd if=w3bs-os-${iso.version}-x86_64.iso of=/dev/sdX bs=4M status=progress oflag=sync`)}</article>`
+      ? `<article><span class="card-index">PCS AND MACS · NETWORK INSTALLER ${e(iso.version)}${iso.preview ? ' · PREVIEW' : ''}</span><h3>Install on a PC or Intel Mac.</h3><p>Write the ISO to a USB stick, boot from it with Secure Boot off, and run <code>w3bs-os-install</code>: KDE, zsh, encrypted disk and the desktop layer by default, with one review screen before anything is written. Packages download during the install.</p><p><a class="button primary" href="${e(iso.url)}">Download the ISO (${e(iso.size)})</a></p>${code(`sha256sum ${iso.name}   # ${iso.sha256}\nsudo dd if=${iso.name} of=/dev/sdX bs=4M status=progress oflag=sync`)}</article>`
       : `<article><span class="card-index">PCS AND MACS · COMING</span><h3>A bootable installer ISO.</h3><p>The x86-64 installer ISO is being built and tested. It appears here with its checksum once it boots and installs in our checks. Secure Boot will need to be off at first: Alpine ships no Microsoft-signed boot shim.</p></article>`,
   );
   routes.push(
@@ -619,7 +620,8 @@ function osSuiteSummary() {
     return null;
   }
 }
-function osPage() {
+async function osPage() {
+  const iso = await latestOsIso();
   const suite = osSuiteSummary();
   const rows = (list) => list.map(([a, b]) => `<tr><th scope="row">${a}</th><td>${b}</td></tr>`).join('');
   const defaults = [
@@ -650,7 +652,7 @@ function osPage() {
   const suiteLine = suite
     ? `The draft suite manifest resolves <strong>${suite.entries}</strong> Profullstack packages from the <a class="inline-link" href="/packages">catalog</a>, including all ${suite.named} named inclusions (MoshCode, PairUX, DiskPush, the Agentic Desktop Layer, Training and more). <strong>${suite.blocking_tasks}</strong> packaging tasks block M0: ${suite.publisher_scripts} packages install only through publisher scripts and need signed artifacts, ${suite.unpinned} has no pinned release, and ${suite.command_collisions.length} command names have two claimants.`
     : 'The draft suite manifest is generated from the package catalog.';
-  return `<section class="page-head"><div class="eyebrow">W3BS OS · SPECIFICATION</div><h1>An OS people<br><em>and agents can run.</em></h1><p>A lightweight Alpine Linux-based operating system with KDE Plasma, zsh, a full setup wizard and every Profullstack app installed, plus a desktop agents can operate under your control. ${OS_RELEASES.docker ? 'Docker images are the first release; the hardware installer and phone builds follow.' : 'There are no images to download yet: this page tracks the specification and its progress.'}</p><div class="actions"><a class="button primary" href="/docs/os-prd.md">Read the specification <span aria-hidden="true">→</span></a><a class="text-link" href="https://github.com/profullstack/w3bs.org/blob/main/os/suite-manifest.json" rel="noopener">Suite manifest ↗</a></div></section>${osInstall()}${osStudio()}<section class="section"><div class="section-heading"><div><div class="eyebrow">DEFAULTS</div><h2>What you get.</h2></div></div><div class="table-wrap"><table class="platform-table"><tbody>${rows(defaults)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">INCLUDED SOFTWARE</div><h2>The whole suite, offline.</h2></div></div><p>${suiteLine}</p></section><section class="section"><div class="section-heading"><div><div class="eyebrow">APPS FROM OTHER PLATFORMS</div><h2>One launcher, honest labels.</h2></div></div><p><code>w3bs run</code> picks the best route for each app and labels its window, so a remote or guest app is never passed off as local.</p><div class="table-wrap"><table class="platform-table"><tbody>${rows(runtimes)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">HARDWARE</div><h2>Certified, preview, research, unsupported.</h2></div></div><p>Only certified devices get an install button. A device with no supported image is offered the companion app instead.</p><div class="table-wrap"><table class="platform-table"><tbody>${rows(hardware)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">ALSO IN THE SPEC</div><h2>For publishers and developers.</h2></div></div><p><strong>W3BS Publish:</strong> ship one signed release and reach users on every OS, with deb, Flatpak, Homebrew, winget, MSIX, dmg and APK built from it. <strong>Providers:</strong> <code>w3bs install</code> drives apt, dnf, pacman, Homebrew, winget, Flatpak, Nix and the app stores, and records what it installed. <strong>W3BS Fleet:</strong> one desktop app and cloud app for every server, desktop, laptop and phone you own (<a class="inline-link" href="/docs/fleet-prd.md">spec</a>).</p></section><div class="draft-note"><strong>Status: specification.</strong> Docker editions are out; the installer ISO and phone builds are in testing. Links and supported-hardware results appear here only once those artifacts and checks exist.</div>`;
+  return `<section class="page-head"><div class="eyebrow">W3BS OS · SPECIFICATION</div><h1>An OS people<br><em>and agents can run.</em></h1><p>A lightweight Alpine Linux-based operating system with KDE Plasma, zsh, a full setup wizard and every Profullstack app installed, plus a desktop agents can operate under your control. ${OS_RELEASES.docker ? 'Docker images are the first release; the hardware installer and phone builds follow.' : 'There are no images to download yet: this page tracks the specification and its progress.'}</p><div class="actions"><a class="button primary" href="/docs/os-prd.md">Read the specification <span aria-hidden="true">→</span></a><a class="text-link" href="https://github.com/profullstack/w3bs.org/blob/main/os/suite-manifest.json" rel="noopener">Suite manifest ↗</a></div></section>${osInstall(iso)}${osStudio()}<section class="section"><div class="section-heading"><div><div class="eyebrow">DEFAULTS</div><h2>What you get.</h2></div></div><div class="table-wrap"><table class="platform-table"><tbody>${rows(defaults)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">INCLUDED SOFTWARE</div><h2>The whole suite, offline.</h2></div></div><p>${suiteLine}</p></section><section class="section"><div class="section-heading"><div><div class="eyebrow">APPS FROM OTHER PLATFORMS</div><h2>One launcher, honest labels.</h2></div></div><p><code>w3bs run</code> picks the best route for each app and labels its window, so a remote or guest app is never passed off as local.</p><div class="table-wrap"><table class="platform-table"><tbody>${rows(runtimes)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">HARDWARE</div><h2>Certified, preview, research, unsupported.</h2></div></div><p>Only certified devices get an install button. A device with no supported image is offered the companion app instead.</p><div class="table-wrap"><table class="platform-table"><tbody>${rows(hardware)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">ALSO IN THE SPEC</div><h2>For publishers and developers.</h2></div></div><p><strong>W3BS Publish:</strong> ship one signed release and reach users on every OS, with deb, Flatpak, Homebrew, winget, MSIX, dmg and APK built from it. <strong>Providers:</strong> <code>w3bs install</code> drives apt, dnf, pacman, Homebrew, winget, Flatpak, Nix and the app stores, and records what it installed. <strong>W3BS Fleet:</strong> one desktop app and cloud app for every server, desktop, laptop and phone you own (<a class="inline-link" href="/docs/fleet-prd.md">spec</a>).</p></section><div class="draft-note"><strong>Status: specification.</strong> Docker editions are out; the installer ISO and phone builds are in testing. Links and supported-hardware results appear here only once those artifacts and checks exist.</div>`;
 }
 const TRAINING_INSTALL = 'curl -fsSL https://w3bs.org/training/install.sh | sh';
 const TRAINING_INSTALL_WIN = 'irm https://w3bs.org/training/install.ps1 | iex';
