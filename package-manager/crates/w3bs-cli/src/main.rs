@@ -989,10 +989,21 @@ fn external(args: &[OsString], out: &Output) -> ! {
     };
     if err.kind() == std::io::ErrorKind::NotFound {
         eprintln!("w3bs: unknown command `{name}` (no `{bin}` on PATH); install it with `w3bs install` or see `w3bs --help`");
+        // It may be a built-in of a newer w3bs (dist-upgrade arrived in 0.1.14).
+        if let Some((latest, how)) = newer_manager(out) {
+            eprintln!("w3bs: your w3bs ({}) is older than the published {latest}, which may have `{name}`: {how}", w3bs_core::engine::MANAGER_VERSION);
+        }
     } else {
         eprintln!("w3bs: could not run {bin}: {err}");
     }
     std::process::exit(exit::USAGE);
+}
+
+/// Best-effort, 5 s at most: a newer published w3bs and how to get it.
+fn newer_manager(out: &Output) -> Option<(semver::Version, String)> {
+    let (_, mk) = engine_factory(out).ok()?;
+    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().ok()?;
+    rt.block_on(async { tokio::time::timeout(std::time::Duration::from_secs(5), mk(&Mutate::default()).newer_manager()).await.ok().flatten() })
 }
 
 /// After updating the CLI itself, continue the same command with the new binary, once.

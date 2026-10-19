@@ -254,6 +254,23 @@ impl Engine {
         Ok(Ok(m))
     }
 
+    /// The newest release of `id` on `channel` of repository `alias` above `current` (majors
+    /// included), read from the signed channel index only. None when current or unreachable.
+    pub(crate) async fn published_version(&mut self, id: &str, alias: &str, channel: &str, current: &Version) -> Option<Version> {
+        let id: PackageId = id.parse().ok()?;
+        let repo = self.repo(alias).await.ok()?;
+        let index = repo.package_index_or_empty().await.ok()?;
+        let path = index.packages.iter().find(|e| e.id == id)?.channels.get(channel)?.clone();
+        let ch: ChannelIndex = repo.channel(&path).await.ok()?;
+        if ch.package_id != id {
+            return None;
+        }
+        match select_upgrade(current, ch.releases.iter().map(|r| &r.version), true, channel != "stable") {
+            Selection::Upgrade(v) | Selection::HeldMajor(v) => Some(v.clone()),
+            Selection::Current => None,
+        }
+    }
+
     /// Platform, artifact binding, revocation, immutability and command-collision checks.
     fn check_artifact(&mut self, repo: &LoadedRepo, m: &Manifest, current: Option<&PackageRow>) -> Result<Artifact> {
         let platform = host_platform();
@@ -1080,6 +1097,9 @@ impl Engine {
         if manager_first && res.packages.iter().any(|p| p.status == Status::Failed) {
             res.data = serde_json::Value::Null;
         }
+        if req.packages.is_empty() {
+            self.note_external_manager(&mut res).await;
+        }
         res.settle();
         Ok(res)
     }
@@ -1109,8 +1129,20 @@ impl Engine {
                 },
             }
         }
+        self.note_external_manager(&mut res).await;
         res.settle();
         Ok(res)
+    }
+
+    /// `data.manager_update`: a w3bs this run could not update because it is not the managed
+    /// one, so "Everything is up to date" is never said over an old w3bs.
+    async fn note_external_manager(&mut self, res: &mut OperationResult) {
+        if let Some(n) = self.external_manager_notice().await {
+            if !res.data.is_object() {
+                res.data = serde_json::json!({});
+            }
+            res.data["manager_update"] = n.into();
+        }
     }
 
     // ---------------------------------------------------------------- pin / unpin / rollback

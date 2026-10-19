@@ -537,7 +537,10 @@ pub fn human(r: &OperationResult) {
                 })
                 .collect(),
         );
-    } else if matches!(r.operation.as_str(), "update" | "outdated" | "dist-upgrade") {
+    } else if matches!(r.operation.as_str(), "update" | "outdated" | "dist-upgrade") && r.data.get("manager_update").is_none() {
         println!("Everything is up to date.");
+    }
+    if let Some(n) = r.data.get("manager_update").and_then(|v| v.as_str()) {
+        println!("{n}");
     }
 }
