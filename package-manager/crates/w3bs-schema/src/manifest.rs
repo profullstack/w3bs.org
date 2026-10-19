@@ -321,6 +321,11 @@ pub struct CatalogEntry {
     pub license: Option<String>,
     #[serde(default)]
     pub agentic: bool,
+    /// Newest release the publisher's installer delivers. With it, `install` and `update`
+    /// compare the version the command reports (`<command> --version`) and skip a re-run
+    /// when it is already current. Without it, W3BS cannot tell and re-runs the installer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

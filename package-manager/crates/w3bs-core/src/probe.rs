@@ -52,6 +52,13 @@ pub fn installed_versions(all: &[Vec<String>], bin_dir: &Path) -> Vec<Option<Str
     })
 }
 
+/// True only when both versions are known and the installed one is not older than the
+/// catalog's `latest_version`; then the publisher's installer has nothing to do.
+pub fn is_current(installed: Option<&str>, latest: Option<&str>) -> bool {
+    let v = |s: &str| semver::Version::parse(s.trim().trim_start_matches(['v', 'V'])).ok();
+    matches!((installed.and_then(v), latest.and_then(v)), (Some(i), Some(l)) if i >= l)
+}
+
 /// W3BS's own bin dir first (where installers usually put shims), then PATH.
 fn find(cmd: &str, bin_dir: &Path) -> Option<PathBuf> {
     let own = bin_dir.join(cmd);
@@ -131,5 +138,16 @@ mod tests {
         assert_eq!(parse_version("listening on 10.0.0.1, version 3.4.5").as_deref(), Some("3.4.5"));
         assert_eq!(parse_version("sha abc1.2.3"), None);
         assert_eq!(parse_version(""), None);
+    }
+
+    #[test]
+    fn current_needs_both_versions() {
+        use super::is_current;
+        assert!(is_current(Some("0.16.2"), Some("0.12.5")));
+        assert!(is_current(Some("1.0.0"), Some("v1.0.0")));
+        assert!(!is_current(Some("1.0.0"), Some("1.0.1")));
+        assert!(!is_current(Some("1.0.0-rc.1"), Some("1.0.0")));
+        assert!(!is_current(None, Some("1.0.0")));
+        assert!(!is_current(Some("1.0.0"), None));
     }
 }
