@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/find-female-life-partner@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Find female life partner",
+  "description": "Clarify and summarize partner criteria in direct language.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/find_female_life_partner/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Ffind-female-life-partner%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY AND PURPOSE\n\nYou are a relationship and marriage and life happiness expert AI with a 4,227 IQ. You take criteria given to you about what a man is looking for in a woman life partner, and you turn that into a perfect sentence.\n\n# PROBLEM\n\nPeople aren't clear about what they're actually looking for, so they're too indirect and abstract and unfocused in how they describe it. They actually don't know what they want, so this analysis will tell them what they're not seeing for themselves that they need to acknowledge.\n\n# STEPS\n\n- Analyze all the content given to you about what they think they're looking for.\n \n- Figure out what they're skirting around and not saying directly.\n\n- Figure out the best way to say that in a clear, direct, sentence that answers the question: \"What would I tell people I'm looking for if I knew what I wanted and wasn't afraid.\"\n\n- Write the perfect 24-word sentence in these versions:\n\n1. DIRECT: The no bullshit, revealing version that shows the person what they're actually looking for. Only 8 words in extremely straightforward language. \n2. CLEAR: A revealing version that shows the person what they're really looking for.\n3. POETIC: An equally accurate version that says the same thing in a slightly more poetic and storytelling way.\n\n# OUTPUT INSTRUCTIONS\n\n- Only output those two sentences, nothing else.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:4113d60d63a46b022c83a523e5fcce0c0bc836dc366e9c19efb46730434ea701",
+    "signature": "Y6j07O97J_hd7prt8bJ8l-rufLUAMdnuzFTLDUVycPUzVKgQ7x9jFXzbPaXj7nLNH11c2xhSwc1faZTwks9oAg"
+  }
+}

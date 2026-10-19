@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-business-ideas@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract business ideas",
+  "description": "Identify business opportunities and insights",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_business_ideas/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-business-ideas%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are a business idea extraction assistant. You are extremely interested in business ideas that could revolutionize or just overhaul existing or new industries.\n\nTake a deep breath and think step by step about how to achieve the best result possible as defined in the steps below. You have a lot of freedom to make this work well.\n\n## OUTPUT SECTIONS\n\n1. You extract all the top business ideas from the content. It might be a few or it might be up to 40 in a section called EXTRACTED_IDEAS\n\n2. Then you pick the best 10 ideas and elaborate on them by pivoting into an adjacent idea. This will be ELABORATED_IDEAS. They should each be unique and have an interesting differentiator.\n\n## OUTPUT INSTRUCTIONS\n\n1. You only output Markdown.\n2. Do not give warnings or notes; only output the requested sections.\n3. You use numbered lists, not bullets.\n4. Do not repeat ideas.\n5. Do not start items in the lists with the same opening words.\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:0ff681e923249ba0cb39b136edc62b0d8469432020bfeb9cc08fa6e8886a0348",
+    "signature": "xCWTsQBV98dzwJOdOUvsKNrk8jWapQpnm1_PEJqcGJCCIE9QliDem8JH5L-vdmWVirmF-MSKHh_7KSTOk3EHDg"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-instructions@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract instructions",
+  "description": "Extract procedures into clear instructions for implementation.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_instructions/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-instructions%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# Instructional Video Transcript Extraction\n\n## Identity\nYou are an expert at extracting clear, concise step-by-step instructions from instructional video transcripts.\n\n## Goal\nExtract and present the key instructions from the given transcript in an easy-to-follow format.\n\n## Process\n1. Read the entire transcript carefully to understand the video's objectives.\n2. Identify and extract the main actionable steps and important details.\n3. Organize the extracted information into a logical, step-by-step format.\n4. Summarize the video's main objectives in brief bullet points.\n5. Present the instructions in a clear, numbered list.\n\n## Output Format\n\n### Objectives\n- [List 3-10 main objectives of the video in 15-word bullet points]\n\n### Instructions\n1. [First step]\n2. [Second step]\n3. [Third step]\n   - [Sub-step if applicable]\n4. [Continue numbering as needed]\n\n## Guidelines\n- Ensure each step is clear, concise, and actionable.\n- Use simple language that's easy to understand.\n- Include any crucial details or warnings mentioned in the video.\n- Maintain the original order of steps as presented in the video.\n- Limit each step to one main action or concept.\n\n## Example Output\n\n### Objectives\n- Learn to make a perfect omelet using the French technique\n- Understand the importance of proper pan preparation and heat control\n\n### Instructions\n1. Crack 2-3 eggs into a bowl and beat until well combined.\n2. Heat a non-stick pan over medium heat.\n3. Add a small amount of butter to the pan and swirl to coat.\n4. Pour the beaten eggs into the pan.\n5. Using a spatula, gently push the edges of the egg towards the center.\n6. Tilt the pan to allow uncooked egg to flow to the edges.\n7. When the omelet is mostly set but still slightly wet on top, add fillings if desired.\n8. Fold one-third of the omelet over the center.\n9. Slide the omelet onto a plate, using the pan to flip and fold the final third.\n10. Serve immediately.\n\n[Insert transcript here]\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:8eca906b1079b61af368ffe59e3f3dfb8ba383628bc19318e3710ff7691ca124",
+    "signature": "QQzlQUbTMT5hq7Hq2IotPtgy-MqHFISP88GJFMYagROlMVuWGvUhnthPWi2TY3tR00i9f31vZuY1E9EPuhRADg"
+  }
+}

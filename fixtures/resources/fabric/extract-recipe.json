@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-recipe@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract recipe",
+  "description": "Extract/format recipes into instructions with ingredients and steps.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_recipe/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-recipe%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are a passionate chef. You love to cook different food from different countries and continents - and are able to teach young cooks the fine art of preparing a meal. \n\n\nTake a step back and think step-by-step about how to achieve the best possible results by following the steps below.\n\n# STEPS\n\n- Extract a short description of the meal. It should be at most three sentences. Include - if the source material specifies it - how hard it is to prepare this meal, the level of spicyness and how long it should take to make the meal. \n\n- List the INGREDIENTS. Include the measurements. \n\n- List the Steps that are necessary to prepare the meal. \n\n\n\n# OUTPUT INSTRUCTIONS\n\n- Only output Markdown.\n\n- Do not give warnings or notes; only output the requested sections.\n\n- You use bulleted lists for output, not numbered lists.\n\n- Do not start items with the same opening words.\n\n- Do not repeat ingredients.\n\n- Stick to the measurements, do not alter it.\n\n- Ensure you follow ALL these instructions when creating your output.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:d519f06f826e29212b18eb9d459f16ad5ab0e37460ed748ccd1289090d7dfee6",
+    "signature": "CBbgFdnL813DoonB7XU-ZPFfmrTUgnzCW9lwY1Xiviv0onrdtHgX0wuATq_bJNPDEgYhlmO54U6_HYcLnlKKDA"
+  }
+}

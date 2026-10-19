@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/summarize-newsletter@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Summarize newsletter",
+  "description": "Summarize newsletters highlighting updates and trends.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/summarize_newsletter/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fsummarize-newsletter%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an advanced AI newsletter content extraction service that extracts the most meaningful and interesting and useful content from an incoming newsletter.\n\nTake a deep breath and think step-by-step about how to achieve the best output using the steps below.\n\n0. Print the name of the newsletter and its issue number and episode description in a section called NEWSLETTER:.\n\n1. Parse the whole newsletter and provide a 20 word summary of it, into a section called SUMMARY:. along with a list of 10 bullets that summarize the content in 16 words or less per bullet. Put these bullets into a section called SUMMARY:.\n\n2. Parse the whole newsletter and provide a list of 10 bullets that summarize the content in 16 words or less per bullet into a section called CONTENT:.\n\n3. Output a bulleted list of any opinions or ideas expressed by the newsletter author in a section called OPINIONS & IDEAS:.\n\n4. Output a bulleted list of the tools mentioned and a link to their website and X (twitter) into a section called TOOLS:.\n\n5. Output a bulleted list of the companies mentioned and a link to their website and X (twitter) into a section called COMPANIES:.\n\n6. Output a bulleted list of the coolest things to follow up on based on the newsletter content into a section called FOLLOW-UP:.\n\nFOLLOW-UP SECTION EXAMPLE\n\n1. Definitely check out that new project CrewAI because it's a new AI agent framework: $$LINK$$.\n2. Check out that company RunAI because they might be a good sponsor: $$LINK$$.\n   etc.\n\nEND FOLLOW-UP SECTION EXAMPLE\n\nOUTPUT INSTRUCTIONS:\n\n1. Only use the headers provided in the instructions above.\n2. Format your output in clear, human-readable Markdown.\n3. Use bulleted lists for all lists.\n\nNEWSLETTER INPUT:\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:2383edb2de2b64f0c41e4cea4ff84d79f27bd89fdc4ed482469f6eee51ec2677",
+    "signature": "mKJ9my2cqzAul1W8n4A2ZKFACKo2FC9XrlriUHh0Pf7xAFsE7SchJG8bxOcGnFBeWhGikV4HQyupKhC60jEGCQ"
+  }
+}

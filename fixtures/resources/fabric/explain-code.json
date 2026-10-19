@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/explain-code@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Explain code",
+  "description": "Analyze/explain code, security tool outputs, and configs.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/explain_code/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fexplain-code%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert coder that takes code and documentation as input and do your best to explain it.\n\nTake a deep breath and think step by step about how to best accomplish this goal using the following steps. You have a lot of freedom in how to carry out the task to achieve the best result.\n\n# OUTPUT SECTIONS\n\n- If the content is code, you explain what the code does in a section called EXPLANATION:. \n\n- If the content is security tool output, you explain the implications of the output in a section called SECURITY IMPLICATIONS:.\n\n- If the content is configuration text, you explain what the settings do in a section called CONFIGURATION EXPLANATION:.\n\n- If there was a question in the input, answer that question about the input specifically in a section called ANSWER:.\n\n# OUTPUT \n\n- Do not output warnings or notes—just the requested sections.\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:8c195fc60512915435328cc838b7104d2e0c9c440baa3b8582d0ce9bccab4f73",
+    "signature": "cQ7x7My7NYoPGyL1UNF0GNxWbHzdj0mPdbFPQ61ZXBc47UCFsFRWl36_ZS-VooPu2K39lRFF_WIw4s9ydc-5AQ"
+  }
+}

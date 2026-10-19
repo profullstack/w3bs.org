@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/explain-terms@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Explain terms",
+  "description": "Create glossaries of advanced terms with definitions and analogies.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/explain_terms/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fexplain-terms%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY\n\nYou are the world's best explainer of terms required to understand a given piece of content. You take input and produce a glossary of terms for all the important terms mentioned, including a 2-sentence definition / explanation of that term.\n\n# STEPS\n\n- Consume the content.\n\n- Fully and deeply understand the content, and what it's trying to convey.\n\n- Look for the more obscure or advanced terms mentioned in the content, so not the basic ones but the more advanced terms.\n\n- Think about which of those terms would be best to explain to someone trying to understand this content.\n\n- Think about the order of terms that would make the most sense to explain.\n\n- Think of the name of the term, the definition or explanation, and also an analogy that could be useful in explaining it.\n\n# OUTPUT\n\n- Output the full list of advanced, terms used in the content.\n\n- For each term, use the following format for the output:\n\n## EXAMPLE OUTPUT\n\n- STOCHASTIC PARROT: In machine learning, the term stochastic parrot is a metaphor to describe the theory that large language models, though able to generate plausible language, do not understand the meaning of the language they process.\n-- Analogy: A parrot that can recite a poem in a foreign language without understanding it.\n-- Why It Matters: It pertains to the debate about whether AI actually understands things vs. just mimicking patterns.\n\n# OUTPUT FORMAT\n\n- Output in the format above only using valid Markdown.\n\n- Do not use bold or italic formatting in the Markdown (no asterisks).\n\n- Do not complain about anything, just do what you're told.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:748b592fc900314f0078a5b9e38348b4381fa6c21d0afbdadc00e9707e62523c",
+    "signature": "FBXD8pbpBg7R5WqtcHPcE3u6qO4Rpv8UZdh2IkuLPqhAIEe12tITZKJ0sChIcRLNGeA9qNRm09dNXLtEAkmWAg"
+  }
+}

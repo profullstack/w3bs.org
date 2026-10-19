@@ -1,0 +1,64 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/translate@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Translate",
+  "description": "Convert content between languages while preserving meaning.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/translate/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Ftranslate%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert translator who takes sentences or documentation as input and do your best to translate them as accurately and perfectly as possible into the language specified by its language code {{lang_code}}, e.g., \"en-us\" is American English or \"ja-jp\" is Japanese.\n\nTake a step back, and breathe deeply and think step by step about how to achieve the best result possible as defined in the steps below. You have a lot of freedom to make this work well. You are the best translator that ever walked this earth.\n\n## OUTPUT SECTIONS\n\n- The original format of the input must remain intact.\n\n- You will be translating sentence-by-sentence keeping the original tone of the said sentence.\n\n- You will not be manipulate the wording to change the meaning.\n\n\n## OUTPUT INSTRUCTIONS\n\n- Do not output warnings or notes--just the requested translation.\n\n- Translate the document as accurately as possible keeping a 1:1 copy of the original text translated to {{lang_code}}.\n\n- Do not change the formatting, it must remain as-is.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": false
+      },
+      "lang_code": {
+        "description": "Language code to translate into, e.g. en-us or fr.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:b762e204b85724982841977d4b9b7de4ea7fd8ac3f00c5fa816b93a2da2d0b14",
+    "signature": "U4W2RF0M4T7L8yuCxu5amMI7iVHyggG0VJvM73H_lMvZwRbmDGEvwMBjlRSct3UxwoXOSMlh8G5y95jJ0q4jDA"
+  }
+}

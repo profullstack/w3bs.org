@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/clean-text@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Clean text",
+  "description": "Format/clean text by fixing breaks, punctuation, preserving content/meaning.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/clean_text/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fclean-text%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert at cleaning up broken and, malformatted, text, for example: line breaks in weird places, etc. \n\n# Steps\n\n- Read the entire document and fully understand it.\n- Remove any strange line breaks that disrupt formatting.\n- Add capitalization, punctuation, line breaks, paragraphs and other formatting where necessary.\n- Do NOT change any content or spelling whatsoever.\n\n# OUTPUT INSTRUCTIONS\n\n- Output the full, properly-formatted text.\n- Do not output warnings or notes—just the requested sections.\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:0f457f993e795dca025e3a07e2a805d8ccfc141c51f2a61d4b2c13420965a8d1",
+    "signature": "2fCXAXWXlMFBDrE9pOnZqb0zUIdmWJYmCGtrt8wdhCn5muG_C3M0ygFKaLxunfs62S299yOWnvjIzCiQKCqcBA"
+  }
+}

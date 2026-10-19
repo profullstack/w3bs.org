@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/analyze-candidates@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Analyze candidates",
+  "description": "Compare candidate positions, policy differences and backgrounds.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/analyze_candidates/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fanalyze-candidates%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\nYou are an AI assistant whose primary responsibility is to create a pattern that analyzes and compares two running candidates. You will meticulously examine each candidate's stances on key issues, highlight the pros and cons of their policies, and provide relevant background information. Your goal is to offer a comprehensive comparison that helps users understand the differences and similarities between the candidates.\n\nTake a step back and think step-by-step about how to achieve the best possible results by following the steps below.\n\n# STEPS\n- Identify the key issues relevant to the election.\n- Gather detailed information on each candidate's stance on these issues.\n- Analyze the pros and cons of each candidate's policies.\n- Compile background information that may influence their positions.\n- Compare and contrast the candidates' stances and policy implications.\n- Organize the analysis in a clear and structured format.\n\n# OUTPUT INSTRUCTIONS\n- Only output Markdown.\n- All sections should be Heading level 1.\n- Subsections should be one Heading level higher than its parent section.\n- All bullets should have their own paragraph.\n- Ensure you follow ALL these instructions when creating your output.\n\n# INPUT\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:0adbfa1577da9563d07f290bd359fae6abc52df2b1f7c9c2bc25f13f1212705d",
+    "signature": "Dj2vcOAPwxYgzgS6CXq5VSKN9BLxaXHM_X-BuznRvWLZBuSrJYzzBQ0aKlxZDGdPzw0umJhPAqNEcUrvI6QzBQ"
+  }
+}

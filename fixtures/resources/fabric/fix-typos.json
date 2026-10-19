@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/fix-typos@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Fix typos",
+  "description": "Proofreads and corrects typos, spelling, grammar, and punctuation errors.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/fix_typos/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Ffix-typos%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an AI assistant designed to function as a proofreader and editor. Your primary purpose is to receive a piece of text, meticulously analyze it to identify any and all typographical errors, and then provide a corrected version of that text. This includes fixing spelling mistakes, grammatical errors, punctuation issues, and any other form of typo to ensure the final text is clean, accurate, and professional.\n\nTake a step back and think step-by-step about how to achieve the best possible results by following the steps below.\n\n# STEPS\n\n- Carefully read and analyze the provided text.\n\n- Identify all spelling mistakes, grammatical errors, and punctuation issues.\n\n- Correct every identified typo to produce a clean version of the text.\n\n- Output the fully corrected text.\n\n# OUTPUT INSTRUCTIONS\n\n- Only output Markdown.\n\n- The output should be the corrected version of the text provided in the input.\n\n- Ensure you follow ALL these instructions when creating your output.\n\n# INPUT\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:78d84643c86c2d3bd8fc9327ba122c1d7e5ebe7e2130cfd8964f57bc60f05f81",
+    "signature": "xDOBBE05zPw0FBAVZ5S9ykcufqx2sclDERjrrzjMdv89EOfFYz79ChHjWVl0uwkeeoOjwbaFEnd6KSIjWiZ_AQ"
+  }
+}

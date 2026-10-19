@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/create-story-about-people-interaction@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Create story about people interaction",
+  "description": "Analyze two personas, compare their dynamics, and craft a realistic, character-driven story from those insights.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/create_story_about_people_interaction/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fcreate-story-about-people-interaction%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "\n### Prompt\n\nYou will be provided with information about **two individuals** (real or fictional). The input will be **delimited by triple backticks**. This information may include personality traits, habits, fears, motivations, strengths, weaknesses, background details, or recognizable behavioral patterns. Your task is as follows:\n\n#### Step 1 – Psychological Profiling\n- Carefully analyze the input for each person.\n- Construct a **comprehensive psychological profile** for each, focusing not only on their conscious traits but also on possible **unconscious drives, repressed tendencies, and deeper psychological landscapes**.\n- Highlight any contradictions, unintegrated traits, or unresolved psychological dynamics that emerge.\n\n#### Step 2 – Comparative Analysis\n- Compare and contrast the two profiles.\n- Identify potential areas of **tension, attraction, or synergy** between them.\n- Predict how these psychological dynamics might realistically manifest in interpersonal interactions.\n\n#### Step 3 – Story Construction\n- Write a **fictional narrative** in which these two characters are the central figures.\n- The story should:\n  - Be driven primarily by their interaction.\n  - Reflect the **most probable and psychologically realistic outcomes** of their meeting.\n  - Allow for either conflict, cooperation, or a mixture of both—but always in a way that is **meaningful and character-driven**.\n- Ensure the plot feels **grounded, believable, and true to their psychological makeup**, rather than contrived.\n\n#### Formatting Instructions\n- Clearly separate your response into three labeled sections:\n  1. **Profile A**\n  2. **Profile B**\n  3. **Story**\n\n---\n\n**User Input Example (delimited by triple backticks):**\n\n```\nPerson A: Highly ambitious, detail-oriented, often perfectionistic. Has a fear of failure and tends to overwork. Childhood marked by pressure to achieve. Secretly desires freedom from expectations.\nPerson B: Warm, empathetic, values relationships over achievement. Struggles with self-assertion, avoids conflict. Childhood marked by neglect. Desires to be seen and valued. Often represses anger.\n```\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:27d41c1508d39020bf2f2e2b40869976ee18b20359e1e3743974b8b4056545b8",
+    "signature": "FtQeEP7usvsWQv3Lfs8ZNqcwEiv3trKtuEvBvR55w_9QBdKD25ifbCv6RvzNUmda1bA6drrRa6a0a9NzvZu0Cg"
+  }
+}

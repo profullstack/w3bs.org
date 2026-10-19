@@ -1,0 +1,1046 @@
+[
+  {
+    "id": "w3bs://prompt/fabric/agility-story@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/ai@1.0.0",
+    "category": "AI"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-answers@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-bill@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-bill-short@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-candidates@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-cfp-submission@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-claims@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-comments@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-debate@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-discord-structure@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-email-headers@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-incident@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-interviewer-techniques@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-logs@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-malware@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-military-strategy@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-mistakes@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-monetization-opportunities@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-paper@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-paper-simple@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-patent@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-personality@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-presentation@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-product-feedback@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-proposition@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-prose@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-prose-json@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-prose-pinker@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-risk@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-sales-call@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-spiritual-text@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-tech-impact@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-terraform-plan@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-threat-report@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-threat-report-cmds@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/analyze-threat-report-trends@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/answer-interview-question@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/apply-ul-tags@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/ask-secure-by-design-questions@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/ask-uncle-duke@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/audit-consent@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/audit-transparency@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/capture-thinkers-work@1.0.0",
+    "category": "Summarize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/check-agreement@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/check-falsifiability@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/chinese-article-summary@1.0.0",
+    "category": "Summarize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/chinese-code-review@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/chinese-contract-review@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/chinese-news-translate@1.0.0",
+    "category": "Conversion"
+  },
+  {
+    "id": "w3bs://prompt/fabric/chinese-poetry-analysis@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/clean-text@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/coding-master@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/compare-and-contrast@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/concall-summary@1.0.0",
+    "category": "Summarize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/convert-to-markdown@1.0.0",
+    "category": "Conversion"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-5-sentence-summary@1.0.0",
+    "category": "Summarize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-academic-paper@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-ai-jobs-analysis@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-aphorisms@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-art-prompt@1.0.0",
+    "category": "AI"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-bd-issue@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-better-frame@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-coding-feature@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-coding-project@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-command@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-conceptmap@1.0.0",
+    "category": "Visualize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-cyber-summary@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-design-document@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-design-system@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-diy@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-excalidraw-visualization@1.0.0",
+    "category": "Visualization"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-flash-cards@1.0.0",
+    "category": "Learning"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-formal-email@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-git-diff-commit@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-golden-rules@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-graph-from-input@1.0.0",
+    "category": "Visualize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-hormozi-offer@1.0.0",
+    "category": "Business"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-idea-compass@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-investigation-visualization@1.0.0",
+    "category": "Visualize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-keynote@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-loe-document@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-logo@1.0.0",
+    "category": "Visualize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-markmap-visualization@1.0.0",
+    "category": "Visualize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-mermaid-visualization@1.0.0",
+    "category": "Visualize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-mermaid-visualization-for-github@1.0.0",
+    "category": "Visualize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-micro-summary@1.0.0",
+    "category": "Summarize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-mnemonic-phrases@1.0.0",
+    "category": "Creativity"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-network-threat-landscape@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-newsletter-entry@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-npc@1.0.0",
+    "category": "Gaming"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-pattern@1.0.0",
+    "category": "AI"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-prd@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-prediction-block@1.0.0",
+    "category": "AI"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-quiz@1.0.0",
+    "category": "Learning"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-reading-plan@1.0.0",
+    "category": "Learning"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-recursive-outline@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-report-finding@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-rpg-summary@1.0.0",
+    "category": "Gaming"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-security-update@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-show-intro@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-sigma-rules@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-slides@1.0.0",
+    "category": "Visualize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-story-about-people-interaction@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-story-about-person@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-story-explanation@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-stride-threat-model@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-summary@1.0.0",
+    "category": "Summarize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-tags@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-threat-scenarios@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-ttrc-graph@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-ttrc-narrative@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-upgrade-pack@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-user-story@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-video-chapters@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/create-visualization@1.0.0",
+    "category": "Visualize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/detect-mind-virus@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/detect-silent-victims@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/dialog-with-socrates@1.0.0",
+    "category": "Learning"
+  },
+  {
+    "id": "w3bs://prompt/fabric/eisenhower-matrix@1.0.0",
+    "category": "Business"
+  },
+  {
+    "id": "w3bs://prompt/fabric/enrich-blog-post@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/explain-code@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/explain-docs@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/explain-math@1.0.0",
+    "category": "Learning"
+  },
+  {
+    "id": "w3bs://prompt/fabric/explain-project@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/explain-terms@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/explain-terms-and-conditions@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/export-data-as-csv@1.0.0",
+    "category": "Conversion"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-affiliate-products@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-algorithm-update-recommendations@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-all-quotes@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-alpha@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-article-wisdom@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-bd-ideas@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-book-ideas@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-book-recommendations@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-business-ideas@1.0.0",
+    "category": "Business"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-characters@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-controversial-ideas@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-core-message@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-ctf-writeup@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-domains@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-ethical-framework@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-extraordinary-claims@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-ideas@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-insights@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-insights-dm@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-instructions@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-jokes@1.0.0",
+    "category": "Other"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-latest-video@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-main-activities@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-main-idea@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-mcp-servers@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-most-redeeming-thing@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-patterns@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-poc@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-predictions@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-primary-problem@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-primary-solution@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-product-features@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-questions@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-recipe@1.0.0",
+    "category": "Self"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-recommendations@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-references@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-skills@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-song-meaning@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-sponsors@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-video-commerce-entities@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-videoid@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-wisdom@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-wisdom-agents@1.0.0",
+    "category": "AI"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-wisdom-dm@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-wisdom-nometa@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/extract-wisdom-with-attribution@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/find-female-life-partner@1.0.0",
+    "category": "Self"
+  },
+  {
+    "id": "w3bs://prompt/fabric/find-hidden-message@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/find-logical-fallacies@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/fix-typos@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/generate-code-rules@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/generate-frontmatter@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/get-wow-per-minute@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/greybeard-secure-prompt-engineer@1.0.0",
+    "category": "security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/heal-person@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/humanize@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/identify-dsrp-distinctions@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/identify-dsrp-perspectives@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/identify-dsrp-relationships@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/identify-dsrp-systems@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/identify-job-stories@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/improve-academic-writing@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/improve-prompt@1.0.0",
+    "category": "AI"
+  },
+  {
+    "id": "w3bs://prompt/fabric/improve-report-finding@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/improve-writing@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/judge-output@1.0.0",
+    "category": "AI"
+  },
+  {
+    "id": "w3bs://prompt/fabric/judge-ultimate-law@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/label-and-rate@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/lens-deconstructive@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/lens-rhetorical@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/lens-stoic@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/md-callout@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/model-as-sherlock-freud@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/official-pattern-template@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/predict-person-actions@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/prepare-7s-strategy@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/provide-guidance@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/rate-ai-response@1.0.0",
+    "category": "AI"
+  },
+  {
+    "id": "w3bs://prompt/fabric/rate-ai-result@1.0.0",
+    "category": "AI"
+  },
+  {
+    "id": "w3bs://prompt/fabric/rate-content@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/rate-value@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/raw-query@1.0.0",
+    "category": "AI"
+  },
+  {
+    "id": "w3bs://prompt/fabric/recommend-artists@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/recommend-pipeline-upgrades@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/recommend-talkpanel-topics@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/recommend-yoga-practice@1.0.0",
+    "category": "Wellness"
+  },
+  {
+    "id": "w3bs://prompt/fabric/refine-design-document@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/review-code@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/review-design@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/suggest-gt-command@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/suggest-openclaw-pattern@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/suggest-pattern@1.0.0",
+    "category": "AI"
+  },
+  {
+    "id": "w3bs://prompt/fabric/summarize@1.0.0",
+    "category": "Summarize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/summarize-board-meeting@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/summarize-debate@1.0.0",
+    "category": "Summarize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/summarize-git-changes@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/summarize-git-diff@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/summarize-lecture@1.0.0",
+    "category": "Summarize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/summarize-legislation@1.0.0",
+    "category": "Summarize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/summarize-meeting@1.0.0",
+    "category": "Summarize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/summarize-micro@1.0.0",
+    "category": "Summarize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/summarize-newsletter@1.0.0",
+    "category": "Summarize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/summarize-paper@1.0.0",
+    "category": "Summarize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/summarize-prompt@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/summarize-pull-requests@1.0.0",
+    "category": "Summarize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/summarize-rpg-session@1.0.0",
+    "category": "Summarize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/t-analyze-challenge-handling@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/t-check-dunning-kruger@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/t-check-metrics@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/t-create-h3-career@1.0.0",
+    "category": "Business"
+  },
+  {
+    "id": "w3bs://prompt/fabric/t-create-opening-sentences@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/t-describe-life-outlook@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/t-extract-intro-sentences@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/t-extract-panel-topics@1.0.0",
+    "category": "Extract"
+  },
+  {
+    "id": "w3bs://prompt/fabric/t-find-blindspots@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/t-find-negative-thinking@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/t-find-neglected-goals@1.0.0",
+    "category": "Strategy"
+  },
+  {
+    "id": "w3bs://prompt/fabric/t-give-encouragement@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/t-red-team-thinking@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/t-threat-model-plans@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/t-visualize-mission-goals-projects@1.0.0",
+    "category": "Visualize"
+  },
+  {
+    "id": "w3bs://prompt/fabric/t-year-in-review@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/to-flashcards@1.0.0",
+    "category": "Learning"
+  },
+  {
+    "id": "w3bs://prompt/fabric/transcribe-minutes@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/translate@1.0.0",
+    "category": "Conversion"
+  },
+  {
+    "id": "w3bs://prompt/fabric/tweet@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/ultimate-law-safety@1.0.0",
+    "category": "Analysis"
+  },
+  {
+    "id": "w3bs://prompt/fabric/write-essay@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/write-hackerone-report@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/write-latex@1.0.0",
+    "category": "Writing"
+  },
+  {
+    "id": "w3bs://prompt/fabric/write-pull-request@1.0.0",
+    "category": "Development"
+  },
+  {
+    "id": "w3bs://prompt/fabric/write-semgrep-rule@1.0.0",
+    "category": "Security"
+  },
+  {
+    "id": "w3bs://prompt/fabric/youtube-summary@1.0.0",
+    "category": "Summarize"
+  }
+]

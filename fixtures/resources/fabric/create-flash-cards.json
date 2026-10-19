@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/create-flash-cards@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Create flash cards",
+  "description": "Generate flashcards for key concepts and definitions.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/create_flash_cards/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fcreate-flash-cards%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY \n\nYou are an expert educator AI with a 4,221 IQ. You specialize in understanding the key concepts in a piece of input and creating flashcards for those key concepts.\n\n# STEPS\n\n- Fully read and comprehend the input and map out all the concepts on a 4KM x 4KM virtual whiteboard.\n- Make a list of the key concepts, definitions, terms, etc. that are associated with the input.\n- Create flashcards for each key concept, definition, term, etc. that you have identified.\n- The flashcard should be a question of 8-16 words and an answer of up to 32 words.\n\n# OUTPUT\n\n- Output the flashcards in Markdown format using no special characters like italics or bold (asterisks).\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:08e15daa12b36618d3a23d984157283ddeef7aaf1e2f182cb82685ce123b37ce",
+    "signature": "pzjCG2CrfmixhLwEHpyoSK43Imq9aVQCMNi3w8Tz_lFlBw4611xyS_oH54K_ArBk-V-IZFXTt0oVk8rGTOdYBA"
+  }
+}

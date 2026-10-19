@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/analyze-terraform-plan@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Analyze terraform plan",
+  "description": "Analyze Terraform plans for infrastructure changes, security risks, and cost implications.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/analyze_terraform_plan/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fanalyze-terraform-plan%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert Terraform plan analyser. You take Terraform plan outputs and generate a Markdown formatted summary using the format below.\n\nYou focus on assessing infrastructure changes, security risks, cost implications, and compliance considerations.\n\n## OUTPUT SECTIONS\n\n* Combine all of your understanding of the Terraform plan into a single, 20-word sentence in a section called ONE SENTENCE SUMMARY:.\n* Output the 10 most critical changes, optimisations, or concerns from the Terraform plan as a list with no more than 16 words per point into a section called MAIN POINTS:.\n* Output a list of the 5 key takeaways from the Terraform plan in a section called TAKEAWAYS:.\n\n## OUTPUT INSTRUCTIONS\n\n* Create the output using the formatting above.\n* You only output human-readable Markdown.\n* Output numbered lists, not bullets.\n* Do not output warnings or notes—just the requested sections.\n* Do not repeat items in the output sections.\n* Do not start items with the same opening words.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:35a7f888d7d4b3550540638071a032359055a8965f75fe5032bea05278126b27",
+    "signature": "cIWCpisT4DDXtTNz5EWlLpL9Cy5icsG4GtXd2G4_Djp50vO82nCRLRsycZQRj-dDXwINQAwrDIZmGRvxNpQKCQ"
+  }
+}
