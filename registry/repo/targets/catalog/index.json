@@ -518,7 +518,7 @@
     {
       "id": "readm3.com/readm3",
       "name": "readm3",
-      "description": "Terminal markdown reader and editor with sharing, version history, an API and an MCP server.",
+      "description": "Plain text editor for Markdown and code: terminal reader, web and desktop editor (Linux, macOS, Windows), sharing, version history, an API and an MCP server.",
       "commands": [
         "readm3"
       ],
@@ -1195,6 +1195,323 @@
       },
       "homepage": "https://submitfleet.com",
       "repository": "https://github.com/profullstack/submitfleet",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "b1dz.com/b1dz",
+      "name": "b1dz",
+      "description": "Terminal client for the b1dz.com crypto arbitrage terminal: live TUI dashboard, backtests, spread audits, a multi-venue quote observer and account setup.",
+      "commands": [
+        "b1dz"
+      ],
+      "install": {
+        "url": "https://b1dz.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://b1dz.com",
+      "repository": "https://github.com/profullstack/b1dz.com",
+      "vendor": "Profullstack",
+      "agentic": false
+    },
+    {
+      "id": "bufferoverride.com/bufferoverride",
+      "name": "bufferoverride",
+      "description": "bo, the BufferOverride CLI: capture a failing command with its environment, redact the secrets, and find the existing answer before you ask. Also prints MCP config for coding agents.",
+      "commands": [
+        "bo"
+      ],
+      "install": {
+        "url": "https://bufferoverride.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://bufferoverride.com",
+      "repository": "https://github.com/profullstack/bufferoverride",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "c0upons.com/c0upons",
+      "name": "c0upons",
+      "description": "Community coupon CLI for c0upons.com: search and reveal coupon codes, submit your own and post bounties for codes you need.",
+      "commands": [
+        "c0upons"
+      ],
+      "install": {
+        "url": "https://c0upons.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://c0upons.com",
+      "repository": "https://github.com/profullstack/c0upons",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "d0rz.com/d0rz",
+      "name": "d0rz",
+      "description": "CLI, TUI and MCP server for d0rz.com, the local help marketplace: post and answer asks and offers, respond, and message neighbors.",
+      "commands": [
+        "d0rz"
+      ],
+      "install": {
+        "url": "https://d0rz.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://d0rz.com",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "demo.movie/demomovie",
+      "name": "demomovie",
+      "description": "mkdemo, the demo.movie command line: make a narrated product demo video from a URL.",
+      "commands": [
+        "mkdemo"
+      ],
+      "install": {
+        "url": "https://demo.movie/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://demo.movie",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "mediaanalyzer.pro/mediaanalyzer",
+      "name": "mediaanalyzer",
+      "description": "AI descriptions and folders for your photo, video, audio and document library, from the terminal. Resumable scans, a safe apply step and undo.",
+      "commands": [
+        "mediaanalyzer"
+      ],
+      "install": {
+        "url": "https://mediaanalyzer.pro/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://mediaanalyzer.pro",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "nichedb.dev/nichedb",
+      "name": "nichedb",
+      "description": "CLI and stdio MCP server for a NicheDB deployment: browse collections, manage sources and feeds, and search items.",
+      "commands": [
+        "nichedb"
+      ],
+      "install": {
+        "url": "https://nichedb.dev/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://nichedb.dev",
+      "repository": "https://github.com/profullstack/niche-db",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "nightcell7.com/nightcell7",
+      "name": "nightcell7",
+      "description": "Installer for NIGHTCELL 7: FALSE DAWN, a desktop game for macOS and Linux. Downloads the release AppImage or dmg from GitHub, checks it against SHA256SUMS and adds a nightcell7 launcher.",
+      "commands": [
+        "nightcell7"
+      ],
+      "install": {
+        "url": "https://nightcell7.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://nightcell7.com",
+      "repository": "https://github.com/profullstack/nightcell7",
+      "vendor": "Profullstack",
+      "license": "proprietary",
+      "agentic": false
+    },
+    {
+      "id": "outreachgraph.com/outreachgraph",
+      "name": "outreachgraph",
+      "description": "og, the OutreachGraph command line: approval queue, prospects, campaigns and imports over the /api/v1 API, through the same policy gates as the web app.",
+      "commands": [
+        "og"
+      ],
+      "install": {
+        "url": "https://outreachgraph.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://outreachgraph.com",
+      "repository": "https://github.com/profullstack/outreachgraph",
+      "vendor": "Profullstack",
+      "license": "proprietary",
+      "agentic": false
+    },
+    {
+      "id": "p0dcasters.com/p0dcasters",
+      "name": "p0dcasters",
+      "description": "p0d, the p0dcasters.com CLI: search the podcast directory, list episodes, submit shows and export the directory as OPML. One Node 22 script, no package manager.",
+      "commands": [
+        "p0d"
+      ],
+      "install": {
+        "url": "https://p0dcasters.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://p0dcasters.com",
+      "repository": "https://github.com/profullstack/p0dcasters",
+      "vendor": "Profullstack",
+      "agentic": false
+    },
+    {
+      "id": "pwamart.com/pwamart",
+      "name": "pwamart",
+      "description": "pwamart, the app store for web apps, from the terminal: search, install PWAs as app windows, publish your own, and browse it all in a TUI.",
+      "commands": [
+        "pwamart"
+      ],
+      "install": {
+        "url": "https://pwamart.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://pwamart.com",
+      "repository": "https://github.com/profullstack/pwamart.com",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "r4ck.dev/r4ck",
+      "name": "r4ck",
+      "description": "r4ck.dev from the terminal and for agents: search hosting offers by spec, price and place, and bridge the same tools into any MCP client.",
+      "commands": [
+        "r4ck"
+      ],
+      "install": {
+        "url": "https://r4ck.dev/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://r4ck.dev",
+      "repository": "https://github.com/profullstack/r4ck.dev",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "reeleel.com/reeleel",
+      "name": "reeleel",
+      "description": "The ReelEel command line: local-first youth-sports video intelligence. Import a game, point at your athlete, get a highlight reel; nothing leaves your machine.",
+      "commands": [
+        "reeleel"
+      ],
+      "install": {
+        "url": "https://reeleel.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://reeleel.com",
+      "repository": "https://github.com/profullstack/reeleel",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "ringhuman.com/ringhuman",
+      "name": "ringhuman",
+      "description": "RingHuman command line: RingHuman calls customer support for you, waits through the phone tree and the hold music, and rings your phone when a real human answers.",
+      "commands": [
+        "ringhuman"
+      ],
+      "install": {
+        "url": "https://ringhuman.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://ringhuman.com",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "saasrow.com/saasrow",
+      "name": "saasrow",
+      "description": "Command-line client for the saasrow.com software directory: search it without an account, and manage your free listings and API keys.",
+      "commands": [
+        "saasrow"
+      ],
+      "install": {
+        "url": "https://saasrow.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://saasrow.com",
+      "repository": "https://github.com/profullstack/saasrow-web",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "tleehealth.com/tleehealth",
+      "name": "tleehealth",
+      "description": "The tleehealth CLI and dashboard TUI: schedule and caseload from the terminal, plus your own health records from MyChart and other SMART on FHIR portals.",
+      "commands": [
+        "tleehealth"
+      ],
+      "install": {
+        "url": "https://tleehealth.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://tleehealth.com",
+      "repository": "https://github.com/profullstack/tleehealth.com",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "typeheard.com/typeheard",
+      "name": "typeheard",
+      "description": "Transcribe audio and video from the terminal with typeheard.com. Also a TUI; the first few minutes of any file are free without a key.",
+      "commands": [
+        "typeheard"
+      ],
+      "install": {
+        "url": "https://typeheard.com/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://typeheard.com",
+      "repository": "https://github.com/profullstack/typeheard.com",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": false
+    },
+    {
+      "id": "ad.network.pit.world/adnetwork",
+      "name": "adnetwork",
+      "description": "Run ads, or earn from your site, in crypto, with ad.network. Advertisers paste a link and a daily budget; publishers paste one tag and add a wallet. Also a TUI and an MCP server; ads by crawlproof, payments by CoinPay.",
+      "commands": [
+        "adnetwork"
+      ],
+      "install": {
+        "url": "https://ad.network.pit.world/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://ad.network.pit.world",
+      "repository": "https://github.com/moshcoder/ad.network",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true
+    },
+    {
+      "id": "built.indie.pit.world/builtindie",
+      "name": "builtindie",
+      "description": "built.indie from the terminal: launch your indie product with one URL, browse and upvote the daily board, claim and edit your listing. Also a TUI and an MCP server.",
+      "commands": [
+        "builtindie"
+      ],
+      "install": {
+        "url": "https://built.indie.pit.world/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://built.indie.pit.world",
+      "repository": "https://github.com/moshcoder/built.indie",
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true

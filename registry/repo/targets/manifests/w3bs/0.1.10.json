@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0",
+  "package": {
+    "id": "w3bs.org/w3bs",
+    "name": "w3bs",
+    "description": "w3bs: the W3BS command line (packages, resources and more)",
+    "license": "MIT OR Apache-2.0"
+  },
+  "release": {
+    "version": "0.1.10",
+    "channel": "stable",
+    "published_at": "2026-10-19T14:45:31Z"
+  },
+  "requirements": {
+    "capabilities": []
+  },
+  "artifacts": [
+    {
+      "platform": "x86_64-unknown-linux-gnu",
+      "target_path": "artifacts/w3bs/0.1.10/w3bs-0.1.10-x86_64-unknown-linux-gnu.tar.gz",
+      "format": "tar.gz",
+      "length": 5519666,
+      "sha256": "1eab8498df343c6806e89d2c6421eb95dff9e7eac06bb712f0472c6500f9552d",
+      "unpacked_size_limit": 67108864,
+      "commands": {
+        "w3bs": "bin/w3bs"
+      }
+    },
+    {
+      "platform": "aarch64-unknown-linux-gnu",
+      "target_path": "artifacts/w3bs/0.1.10/w3bs-0.1.10-aarch64-unknown-linux-gnu.tar.gz",
+      "format": "tar.gz",
+      "length": 5240021,
+      "sha256": "f492dbfc86dc0ecc7721031a972370ab651a78c6377879d59e2c2179f0004f1c",
+      "unpacked_size_limit": 67108864,
+      "commands": {
+        "w3bs": "bin/w3bs"
+      }
+    },
+    {
+      "platform": "x86_64-apple-darwin",
+      "target_path": "artifacts/w3bs/0.1.10/w3bs-0.1.10-x86_64-apple-darwin.tar.gz",
+      "format": "tar.gz",
+      "length": 5510035,
+      "sha256": "98d0f87e0d0ddfd534216fb7fb9f5775e1fa4c757fe19f02a7c158ad746d4468",
+      "unpacked_size_limit": 67108864,
+      "commands": {
+        "w3bs": "bin/w3bs"
+      }
+    },
+    {
+      "platform": "aarch64-apple-darwin",
+      "target_path": "artifacts/w3bs/0.1.10/w3bs-0.1.10-aarch64-apple-darwin.tar.gz",
+      "format": "tar.gz",
+      "length": 5087396,
+      "sha256": "fa39376106675acf82f596a65fce4b549e5800c74f3154a659c3710b66588fd9",
+      "unpacked_size_limit": 67108864,
+      "commands": {
+        "w3bs": "bin/w3bs"
+      }
+    }
+  ]
+}
