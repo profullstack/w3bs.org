@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Agentic Desktop Layer broker
+Comment=Starts with agent access Disabled. https://w3bs.org/desktop
+Exec=/usr/local/bin/w3bs-desktop daemon --adapter auto --mcp-http 127.0.0.1:7801
+NoDisplay=true
+X-KDE-autostart-phase=2
+X-GNOME-Autostart-enabled=true

@@ -1,0 +1,8 @@
+
+# W3BS OS: a fast prompt with the git branch, no network at startup (docs/os-prd.md §3).
+autoload -Uz vcs_info compinit
+compinit -u
+zstyle ':vcs_info:git:*' formats ' %b'
+precmd() { vcs_info }
+setopt prompt_subst
+PROMPT='%F{208}w3bs%f %F{blue}%~%f%F{242}${vcs_info_msg_0_}%f %# '

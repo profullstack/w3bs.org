@@ -1,0 +1,7 @@
+Welcome to W3BS OS (Alpine Linux based).
+
+  w3bs search <name>     find software        w3bs install <name>   install it
+  w3bs desktop status    Agentic Desktop Layer (agent access is OFF until you enable it)
+  doas <command>         run as administrator
+
+Docs: https://w3bs.org/os

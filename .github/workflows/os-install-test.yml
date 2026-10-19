@@ -1,0 +1,146 @@
+# W3BS OS installer end-to-end test in QEMU with KVM (os/iso/test/vmtest.py), set up like a
+# VPS: the ISO on a CD-ROM drive, a virtio target disk, virtio-net with DHCP, VGA console.
+# For each of SeaBIOS and OVMF (UEFI):
+#   1. the live ISO boots to a login (screenshots of tty1 and the installer on VGA)
+#   2. unattended install onto a 20 GB qcow2 over the serial console (UEFI: --disk /dev/vda,
+#      after walking the interactive installer on VGA to its review screen and cancelling;
+#      BIOS: no --disk, the installer must pick /dev/vda as the largest disk)
+#   3. the installed disk boots; over serial: w3bs --version, zsh login shell, wheel,
+#      /etc/w3bs-os-release, sddm running; screendumps of the greeter and the Plasma desktop
+# plus a LUKS job: an encrypted install creates a LUKS2 volume.
+# Also called by os-iso.yml (workflow_call) before it publishes a release.
+name: os-install-test
+
+on:
+  pull_request:
+    paths:
+      - "os/iso/**"
+      - ".github/workflows/os-install-test.yml"
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        description: "ISO version to build (default: os/iso/VERSION + -test)"
+        type: string
+        required: false
+
+jobs:
+  iso:
+    name: Build ISO
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    outputs:
+      iso: ${{ steps.v.outputs.iso }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        id: v
+        run: |
+          v="${{ inputs.version }}"
+          [ -n "$v" ] || v="$(cat os/iso/VERSION)-test"
+          echo "$v" | grep -Eq '^[0-9A-Za-z._+-]+$' || { echo "bad version $v"; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "iso=w3bs-os-$v-x86_64.iso" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - name: Build w3bs and w3bs-desktop for musl
+        run: |
+          docker buildx build -f os/iso/Dockerfile.bins \
+            --cache-from type=gha,scope=os-iso-bins --cache-to type=gha,scope=os-iso-bins,mode=max \
+            --output type=local,dest=os/iso/out/bin .
+      - name: Build the ISO (alpine:3.24, aports mkimage.sh)
+        run: |
+          docker run --rm \
+            -v "$PWD:/src:ro" -v "$PWD/os/iso/out/bin:/bin-in:ro" -v "$PWD/os/iso/out:/out" \
+            alpine:3.24 sh /src/os/iso/build-in-container.sh "${{ steps.v.outputs.version }}"
+          sudo chown -R "$(id -u):$(id -g)" os/iso/out
+          size=$(stat -c %s "os/iso/out/${{ steps.v.outputs.iso }}")
+          echo "ISO size: $size bytes" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$size" -lt 2000000000 ] || { echo "ISO is over the 2 GB release asset limit"; exit 1; }
+          (cd os/iso/out && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: os-iso-image
+          path: |
+            os/iso/out/${{ steps.v.outputs.iso }}
+            os/iso/out/SHA256SUMS
+          retention-days: 7
+          compression-level: 0
+
+  install:
+    name: Install + boot (${{ matrix.firmware }})
+    needs: iso
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - firmware: uefi
+            install_flags: --vga-review
+          - firmware: bios
+            install_flags: --auto-disk
+    env:
+      ISO: iso/${{ needs.iso.outputs.iso }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: os-iso-image
+          path: iso
+      - name: QEMU, OVMF and KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            qemu-system-x86 qemu-utils ovmf python3-pil >/dev/null
+          ls -l /dev/kvm
+      - name: Live ISO boots to a login
+        run: python3 os/iso/test/vmtest.py boot --iso "$ISO" --firmware ${{ matrix.firmware }} --out out --timeout 600
+      - name: Unattended install (Plasma, no encryption) onto a 20 GB virtio disk
+        run: |
+          qemu-img create -q -f qcow2 out/disk.qcow2 20G
+          python3 os/iso/test/vmtest.py install --iso "$ISO" --disk out/disk.qcow2 --firmware ${{ matrix.firmware }} \
+            ${{ matrix.install_flags }} --desktop plasma --out out --timeout 600 --install-timeout 2400
+      - name: Installed disk boots; w3bs, zsh, os-release and sddm checked over serial
+        run: |
+          python3 os/iso/test/vmtest.py installed --disk out/disk.qcow2 --firmware ${{ matrix.firmware }} \
+            --desktop plasma --type-password --desktop-wait 120 --out out --timeout 900
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: os-install-test-${{ matrix.firmware }}
+          path: |
+            out/*.png
+            out/*.log
+
+  luks:
+    name: Encrypted install creates LUKS2
+    needs: iso
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ISO: iso/${{ needs.iso.outputs.iso }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: os-iso-image
+          path: iso
+      - name: QEMU, OVMF and KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            qemu-system-x86 qemu-utils ovmf python3-pil >/dev/null
+      - name: Unattended encrypted install (no desktop)
+        run: |
+          mkdir -p out && qemu-img create -q -f qcow2 out/crypt.qcow2 12G
+          python3 os/iso/test/vmtest.py install --iso "$ISO" --disk out/crypt.qcow2 --firmware uefi \
+            --encrypt --desktop none --out out --timeout 600 --install-timeout 1500
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: os-install-test-luks
+          path: out/*.log
