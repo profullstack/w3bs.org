@@ -3,7 +3,7 @@
 // the key, and submits releases signed with `ssh-keygen -Y sign -n w3bs-release@w3bs.org`.
 // Releases are immutable; revoking a key marks its releases revoked.
 import { createHash, randomBytes } from 'node:crypto';
-import { lookup as dnsLookup, resolveTxt as dnsResolveTxt } from 'node:dns/promises';
+import { Resolver, lookup as dnsLookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import canonicalize from 'canonicalize';
 import { W3bsError } from './core.mjs';
@@ -131,9 +131,18 @@ export function privateAddress(address) {
   );
 }
 
+// Domain proof reads TXT records from public resolvers with a new Resolver each time. The
+// process-wide resolver keeps negative answers, so a record added after the first check (the
+// order `w3bs publish key add` asks for) went unseen until the server restarted.
+export async function freshResolveTxt(name) {
+  const resolver = new Resolver({ timeout: 5000, tries: 2 });
+  resolver.setServers(['1.1.1.1', '8.8.8.8', '9.9.9.9']);
+  return resolver.resolveTxt(name);
+}
+
 export function createPublishing(
   db,
-  { fetchImpl = fetch, resolveTxt = dnsResolveTxt, lookup = dnsLookup } = {},
+  { fetchImpl = fetch, resolveTxt = freshResolveTxt, lookup = dnsLookup } = {},
 ) {
   // An https GET of a public host, bounded in time and size; redirects are not followed.
   async function fetchPublic(url, max) {
