@@ -1088,9 +1088,13 @@
       {
         "run": "hdtilt serve",
         "does": "Run the web app on http://127.0.0.1:8930"
+      },
+      {
+        "run": "hdtilt mcp",
+        "does": "Serve the MCP tools over stdio for an agent (also POST /mcp on any server)"
       }
     ],
-    "description": "Open source IPTV player for M3U, Xtream Codes and XMLTV with web, CLI, TUI and MCP interfaces.",
+    "description": "Open source TiviMate-style IPTV player for M3U, Xtream Codes and XMLTV: web/PWA, desktop app (AppImage, deb, dmg, exe), CLI, TUI, MCP and a JSON API.",
     "homepage": "https://hdtilt.com",
     "repository": "https://github.com/profullstack/hdtilt.com",
     "license": "MIT",
