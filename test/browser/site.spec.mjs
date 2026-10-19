@@ -69,7 +69,7 @@ test('empty and invalid URI states stay useful', async ({ page }) => {
   await page.goto('/prompts?q=does-not-exist-82751');
   await expect(page.getByRole('heading', { name: 'No matching resources.' })).toBeVisible();
   await page.goto('/browse?uri=not-a-w3bs-uri');
-  await expect(page.getByRole('alert')).toContainText('Could not resolve');
+  await expect(page.getByRole('alert')).toContainText('Could not browse');
 });
 test('PWA provides an honest offline state instead of cached verification', async ({
   page,
