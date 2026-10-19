@@ -77,6 +77,10 @@ pub struct PackageOutcome {
     pub reason: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorInfo>,
+    /// Curl-installed tools: `signed by SHA256:…` when a W3BS-SIGN-1 publisher signature
+    /// covered the installer that ran, `unsigned` otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

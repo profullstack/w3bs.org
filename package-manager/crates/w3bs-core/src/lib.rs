@@ -12,7 +12,9 @@ pub mod layout;
 pub mod lock;
 pub mod probe;
 pub mod repo;
+pub mod release;
 pub mod resources;
+pub mod sshsig;
 pub mod transport;
 
 pub use engine::repos_api::RepoAdd;

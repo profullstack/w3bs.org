@@ -25,6 +25,9 @@ aws-lc-rs.workspace = true
 fs4.workspace = true
 libc = "0.2"
 futures.workspace = true
+hex.workspace = true
+# `w3bs publish release --from w3bs.toml`.
+toml = { version = "=1.1.8", default-features = false, features = ["std", "serde", "parse"] }
 # Fleet screens (src/screen.rs): the agent's outbound WebSockets, TLS like reqwest's.
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "handshake", "rustls-tls-native-roots"] }
 rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std", "tls12"] }
