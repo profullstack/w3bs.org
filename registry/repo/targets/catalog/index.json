@@ -233,7 +233,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.44.0"
+      "latest_version": "0.45.5"
     },
     {
       "id": "threatcrush.com/threatcrush",
@@ -251,7 +251,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.13.48"
+      "latest_version": "0.13.49"
     },
     {
       "id": "coinpayportal.com/coinpay",
@@ -560,7 +560,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.15.0"
+      "latest_version": "0.17.0"
     },
     {
       "id": "hdtilt.com/hdtilt",
@@ -835,7 +835,7 @@
       "vendor": "GitHub",
       "license": "proprietary",
       "agentic": true,
-      "latest_version": "1.0.98"
+      "latest_version": "1.0.100"
     },
     {
       "id": "aider.chat/aider",
@@ -1207,7 +1207,7 @@
       "vendor": "Daniel Miessler",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "1.4.526"
+      "latest_version": "1.4.527"
     },
     {
       "id": "w3bs.org/agentic-desktop-layer",
@@ -1230,7 +1230,7 @@
     {
       "id": "w3bs.org/w3bs-training",
       "name": "w3bs-training",
-      "description": "Review, curate and version demonstrations of your desktop work, then let an authorized agent retrieve approved examples over MCP. Local first and encrypted at rest; push reviewed tasks to your own workspace at w3bs.org/training/app when you want them on another device or for a hosted agent.",
+      "description": "Review, curate and version demonstrations of your desktop work, then let an authorized agent retrieve approved examples over MCP. Local first and encrypted at rest; push reviewed tasks to your own workspace at w3bs.org/training/app, or publish them as OpenTasks on w3bs.org/tasks with a moshscript anyone can run.",
       "commands": [
         "w3bs-training"
       ],
@@ -1243,7 +1243,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.2.6"
+      "latest_version": "0.2.7"
     },
     {
       "id": "submitfleet.com/submitfleet",
@@ -1436,7 +1436,7 @@
       "repository": "https://github.com/profullstack/p0dcasters",
       "vendor": "Profullstack",
       "agentic": false,
-      "latest_version": "0.2.0"
+      "latest_version": "0.2.3"
     },
     {
       "id": "pwamart.com/pwamart",
@@ -1454,7 +1454,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.6.0"
+      "latest_version": "0.7.0"
     },
     {
       "id": "r4ck.dev/r4ck",
