@@ -32,8 +32,8 @@ w3bs_main() {
   MANAGER_REPO_URL='https://w3bs.org/repo/'
   MANAGER_FINGERPRINT='sha256:48d521f7610117c95cc782982e5c05b641b18bdfa8e48b36a634186133bc766f'
   MANAGER_DOWNLOAD_BASE='https://github.com/profullstack/w3bs.org/releases/download'
-  MANAGER_VERSION='0.1.15'
-  MANAGER_SHA256S='x86_64-unknown-linux-gnu=6b2cf1b17191ec6ac2f5784b8a0229263d8a5b7bea903b40c1f4bb101f50703a aarch64-unknown-linux-gnu=184238913fa4d6d01d226b2289f410c622e40d8dfeda92612a328916c9900167 x86_64-unknown-linux-musl=1cb701dee155ab272bf8aac3999708d03e7a5e2597501f592c5398b1f10011e2 aarch64-unknown-linux-musl=1412ea869289004b8a4aa9c4424be773a895b18117a9c019afb6189d18482149 x86_64-apple-darwin=3065f595539e0d74134ce50138502ae217a93019bbcf9de703bd936542c7ddab aarch64-apple-darwin=180aaed69454d285ffa3a6e2661c6768f5038aae4d8803e9254c9eab80e4536f'
+  MANAGER_VERSION='0.1.16'
+  MANAGER_SHA256S='x86_64-unknown-linux-gnu=8a1ffd7e0a39730fe6bef224fada665a90d2e3e573d5a751c92972868d6e0109 aarch64-unknown-linux-gnu=f0aad4b98e4b1dbecc974f567204fce1a4310c328a90aefb26b230b3831b8388 x86_64-unknown-linux-musl=50fd98ae73a43825652cb0d5ecf147bdb4c9a2d73604f1168aef073c8555ff52 aarch64-unknown-linux-musl=50ece32b9dd6033c113271bbb77e5994e44c6d9287f9f684633e43fa3aa24dfb x86_64-apple-darwin=26878f4c07e1e74ca1f6cfff24fe0529e77e7a5b1e7324f2fcfa9896691cee4f aarch64-apple-darwin=a5fd90903c223e12d44dc424014367d32ca135b3832883bb224c359514433d3b'
 
   say() { printf '%s\n' "$*" >&2; }
   die() { say "w3bs installer: $*"; exit "${2:-4}"; }
@@ -124,10 +124,6 @@ w3bs_main() {
       say "Until then, run it as:  $bin/w3bs update"
       ;;
   esac
-  # On a desktop, offer (never register silently) the handler for w3bs:// install links.
-  if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] || { [ "$(uname -s)" = Darwin ] && [ -z "${SSH_CONNECTION:-}" ]; }; then
-    say "Open w3bs:// install links from your browser (asks before every install):  w3bs handler install"
-  fi
 }
 
 w3bs_main "$@"
