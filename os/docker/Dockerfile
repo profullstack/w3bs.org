@@ -47,8 +47,14 @@ LABEL org.opencontainers.image.title="W3BS OS server" \
       org.opencontainers.image.source="https://github.com/profullstack/w3bs.org" \
       org.opencontainers.image.licenses="MIT"
 RUN apk add --no-cache zsh zsh-vcs bash ca-certificates curl git openssh-client-default nodejs npm \
-      tini tzdata procps less \
+      tini tzdata procps less caddy \
     && adduser -D -u 1000 -s /bin/zsh w3bs
+# Caddy is the W3BS OS web server (docs/os-prd.md): automatic HTTPS, IPv6 by default. The
+# Caddyfile only imports /etc/caddy/sites/*, the same layout as the ISO install, so tools
+# add a site by dropping one file there. Installed, not started: run `caddy run` yourself.
+RUN mkdir -p /etc/caddy/sites \
+    && printf 'import /etc/caddy/sites/*\n' > /etc/caddy/Caddyfile \
+    && chown w3bs:w3bs /etc/caddy/sites
 COPY --from=rust /usr/local/bin/w3bs /usr/local/bin/w3bs
 COPY registry/FINGERPRINT /usr/share/w3bs-os/FINGERPRINT
 COPY os/docker/init.sh /usr/local/bin/w3bs-os-init

@@ -662,6 +662,7 @@ async function osPage() {
     ['First release', 'Docker images: <code>w3bs-os:server</code> and <code>w3bs-os:desktop</code> with the Agentic Desktop Layer installed'],
     ['Desktop', 'KDE Plasma by default; GNOME selectable; LXQt and Xfce once qualified'],
     ['Shell', 'zsh for new users; bash and fish selectable'],
+    ['Web server', 'Caddy: hosts, reverse proxies and static sites with automatic HTTPS and IPv6 by default; drop a file in /etc/caddy/sites to add a site'],
     ['Installer', 'Terminal and graphical wizards on one engine, with sane defaults: largest disk erased, LUKS2 encryption, KDE, zsh, the full suite; one review screen before anything is written'],
     ['Apps', 'The full Profullstack CLI and desktop suite, selected by default and present offline at first boot'],
     ['Agents', 'Agentic Desktop Layer and W3BS Training preinstalled; observing, input and recording each need your permission'],

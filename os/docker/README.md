@@ -51,3 +51,14 @@ docker buildx build -f os/docker/Dockerfile --target desktop -t w3bs-os:desktop 
 
 The `w3bs` CLI and `w3bs-desktop` are compiled from this checkout for musl (their release
 binaries are glibc builds). `os/docker/Dockerfile.dockerignore` lists what the build reads.
+
+## Web server
+
+Both images include **Caddy**, the W3BS OS web server: virtual hosts, reverse proxies and
+static sites, with automatic HTTPS and IPv6 by default. `/etc/caddy/Caddyfile` only imports
+`/etc/caddy/sites/*`, so a site is one file:
+
+```sh
+docker run -d --name web -p 80:80 -p 443:443 -v w3bs-caddy:/data --user root \
+  w3bs.org/os:server sh -c "echo 'example.com { reverse_proxy app:3000 }' > /etc/caddy/sites/example && caddy run --config /etc/caddy/Caddyfile"
+```
