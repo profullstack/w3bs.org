@@ -686,6 +686,31 @@ fn publisher_key_change_needs_accept_new_key() {
 }
 
 #[test]
+fn stripped_signature_on_a_pinned_namespace_is_refused() {
+    let env = Env::new();
+    let ws = catalog_repo(&env);
+    let key = ssh_key(&env, "publisher");
+    let v1 = scout_installer(&env, "1.0.0");
+    set_raw_catalog(&ws, vec![scout_entry(&env, "1.0.0", &v1, Some(&key))]);
+    add_repo(&env, "cat", &ws);
+    let (code, v, _) = env.w3bs(&["install", "scout", "--yes"]);
+    assert_eq!(code, 0, "{v}");
+
+    // 1.0.1 arrives with its signature removed: a downgrade to "unsigned" is not allowed
+    // once this machine has pinned the namespace's key.
+    let v2 = scout_installer(&env, "1.0.1");
+    set_raw_catalog(&ws, vec![scout_entry(&env, "1.0.1", &v2, None)]);
+    let (code, v, _) = env.w3bs(&["update", "--yes"]);
+    assert_eq!(code, 1, "{v}");
+    let o = outcome(&v, "tools.example/scout");
+    assert_eq!((o["status"].as_str(), o["error"]["code"].as_str()), (Some("blocked"), Some("PUBLISHER_SIGNATURE_MISSING")), "{v}");
+    assert_eq!(runs(&env), vec!["1.0.0"], "the unsigned installer ran");
+    let (code, v, _) = env.w3bs(&["update", "--yes", "--accept-new-key"]);
+    assert_eq!(code, 0, "explicit acceptance: {v}");
+    assert_eq!(runs(&env), vec!["1.0.0", "1.0.1"]);
+}
+
+#[test]
 fn unsigned_entries_install_as_before_and_say_so() {
     let env = Env::new();
     let ws = catalog_repo(&env);

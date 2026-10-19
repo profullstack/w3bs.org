@@ -452,7 +452,27 @@ impl Engine {
     /// against this machine's pins for the namespace. Nothing is pinned here; that happens
     /// once the installer has been checked and has run.
     fn check_publisher(&mut self, entry: &CatalogEntry, accept_new_key: bool) -> Result<Option<VerifiedRelease>> {
-        let Some(v) = release::verify_entry(entry)? else { return Ok(None) };
+        let Some(v) = release::verify_entry(entry)? else {
+            // A namespace this machine has pinned keys for must stay signed: an unsigned entry
+            // there is either a stripped signature or a revoked key, and both need a person.
+            let namespace = entry.id.publisher();
+            let pins = match self.read_state()? {
+                Some(c) => db::publisher_keys(c, namespace)?,
+                None => vec![],
+            };
+            if !pins.is_empty() && !accept_new_key {
+                return Err(Error::approval(
+                    "PUBLISHER_SIGNATURE_MISSING",
+                    format!(
+                        "{} is unsigned, but this machine trusts {} for {}. The signature was removed or the publisher revoked its key; re-run with --accept-new-key only if you know why",
+                        entry.id,
+                        pins.join(", "),
+                        namespace
+                    ),
+                ));
+            }
+            return Ok(None);
+        };
         let pins = match self.read_state()? {
             Some(c) => db::publisher_keys(c, &v.namespace)?,
             None => vec![],
