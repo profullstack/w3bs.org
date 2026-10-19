@@ -546,16 +546,29 @@ fi
 # --- desktop ----------------------------------------------------------------------------
 if [ "$DESKTOP" != none ]; then
 	step "Installing the $DESKTOP desktop (setup-desktop $DESKTOP; this downloads about 1-2 GB)"
+	# setup-desktop runs `rc-update add SERVICE` without a runlevel, meaning "the current one":
+	# in this chroot OpenRC has no state and that is sysinit, so sddm, dbus and elogind would
+	# start before the system is up. Say the current runlevel is default while it runs.
+	mkdir -p "$TARGET/run/openrc" && echo default >"$TARGET/run/openrc/softlevel"
 	in_target setup-desktop "$DESKTOP" </dev/null 2>&1 | tee -a "$LOG"
+	rm -f "$TARGET/run/openrc/softlevel"
+	for svc in dbus elogind sddm gdm lightdm greetd; do
+		if [ -L "$TARGET/etc/runlevels/sysinit/$svc" ]; then
+			in_target rc-update del "$svc" sysinit >>"$LOG" 2>&1
+			in_target rc-update add "$svc" default >>"$LOG" 2>&1 || fail "cannot move $svc to the default runlevel"
+		fi
+	done
+	# setup-desktop installs a meta package's dependencies, not the meta package itself.
 	case "$DESKTOP" in
-		plasma) want="plasma-desktop-meta sddm"; dm=sddm ;;
-		gnome) want="gnome gdm"; dm=gdm ;;
-		xfce) want="xfce4 lightdm"; dm=lightdm ;;
+		plasma) want="plasma-workspace sddm"; dm=sddm ;;
+		gnome) want="gnome-shell gdm"; dm=gdm ;;
+		xfce) want="xfce4-session lightdm"; dm=lightdm ;;
 	esac
 	for p in $want; do
 		in_target apk info -e "$p" >/dev/null 2>&1 || fail "setup-desktop $DESKTOP did not install $p"
 	done
 	[ -L "$TARGET/etc/runlevels/default/$dm" ] || fail "the display manager $dm is not enabled"
+	[ -L "$TARGET/etc/runlevels/default/dbus" ] || fail "dbus is not in the default runlevel"
 fi
 
 # --- W3BS -------------------------------------------------------------------------------
