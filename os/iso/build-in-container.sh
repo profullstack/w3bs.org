@@ -27,7 +27,14 @@ pub=$(ls /home/build/.abuild/*.rsa.pub | head -n 1)
 cp "$pub" /etc/apk/keys/
 
 echo "==> Staging aports $ALPINE_BRANCH-stable, the profile and the overlay"
-su build -s /bin/sh -c "git clone -q --depth 1 -b '${ALPINE_BRANCH}-stable' https://gitlab.alpinelinux.org/alpine/aports.git '$work/aports'"
+# gitlab.alpinelinux.org answers CI runners with HTTP 418 at times; the read-only mirror has the
+# same branches.
+for url in https://gitlab.alpinelinux.org/alpine/aports.git https://github.com/alpinelinux/aports.git; do
+	rm -rf "$work/aports"
+	su build -s /bin/sh -c "git clone -q --depth 1 -b '${ALPINE_BRANCH}-stable' '$url' '$work/aports'" && break
+	echo "    $url failed; trying the next mirror"
+done
+[ -f "$work/aports/scripts/mkimage.sh" ] || { echo "cannot clone aports ${ALPINE_BRANCH}-stable" >&2; exit 1; }
 mkdir -p /home/build/.mkimage
 cp "$SRC/os/iso/mkimg.w3bs.sh" "$SRC/os/iso/genapkovl-w3bs.sh" /home/build/.mkimage/
 chmod 0755 /home/build/.mkimage/genapkovl-w3bs.sh
