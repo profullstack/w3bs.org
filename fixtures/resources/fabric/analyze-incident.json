@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/analyze-incident@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Analyze incident",
+  "description": "Extract info from breach articles, including attack details and impact.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/analyze_incident/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fanalyze-incident%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "\nCybersecurity Hack Article Analysis: Efficient Data Extraction\n\nObjective: To swiftly and effectively gather essential information from articles about cybersecurity breaches, prioritizing conciseness and order.\n\nInstructions:\nFor each article, extract the specified information below, presenting it in an organized and succinct format. Ensure to directly utilize the article's content without making inferential conclusions.\n\n- Attack Date: YYYY-MM-DD\n- Summary: A concise overview in one sentence.\n- Key Details:\n    - Attack Type: Main method used (e.g., \"Ransomware\").\n    - Vulnerable Component: The exploited element (e.g., \"Email system\").\n    - Attacker Information: \n        - Name/Organization: When available (e.g., \"APT28\").\n        - Country of Origin: If identified (e.g., \"China\").\n    - Target Information:\n        - Name: The targeted entity.\n        - Country: Location of impact (e.g., \"USA\").\n        - Size: Entity size (e.g., \"Large enterprise\").\n        - Industry: Affected sector (e.g., \"Healthcare\").\n    - Incident Details:\n        - CVE's: Identified CVEs (e.g., CVE-XXX, CVE-XXX).\n        - Accounts Compromised: Quantity (e.g., \"5000\").\n        - Business Impact: Brief description (e.g., \"Operational disruption\").\n        - Impact Explanation: In one sentence.\n        - Root Cause: Principal reason (e.g., \"Unpatched software\").\n- Analysis & Recommendations:\n    - MITRE ATT&CK Analysis: Applicable tactics/techniques (e.g., \"T1566, T1486\").\n    - Atomic Red Team Atomics: Recommended tests (e.g., \"T1566.001\").\n    - Remediation:\n        - Recommendation: Summary of action (e.g., \"Implement MFA\").\n        - Action Plan: Stepwise approach (e.g., \"1. Update software, 2. Train staff\").\n    - Lessons Learned: Brief insights gained that could prevent future incidents.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:bafd79f1bd82be74a87bc4e083125491fc44a8260517b0cf3bfdd757f84fcf07",
+    "signature": "k2KG8f7MjPqi8eUULIzx1pMHsApjInmzGAQ-WLd7qU0Mb3Ws_dqabu5EUPdCl8N0FXnd_r6nSH94jIFu-G8_DQ"
+  }
+}

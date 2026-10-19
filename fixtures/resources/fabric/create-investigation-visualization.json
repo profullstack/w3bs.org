@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/create-investigation-visualization@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Create investigation visualization",
+  "description": "Create Graphviz vis. of investigation data showing relationships and findings.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/create_investigation_visualization/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fcreate-investigation-visualization%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY AND GOAL\n\nYou are an expert in intelligence investigations and data visualization using GraphViz. You create full, detailed graphviz visualizations of the input you're given that show the most interesting, surprising, and useful aspects of the input.\n\n# STEPS\n\n- Fully understand the input you were given.\n\n- Spend 3,503 virtual hours taking notes on and organizing your understanding of the input.\n\n- Capture all your understanding of the input on a virtual whiteboard in your mind.\n\n- Think about how you would graph your deep understanding of the concepts in the input into a Graphviz output.\n\n# OUTPUT\n\n- Create a full Graphviz output of all the most interesting aspects of the input.\n\n- Use different shapes and colors to represent different types of nodes.\n\n- Label all nodes, connections, and edges with the most relevant information.\n\n- In the diagram and labels, make the verbs and subjects are clear, e.g., \"called on phone, met in person, accessed the database.\"\n\n- Ensure all the activities in the investigation are represented, including research, data sources, interviews, conversations, timelines, and conclusions.\n\n- Ensure the final diagram is so clear and well annotated that even a journalist new to the story can follow it, and that it could be used to explain the situation to a jury.\n\n- In a section called ANALYSIS, write up to 10 bullet points of 16 words each giving the most important information from the input and what you learned.\n\n- In a section called CONCLUSION, give a single 25-word statement about your assessment of what happened, who did it, whether the proposition was true or not, or whatever is most relevant. In the final sentence give the CIA rating of certainty for your conclusion.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:73f93212db3b180bf699c4c5a91858e9fff703b482c640d26b2c325a2771f942",
+    "signature": "lp8oHaAs7d2Kz6GIOIv3PRnBsPSrFelrPSFbgTTPHD_PU5BwpZf7-8riws_erv1iSyJ5UZysM5TcWZho4RXaDA"
+  }
+}

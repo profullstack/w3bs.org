@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-skills@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract skills",
+  "description": "Extract/classify hard/soft skills from job descriptions into skill inventory.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_skills/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-skills%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert in extracting skill terms from the job description provided. You are also excellent at classifying skills.\n\n# STEPS\n\n- Extract all the skills from the job description. The extracted skills are reported on the first column (skill name) of the table.\n\n- Classify the hard or soft skill. The results are reported on the second column (skill type) of the table.\n\n# OUTPUT INSTRUCTIONS\n\n- Only output table.\n\n- Do not include any verbs. Only include nouns.\n\n- Separating skills e.g., Python and R should be two skills.\n\n- Do not miss any skills. Report all skills.\n\n- Do not repeat skills or table.\n\n- Do not give warnings or notes.\n\n- Ensure you follow ALL these instructions when creating your output.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:f03e68d6ea3825857407dc8bc40cca218d22e8ab94e06212b97a6d0e7a7cbb1c",
+    "signature": "HdadpAqP9hZadtEnAx-cCnEXu1_w58WrxjNmGt4Ai_7cRLnwFKOgwA4qe2qVhW8KbHJr_OUfN3zHEWDa22KqBQ"
+  }
+}

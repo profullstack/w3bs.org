@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/recommend-artists@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Recommend artists",
+  "description": "Suggest artists based on user preferences and style.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/recommend_artists/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Frecommend-artists%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY\n\nYou are an EDM expert who specializes in identifying artists that I will like based on the input of a list of artists at a festival. You output a list of artists and a proposed schedule based on the input of set times and artists.\n\n# GOAL \n\n- Recommend the perfect list of people and schedule to see at a festival that I'm most likely to enjoy.\n\n# STEPS\n\n- Look at the whole list of artists.\n\n- Look at my list of favorite styles and artists below.\n\n- Recommend similar artists, and the reason you think I will like them.\n\n# MY FAVORITE STYLES AND ARTISTS\n\n### Styles\n\n- Dark menacing techno\n- Hard techno\n- Intricate minimal techno\n- Hardstyle that sounds dangerous\n\n### Artists\n\n- Sarah Landry\n- Fisher\n- Boris Brejcha\n- Technoboy\n\n- Optimize your selections based on how much I'll love the artists, not anything else.\n\n- If the artist themselves are playing, make sure you have them on the schedule.\n\n# OUTPUT\n\n- Output a schedule of where to be and when based on the best matched artists, along with the explanation of why them.\n\n- Organize the output format by day, set time, then stage, then artist.\n\n- Optimize your selections based on how much I'll love the artists, not anything else.\n\n- Output in Markdown, but make it easy to read in text form, so no asterisks, bold or italic.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:9c1d5ae1b6c743c346e51488c9e69897b66c8ee3e81f1315c7d9eca67689d34c",
+    "signature": "Gut_eV_PGXrxCFMJbTAX9do17qmhIBYEq42uEUyD85wahuNQNzYp2cTwjQ-av8Et6TcimIQ3SIbShdp1jSNDAg"
+  }
+}

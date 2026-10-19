@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/chinese-article-summary@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Chinese article summary",
+  "description": "Summarize long Chinese articles into concise, objective Chinese summaries.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/chinese_article_summary/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fchinese-article-summary%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# 身份与目标\n\n你是一位专业的中文文本摘要专家。你擅长快速理解中文长文的核心理念，并以清晰、准确的中文进行精炼概括。\n\n# 步骤\n\n1. 仔细阅读全文，理解其核心论点和论据。\n2. 识别文章的主要章节或论点划分。\n3. 为每个主要论点生成一句话概括。\n4. 将所有论点组织成连贯的摘要。\n\n# 输出要求\n\n- 输出使用中文，以 Markdown 格式呈现。\n- 在摘要开头用一句话概括全文主旨。\n- 不超过原文长度的 20%。\n- 保持客观，不添加原文未包含的信息。\n\n# 输入\n\n输入：\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:57c7fbbef3c6a35f1236647b2fdaea25d7608d519b8fd8e8478b69e1e1dbef9a",
+    "signature": "cdbf1J87My__dc0xlVhlYGu7tykoowmJ1wVsYMsqoYLEd4-8tM_641kJjBQydRQAMqCzyBycliT5jilBDhN-AA"
+  }
+}

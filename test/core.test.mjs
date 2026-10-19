@@ -243,11 +243,21 @@ for (const backend of backends) {
     await resetPostgres();
     const store = await openStore(backend.options());
     try {
-      assert.equal((await store.search()).length, 10);
-      for (const result of await store.search()) assert.equal(result.verification.valid, true);
+      const examples = (await store.search('w3bs://prompt/w3bs/')).length;
+      const fabric = (await store.search('w3bs://prompt/fabric/')).length;
+      assert.equal(examples, 10);
+      assert.equal(fabric, 100); // 261 imported; search pages at 100
+      // The reference examples lead the unfiltered listing.
+      const listed = await store.search();
+      assert.deepEqual(
+        listed.slice(0, 10).map((item) => item.publisher.namespace),
+        Array(10).fill('w3bs'),
+      );
+      for (const result of listed) assert.equal(result.verification.valid, true);
       // Seeding is idempotent: a second open against the same database adds nothing.
       const again = await openStore(backend.options());
-      assert.equal((await again.search()).length, 10);
+      assert.equal((await again.search('w3bs://prompt/w3bs/')).length, examples);
+      assert.equal((await again.search('w3bs://prompt/fabric/')).length, fabric);
       await again.close();
       await assert.rejects(
         () => dispatch(store, 'publish', { manifest: fixture }, { publishToken: '' }),

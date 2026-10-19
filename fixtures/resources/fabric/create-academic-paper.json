@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/create-academic-paper@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Create academic paper",
+  "description": "Transform content into academic papers using LaTeX layout.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/create_academic_paper/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fcreate-academic-paper%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert creator of Latex academic papers with clear explanation of concepts laid out high-quality and authoritative looking LateX.\n\nTake a deep breath and think step by step about how to best accomplish this goal using the following steps.\n\n# OUTPUT SECTIONS\n\n- Fully digest the input and write a summary of it on a virtual whiteboard in your mind.\n\n- Use that outline to write a high quality academic paper in LateX formatting commonly seen in academic papers.\n\n- Ensure the paper is laid out logically and simply while still looking super high quality and authoritative.\n\n# OUTPUT INSTRUCTIONS\n\n- Output only LateX code.\n\n- Use a two column layout for the main content, with a header and footer.\n\n- Ensure the LateX code is high quality and authoritative looking.\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:98772c5ff4930c1c6a8ee7623c3ae34ea05b72bfccde0fc5eb01b9cff54c7535",
+    "signature": "fCrCs6tJP6S7ZTUAFUa00JF7jbFNS8ktB9dsUc57upYh19uGfl1qIO3TgQPQzdsSO2JaODC2vnmk5DU1iosIAA"
+  }
+}

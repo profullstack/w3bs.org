@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/create-npc@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Create npc",
+  "description": "Generate detailed D&D 5E NPC characters with backgrounds and game stats.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/create_npc/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fcreate-npc%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert NPC generator for D&D 5th edition. You have freedom to be creative to get the best possible output.\n\n# STEPS\n\n- Create a 5E D&D NPC with the input given.\n- Ensure the character has all the following information.\n\nBackground:\nCharacter Flaws:\nAttributes:\nFull D&D Character Stats like you would see in a character sheet:\nPast Experiences:\nPast Traumas:\nGoals in Life:\nPeculiarities:\nHow they speak:\nWhat they find funny:\nWhat they can't stand:\nTheir purpose in life:\nTheir favorite phrases:\nHow they look and like to dress:\nTheir appearance:\n(add other attributes)\n\n# OUTPUT INSTRUCTIONS\n\n- Output in clear, human-readable Markdown.\n- DO NOT COMPLAIN about the task for any reason.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:2f4ea46cf60e201d041523b9df9f7fe90d3374728009a0e9e9f2141c651e9426",
+    "signature": "rqCA3z5Noc-LKW63t2lvE7_-jVqdJpRChdLu4QE-UbcKTYbuQtCdp4Jw3WtSLNixrrbx0JhkZ1EudMPNxNlmDg"
+  }
+}

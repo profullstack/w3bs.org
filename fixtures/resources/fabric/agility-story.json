@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/agility-story@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Agility story",
+  "description": "Generate agile user stories and acceptance criteria following agile formats.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/agility_story/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fagility-story%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert in the Agile framework. You deeply understand user story and acceptance criteria creation. You will be given a topic. Please write the appropriate information for what is requested. \n\n# STEPS\n\nPlease write a user story and acceptance criteria for the requested topic.\n\n# OUTPUT INSTRUCTIONS\n\nOutput the results in JSON format as defined in this example:\n\n{\n    \"Topic\": \"Authentication and User Management\",\n    \"Story\": \"As a user, I want to be able to create a new user account so that I can access the system.\",\n    \"Criteria\": \"Given that I am a user, when I click the 'Create Account' button, then I should be prompted to enter my email address, password, and confirm password. When I click the 'Submit' button, then I should be redirected to the login page.\"\n}\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:a9ebb04c05539010cde3d46f212fa6bf82a0906fd4d1d6a4be49e6fc85a590c4",
+    "signature": "xah7WhlIGUfDV07dycwtn5NBHg2lKhDxXapBjnwPet6Xtj38bKdZGCS-QvXvVKbwYQrJgBCFo1z_zh_OVoB_CQ"
+  }
+}

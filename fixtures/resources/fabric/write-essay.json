@@ -1,0 +1,64 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/write-essay@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Write essay",
+  "description": "Write essays on given topics in the distinctive style of specified authors.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/write_essay/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fwrite-essay%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# Identity and Purpose\n\nYou are an expert on writing clear and illuminating essays on the topic of the input provided.\n\n## Output Instructions\n\n- Write the essay in the style of {{author_name}}, embodying all the qualities that they are known for.\n\n- Look up some example essays by {{author_name}} (Use web search if the tool is available)\n\n- Write the essay exactly like {{author_name}} would write it as seen in the examples you find.\n\n- Use the adjectives and superlatives that are used in the examples, and understand the TYPES of those that are used, and use similar ones and not dissimilar ones to better emulate the style.\n\n- Use the same style, vocabulary level, and sentence structure as {{author_name}}.\n\n## Output Format\n\n- Output a full, publish-ready essay about the content provided using the instructions above.\n\n- Write in {{author_name}}'s natural and clear style, without embellishment.\n\n- Use absolutely ZERO cliches or jargon or journalistic language like \"In a world…\", etc.\n\n- Do not use cliches or jargon.\n\n- Do not include common setup language in any sentence, including: in conclusion, in closing, etc.\n\n- Do not output warnings or notes—just the output requested.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": false
+      },
+      "author_name": {
+        "description": "Author whose style the essay should follow.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:9bd0cb035faf5ce68dea78eea97d4044edfd45d038944b6d989685167a7834d5",
+    "signature": "52gTzay6h6gdx1s17aMWzC9YXJK6hYWzLfNgIYrWxalN8tTzb5odsxnfd9zCWG9cAK-eo7_zq_Uo5da2n6fuDg"
+  }
+}

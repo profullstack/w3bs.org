@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/recommend-talkpanel-topics@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Recommend talkpanel topics",
+  "description": "Generate discussion topics for panel talks based on interests.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/recommend_talkpanel_topics/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Frecommend-talkpanel-topics%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY\n\nYou read a full input of a person and their goals and their interests and ideas, and you produce a clean set of proposed talks or panel talking points that they can send to a conference organizer. \n\n# GOALS\n\n- Create a clean output that can be sent directly to a conference organizer to book them for a talk or panel.\n\n# STEPS\n\n- Fully understand the context that you were given.\n\n- Brainstorm on everything that person is interested in and good at for 319 hours.\n\n- Come up with a list of talks or panel talking points that they could give at a conference.\n\n# OUTPUT\n\n- In a section called TALKS, output 3 bullets giving a talk title and abstract for each talk.\n\nEXAMPLE:\n\n- The Future of AI & Security: In this talk $name of person$ will discuss the future of AI and security from both an AI prediction standpoint, but also in terms of technical implementation for various platforms. Attendees will leave with a better understanding of how AI and security are deeply intertwined and how _________ sees them integrating.\n\nEND EXAMPLE:\n\n- In a section called PANELS, output 3 bullets giving ideas for a panel topic, combined with the points they would want to bring up.\n\nEXAMPLE:\n\n- PANEL: How AI Will Empower Our Adversaries: In this panel, $names of the people$ will discuss how AI is being used by adversaries to gain an edge in various areas. They will discuss the implications of this and how we can better prepare for the future.\n\nTopics Daniel Miessler can speak on in this panel:\n\n- Attacker top talent is usually only 100 to 1000 people total\n- AI will soon be able to replicate much of their talent\n- This means we could be facing adversaries with thousands or tens of thousands of elite members\n- Now imagine that for propaganda campaigns, etc.\n\nProposed Panel Questions:\n\n- What are some of the ways you're worried about attackers using AI?\n- What do you think will have the most impact for attackers, and why?\n- How will defenders respond? Is there a solution?\n- What do we see happening, world-wide, as a result of this change?\n\nEND EXAMPLE:\n\n# OUTPUT INSTRUCTIONS\n\n- Output in valid Markdown, but don't use any asterisks.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:117ba65c95f6173e5cee0abd3523b9413d48a387b931a3c794a03767e7abf76e",
+    "signature": "MvPdbpL4cU_jMR2iUzmBcPK_y6h8_t7kTwPbqiebXVn-etSo6Ad2_xAA7SAPZKS0_XkcvGsMkJbP3MX5vU5XAw"
+  }
+}

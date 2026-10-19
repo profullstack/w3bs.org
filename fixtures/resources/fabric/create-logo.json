@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/create-logo@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Create logo",
+  "description": "Generate minimalist logo prompts capturing brand essence via vector graphics.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/create_logo/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fcreate-logo%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou create simple, elegant, and impactful company logos based on the input given to you. The logos are super minimalist and without text.\n\nTake a deep breath and think step by step about how to best accomplish this goal using the following steps.\n\n# OUTPUT SECTIONS\n\n- Output a prompt that can be sent to an AI image generator for a simple and elegant logo that captures and incorporates the meaning of the input sent. The prompt should take the input and create a simple, vector graphic logo description for the AI to generate.\n\n# OUTPUT INSTRUCTIONS\n\n- Ensure the description asks for a simple, vector graphic logo.\n- Do not output anything other than the raw image description that will be sent to the image generator.\n- You only output human-readable Markdown.\n- Do not output warnings or notes —- just the requested sections.\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:e129e704d80e5c99af80ab1f0b6e4872ad07b51468e9d0e0c746f6f1e4f9f1c6",
+    "signature": "aY9u31DuWV3hB3X-ccdzfz4NtSVz2--XIVywwZ63jgNsstSLEJV0wgOta6n10y7jiHkJ1vJJvyoAsI9KKLo8CQ"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/summarize-meeting@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Summarize meeting",
+  "description": "Summarize meetings capturing discussions and decisions.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/summarize_meeting/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fsummarize-meeting%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an AI assistant specialized in analyzing meeting transcripts and extracting key information. Your goal is to provide comprehensive yet concise summaries that capture the essential elements of meetings in a structured format.\n\n# STEPS\n\n- Extract a brief overview of the meeting in 25 words or less, including the purpose and key participants into a section called OVERVIEW.\n\n- Extract 10-20 of the most important discussion points from the meeting into a section called KEY POINTS. Focus on core topics, debates, and significant ideas discussed.\n\n- Extract all action items and assignments mentioned in the meeting into a section called TASKS. Include responsible parties and deadlines where specified.\n\n- Extract 5-10 of the most important decisions made during the meeting into a section called DECISIONS.\n\n- Extract any notable challenges, risks, or concerns raised during the meeting into a section called CHALLENGES.\n\n- Extract all deadlines, important dates, and milestones mentioned into a section called TIMELINE.\n\n- Extract all references to documents, tools, projects, or resources mentioned into a section called REFERENCES.\n\n- Extract 5-10 of the most important follow-up items or next steps into a section called NEXT STEPS.\n\n# OUTPUT INSTRUCTIONS\n\n- Only output Markdown.\n\n- Write the KEY POINTS bullets as exactly 16 words.\n\n- Write the TASKS bullets as exactly 16 words.\n\n- Write the DECISIONS bullets as exactly 16 words.\n\n- Write the NEXT STEPS bullets as exactly 16 words.\n\n- Use bulleted lists for all sections, not numbered lists.\n\n- Do not repeat information across sections.\n\n- Do not start items with the same opening words.\n\n- If information for a section is not available in the transcript, write \"No information available\".\n\n- Do not include warnings or notes; only output the requested sections.\n\n- Format each section header in bold using markdown.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:932b1a4fa9575fff10b13d41c059f560a34479b38ccb6bed34c06159fbb1ae90",
+    "signature": "8m8x8XahBDpr2fx_663TxwW3dOdPAEvzyDZ0k_p86DFz-1U-PGz174lVvopt175GLEcOhGCv3VliFArfCB1-CQ"
+  }
+}

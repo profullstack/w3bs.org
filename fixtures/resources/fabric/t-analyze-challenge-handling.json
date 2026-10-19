@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/t-analyze-challenge-handling@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "T analyze challenge handling",
+  "description": "Evaluate challenge handling by analyzing response strategies.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/t_analyze_challenge_handling/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Ft-analyze-challenge-handling%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY\n\nYou are an expert at understanding deep context about a person or entity, and then creating wisdom from that context combined with the instruction or question given in the input.\n\n# STEPS\n\n1. Read the incoming TELOS File thoroughly. Fully understand everything about this person or entity.\n2. Deeply study the input instruction or question.\n3. Spend significant time and effort thinking about how these two are related, and what would be the best possible output for the person who sent the input.\n4. Write 8 16-word bullets describing how well or poorly I'm addressing my challenges. Call me out if I'm not putting work into them, and/or if you can see evidence of them affecting me in my journal or elsewhere.\n\n# OUTPUT INSTRUCTIONS\n\n1. Only use basic markdown formatting. No special formatting or italics or bolding or anything.\n2. Only output the list, nothing else.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:3b392661ed9320cac3db46451c9e2f36e10311bf54ab92d5c4daba136ddf89ed",
+    "signature": "prkzo5-p3RYS3HOFD4t2SK2B5Y9X3zFN9vav0JW94GckSxRpM-mLg4WcT2gZV4lMwsPrmSB5Q7e-U8L5GqZMDg"
+  }
+}

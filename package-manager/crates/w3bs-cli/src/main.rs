@@ -11,6 +11,7 @@ mod link;
 mod publish;
 mod screen;
 mod render;
+mod runner;
 
 use clap::{Args, Parser, Subcommand};
 use serde_json::{Value, json};
@@ -326,15 +327,26 @@ enum ResCmd {
         #[command(flatten)]
         a: Api,
     },
-    /// Render a prompt template with explicit consent (no model or tool is called)
+    /// Render a prompt template with explicit consent; --via hands the result to a model
+    #[command(after_help = "Piped text fills the `input` input (or a prompt's only input):\n  pbpaste | w3bs resource run fabric/summarize --consent --via moshcode --model claude\n  w3bs resource run fabric/translate --input lang_code=fr --consent --via infernet < notes.md")]
     Run {
+        /// w3bs://prompt/<namespace>/<name>[@version], or <namespace>/<name>
         uri: String,
         /// JSON file of template inputs
         #[arg(long, value_name = "FILE")]
         inputs: Option<PathBuf>,
-        /// Authorize rendering
+        /// One template input (repeatable)
+        #[arg(long = "input", value_name = "NAME=VALUE")]
+        input: Vec<String>,
+        /// Authorize rendering, and sending the result to --via
         #[arg(long)]
         consent: bool,
+        /// Send the rendered instructions to a model through this runner
+        #[arg(long, value_enum)]
+        via: Option<runner::Via>,
+        /// Model for infernet/c0mpute (e.g. qwen2.5:7b), engine for moshcode (e.g. claude)
+        #[arg(long)]
+        model: Option<String>,
         #[command(flatten)]
         a: Api,
     },
@@ -768,6 +780,7 @@ enum Cmd {
     Update(UpdateArgs),
     /// Upgrade the whole machine: the system packages (apk, apt, dnf, pacman, zypper or brew),
     /// then every W3BS package and the w3bs CLI
+    #[command(visible_alias = "upgrade")]
     DistUpgrade(DistUpgradeArgs),
     /// List installed packages (shortcut for `w3bs pkg list`)
     List,
@@ -1354,13 +1367,7 @@ async fn run_resource(cmd: ResCmd) -> (&'static str, w3bs_core::Result<Operation
         ResCmd::Inspect { uri, a } => ("resource.inspect", api_uri(&a, "inspect", &uri).await),
         ResCmd::Verify { uri, a } => ("resource.verify", api_uri(&a, "verify", &uri).await),
         ResCmd::Conformance { uri, a } => ("resource.conformance", api_uri(&a, "conformance", &uri).await),
-        ResCmd::Run { uri, inputs, consent, a } => {
-            let inputs = match inputs.map(|p| read_json(&p)).transpose() {
-                Ok(i) => i.unwrap_or_else(|| json!({})),
-                Err(e) => return ("resource.run", Err(e)),
-            };
-            ("resource.run", api_call(&a, "run", json!({ "uri": uri, "inputs": inputs, "consent": consent })).await)
-        }
+        ResCmd::Run { uri, inputs, input, consent, via, model, a } => ("resource.run", run_prompt(&a, &uri, inputs, &input, consent, via, model.as_deref()).await),
         ResCmd::Publish { manifest, a } => match read_json(&manifest) {
             Ok(m) => ("resource.publish", api_call(&a, "publish", json!({ "manifest": m })).await),
             Err(e) => ("resource.publish", Err(e)),
@@ -1392,6 +1399,42 @@ async fn run_resource(cmd: ResCmd) -> (&'static str, w3bs_core::Result<Operation
         }
         Err(e) => (op, Err(e)),
     }
+}
+
+/// `<namespace>/<name>` is shorthand for a prompt: `fabric/summarize`.
+fn prompt_uri(uri: &str) -> String {
+    if !uri.contains("://") && uri.matches('/').count() == 1 { format!("w3bs://prompt/{uri}") } else { uri.to_owned() }
+}
+
+/// Render through the registry, then, with `--via`, hand the instructions to a runner.
+async fn run_prompt(a: &Api, uri: &str, file: Option<PathBuf>, pairs: &[String], consent: bool, via: Option<runner::Via>, model: Option<&str>) -> w3bs_core::Result<Value> {
+    let uri = prompt_uri(uri);
+    let mut inputs = file.map(|p| read_json(&p)).transpose()?.unwrap_or_else(|| json!({}));
+    if !inputs.is_object() {
+        return Err(w3bs_core::Error::usage("INVALID_INPUT", "--inputs must be a JSON object"));
+    }
+    for pair in pairs {
+        let (k, v) = pair.split_once('=').ok_or_else(|| w3bs_core::Error::usage("INVALID_INPUT", format!("--input expects NAME=VALUE, got {pair}")))?;
+        inputs[k] = v.into();
+    }
+    // Piped text fills `input` (Fabric's convention) or the prompt's only input, unless given.
+    if !link::stdin_is_tty() {
+        let declared = api_uri(a, "inspect", &uri).await?["manifest"]["content"]["inputs"].as_object().cloned().unwrap_or_default();
+        let target = if declared.contains_key("input") { Some("input".to_owned()) } else if declared.len() == 1 { declared.keys().next().cloned() } else { None };
+        if let Some(target) = target.filter(|t| inputs.get(t).is_none()) {
+            let mut text = String::new();
+            std::io::Read::read_to_string(&mut std::io::stdin(), &mut text).map_err(|e| w3bs_core::Error::usage("READ", format!("stdin: {e}")))?;
+            if !text.trim().is_empty() {
+                inputs[target] = text.into();
+            }
+        }
+    }
+    let mut out = api_call(a, "run", json!({ "uri": uri, "inputs": inputs, "consent": consent })).await?;
+    if let Some(via) = via {
+        out["runner"] = runner::run(via, model, out["output"].as_str().unwrap_or_default())?;
+        out["modelInvoked"] = true.into();
+    }
+    Ok(out)
 }
 
 async fn api_call(a: &Api, operation: &str, args: Value) -> w3bs_core::Result<Value> {

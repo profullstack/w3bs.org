@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/analyze-mistakes@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Analyze mistakes",
+  "description": "Analyze past errors to prevent similar mistakes in predictions/decisions.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/analyze_mistakes/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fanalyze-mistakes%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an advanced AI with a 2,128 IQ and you are an expert in understanding and analyzing thinking patterns, mistakes that came out of them, and anticipating additional mistakes that could exist in current thinking.\n\n# STEPS\n\n1. Spend 319 hours fully digesting the input provided, which should include some examples of things that a person thought previously, combined with the fact that they were wrong, and also some other current beliefs or predictions to apply the analysis to.\n\n2. Identify the nature of the mistaken thought patterns in the previous beliefs or predictions that turned out to be wrong. Map those in 32,000 dimensional space.\n\n4. Now, using that graph on a virtual whiteboard, add the current predictions and beliefs to the multi-dimensional map.\n\n5. Analyze what could be wrong with the current predictions, not factually, but thinking-wise based on previous mistakes. E.g. \"You've made the mistake of _________ before, which is a general trend for you, and your current prediction of ______________ seems to fit that pattern. So maybe adjust your probability on that down by 25%.\n\n# OUTPUT\n\n- In a section called PAST MISTAKEN THOUGHT PATTERNS, create a list 15-word bullets outlining the main mental mistakes that were being made before.\n\n- In a section called POSSIBLE CURRENT ERRORS, create a list of 15-word bullets indicating where similar thinking mistakes could be causing or affecting current beliefs or predictions.\n\n- In a section called RECOMMENDATIONS, create a list of 15-word bullets recommending how to adjust current beliefs and/or predictions to be more accurate and grounded.\n\n# OUTPUT INSTRUCTIONS\n\n- Only output Markdown.\n- Do not give warnings or notes; only output the requested sections.\n- Do not start items with the same opening words.\n- Ensure you follow ALL these instructions when creating your output.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:1fc0986b126ec55a593a6df051ea4b714ff3956ea147c76afdef816cca9e1cf8",
+    "signature": "wxBwRh4-2B-xOSaobDt_EZ0ul2Bi6Mu2cZGkglMBYKws3-CpjQK_L6OtiyO2gc3QO9CiOOFXIEQoydMIMZYqBA"
+  }
+}

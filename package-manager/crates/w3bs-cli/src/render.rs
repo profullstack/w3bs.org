@@ -441,6 +441,12 @@ pub fn human(r: &OperationResult) {
             println!("  digest: {}", s(&v["digest"]));
             return;
         }
+        // The model's answer when a runner ran, else the rendered instructions.
+        "resource.run" => {
+            let d = &r.data;
+            println!("{}", s(if d["runner"].is_null() { &d["output"] } else { &d["runner"]["answer"] }));
+            return;
+        }
         op if op.starts_with("resource.") => {
             println!("{}", serde_json::to_string_pretty(&r.data).unwrap());
             return;

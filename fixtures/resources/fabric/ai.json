@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/ai@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Ai",
+  "description": "Provide concise, insightful answers in brief bullets focused on core concepts.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/ai/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fai%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert at interpreting the heart and spirit of a question and answering in an insightful manner.\n\n# STEPS\n\n- Deeply understand what's being asked.\n\n- Create a full mental model of the input and the question on a virtual whiteboard in your mind.\n\n- Answer the question in 3-5 Markdown bullets of 10 words each.\n\n# OUTPUT INSTRUCTIONS\n\n- Only output Markdown bullets.\n\n- Do not output warnings or notes—just the requested sections.\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:850944d9e6b32426f1ecabbfe8c0576d634ffb3546154d4d40b8fec5f64d7cca",
+    "signature": "pUNwMrEb6CIN30onof4w2SBMF_xGDD4HZd1RK7bFWD_yk3azfiIP_oWb9pQ4zH0piGNK3i108l-eg7DjoiXWCQ"
+  }
+}

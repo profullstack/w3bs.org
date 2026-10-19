@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-sponsors@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract sponsors",
+  "description": "Extract/organize sponsorship info, including names and messages.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_sponsors/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-sponsors%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert at extracting the sponsors and potential sponsors from a given transcript, such a from a podcast, video transcript, essay, or whatever.\n\n# Steps\n\n- Consume the whole transcript so you understand what is content, what is meta information, etc.\n\n- Discern the difference between companies that were mentioned and companies that actually sponsored the podcast or video.\n\n- Output the following:\n\n## OFFICIAL SPONSORS\n\n- $SOURCE_CHANNEL$ | $SPONSOR1$ | $SPONSOR1_DESCRIPTION$ | $SPONSOR1_LINK$\n- $SOURCE_CHANNEL$ | $SPONSOR2$ | $SPONSOR2_DESCRIPTION$ | $SPONSOR2_LINK$\n- $SOURCE_CHANNEL$ | $SPONSOR3$ | $SPONSOR3_DESCRIPTION$ | $SPONSOR3_LINK$\n- And so on…\n\n# EXAMPLE OUTPUT\n\n## OFFICIAL SPONSORS\n\n- Flair | Flair is a threat intel platform powered by AI. | https://flair.ai\n- Weaviate | Weviate is an open-source knowledge graph powered by ML. | https://weaviate.com\n- JunaAI | JunaAI is a platform for AI-powered content creation. | https://junaai.com\n- JunaAI | JunaAI is a platform for AI-powered content creation. | https://junaai.com\n\n## END EXAMPLE OUTPUT\n\n# OUTPUT INSTRUCTIONS\n\n- The official sponsor list should only include companies that officially sponsored the content in question.\n- Do not output warnings or notes—just the requested sections.\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:bf8beca9fda7bd8907b68e5c4b964e30352534a0421f53409c81a326d5f55c69",
+    "signature": "HA8mp5SCEWfFmbgMwhDM_vNBPCizkR0NS9ldAhkERQ7SCRf9McKZ4MoX7-TqujyupDpFCdihk3Q-Qcy8IDRlBg"
+  }
+}

@@ -204,24 +204,33 @@ export async function openStore({
         latest.set(base, manifest);
     }
     const revokedIds = new Set((await db.all('SELECT id FROM revocations')).map((row) => row.id));
-    return [...latest.values()]
-      .filter(
-        (item) =>
-          (!type || item.type === type) &&
-          `${item.id} ${item.name} ${item.description}`.toLowerCase().includes(query.toLowerCase()),
-      )
-      .sort((a, b) => a.id.localeCompare(b.id))
-      .slice(0, 100)
-      .map((manifest) => ({
-        id: manifest.id,
-        name: manifest.name,
-        description: manifest.description,
-        type: manifest.type,
-        version: manifest.version,
-        publisher: manifest.publisher,
-        permissions: manifest.permissions,
-        verification: verifyManifest(manifest, trust, revokedIds.has(manifest.id)),
-      }));
+    return (
+      [...latest.values()]
+        .filter(
+          (item) =>
+            (!type || item.type === type) &&
+            `${item.id} ${item.name} ${item.description}`
+              .toLowerCase()
+              .includes(query.toLowerCase()),
+        )
+        // The w3bs reference examples lead; imported libraries follow by id.
+        .sort(
+          (a, b) =>
+            (b.publisher.namespace === 'w3bs') - (a.publisher.namespace === 'w3bs') ||
+            a.id.localeCompare(b.id),
+        )
+        .slice(0, 100)
+        .map((manifest) => ({
+          id: manifest.id,
+          name: manifest.name,
+          description: manifest.description,
+          type: manifest.type,
+          version: manifest.version,
+          publisher: manifest.publisher,
+          permissions: manifest.permissions,
+          verification: verifyManifest(manifest, trust, revokedIds.has(manifest.id)),
+        }))
+    );
   }
   async function revoke(uri, reason) {
     if (!parseUri(uri).version?.includes('.'))
@@ -384,15 +393,15 @@ export async function openStore({
   await createAccounts(db, { origin: 'http://localhost', events }).seedClients();
   const accounts = (origin) => createAccounts(db, { origin, events });
   if (seed) {
-    for (const filename of readdirSync(resolve(ROOT, 'fixtures/resources'))
-      .filter((name) => name.endsWith('.json'))
-      .sort()) {
-      const manifest = JSON.parse(
-        readFileSync(resolve(ROOT, 'fixtures/resources', filename), 'utf8'),
-      );
-      if (!(await db.get('SELECT id FROM resources WHERE id = ?', [manifest.id])))
-        await publish(manifest);
-    }
+    // The reference examples, then imported libraries (fixtures/resources/fabric).
+    for (const dir of ['fixtures/resources', 'fixtures/resources/fabric'])
+      for (const filename of readdirSync(resolve(ROOT, dir))
+        .filter((name) => name.endsWith('.json') && name !== 'catalog.json')
+        .sort()) {
+        const manifest = JSON.parse(readFileSync(resolve(ROOT, dir, filename), 'utf8'));
+        if (!(await db.get('SELECT id FROM resources WHERE id = ?', [manifest.id])))
+          await publish(manifest);
+      }
   }
   return {
     inspect,

@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/improve-academic-writing@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Improve academic writing",
+  "description": "Enhance academic writing by improving clarity and structure.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/improve_academic_writing/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fimprove-academic-writing%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an academic writing expert. You refine the input text in academic and scientific language using common words for the best clarity, coherence, and ease of understanding.\n\n# Steps\n\n- Refine the input text for grammatical errors, clarity issues, and coherence.\n- Refine the input text into academic voice.\n- Use formal English only.\n- Tend to use common and easy-to-understand words and phrases.\n- Avoid wordy sentences.\n- Avoid trivial statements.\n- Avoid using the same words and phrases repeatedly.\n- Apply corrections and improvements directly to the text.\n- Maintain the original meaning and intent of the user's text.\n\n# OUTPUT INSTRUCTIONS\n\n- Refined and improved text that is professionally academic.\n- A list of changes made to the original text.\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:30a04d38f4857fd5fd6eab11cbf81e78ec7efe80429e6f3ee3387b2cc2b4c82b",
+    "signature": "S4Ol3H6WdnNGSB9AbZj3nUjQO8USJ0JS15JgoTKixrwb2ykoCwtH0bZCbtBcauFH7OOEExKpI28bUfEi86_6Cg"
+  }
+}
