@@ -1,0 +1,110 @@
+# W3BS OS Docker editions (docs/os-prd.md §20): ghcr.io/profullstack/w3bs-os:{server,desktop}.
+# Pull requests build and smoke-test the server image; main builds both images natively on
+# amd64 and arm64, pushes them by digest, joins each into one multi-arch tag and signs it
+# (cosign keyless, GitHub OIDC). The desktop image's agent check needs vkms, which hosted
+# runners lack; run os/docker/check-desktop.sh on a host that has it.
+name: W3BS OS images
+on:
+  push:
+    branches: [main]
+    paths: ['os/docker/**', 'desktop/crates/**', 'desktop/Cargo.*', 'package-manager/crates/**', 'package-manager/Cargo.*', 'registry/FINGERPRINT', '.github/workflows/os-docker.yml']
+  pull_request:
+    paths: ['os/docker/**', 'desktop/crates/**', 'desktop/Cargo.*', 'package-manager/crates/**', 'package-manager/Cargo.*', 'registry/FINGERPRINT', '.github/workflows/os-docker.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  IMAGE: ghcr.io/profullstack/w3bs-os
+jobs:
+  smoke:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the server image
+        run: docker buildx build -f os/docker/Dockerfile --target server -t w3bs-os:server --load .
+      - name: w3bs runs, the official repository is pinned, and a catalog tool installs
+        run: |
+          docker run --rm w3bs-os:server zsh -lc '
+            set -e
+            w3bs --version
+            w3bs repo list | grep -q "$(cat /usr/share/w3bs-os/FINGERPRINT)"
+            w3bs install hqtui --yes >/dev/null
+            hqtui --version'
+
+  build:
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [server, desktop]
+        platform:
+          - { arch: amd64, runner: ubuntu-latest }
+          - { arch: arm64, runner: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: os/docker/Dockerfile
+          target: ${{ matrix.target }}
+          platforms: linux/${{ matrix.platform.arch }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=${{ matrix.target }}-${{ matrix.platform.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target }}-${{ matrix.platform.arch }}
+      - name: Record the digest
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          echo "${{ steps.build.outputs.digest }}" > "$RUNNER_TEMP/digests/${{ matrix.platform.arch }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.target }}-${{ matrix.platform.arch }}
+          path: ${{ runner.temp }}/digests/*
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    strategy:
+      matrix:
+        target: [server, desktop]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-${{ matrix.target }}-*
+          path: digests
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: sigstore/cosign-installer@v3
+      - name: Tag the multi-arch image and sign it
+        run: |
+          short=$(echo "$GITHUB_SHA" | cut -c1-7)
+          refs=$(for f in digests/*; do printf '%s@%s ' "$IMAGE" "$(cat "$f")"; done)
+          docker buildx imagetools create -t "$IMAGE:${{ matrix.target }}" -t "$IMAGE:${{ matrix.target }}-$short" $refs
+          digest=$(docker buildx imagetools inspect "$IMAGE:${{ matrix.target }}" --format '{{.Manifest.Digest}}')
+          cosign sign --yes "$IMAGE@$digest"
+          echo "$IMAGE:${{ matrix.target }} = $IMAGE@$digest (signed)" >> "$GITHUB_STEP_SUMMARY"
