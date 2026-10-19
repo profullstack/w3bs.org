@@ -52,6 +52,14 @@ async function releasedStore(dir) {
   return { t, episode: episodes[0], dataset: ds.dataset_id };
 }
 
+test('bare --version prints the release, the way w3bs update probes curl-installed tools', () => {
+  for (const flag of ['--version', '-V']) {
+    const r = spawnSync(process.execPath, ['training/bin/w3bs-training.mjs', flag], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /^w3bs-training \d+\.\d+\.\d+\n$/);
+  }
+});
+
 test('CLI imports, reports status and refuses human-only commands without a terminal', async () => {
   const dir = home();
   const bundle = join(dir, 'demo.w3bs-training.zip');

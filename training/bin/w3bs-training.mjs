@@ -92,6 +92,13 @@ function parseDuration(value) {
   return Number(match[1]) * { s: 1e3, m: 6e4, h: 36e5, d: 864e5 }[match[2]];
 }
 
+// A bare `--version` means "which release is this" (w3bs update asks every curl-installed
+// tool this way). It has to be caught before parseArgs, where --version takes a value.
+if (process.argv.length === 3 && ['--version', '-V'].includes(process.argv[2])) {
+  process.stdout.write(`w3bs-training ${VERSION}\n`);
+  process.exit(0);
+}
+
 const { values, positionals } = (() => {
   try {
     return parseArgs({
