@@ -131,6 +131,35 @@ fn at01_03_install_update_all_two_publishers() {
     assert_eq!(info["data"]["previous_version"], "1.0.0");
 }
 
+// A w3bs that is not the managed one (here the test binary; in W3BS OS the one baked into the
+// image) cannot update itself, so `update` must not call itself up to date over an old w3bs.
+#[test]
+fn update_reports_a_newer_unmanaged_w3bs() {
+    let env = Env::new();
+    let m = publisher(&env, "w3bs.org", "w3bs", &[env!("CARGO_PKG_VERSION")]);
+    add_repo(&env, "w3bs", &m);
+    let (code, v, _) = env.w3bs(&["update", "--yes"]);
+    assert_eq!(code, 0, "{v}");
+    assert!(v["data"].get("manager_update").is_none(), "{v}");
+
+    release(&env, &m, "w3bs.org", "w3bs", "99.0.0");
+    publish(&m);
+    let want = format!("w3bs 99.0.0 is available (you have {})", env!("CARGO_PKG_VERSION"));
+    for op in ["update", "outdated"] {
+        let args: &[&str] = if op == "update" { &["update", "--yes"] } else { &["outdated"] };
+        let (code, v, _) = env.w3bs(args);
+        assert_eq!(code, 0, "{v}");
+        let note = v["data"]["manager_update"].as_str().unwrap_or_default();
+        assert!(note.starts_with(&want), "{op}: {v}");
+    }
+
+    // An unknown command may be a built-in of that newer w3bs.
+    let o = Command::new(env!("CARGO_BIN_EXE_w3bs")).arg("dist-nope").env("W3BS_HOME", env.home()).env("W3BS_DEV_INSECURE_TRANSPORT", "1").output().unwrap();
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(err.contains("unknown command `dist-nope`"), "{err}");
+    assert!(err.contains("is older than the published 99.0.0, which may have `dist-nope`"), "{err}");
+}
+
 #[test]
 fn at15_headless_unknown_root_needs_trust() {
     let env = Env::new();

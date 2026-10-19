@@ -10,6 +10,7 @@ pub mod repos_api {
 }
 
 pub use lifecycle::{InstallRequest, UpdateRequest};
+pub use maint::in_container;
 
 use crate::db;
 use crate::error::{Error, Result};
