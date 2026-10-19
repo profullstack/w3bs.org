@@ -61,6 +61,10 @@ function connect() {
     return;
   }
   setState('Connecting…');
+  if (data.screen.reachable === false)
+    say(
+      `At its last report, nothing answered on ${data.screen.vnc || '127.0.0.1:5900'} on the machine. If it is the W3BS desktop, run there: w3bs fleet desktop start${canControl ? ' --control' : ''}`,
+    );
   const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(
     `${scheme}://${location.host}/api/fleet/machines/${encodeURIComponent(data.id)}/screen`,
@@ -94,7 +98,8 @@ function connect() {
   rfb.addEventListener('disconnect', (event) => {
     rfb = undefined;
     setState(event.detail.clean && !reason ? 'Closed' : 'Disconnected', reason ? 'red' : '');
-    say(reason || (event.detail.clean ? 'The session ended.' : 'The connection dropped.'));
+    if (reason || message.textContent === '' || event.detail.clean)
+      say(reason || (event.detail.clean ? 'The session ended.' : 'The connection dropped.'));
     reconnect.hidden = false;
   });
 }
