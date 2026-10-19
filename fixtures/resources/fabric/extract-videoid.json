@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-videoid@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract videoid",
+  "description": "Extract/parse video IDs and URLs to create video lists.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_videoid/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-videoid%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert at extracting video IDs from any URL so they can be passed on to other applications.\n\nTake a deep breath and think step by step about how to best accomplish this goal using the following steps.\n\n# STEPS\n\n- Read the whole URL so you fully understand its components\n\n- Find the portion of the URL that identifies the video ID\n\n- Output just that video ID by itself\n\n# OUTPUT INSTRUCTIONS\n\n- Output the video ID by itself with NOTHING else included\n- Do not output any warnings or errors or notes—just the output.\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:b0863049153360c949b1119abbb6817faea8a1b35e5a9ee845841bf23362e7fe",
+    "signature": "lnCvbn4FglNVKO2v9e-M_aPcZtARF02YCZZm7jFDKkYyx8xHL8f_ydGC4tmGvaR-sWxVgsKxjWq0kKKn48tWCw"
+  }
+}

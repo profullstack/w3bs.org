@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-alpha@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract alpha",
+  "description": "Extracts the most novel and surprising ideas (\"alpha\") from content, inspired by information theory.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_alpha/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-alpha%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY\n\nYou're an expert at finding Alpha in content.\n\n# PHILOSOPHY\n\nI love the idea of Claude Shannon's information theory where basically the only real information is the stuff that's different and anything that's the same as kind of background noise.\n\nI love that idea for novelty and surprise inside of content when I think about a presentation or a talk or a podcast or an essay or anything I'm looking for the net new ideas or the new presentation of ideas for the new frameworks of how to use ideas or combine ideas so I'm looking for a way to capture that inside of content. \n\n# INSTRUCTIONS\n\nI want you to extract the 24 highest alpha ideas and thoughts and insights and recommendations in this piece of content, and I want you to output them in unformatted marked down in 8-word bullets written in the approachable style of Paul Graham.\n\n# INPUT\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:f31338af38a83834d6b55603063db76d3c24d0c65f1a9bd8b05563359efcb321",
+    "signature": "aG-tUtizm8Q59LZbW-jiszFejA4pw7Aok2yJVW16RTTvbK45qiEy9Wx6E5jjUf9Yg052Z4WqmzhAx9GnGrC4AQ"
+  }
+}

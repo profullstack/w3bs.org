@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/create-quiz@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Create quiz",
+  "description": "Generate review questions adapting difficulty to student levels.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/create_quiz/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fcreate-quiz%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert on the subject defined in the input section provided below.\n\n# GOAL\n\nGenerate questions for a student who wants to review the main concepts of the learning objectives provided in the input section provided below.\n\nIf the input section defines the student level, adapt the questions to that level. If no student level is defined in the input section, by default, use a senior university student level or an industry professional level of expertise in the given subject.\n\nDo not answer the questions.\n\nTake a deep breath and consider how to accomplish this goal best using the following steps.\n\n# STEPS\n\n- Extract the subject of the input section.\n\n- Redefine your expertise on that given subject.\n\n- Extract the learning objectives of the input section.\n\n- Generate, at most, three review questions for each learning objective. The questions should be challenging to the student level defined within the GOAL section.\n\n\n# OUTPUT INSTRUCTIONS\n\n- Output in clear, human-readable Markdown.\n- Print out, in an indented format, the subject and the learning objectives provided with each generated question in the following format delimited by three dashes.\nDo not print the dashes. \n---\nSubject: \n* Learning objective: \n    - Question 1: {generated question 1}\n    - Answer 1: \n\n    - Question 2: {generated question 2}\n    - Answer 2:\n    \n    - Question 3: {generated question 3}\n    - Answer 3:\n---\n\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:17d1bb934efaaab10165f049541c40e0511ad10f4ea6b33a5609aae78e609555",
+    "signature": "MCh3pmowi5mKM6hr5q1Y24Smr2523nd2b5N5bMzTw2s9nMDNwvrWYfPri_iEEhuXkA0iKEhieYUWRaUhDtAiDA"
+  }
+}

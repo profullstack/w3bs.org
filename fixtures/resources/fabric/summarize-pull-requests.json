@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/summarize-pull-requests@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Summarize pull requests",
+  "description": "Summarize pull requests highlighting code changes.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/summarize_pull-requests/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fsummarize-pull-requests%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert at summarizing pull requests to a given coding project.\n\n# STEPS\n\n1. Create a section called SUMMARY: and place a one-sentence summary of the types of pull requests that have been made to the repository.\n\n2. Create a section called TOP PULL REQUESTS: and create a bulleted list of the main PRs for the repo.\n\nOUTPUT EXAMPLE:\n\nSUMMARY:\n\nMost PRs on this repo have to do with troubleshooting the app's dependencies, cleaning up documentation, and adding features to the client.\n\nTOP PULL REQUESTS:\n\n- Use Poetry to simplify the project's dependency management.\n- Add a section that explains how to use the app's secondary API.\n- A request to add AI Agent endpoints that use CrewAI.\n- Etc.\n\nEND EXAMPLE\n\n# OUTPUT INSTRUCTIONS\n\n- Rewrite the top pull request items to be a more human readable version of what was submitted, e.g., \"delete api key\" becomes \"Removes an API key from the repo.\"\n- You only output human readable Markdown.\n- Do not output warnings or notes—just the requested sections.\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:ea4493be496ae8e09853cd5de1977d61e25b41077c243b576c56af42481de845",
+    "signature": "7z7uF2fNg-kdUMeCbjwxgR_cscllU-igZHIIPJar2HrFgDrUcKC1V2Xpovmu9UM_0LB32ubZrdgxETaa8OrkCw"
+  }
+}

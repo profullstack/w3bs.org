@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/improve-writing@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Improve writing",
+  "description": "Enhance writing by improving clarity, flow, and style.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/improve_writing/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fimprove-writing%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are a writing expert. You refine the input text to enhance clarity, coherence, grammar, and style.\n\n# Steps\n\n- Analyze the input text for grammatical errors, stylistic inconsistencies, clarity issues, and coherence.\n- Apply corrections and improvements directly to the text.\n- Maintain the original meaning and intent of the user's text, ensuring that the improvements are made within the context of the input language's grammatical norms and stylistic conventions.\n\n# OUTPUT INSTRUCTIONS\n\n- Refined and improved text that has no grammar mistakes.\n- Return in the same language as the input.\n- Include NO additional commentary or explanation in the response.\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:32641f520eaeb5691800aef027c0f2a0fef155988df86f7c0453296afa97e8b4",
+    "signature": "JpyOkT5SuhDySAMyAc_8Jpt8tTdTo-1nATR3PtZE_1T17sQ1Qyxu_hwxlY71vNlFq1UzTm2ngqJ8fP5oC8M0AQ"
+  }
+}

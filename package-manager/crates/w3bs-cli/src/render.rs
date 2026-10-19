@@ -47,7 +47,7 @@ pub fn human(r: &OperationResult) {
         eprintln!("error: {} ({})", e.message, e.code);
         if e.code == "PUBLISHER_KEY_CHANGED" {
             eprintln!("hint: check with the publisher that the key change is genuine before using --accept-new-key");
-        } else if r.result == Overall::ApprovalRequired {
+        } else if r.result == Overall::ApprovalRequired && r.operation != "open" {
             eprintln!("hint: re-run interactively, or add --yes (and a pre-provisioned trust root for new repositories)");
         }
         return;
@@ -124,6 +124,30 @@ pub fn human(r: &OperationResult) {
             }
             return;
         }
+        "open" => {
+            println!("Opened a terminal window ({}) to confirm installing {}.", s(&r.data["terminal"]), s(&r.data["package"]));
+            return;
+        }
+        "handler.install" | "handler.uninstall" | "handler.status" => {
+            let d = &r.data;
+            let place = if d["desktop_file"].is_null() { s(&d["app"]) } else { s(&d["desktop_file"]) };
+            match r.operation.as_str() {
+                "handler.install" => println!("Registered the w3bs:// handler: {place}"),
+                "handler.uninstall" if d["removed"] == true => println!("Removed the w3bs:// handler: {place}"),
+                "handler.uninstall" => println!("The w3bs:// handler was not installed ({place})."),
+                _ => println!("Handler: {}", if d["installed"] == true { place } else { "not installed (run `w3bs handler install`)".into() }),
+            }
+            if r.operation != "handler.uninstall" {
+                if !d["exec"].is_null() {
+                    println!("Runs: {} open <link>", s(&d["exec"]).trim_end_matches(" open %u"));
+                }
+                println!("Default for w3bs:// links: {}", if d["default"].is_null() { "none".into() } else { s(&d["default"]) });
+                if d["installed"] == true && d["registered"] != true {
+                    println!("warning: another application, or none, is the default for w3bs:// links");
+                }
+            }
+            return;
+        }
         "fleet.join" => {
             let d = &r.data;
             println!("Joined {} to your fleet on {}. It reports every {}s; see {}/fleet", s(&d["name"]), s(&d["origin"]), s(&d["interval"]), s(&d["origin"]));
@@ -159,6 +183,24 @@ pub fn human(r: &OperationResult) {
                 eprintln!("warning: nothing answers on {} yet; start a VNC server there, see https://w3bs.org/docs/fleet-screen.md", s(&sc["vnc"]));
             }
             return;
+        }
+        "dist-upgrade" => {
+            let sys = &r.data["system"];
+            let provider = sys["provider"].as_str().unwrap_or("system");
+            match sys["status"].as_str() {
+                Some("upgraded") => println!("System packages ({provider}) upgraded."),
+                Some("planned") => {
+                    println!("Would upgrade the system packages ({provider}):");
+                    for c in sys["commands"].as_array().into_iter().flatten() {
+                        println!("  {}", s(c));
+                    }
+                }
+                Some("done") => {}
+                _ => println!("System packages: skipped."),
+            }
+            if let Some(n) = sys["note"].as_str() {
+                eprintln!("note: {n}");
+            }
         }
         "fleet.desktop.start" => {
             let d = &r.data;
@@ -461,6 +503,12 @@ pub fn human(r: &OperationResult) {
             println!("  digest: {}", s(&v["digest"]));
             return;
         }
+        // The model's answer when a runner ran, else the rendered instructions.
+        "resource.run" => {
+            let d = &r.data;
+            println!("{}", s(if d["runner"].is_null() { &d["output"] } else { &d["runner"]["answer"] }));
+            return;
+        }
         op if op.starts_with("resource.") => {
             println!("{}", serde_json::to_string_pretty(&r.data).unwrap());
             return;
@@ -551,7 +599,10 @@ pub fn human(r: &OperationResult) {
                 })
                 .collect(),
         );
-    } else if matches!(r.operation.as_str(), "update" | "outdated") {
+    } else if matches!(r.operation.as_str(), "update" | "outdated" | "dist-upgrade") && r.data.get("manager_update").is_none() {
         println!("Everything is up to date.");
+    }
+    if let Some(n) = r.data.get("manager_update").and_then(|v| v.as_str()) {
+        println!("{n}");
     }
 }

@@ -4,6 +4,7 @@ import { startServer } from '../src/server.mjs';
 import { openStore } from '../src/store.mjs';
 import { CRAWLPROOF_SITE_ID, trackerSite } from '../src/site.mjs';
 import { FLEET_LIMITS } from '../src/fleet.mjs';
+import { osReleaseSource, resetOsReleaseCache } from '../src/os-releases.mjs';
 
 const ORIGIN = 'http://localhost:3000';
 
@@ -86,6 +87,32 @@ test('every page has the support line in the footer', async () => {
   }
 });
 
+test('the footer links our socials and carries the Profullstack webring', async () => {
+  const t = await boot();
+  try {
+    for (const path of ['/mission', '/login']) {
+      const html = await (await fetch(`${t.base}${path}`)).text();
+      const footer = html.slice(html.indexOf('<footer'));
+      for (const href of [
+        'https://www.reddit.com/r/w3bs/',
+        'https://github.com/profullstack',
+        'https://discord.gg/U7dEXfBA3s',
+        'https://x.com/profullstackinc',
+        'https://youtube.com/@profullstack',
+      ]) {
+        assert.ok(footer.includes(`href="${href}"`), `${path} ${href}`);
+      }
+      assert.match(footer, /rssamplifier\.com\/ring\/profullstack\/next/, path);
+      // The CSP is style-src 'self': no inline <style> may ride in with it.
+      assert.doesNotMatch(footer, /<style/, path);
+    }
+    const ring = await (await fetch(`${t.base}/.well-known/openwebring.json`)).json();
+    assert.equal(ring.site.url, 'https://w3bs.org/');
+  } finally {
+    await t.close();
+  }
+});
+
 test('CrawlProof: only for https://w3bs.org, never on pages that can carry account data', async () => {
   assert.equal(trackerSite({ PUBLIC_ORIGIN: 'https://w3bs.org' }), CRAWLPROOF_SITE_ID);
   assert.equal(trackerSite({ PUBLIC_ORIGIN: 'https://w3bs.org/' }), CRAWLPROOF_SITE_ID);
@@ -120,7 +147,13 @@ test('CrawlProof: only for https://w3bs.org, never on pages that can carry accou
   }
 });
 
-test('/os offers only what exists: Docker now, the ISO and phones as coming, no iOS install', async () => {
+test('/os offers only what exists: Docker now, the ISO from the newest os-v* release, no iOS install', async () => {
+  const sha = 'e0c9a899516957dd53e79e6a6dc8bdb391ff7a49acce0ab0f4d64531e6e4991b';
+  const dl = 'https://github.com/profullstack/w3bs.org/releases/download/os-v0.1.0-preview';
+  let latest = null;
+  osReleaseSource.fetchImpl = async () =>
+    latest ? new Response(JSON.stringify(latest)) : new Response('Not Found', { status: 404 });
+  resetOsReleaseCache();
   const t = await boot();
   try {
     const res = await fetch(`${t.base}/os`);
@@ -129,16 +162,35 @@ test('/os offers only what exists: Docker now, the ISO and phones as coming, no 
     assert.match(html, /W3BS OS · SPECIFICATION/);
     assert.match(html, /resolves <strong>\d+<\/strong> Profullstack packages/);
     assert.match(html, /docker run -it --rm w3bs\.org\/os:server/);
-    // No ISO link until OS_RELEASES.iso is set by a release that passed its checks.
+    // No os-v* release yet: no ISO link.
     assert.match(html, /PCS AND MACS · COMING/);
     assert.doesNotMatch(html, /\.iso"/);
     assert.match(html, /nothing can replace iOS/);
     assert.match(html, /Debug desktop and phone apps in one place/);
+
+    latest = {
+      version: '0.1.0-preview',
+      name: 'w3bs-os-0.1.0-x86_64.iso',
+      url: `${dl}/w3bs-os-0.1.0-x86_64.iso`,
+      sumsUrl: `${dl}/SHA256SUMS`,
+      sha256: sha,
+      size: 1459617792,
+      preview: true,
+    };
+    resetOsReleaseCache();
+    const live = await (await fetch(`${t.base}/os`)).text();
+    assert.match(live, new RegExp(`href="${dl}/w3bs-os-0\\.1\\.0-x86_64\\.iso"`));
+    assert.match(live, /Download the ISO \(1\.46 GB\)/);
+    assert.match(live, new RegExp(sha));
+    assert.match(live, /PCS, INTEL MACS AND VPS SERVERS · ISO 0\.1\.0-preview · PREVIEW/);
+    assert.equal(live.match(/Download the ISO/g).length, 1, "one ISO, one button");
+    assert.match(live, /APPLE SILICON MACS/);
     const prd = await fetch(`${t.base}/docs/os-prd.md`);
     assert.equal(prd.status, 200);
     assert.match(await prd.text(), /^# W3BS OS Product Requirements/);
     assert.match(await (await fetch(`${t.base}/sitemap.xml`)).text(), /\/os<\/loc>/);
   } finally {
+    resetOsReleaseCache();
     await t.close();
   }
 });

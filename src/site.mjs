@@ -6,6 +6,9 @@ import { W3bsError } from './core.mjs';
 import { FLEET_LIMITS } from './fleet.mjs';
 import { TTL } from './accounts.mjs';
 import { buildSuite } from './os-suite.mjs';
+import { latestOsIso } from './os-releases.mjs';
+import { footerHtml, footerHtmlSync } from '@profullstack/footer';
+import { MOSHPIT_EXAMPLES, WEB_EXAMPLES } from './browse-examples.mjs';
 
 const e = (value) =>
   String(value ?? '').replace(
@@ -93,8 +96,33 @@ function header(active) {
       '',
     )}</nav><a class="header-account" href="/account" ${active === '/account' ? 'aria-current="page"' : ''}>Account</a><a class="header-action" href="/developers">Start building <span aria-hidden="true">↗</span></a></header>`;
 }
+// W3BS's own community first, then Profullstack's accounts (the same list as
+// profullstack.com's footer).
+const SOCIALS = [
+  ['r/w3bs on Reddit', 'https://www.reddit.com/r/w3bs/'],
+  ['r/fleetcoding on Reddit', 'https://www.reddit.com/r/fleetcoding/'],
+  ['Profullstack on GitHub', 'https://github.com/profullstack'],
+  ['Profullstack on Discord', 'https://discord.gg/U7dEXfBA3s'],
+  ['Profullstack on X', 'https://x.com/profullstackinc'],
+  ['Profullstack on YouTube', 'https://youtube.com/@profullstack'],
+];
+
+// The fleet-wide Profullstack footer (webring, built.indie badge, copyright)
+// from @profullstack/footer. Pages render synchronously, so this starts as the
+// bundled template and refreshHouseFooter() swaps in @latest from the CDN.
+// css:false because the CSP is style-src 'self'; its rules live in style.css.
+const HOUSE_FOOTER = { site: 'https://w3bs.org/', name: 'W3BS', since: 2026, css: false };
+let houseFooter = footerHtmlSync(HOUSE_FOOTER);
+export async function refreshHouseFooter() {
+  houseFooter = await footerHtml(HOUSE_FOOTER);
+}
+
 function footer() {
-  return `<footer><div><a class="wordmark" href="/mission">w3bs<span class="wordmark-dot">.</span></a><p>Human-friendly. Agent-native.<br>Device-friendly. Open by design.</p><p class="footer-support"><strong>Need help?</strong> Email <a href="mailto:hello@w3bs.org">hello@w3bs.org</a> or ask on the <a href="/bbs/f/help">Help board</a>.</p></div><div><span class="eyebrow">FLEET AND ACCOUNTS</span><a href="/fleet">Your fleet</a><a href="/ab-testing">A/B testing</a><a href="/pricing">Pricing: Fleet is free</a><a href="/signup?next=%2Ffleet">Create an account</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><span class="eyebrow footer-gap">THE INITIATIVE</span><a href="/governance">Governance & participation</a><a href="/bbs">Community forums</a><a href="/social">W3BS Social (AT Protocol)</a><a href="/desktop">Agentic Desktop Layer</a><a href="/training">W3BS Training</a><a href="/os">W3BS OS (specification)</a></div><div><span class="eyebrow">FOR IMPLEMENTERS</span><a href="/developers">Developer guide</a><a href="/packages">Packages and the w3bs CLI</a><a href="/docs/founding-prd.md">Founding PRD · v2.0</a><a href="/docs/roadmap.md">Implementation status</a><a href="/.well-known/w3bs.json">Machine discovery ↗</a><a href="/api">API reference ↗</a><a href="https://github.com/profullstack/w3bs.org" rel="noopener">Source on GitHub ↗</a></div><div class="footer-bottom"><span>Operated by Profullstack, Inc. Open standards for the Agentic Era.</span><span>Community drafts · No Recommendations issued</span></div></footer>`;
+  return `${siteFooter()}${houseFooter}`;
+}
+
+function siteFooter() {
+  return `<footer><div><a class="wordmark" href="/mission">w3bs<span class="wordmark-dot">.</span></a><p>Human-friendly. Agent-native.<br>Device-friendly. Open by design.</p><p class="footer-support"><strong>Need help?</strong> Email <a href="mailto:hello@w3bs.org">hello@w3bs.org</a> or ask on the <a href="/bbs/f/help">Help board</a>.</p></div><div><span class="eyebrow">FLEET AND ACCOUNTS</span><a href="/fleet">Your fleet</a><a href="/ab-testing">A/B testing</a><a href="/pricing">Pricing: Fleet is free</a><a href="/signup?next=%2Ffleet">Create an account</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><span class="eyebrow footer-gap">THE INITIATIVE</span><a href="/governance">Governance & participation</a><a href="/bbs">Community forums</a><a href="/social">W3BS Social (AT Protocol)</a><a href="/desktop">Agentic Desktop Layer</a><a href="/training">W3BS Training</a><a href="/os">W3BS OS (specification)</a></div><div><span class="eyebrow">FOR IMPLEMENTERS</span><a href="/developers">Developer guide</a><a href="/packages">Packages and the w3bs CLI</a><a href="/docs/founding-prd.md">Founding PRD · v2.0</a><a href="/docs/roadmap.md">Implementation status</a><a href="/.well-known/w3bs.json">Machine discovery ↗</a><a href="/api">API reference ↗</a><a href="https://github.com/profullstack/w3bs.org" rel="noopener">Source on GitHub ↗</a><span class="eyebrow footer-gap">COMMUNITY</span>${SOCIALS.map(([label, href]) => `<a href="${href}" rel="noopener">${label} ↗</a>`).join('')}</div><div class="footer-bottom"><span>Operated by Profullstack, Inc. Open standards for the Agentic Era.</span><span>Community drafts · No Recommendations issued</span></div></footer>`;
 }
 const INSTALL = 'curl -fsSL https://w3bs.org/install.sh | sh';
 // The campaign path: install the CLI, sign in, join a server, watch it on /fleet.
@@ -143,20 +171,139 @@ async function home(store) {
 }
 async function promptCards(store, query) {
   const resources = await store.search(query.q || '', query.type || '');
-  const catalog = JSON.parse(readFileSync(resolve(ROOT, 'fixtures/catalog.json'), 'utf8'));
+  const catalog = ['fixtures/catalog.json', 'fixtures/resources/fabric/catalog.json'].flatMap(
+    (file) => JSON.parse(readFileSync(resolve(ROOT, file), 'utf8')),
+  );
   const categories = new Map(catalog.map((item) => [item.id, item.category]));
   return `<section class="page-head"><div class="eyebrow">THE OPEN PROMPT REGISTRY</div><h1>Good instructions<br>should <em>travel.</em></h1><p>Portable, versioned, signed artifacts. Inspect their source, understand their permissions and make them your own.</p></section><form class="search-bar" action="/prompts" role="search"><label class="sr-only" for="prompt-search">Search prompts</label><input id="prompt-search" name="q" type="search" value="${e(query.q || '')}" placeholder="Search by name, topic or URI…"><button class="button dark" type="submit">Search <span aria-hidden="true">→</span></button></form><div class="catalog-heading"><span>${resources.length} ${resources.length === 1 ? 'resource' : 'resources'}</span><span>Open examples · MIT licensed · v1.0.0</span></div><div class="prompt-grid">${resources.map((item) => `<a class="prompt-card" href="${resourceLink(item.id)}"><div class="prompt-top">${pill(categories.get(item.id) || item.type)}<span class="verified-small">${item.verification.valid ? '✓ Signed' : 'Verification failed'}</span></div><h2>${e(item.name)}</h2><p>${e(item.description)}</p><code>${e(item.id.replace('w3bs://', ''))}</code><div class="prompt-bottom"><span>${e(item.publisher.namespace)} <span class="muted">/ ${e(item.version)}</span></span><span aria-hidden="true">↗</span></div></a>`).join('') || '<div class="empty"><h2>No matching resources.</h2><p>Try another phrase or <a href="/prompts">view all prompts</a>.</p></div>'}</div><aside class="callout"><strong>A registry is an implementation, not the standard.</strong><p>Host your own compatible registry. Your resource identity and signed manifest remain portable.</p><a href="/developers">Build with W3BS →</a></aside>`;
 }
-async function browse(store, query) {
+const BROWSE_COMMANDS = [
+  {
+    run: `w3bs resolve ${canonicalExample}`,
+    does: 'Resolve, verify and print a signed W3BS resource',
+  },
+  {
+    run: 'w3bs install hqtui.com/hqtui-demo-rust',
+    does: 'Install a package from the signed repository',
+  },
+  { run: 'w3bs packages', does: 'The package catalog, as on w3bs.org/packages' },
+  {
+    run: 'w3bs publish key add example.com',
+    does: 'Register your SSH key for a domain you publish under',
+  },
+  {
+    run: 'w3bs open https://w3bs.org/i/hqtui.com/hqtui-demo-rust',
+    does: 'Install from an install link (always asks first)',
+  },
+  { run: 'curl -s https://w3bs.org/.well-known/w3bs.json', does: 'The W3BS discovery document' },
+  {
+    run: 'dig +https @dns.moshcode.sh chovy.hacker TXT +short',
+    does: 'Look up a Moshpit name over DNS over HTTPS',
+  },
+  {
+    run: "curl -s 'https://pit.moshcode.sh/api/moshpit/resolve?name=chovy.hacker'",
+    does: 'Ask the Moshpit registry where a name points',
+  },
+  {
+    run: "curl -s 'https://w3bs.org/api/browse?q=chovy.hacker'",
+    does: 'This page as JSON, for agents (also the w3bs_browse MCP tool)',
+  },
+];
+const browseLink = (q) => `/browse?q=${encodeURIComponent(q)}`;
+const browseCopy = (text) =>
+  `<button class="small-button" type="button" data-copy="${e(text)}" aria-label="Copy: ${e(text)}">Copy</button>`;
+function browseExamples() {
+  const card = (q, label, blurb, host, tag) =>
+    `<a class="prompt-card browse-card" href="${browseLink(q)}"><div class="prompt-top">${pill(tag)}</div><h2>${e(label)}</h2><p>${e(blurb)}</p><code>${e(host)}</code><div class="prompt-bottom"><span>Browse</span><span aria-hidden="true">→</span></div></a>`;
+  return `<section class="section browse-examples" aria-labelledby="browse-examples-title"><div class="section-heading"><div><div class="eyebrow">EXAMPLES</div><h2 id="browse-examples-title">Try one of ours.</h2></div><p>Moshpit names open as themselves when your resolver speaks Moshpit, and through their pit.world gateway when it does not.</p></div><h3 class="browse-group">Moshpit names</h3><div class="prompt-grid">${MOSHPIT_EXAMPLES.map(
+    ({ name, blurb }) => card(name, name, blurb, `${name}.pit.world`, 'Moshpit'),
+  ).join(
+    '',
+  )}</div><h3 class="browse-group">On the Web</h3><div class="prompt-grid">${WEB_EXAMPLES.map(({ host, blurb }) => card(host, host, blurb, `https://${host}`, 'ICANN')).join('')}</div></section>`;
+}
+function browseCli() {
+  return `<section class="section browse-cli" aria-labelledby="browse-cli-title"><div class="section-heading"><div><div class="eyebrow">FROM A TERMINAL</div><h2 id="browse-cli-title">The same, on the command line.</h2></div><p>No <code>w3bs</code> yet? <code>${e(INSTALL)}</code></p></div><section class="inspector-panel"><ol class="usage-steps">${BROWSE_COMMANDS.map(
+    ({ run, does }) =>
+      `<li><div><code>${e(run)}</code><span class="muted">${e(does)}</span></div>${browseCopy(run)}</li>`,
+  ).join('')}</ol></section></section>`;
+}
+const list = (values) =>
+  values?.length ? values.map((v) => `<code class="break">${e(v)}</code>`).join('<br>') : 'None';
+const safeHref = (value) =>
+  typeof value === 'string' && /^https:\/\/[^\s"'<>]+$/.test(value)
+    ? `<a class="break" href="${e(value)}" rel="noopener nofollow">${e(value)}</a>`
+    : `<code class="break">${e(String(value).slice(0, 300))}</code>`;
+const DISCOVERY_FIELDS = [
+  'specVersion',
+  'status',
+  'registry',
+  'resolution',
+  'manifest',
+  'search',
+  'mcp',
+  'trust',
+  'specs',
+];
+function discoveryPanel(found) {
+  if (!found.found)
+    return `<section class="inspector-panel"><h3>W3BS discovery</h3><p>No discovery document at <code class="break">${e(found.url)}</code>${found.status ? ` (HTTP ${e(found.status)})` : ''}${found.error ? ` (${e(found.error)})` : ''}. A site publishes one so agents can find its registry, MCP endpoint and surfaces: see <a href="/specs/W3BS-DISCOVERY-1">W3BS-DISCOVERY-1</a>.</p></section>`;
+  const d = found.document;
+  const rows = DISCOVERY_FIELDS.filter((key) => typeof d[key] === 'string').map(
+    (key) => `<dt>${e(key)}</dt><dd>${safeHref(d[key])}</dd>`,
+  );
+  if (d.surfaces && typeof d.surfaces === 'object')
+    for (const [key, value] of Object.entries(d.surfaces).slice(0, 12))
+      if (typeof value === 'string')
+        rows.push(`<dt>surface: ${e(key)}</dt><dd>${safeHref(value)}</dd>`);
+  if (Array.isArray(d.operations))
+    rows.push(
+      `<dt>Operations</dt><dd>${e(
+        d.operations
+          .filter((op) => typeof op === 'string')
+          .slice(0, 40)
+          .join(', '),
+      )}</dd>`,
+    );
+  return `<section class="inspector-panel metadata"><h3>W3BS discovery</h3><p>Declared by <code class="break">${e(found.url)}</code>. What a site declares is information, not authority.</p><dl>${rows.join('') || '<dt>Fields</dt><dd>None this browser knows</dd>'}</dl><details><summary>Document</summary><pre class="json-source">${e(JSON.stringify(d, null, 2).slice(0, 20000))}</pre></details></section>`;
+}
+function browseDetail(r) {
+  const moshpit = r.kind === 'moshpit';
+  const g = r.gateway;
+  const gatewayHost = r.fallback ? new URL(r.fallback).host : null;
+  const summary = moshpit
+    ? r.moshpit?.minted
+      ? `A Moshpit name, registered and pointing at <code>${e(r.moshpit.target)}</code>.`
+      : r.moshpit
+        ? 'Its ending is on Moshpit, but nobody has claimed this name yet.'
+        : 'The Moshpit resolver has no record for this name.'
+    : 'An ICANN site, shown as it is.';
+  const status = g.ok
+    ? pill(moshpit ? 'Gateway answers' : 'Site answers', 'green')
+    : pill(moshpit ? 'Gateway not answering' : 'Site not answering', 'red');
+  const open = moshpit
+    ? `<a class="button primary" href="${e(r.primary)}" rel="noopener">Open ${e(r.name)} <span aria-hidden="true">↗</span></a><a class="text-link" href="${e(r.fallback)}" rel="noopener">via ${e(gatewayHost)} <span aria-hidden="true">↗</span></a>`
+    : `<a class="button primary" href="${e(r.primary)}" rel="noopener">Open ${e(r.name)} <span aria-hidden="true">↗</span></a>`;
+  const dns = r.dns;
+  return `<section class="resource-detail browse-detail"><div class="resource-title"><div><div class="eyebrow">${moshpit ? 'MOSHPIT NAME' : 'WEB SITE'}</div><h2>${e(r.name)}</h2><p>${summary}</p></div>${status}</div><div class="identity-line browse-open"><span class="eyebrow">${moshpit ? 'NAME' : 'URL'}</span><code>${e(moshpit ? r.name : r.primary)}</code>${open}</div>${moshpit ? `<p class="muted browse-note"><code>${e(r.name)}</code> opens directly when your resolver speaks Moshpit (<code>dns.moshcode.sh</code>); everywhere else, use <code>${e(gatewayHost)}</code>.</p>` : ''}<div class="inspector-grid"><div><section class="inspector-panel metadata"><h3>${moshpit ? 'pit.world gateway' : 'Site'}</h3><dl><dt>Checked</dt><dd>${safeHref(g.url)}</dd><dt>Status</dt><dd>${g.status ? `HTTP ${e(g.status)}` : e(g.error || 'No answer')}</dd>${g.finalUrl && g.finalUrl !== g.url ? `<dt>Landed on</dt><dd>${safeHref(g.finalUrl)}</dd>` : ''}${g.redirects?.length ? `<dt>Redirects</dt><dd>${e(g.redirects.length)}</dd>` : ''}${g.title ? `<dt>Title</dt><dd>${e(g.title)}</dd>` : ''}${g.contentType ? `<dt>Type</dt><dd>${e(g.contentType)}</dd>` : ''}</dl></section>${discoveryPanel(r.discovery)}</div><aside><section class="inspector-panel metadata"><h3>DNS</h3><p>Asked over DNS over HTTPS (RFC 8484) at <code class="break">${e(dns.resolver)}</code>.</p><dl>${dns.CNAME.length ? `<dt>CNAME</dt><dd>${list(dns.CNAME)}</dd>` : ''}<dt>A</dt><dd>${list(dns.A)}</dd><dt>AAAA</dt><dd>${list(dns.AAAA)}</dd><dt>TXT</dt><dd>${list(dns.TXT)}</dd>${dns.errors?.length ? `<dt>Errors</dt><dd>${e(dns.errors.join('; '))}</dd>` : ''}</dl></section>${r.moshpit ? `<section class="inspector-panel metadata"><h3>Moshpit record</h3><dl><dt>Name</dt><dd>${e(r.name)}</dd><dt>Claimed</dt><dd>${r.moshpit.minted ? 'Yes' : 'No'}</dd>${r.moshpit.target ? `<dt>Target</dt><dd><code class="break">${e(r.moshpit.target)}</code></dd>` : ''}<dt>Gateway</dt><dd>${safeHref(r.fallback)}</dd></dl></section>` : ''}<section class="inspector-panel"><h3>For agents</h3><p>The same answer as JSON.</p><a class="text-link" href="/api/browse?q=${encodeURIComponent(r.input)}">/api/browse?q=${e(r.input)} <span aria-hidden="true">↗</span></a></section></aside></div></section>`;
+}
+async function browse(store, query, browser) {
+  const q = String(query.q ?? query.uri ?? '').trim();
   let result, error;
-  if (query.uri) {
+  if (q) {
     try {
-      result = await store.inspect(query.uri);
+      result = await browser.resolve(q, { inspect: (uri) => store.inspect(uri) });
     } catch (failure) {
       error = failure.message;
     }
   }
-  return `<section class="page-head compact"><div class="eyebrow">THE REFERENCE RESOLVER</div><h1>A window into<br>the <em>Agentic Web.</em></h1><p>Enter a W3BS URI to inspect its canonical artifact, publisher, provenance and verification state.</p></section><form class="search-bar resolver" action="/browse"><label class="sr-only" for="resolve-uri">W3BS resource URI</label><input id="resolve-uri" name="uri" value="${e(query.uri || canonicalExample)}" required spellcheck="false"><button class="button primary" type="submit">Resolve <span aria-hidden="true">→</span></button></form>${error ? `<div class="error" role="alert"><strong>Could not resolve this resource.</strong><p>${e(error)}</p><a href="/prompts">Browse available resources →</a></div>` : ''}${result ? resourceDetail(result) : `<div class="resolver-empty"><span class="large-mark">w3bs<span>://</span></span><h2>The URI is canonical.<br>The surface is optional.</h2><p>Try <a href="${resourceLink(canonicalExample)}">the research prompt</a>, or <a href="/prompts">explore the registry</a>.</p></div>`}`;
+  const body = error
+    ? `<div class="error" role="alert"><strong>${/^w3bs:\/\//i.test(q) ? 'Could not resolve this resource.' : 'Could not browse this.'}</strong><p>${e(error)}</p><a href="/browse">Try an example →</a></div>`
+    : result?.kind === 'w3bs'
+      ? resourceDetail(result.resource)
+      : result
+        ? browseDetail(result)
+        : `<div class="resolver-empty"><span class="large-mark">w3bs<span>://</span></span><h2>The URI is canonical.<br>The surface is optional.</h2><p>Try <a href="${resourceLink(canonicalExample)}">the research prompt</a>, a Moshpit name like <a href="${browseLink('chovy.hacker')}">chovy.hacker</a>, or <a href="/prompts">explore the registry</a>.</p></div>`;
+  return `<section class="page-head compact"><div class="eyebrow">THE BROWSER</div><h1>A window into<br>the <em>Agentic Web.</em></h1><p>Enter a W3BS URI, a Moshpit name like chovy.hacker, a pit.world URL or any https URL. Moshpit names resolve on the server over Moshpit DNS.</p></section><form class="search-bar resolver" action="/browse" role="search"><label class="sr-only" for="resolve-uri">W3BS URI, Moshpit name or URL</label><input id="resolve-uri" name="q" value="${e(q || canonicalExample)}" required spellcheck="false" autocapitalize="off" maxlength="2048"><button class="button primary" type="submit">Browse <span aria-hidden="true">→</span></button></form>${body}${browseExamples()}${browseCli()}`;
 }
 function resourceDetail(result) {
   const { manifest: m, verification: v } = result;
@@ -169,7 +316,7 @@ function resourceDetail(result) {
     )
     .join(
       '',
-    )}<label class="consent"><input type="checkbox" id="run-consent" required> I authorize rendering this template with the inputs above.</label><button class="button dark" type="submit" ${!v.valid ? 'disabled' : ''}>Render instructions <span aria-hidden="true">→</span></button><p id="run-status" role="status" aria-live="polite"></p><pre class="instructions" id="run-output" hidden></pre></form></section><details class="inspector-panel"><summary>Canonical manifest</summary><pre class="json-source">${e(JSON.stringify(m, null, 2))}</pre></details></div><aside><section class="inspector-panel metadata"><h3>Resource details</h3><dl><dt>Version</dt><dd>${e(m.version)}</dd><dt>Publisher</dt><dd>${e(m.publisher.name)}</dd><dt>License</dt><dd>${e(m.license)}</dd><dt>Created</dt><dd>${e(m.createdAt.slice(0, 10))}</dd><dt>Runtime</dt><dd>${e(m.content.runtime)}</dd><dt>Permissions</dt><dd>${m.permissions.length ? e(m.permissions.join(', ')) : 'None requested'}</dd><dt>Dependencies</dt><dd>${m.dependencies.length ? e(m.dependencies.join(', ')) : 'None'}</dd><dt>Declared class</dt><dd>${e(m.trust.classification)}</dd><dt>Effective authority</dt><dd>${e(v.authority)}</dd></dl></section><section class="inspector-panel metadata"><h3>Verification</h3><dl><dt>Signature</dt><dd>${v.signatureValid ? 'Valid Ed25519 signature' : 'Not verified'}</dd><dt>Publisher key</dt><dd>${v.publisherTrusted ? 'Pinned by registry operator' : 'Untrusted'}</dd><dt>Revocation</dt><dd>${v.revoked ? 'Revoked' : 'Not revoked'}</dd><dt>Key ID</dt><dd>${e(v.keyId)}</dd><dt>Digest</dt><dd class="digest">${e(v.digest)}</dd></dl><a class="text-link" href="/api/manifest?uri=${encodeURIComponent(m.id)}">Download manifest ↗</a><a class="text-link" href="/api/conformance?uri=${encodeURIComponent(m.id)}">View fixture checks ↗</a></section><section class="inspector-panel"><h3>Provenance</h3><a class="break" href="${e(m.provenance.source)}">${e(m.provenance.source)}</a><p>${m.provenance.derivedFrom.length ? `Derived from ${e(m.provenance.derivedFrom.join(', '))}` : 'Original reference example.'}</p></section></aside></div></section>`;
+    )}<label class="consent"><input type="checkbox" id="run-consent" required> I authorize rendering this template with the inputs above.</label><button class="button dark" type="submit" ${!v.valid ? 'disabled' : ''}>Render instructions <span aria-hidden="true">→</span></button><p id="run-status" role="status" aria-live="polite"></p><pre class="instructions" id="run-output" hidden></pre></form></section><details class="inspector-panel"><summary>Canonical manifest</summary><pre class="json-source">${e(JSON.stringify(m, null, 2))}</pre></details></div><aside><section class="inspector-panel metadata"><h3>Resource details</h3><dl><dt>Version</dt><dd>${e(m.version)}</dd><dt>Publisher</dt><dd>${e(m.publisher.name)}</dd><dt>License</dt><dd>${e(m.license)}</dd><dt>Created</dt><dd>${e(m.createdAt.slice(0, 10))}</dd><dt>Runtime</dt><dd>${e(m.content.runtime)}</dd><dt>Permissions</dt><dd>${m.permissions.length ? e(m.permissions.join(', ')) : 'None requested'}</dd><dt>Dependencies</dt><dd>${m.dependencies.length ? e(m.dependencies.join(', ')) : 'None'}</dd><dt>Declared class</dt><dd>${e(m.trust.classification)}</dd><dt>Effective authority</dt><dd>${e(v.authority)}</dd></dl></section><section class="inspector-panel metadata"><h3>Verification</h3><dl><dt>Signature</dt><dd>${v.signatureValid ? 'Valid Ed25519 signature' : 'Not verified'}</dd><dt>Publisher key</dt><dd>${v.publisherTrusted ? 'Pinned by registry operator' : 'Untrusted'}</dd><dt>Revocation</dt><dd>${v.revoked ? 'Revoked' : 'Not revoked'}</dd><dt>Key ID</dt><dd>${e(v.keyId)}</dd><dt>Digest</dt><dd class="digest">${e(v.digest)}</dd></dl><a class="text-link" href="/api/manifest?uri=${encodeURIComponent(m.id)}">Download manifest ↗</a><a class="text-link" href="/api/conformance?uri=${encodeURIComponent(m.id)}">View fixture checks ↗</a></section><section class="inspector-panel"><h3>Provenance</h3><a class="break" href="${e(m.provenance.source)}">${e(m.provenance.source)}</a><p>${m.provenance.derivedFrom.length ? `Derived from ${e(m.provenance.derivedFrom.join(', '))}` : m.publisher.namespace === 'w3bs' ? 'Original reference example.' : `Published by ${e(m.publisher.name)} from the source above.`}</p></section></aside></div></section>`;
 }
 // ThreatCrush scan state for a catalog package (src/scan.mjs).
 const SCAN_LABELS = {
@@ -493,7 +640,7 @@ function privacyPage() {
 <h2>Removing your data</h2><p>Remove a machine on <a href="/fleet">/fleet</a> or with <code>w3bs fleet rm</code>. Sign the CLI out on <a href="/account">your account page</a> or with <code>w3bs logout</code>. To delete your account, email <a href="mailto:hello@w3bs.org">hello@w3bs.org</a> from the address on it. That removes your profile, passkeys, sessions, sign-ins, machines and their history. W3BS Social has its own notes on <a href="/social#policy">its page</a>, because posts there are public on the AT Protocol network.</p>
 </article>`;
 }
-export async function renderPage({ path, host, query, store, origin }) {
+export async function renderPage({ path, host, query, store, origin, browser }) {
   if (path === '/')
     path = host.startsWith('browse.')
       ? '/browse'
@@ -517,7 +664,7 @@ export async function renderPage({ path, host, query, store, origin }) {
     content = await promptCards(store, query);
   } else if (path === '/browse') {
     title = 'Resource Browser';
-    content = await browse(store, query);
+    content = await browse(store, query, browser);
   } else if (path === '/packages') {
     title = 'Packages · the w3bs CLI';
     content = await packagesPage(store, query);
@@ -555,7 +702,7 @@ export async function renderPage({ path, host, query, store, origin }) {
     title = 'W3BS OS';
     description =
       'W3BS OS: a lightweight Alpine Linux-based OS for containers, servers, desktops and phones, with KDE, zsh, the full Profullstack suite and an agent-operable desktop. Specification stage; Docker editions come first.';
-    content = osPage();
+    content = await osPage();
     active = '/os';
   } else if (path === '/training') {
     title = 'W3BS Training';
@@ -578,11 +725,11 @@ export async function renderPage({ path, host, query, store, origin }) {
 // has passed its checks; until then the page says it is coming instead of offering a link.
 export const OS_RELEASES = {
   docker: 'w3bs.org/os', // server + desktop images (built and cosign-signed in CI, served by w3bs.org/v2)
-  iso: null, // { version, url, sha256, size } for the x86-64 installer ISO
+  // iso: read live from the newest os-v* GitHub release (src/os-releases.mjs)
   musl: false, // `curl -fsSL https://w3bs.org/install.sh | sh` works on Alpine and Nura
 };
-function osInstall() {
-  const { docker, iso, musl } = OS_RELEASES;
+function osInstall(iso) {
+  const { docker, musl } = OS_RELEASES;
   const code = (text) => `<pre class="instructions">${e(text)}</pre>`;
   const routes = [];
   if (docker)
@@ -591,15 +738,20 @@ function osInstall() {
     );
   const vpsSteps =
     'Upload the ISO in your provider\u2019s panel (on netcup: Media \u203a DVD drive, upload by FTP, pick it under Own DVDs and turn on DVD boot), boot the server from it, open the provider\u2019s web console and run <code>w3bs-os-install</code>. KVM servers with virtio disks, BIOS or UEFI, are what we test on.';
+  if (iso)
+    routes.push(
+      `<article><span class="card-index">PCS, INTEL MACS AND VPS SERVERS · ISO ${e(iso.version)}${iso.preview ? ' · PREVIEW' : ''}</span><h3>One installer ISO for x86-64.</h3><p>The same ISO installs on Intel and AMD PCs, Intel Macs and VPS servers. Boot it with Secure Boot off and run <code>w3bs-os-install</code>: KDE, zsh, encrypted disk and the desktop layer by default, with one review screen before anything is written. Packages download during the install.</p><p><a class="button primary" href="${e(iso.url)}">Download the ISO (${e(iso.size)})</a></p><p class="muted">SHA-256 <code class="break">${e(iso.sha256)}</code></p>${code(`curl -fLO ${iso.url}\ncurl -fLO ${iso.sumsUrl} && sha256sum -c SHA256SUMS`)}<p><strong>PC or Intel Mac:</strong> write it to a USB stick and boot from it.</p>${code(`sudo dd if=${iso.name} of=/dev/sdX bs=4M status=progress oflag=sync`)}<p><strong>VPS:</strong> ${vpsSteps}</p>${iso.preview ? '<p class="muted">Preview build: its automated install test is still running. Use it on a machine or server you can wipe.</p>' : ''}</article>`,
+    );
+  else {
+    routes.push(
+      `<article><span class="card-index">VPS AND CLOUD SERVERS · ${docker ? 'DOCKER NOW, ISO COMING' : 'COMING'}</span><h3>Run it on a VPS.</h3><p>${docker ? `Today: on any Linux VPS with Docker, run the server image above, or the desktop image and watch it from <a class="inline-link" href="/fleet">Fleet</a>.` : ''} Once the installer ISO passes its checks, it installs on any VPS that lets you mount your own ISO: ${vpsSteps.charAt(0).toLowerCase()}${vpsSteps.slice(1)}</p>${docker ? code(`docker run -it --rm ${docker}:server`) : ''}</article>`,
+    );
+    routes.push(
+      `<article><span class="card-index">PCS AND MACS · COMING</span><h3>A bootable installer ISO.</h3><p>The x86-64 installer ISO is being built and tested. It appears here with its checksum once it boots and installs in our checks. Secure Boot will need to be off at first: Alpine ships no Microsoft-signed boot shim.</p></article>`,
+    );
+  }
   routes.push(
-    iso
-      ? `<article><span class="card-index">VPS AND CLOUD SERVERS \u00b7 ISO ${e(iso.version)}</span><h3>Install on a VPS.</h3><p>${vpsSteps}</p><p><a class="button primary" href="${e(iso.url)}">Download the ISO (${e(iso.size)})</a></p>${code(`curl -fLO ${iso.url}\nsha256sum w3bs-os-${iso.version}-x86_64.iso   # ${iso.sha256}`)}</article>`
-      : `<article><span class="card-index">VPS AND CLOUD SERVERS \u00b7 ${docker ? 'DOCKER NOW, ISO COMING' : 'COMING'}</span><h3>Run it on a VPS.</h3><p>${docker ? `Today: on any Linux VPS with Docker, run the server image above, or the desktop image and watch it from <a class="inline-link" href="/fleet">Fleet</a>.` : ''} Once the installer ISO passes its checks, it installs on any VPS that lets you mount your own ISO: ${vpsSteps.charAt(0).toLowerCase()}${vpsSteps.slice(1)}</p>${docker ? code(`docker run -it --rm ${docker}:server`) : ''}</article>`,
-  );
-  routes.push(
-    iso
-      ? `<article><span class="card-index">PCS AND MACS · NETWORK INSTALLER ${e(iso.version)}</span><h3>Install on a PC or Intel Mac.</h3><p>Write the ISO to a USB stick, boot from it with Secure Boot off, and run <code>w3bs-os-install</code>: KDE, zsh, encrypted disk and the desktop layer by default, with one review screen before anything is written. Packages download during the install.</p><p><a class="button primary" href="${e(iso.url)}">Download the ISO (${e(iso.size)})</a></p>${code(`sha256sum w3bs-os-${iso.version}-x86_64.iso   # ${iso.sha256}\nsudo dd if=w3bs-os-${iso.version}-x86_64.iso of=/dev/sdX bs=4M status=progress oflag=sync`)}</article>`
-      : `<article><span class="card-index">PCS AND MACS · COMING</span><h3>A bootable installer ISO.</h3><p>The x86-64 installer ISO is being built and tested. It appears here with its checksum once it boots and installs in our checks. Secure Boot will need to be off at first: Alpine ships no Microsoft-signed boot shim.</p></article>`,
+    `<article><span class="card-index">APPLE SILICON MACS (M1, M2) · COMING</span><h3>Not from the ISO.</h3><p>Apple Silicon Macs are ARM and never boot an ISO: Linux goes on them through the Asahi Linux installer, run from macOS, which sets up dual boot. W3BS OS for M1 and M2 will install that way, on the Asahi kernel; M3 follows Asahi's support.</p></article>`,
   );
   routes.push(
     `<article><span class="card-index">ANDROID PHONES AND TABLETS · ${musl ? 'AVAILABLE' : 'COMING'}</span><h3>Install on a phone.</h3><p>Install <a class="inline-link" href="https://postmarketos.org/download/" rel="noopener">Nura (postmarketOS)</a> with Plasma Mobile on a supported, unlockable device, then add W3BS. Unlocking the bootloader erases the phone. A W3BS-branded phone image follows.</p>${musl ? code('curl -fsSL https://w3bs.org/install.sh | sh\nw3bs install agentic-desktop-layer') : '<p class="muted">The W3BS installer for Alpine and Nura is in testing.</p>'}</article>`,
@@ -614,43 +766,67 @@ function osStudio() {
 }
 function osSuiteSummary() {
   try {
-    return buildSuite(JSON.parse(readFileSync(resolve(ROOT, 'catalog/catalog.json'), 'utf8'))).summary;
+    return buildSuite(JSON.parse(readFileSync(resolve(ROOT, 'catalog/catalog.json'), 'utf8')))
+      .summary;
   } catch {
     return null;
   }
 }
-function osPage() {
+async function osPage() {
+  const iso = await latestOsIso();
   const suite = osSuiteSummary();
-  const rows = (list) => list.map(([a, b]) => `<tr><th scope="row">${a}</th><td>${b}</td></tr>`).join('');
+  const rows = (list) =>
+    list.map(([a, b]) => `<tr><th scope="row">${a}</th><td>${b}</td></tr>`).join('');
   const defaults = [
-    ['Base', 'Alpine Linux (13 MB base): the same OS in Docker, on servers, PCs and Macs; Nura (postmarketOS) on phones'],
-    ['First release', 'Docker images: <code>w3bs-os:server</code> and <code>w3bs-os:desktop</code> with the Agentic Desktop Layer installed'],
+    [
+      'Base',
+      'Alpine Linux (13 MB base): the same OS in Docker, on servers, PCs and Macs; Nura (postmarketOS) on phones',
+    ],
+    [
+      'First release',
+      'Docker images: <code>w3bs-os:server</code> and <code>w3bs-os:desktop</code> with the Agentic Desktop Layer installed',
+    ],
     ['Desktop', 'KDE Plasma by default; GNOME selectable; LXQt and Xfce once qualified'],
     ['Shell', 'zsh for new users; bash and fish selectable'],
-    ['Installer', 'Terminal and graphical wizards on one engine, with sane defaults: largest disk erased, LUKS2 encryption, KDE, zsh, the full suite; one review screen before anything is written'],
-    ['Apps', 'The full Profullstack CLI and desktop suite, selected by default and present offline at first boot'],
-    ['Agents', 'Agentic Desktop Layer and W3BS Training preinstalled; observing, input and recording each need your permission'],
+    [
+      'Installer',
+      'Terminal and graphical wizards on one engine, with sane defaults: largest disk erased, LUKS2 encryption, KDE, zsh, the full suite; one review screen before anything is written',
+    ],
+    [
+      'Apps',
+      'The full Profullstack CLI and desktop suite, selected by default and present offline at first boot',
+    ],
+    [
+      'Agents',
+      'Agentic Desktop Layer and W3BS Training preinstalled; observing, input and recording each need your permission',
+    ],
     ['Account', 'Local login and installed apps work without a W3BS account'],
   ];
   const runtimes = [
     ['Linux, Nix', 'Native'],
     ['Windows', 'Wine/Proton per app; optional Windows guest with app windows'],
     ['Android', 'Waydroid: real Android in a container, apps as desktop windows'],
-    ['macOS', 'Darling for command-line tools (GUI is research); otherwise your own Mac, labelled remote'],
+    [
+      'macOS',
+      'Darling for command-line tools (GUI is research); otherwise your own Mac, labelled remote',
+    ],
     ['iOS/iPadOS', 'Remote only: eligible apps on your Apple Silicon Mac, labelled'],
   ];
   const hardware = [
     ['Docker (any OS)', 'First release: server and desktop images'],
     ['x86-64 PCs and laptops', 'Primary hardware target; certified reference devices'],
     ['Intel Macs', 'Without T2: ordinary x86-64; with T2: needs a W3BS kernel port'],
-    ['Apple Silicon M1/M2, M3', 'Asahi kernel (already packaged by Nura), model by model; M3 preview'],
+    [
+      'Apple Silicon M1/M2, M3',
+      'Asahi kernel (already packaged by Nura), model by model; M3 preview',
+    ],
     ['Android phones/tablets', 'Nura with Plasma Mobile on named unlockable models'],
     ['Stock iPhone/iPad', 'Companion app, not an OS install'],
   ];
   const suiteLine = suite
     ? `The draft suite manifest resolves <strong>${suite.entries}</strong> Profullstack packages from the <a class="inline-link" href="/packages">catalog</a>, including all ${suite.named} named inclusions (MoshCode, PairUX, DiskPush, the Agentic Desktop Layer, Training and more). <strong>${suite.blocking_tasks}</strong> packaging tasks block M0: ${suite.publisher_scripts} packages install only through publisher scripts and need signed artifacts, ${suite.unpinned} has no pinned release, and ${suite.command_collisions.length} command names have two claimants.`
     : 'The draft suite manifest is generated from the package catalog.';
-  return `<section class="page-head"><div class="eyebrow">W3BS OS · SPECIFICATION</div><h1>An OS people<br><em>and agents can run.</em></h1><p>A lightweight Alpine Linux-based operating system with KDE Plasma, zsh, a full setup wizard and every Profullstack app installed, plus a desktop agents can operate under your control. ${OS_RELEASES.docker ? 'Docker images are the first release; the hardware installer and phone builds follow.' : 'There are no images to download yet: this page tracks the specification and its progress.'}</p><div class="actions"><a class="button primary" href="/docs/os-prd.md">Read the specification <span aria-hidden="true">→</span></a><a class="text-link" href="https://github.com/profullstack/w3bs.org/blob/main/os/suite-manifest.json" rel="noopener">Suite manifest ↗</a></div></section>${osInstall()}${osStudio()}<section class="section"><div class="section-heading"><div><div class="eyebrow">DEFAULTS</div><h2>What you get.</h2></div></div><div class="table-wrap"><table class="platform-table"><tbody>${rows(defaults)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">INCLUDED SOFTWARE</div><h2>The whole suite, offline.</h2></div></div><p>${suiteLine}</p></section><section class="section"><div class="section-heading"><div><div class="eyebrow">APPS FROM OTHER PLATFORMS</div><h2>One launcher, honest labels.</h2></div></div><p><code>w3bs run</code> picks the best route for each app and labels its window, so a remote or guest app is never passed off as local.</p><div class="table-wrap"><table class="platform-table"><tbody>${rows(runtimes)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">HARDWARE</div><h2>Certified, preview, research, unsupported.</h2></div></div><p>Only certified devices get an install button. A device with no supported image is offered the companion app instead.</p><div class="table-wrap"><table class="platform-table"><tbody>${rows(hardware)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">ALSO IN THE SPEC</div><h2>For publishers and developers.</h2></div></div><p><strong>W3BS Publish:</strong> ship one signed release and reach users on every OS, with deb, Flatpak, Homebrew, winget, MSIX, dmg and APK built from it. <strong>Providers:</strong> <code>w3bs install</code> drives apt, dnf, pacman, Homebrew, winget, Flatpak, Nix and the app stores, and records what it installed. <strong>W3BS Fleet:</strong> one desktop app and cloud app for every server, desktop, laptop and phone you own (<a class="inline-link" href="/docs/fleet-prd.md">spec</a>).</p></section><div class="draft-note"><strong>Status: specification.</strong> Docker editions are out; the installer ISO and phone builds are in testing. Links and supported-hardware results appear here only once those artifacts and checks exist.</div>`;
+  return `<section class="page-head"><div class="eyebrow">W3BS OS · SPECIFICATION</div><h1>An OS people<br><em>and agents can run.</em></h1><p>A lightweight Alpine Linux-based operating system with KDE Plasma, zsh, a full setup wizard and every Profullstack app installed, plus a desktop agents can operate under your control. ${OS_RELEASES.docker ? 'Docker images are the first release; the hardware installer and phone builds follow.' : 'There are no images to download yet: this page tracks the specification and its progress.'}</p><div class="actions"><a class="button primary" href="/docs/os-prd.md">Read the specification <span aria-hidden="true">→</span></a><a class="text-link" href="https://github.com/profullstack/w3bs.org/blob/main/os/suite-manifest.json" rel="noopener">Suite manifest ↗</a></div></section>${osInstall(iso)}${osStudio()}<section class="section"><div class="section-heading"><div><div class="eyebrow">DEFAULTS</div><h2>What you get.</h2></div></div><div class="table-wrap"><table class="platform-table"><tbody>${rows(defaults)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">INCLUDED SOFTWARE</div><h2>The whole suite, offline.</h2></div></div><p>${suiteLine}</p></section><section class="section"><div class="section-heading"><div><div class="eyebrow">APPS FROM OTHER PLATFORMS</div><h2>One launcher, honest labels.</h2></div></div><p><code>w3bs run</code> picks the best route for each app and labels its window, so a remote or guest app is never passed off as local.</p><div class="table-wrap"><table class="platform-table"><tbody>${rows(runtimes)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">HARDWARE</div><h2>Certified, preview, research, unsupported.</h2></div></div><p>Only certified devices get an install button. A device with no supported image is offered the companion app instead.</p><div class="table-wrap"><table class="platform-table"><tbody>${rows(hardware)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">ALSO IN THE SPEC</div><h2>For publishers and developers.</h2></div></div><p><strong>W3BS Publish:</strong> ship one signed release and reach users on every OS, with deb, Flatpak, Homebrew, winget, MSIX, dmg and APK built from it. <strong>Providers:</strong> <code>w3bs install</code> drives apt, dnf, pacman, Homebrew, winget, Flatpak, Nix and the app stores, and records what it installed. <strong>W3BS Fleet:</strong> one desktop app and cloud app for every server, desktop, laptop and phone you own (<a class="inline-link" href="/docs/fleet-prd.md">spec</a>).</p></section><div class="draft-note"><strong>Status: specification.</strong> Docker editions are out; the installer ISO and phone builds are in testing. Links and supported-hardware results appear here only once those artifacts and checks exist.</div>`;
 }
 const TRAINING_INSTALL = 'curl -fsSL https://w3bs.org/training/install.sh | sh';
 const TRAINING_INSTALL_WIN = 'irm https://w3bs.org/training/install.ps1 | iex';

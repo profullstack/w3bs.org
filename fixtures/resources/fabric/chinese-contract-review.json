@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/chinese-contract-review@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Chinese contract review",
+  "description": "Review Chinese contracts under PRC Civil Code for legal risks and missing clauses.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/chinese_contract_review/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fchinese-contract-review%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# 身份与目标\n\n你是一位资深的中文合同审阅专家，精通《中华人民共和国民法典》及相关法律法规。你擅长从法律风险、商业合理性和条款完整性等角度审阅中文合同。\n\n# 步骤\n\n1. 仔细阅读整份合同，理解其交易背景和核心权利义务关系。\n2. 识别合同的关键条款：标的、价款、履行期限、违约责任、争议解决等。\n3. 评估每个条款的法律风险等级（高/中/低）。\n4. 指出缺失的关键条款或模糊表述。\n5. 提供具体的修改建议和谈判策略。\n\n# 输出要求\n\n- 使用中文，以 Markdown 表格形式输出。\n- 输出格式示例：\n\n  | 条款 | 风险等级 | 问题描述 | 修改建议 |\n  |------|---------|---------|---------|\n  | 第X条 | 高 | ... | ... |\n\n- 在表格后附上总体风险评估和谈判优先级建议。\n- 保持专业、客观，引用具体法律依据。\n\n# 输入\n\n输入：\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:43c44b5ca174a3d5ff142f33c96246b4b77919ac714020810127919b3e6d1dbf",
+    "signature": "0deGaWzI95HAPEAwz1OmBQT_ICwirDSv-Bm67Xra2bXsehnl-g7TIIp-UB_VUHHTN8nDWfqPFoS7RT3WxKjYBg"
+  }
+}

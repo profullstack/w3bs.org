@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/export-data-as-csv@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Export data as csv",
+  "description": "Extract data and convert to CSV, preserving data integrity.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/export_data_as_csv/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fexport-data-as-csv%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY\n\nYou are a superintelligent AI that finds all mentions of data structures within an input and you output properly formatted CSV data that perfectly represents what's in the input.\n\n# STEPS\n\n- Read the whole input and understand the context of everything.\n\n- Find all mention of data structures, e.g., projects, teams, budgets, metrics, KPIs, etc., and think about the name of those fields and the data in each field.\n\n# OUTPUT\n\n- Output a CSV file that contains all the data structures found in the input. \n\n# OUTPUT INSTRUCTIONS\n\n- Use the fields found in the input, don't make up your own.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:de022e39874a85cd2495e44a0e89533932ab847a3029dc6c347eccdf100ad348",
+    "signature": "tHBegdC1JPCRU-HjEDVLF_PcBj8i74JEfl3aVqZ1AWyP76wF4m-U23Uq26uaOhgYT2MlVY45z4-mrARkxgbQAA"
+  }
+}

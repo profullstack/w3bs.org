@@ -4,11 +4,15 @@
 mod ab;
 mod auth;
 mod desktop;
+mod distupgrade;
 mod fleet;
 mod os;
+mod handler;
+mod link;
 mod publish;
 mod screen;
 mod render;
+mod runner;
 
 use clap::{Args, Parser, Subcommand};
 use serde_json::{Value, json};
@@ -27,6 +31,8 @@ Apps:
   packages   w3bs packages            the package catalog (same list as w3bs.org/packages)
              w3bs install <pkg>       install, then `w3bs update` keeps everything current
              w3bs pkg --help          the whole package manager
+             w3bs open <w3bs://install/…>  install from a link (always asks first)
+             w3bs handler install     let the browser open w3bs:// links with `w3bs open`
   resources  w3bs resolve <w3bs://…>  resolve, inspect, verify and run signed W3BS resources
              w3bs resource --help     the whole resource client (search, publish, fork, sign…)
   account    w3bs login               sign in to your W3BS account (opens the browser; works
@@ -163,6 +169,18 @@ struct UpdateArgs {
     /// Reinstall even when the package is already current (pins still hold)
     #[arg(long, conflicts_with_all = ["version", "channel"])]
     force: bool,
+    /// Accept a publisher signing key this machine has not seen for a package's namespace
+    #[arg(long)]
+    accept_new_key: bool,
+    #[command(flatten)]
+    m: Mutate,
+}
+
+#[derive(Args, Clone)]
+struct DistUpgradeArgs {
+    /// Permit incompatible (major, or 0.x minor) W3BS package updates; pins still hold
+    #[arg(long)]
+    allow_major: bool,
     /// Accept a publisher signing key this machine has not seen for a package's namespace
     #[arg(long)]
     accept_new_key: bool,
@@ -313,15 +331,26 @@ enum ResCmd {
         #[command(flatten)]
         a: Api,
     },
-    /// Render a prompt template with explicit consent (no model or tool is called)
+    /// Render a prompt template with explicit consent; --via hands the result to a model
+    #[command(after_help = "Piped text fills the `input` input (or a prompt's only input):\n  pbpaste | w3bs resource run fabric/summarize --consent --via moshcode --model claude\n  w3bs resource run fabric/translate --input lang_code=fr --consent --via infernet < notes.md")]
     Run {
+        /// w3bs://prompt/<namespace>/<name>[@version], or <namespace>/<name>
         uri: String,
         /// JSON file of template inputs
         #[arg(long, value_name = "FILE")]
         inputs: Option<PathBuf>,
-        /// Authorize rendering
+        /// One template input (repeatable)
+        #[arg(long = "input", value_name = "NAME=VALUE")]
+        input: Vec<String>,
+        /// Authorize rendering, and sending the result to --via
         #[arg(long)]
         consent: bool,
+        /// Send the rendered instructions to a model through this runner
+        #[arg(long, value_enum)]
+        via: Option<runner::Via>,
+        /// Model for infernet/c0mpute (e.g. qwen2.5:7b), engine for moshcode (e.g. claude)
+        #[arg(long)]
+        model: Option<String>,
         #[command(flatten)]
         a: Api,
     },
@@ -706,6 +735,16 @@ enum ScreenCmd {
 }
 
 #[derive(Subcommand, Clone)]
+enum HandlerCmd {
+    /// Register `w3bs open` as this user's handler for w3bs:// links
+    Install,
+    /// Remove the w3bs:// handler registration
+    Uninstall,
+    /// Show whether the handler is registered and which app is the default
+    Status,
+}
+
+#[derive(Subcommand, Clone)]
 enum SelfCmd {
     /// Update the w3bs CLI through its own signed repository
     Update {
@@ -780,6 +819,10 @@ enum Cmd {
     Install(InstallArgs),
     /// Update everything, or the named packages (shortcut for `w3bs pkg update`)
     Update(UpdateArgs),
+    /// Upgrade the whole machine: the system packages (apk, apt, dnf, pacman, zypper or brew),
+    /// then every W3BS package and the w3bs CLI
+    #[command(visible_alias = "upgrade")]
+    DistUpgrade(DistUpgradeArgs),
     /// List installed packages (shortcut for `w3bs pkg list`)
     List,
     /// Search packages (shortcut for `w3bs pkg search`)
@@ -808,6 +851,18 @@ enum Cmd {
     },
     #[command(subcommand, hide = true)]
     Repo(RepoCmd),
+    /// Install from a link: w3bs://install/<namespace>/<name>[?channel=<c>] or
+    /// https://w3bs.org/i/<namespace>/<name>. Shows the install plan, with the publisher
+    /// signature, and always asks; opens a terminal window when started by a browser.
+    Open {
+        url: String,
+        /// Never open a terminal window; refuse when not run in one
+        #[arg(long)]
+        no_terminal: bool,
+    },
+    /// The w3bs:// link handler: install, uninstall, status
+    #[command(subcommand)]
+    Handler(HandlerCmd),
 
     // Resources: the second app.
     /// W3BS resources: search, resolve, inspect, verify, run, publish, fork, sign
@@ -978,10 +1033,21 @@ fn external(args: &[OsString], out: &Output) -> ! {
     };
     if err.kind() == std::io::ErrorKind::NotFound {
         eprintln!("w3bs: unknown command `{name}` (no `{bin}` on PATH); install it with `w3bs install` or see `w3bs --help`");
+        // It may be a built-in of a newer w3bs (dist-upgrade arrived in 0.1.14).
+        if let Some((latest, how)) = newer_manager(out) {
+            eprintln!("w3bs: your w3bs ({}) is older than the published {latest}, which may have `{name}`: {how}", w3bs_core::engine::MANAGER_VERSION);
+        }
     } else {
         eprintln!("w3bs: could not run {bin}: {err}");
     }
     std::process::exit(exit::USAGE);
+}
+
+/// Best-effort, 5 s at most: a newer published w3bs and how to get it.
+fn newer_manager(out: &Output) -> Option<(semver::Version, String)> {
+    let (_, mk) = engine_factory(out).ok()?;
+    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().ok()?;
+    rt.block_on(async { tokio::time::timeout(std::time::Duration::from_secs(5), mk(&Mutate::default()).newer_manager()).await.ok().flatten() })
 }
 
 /// After updating the CLI itself, continue the same command with the new binary, once.
@@ -1015,10 +1081,52 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
         }
         Err(Cmd::Logout { a }) => ("logout", account("logout", &a, |o| async move { auth::logout(&o).await }).await),
         Err(Cmd::Whoami { a }) => ("whoami", account("whoami", &a, |o| async move { auth::whoami(&o).await }).await),
+        Err(Cmd::DistUpgrade(DistUpgradeArgs { allow_major, accept_new_key, m })) => {
+            let (_, mk) = match engine_factory(&out) {
+                Ok(x) => x,
+                Err(e) => return ("startup", Err(e)),
+            };
+            let tty = Tty { out: out.clone() };
+            let system = match distupgrade::system(m.yes, m.dry_run, |p| tty.confirm(p), |msg| tty.progress(msg)) {
+                Ok(v) => v,
+                Err(e) => return ("dist-upgrade", Err(e)),
+            };
+            // Approving the system step approves the whole upgrade; when it was skipped, the
+            // package step asks for itself.
+            let m = Mutate { yes: m.yes || system["status"] == "upgraded", dry_run: m.dry_run };
+            let r = mk(&m).update(UpdateRequest { packages: vec![], all: true, version: None, channel: None, allow_major, force: false, accept_new_key }).await;
+            (
+                "dist-upgrade",
+                r.map(|mut res| {
+                    res.operation = "dist-upgrade".into();
+                    res.data["system"] = system;
+                    res
+                }),
+            )
+        }
         Err(Cmd::Fleet(f)) => run_fleet(f).await,
         Err(Cmd::Ab(c)) => run_ab(c).await,
         Err(Cmd::Publish(c)) => run_publish(c).await,
         Err(Cmd::Os(c)) => run_os(c, out).await,
+        Err(Cmd::Open { url, no_terminal }) => run_open(&url, no_terminal, out).await,
+        Err(Cmd::Handler(h)) => {
+            let (op, r) = match h {
+                HandlerCmd::Install => ("handler.install", handler::install()),
+                HandlerCmd::Uninstall => ("handler.uninstall", handler::uninstall()),
+                HandlerCmd::Status => ("handler.status", handler::status()),
+            };
+            (
+                op,
+                r.map(|data| {
+                    let mut res = OperationResult::new(op);
+                    if let Some(w) = data["warnings"].as_array() {
+                        res.warnings.extend(w.iter().filter_map(|x| x.as_str().map(str::to_owned)));
+                    }
+                    res.data = data;
+                    res
+                }),
+            )
+        }
         Err(Cmd::SelfCmd(s)) => {
             let (layout, mk) = match engine_factory(&out) {
                 Ok(x) => x,
@@ -1047,6 +1155,58 @@ async fn run_os(cmd: OsCmd, out: Output) -> (&'static str, w3bs_core::Result<Ope
             os::upgrade(&os::UpgradeOpts { to, allow_skip, ignore_policy, no_snapshot, resume, rollback, yes: m.yes, dry_run: m.dry_run, non_interactive: ni }, &ui).await,
         ),
     }
+}
+
+/// `w3bs open <link>`: the normal interactive install for the package a link names. Never
+/// `--yes`: a person always sees the plan and the signature status and answers.
+async fn run_open(url: &str, no_terminal: bool, out: Output) -> (&'static str, w3bs_core::Result<OperationResult>) {
+    let l = match link::parse(url) {
+        Ok(l) => l,
+        Err(e) => return ("open", Err(w3bs_core::Error::usage("BAD_INSTALL_LINK", e))),
+    };
+    let manual = format!("run `w3bs install {}{}` in a terminal", l.id, l.channel.as_ref().map(|c| format!(" --channel {c}")).unwrap_or_default());
+    if !link::stdin_is_tty() {
+        // Started by a browser: no terminal to ask in. Re-run in a terminal window.
+        if no_terminal || out.json || out.non_interactive || !link::has_desktop() {
+            return ("open", Err(w3bs_core::Error::approval("NO_TERMINAL", format!("an install link needs a person at a terminal to confirm; {manual}"))));
+        }
+        let exe = match std::env::current_exe() {
+            Ok(e) => e,
+            Err(e) => return ("open", Err(w3bs_core::Error::preflight("NO_EXE", format!("cannot find the w3bs binary: {e}")))),
+        };
+        return match link::relaunch_in_terminal(&exe, &l) {
+            Ok(terminal) => {
+                let mut res = OperationResult::new("open");
+                res.data = json!({ "package": l.id.to_string(), "channel": l.channel, "terminal": terminal, "relaunched": true });
+                ("open", Ok(res))
+            }
+            Err(e) => ("open", Err(w3bs_core::Error::approval("NO_TERMINAL", format!("{e}; {manual}")))),
+        };
+    }
+    if out.json || out.non_interactive {
+        return ("open", Err(w3bs_core::Error::approval("APPROVAL_REQUIRED", format!("an install link always asks for confirmation, so it cannot run with --json or --non-interactive; {manual}"))));
+    }
+    eprintln!(
+        "w3bs: this link asks to install {}{}. Check the plan below, including who signed it; nothing changes unless you answer yes.",
+        l.id,
+        l.channel.as_ref().map(|c| format!(" from the {c} channel")).unwrap_or_default()
+    );
+    let (_, mk) = match engine_factory(&out) {
+        Ok(x) => x,
+        Err(e) => return ("startup", Err(e)),
+    };
+    let req = InstallRequest {
+        packages: vec![l.id.to_string()],
+        manifest: None,
+        repository: None,
+        version: None,
+        channel: l.channel,
+        pin: false,
+        force: false,
+        origin: Some("link".into()),
+        accept_new_key: false,
+    };
+    ("install", mk(&Mutate::default()).install(req).await)
 }
 
 async fn run_publish(cmd: PublishCmd) -> (&'static str, w3bs_core::Result<OperationResult>) {
@@ -1265,13 +1425,7 @@ async fn run_resource(cmd: ResCmd) -> (&'static str, w3bs_core::Result<Operation
         ResCmd::Inspect { uri, a } => ("resource.inspect", api_uri(&a, "inspect", &uri).await),
         ResCmd::Verify { uri, a } => ("resource.verify", api_uri(&a, "verify", &uri).await),
         ResCmd::Conformance { uri, a } => ("resource.conformance", api_uri(&a, "conformance", &uri).await),
-        ResCmd::Run { uri, inputs, consent, a } => {
-            let inputs = match inputs.map(|p| read_json(&p)).transpose() {
-                Ok(i) => i.unwrap_or_else(|| json!({})),
-                Err(e) => return ("resource.run", Err(e)),
-            };
-            ("resource.run", api_call(&a, "run", json!({ "uri": uri, "inputs": inputs, "consent": consent })).await)
-        }
+        ResCmd::Run { uri, inputs, input, consent, via, model, a } => ("resource.run", run_prompt(&a, &uri, inputs, &input, consent, via, model.as_deref()).await),
         ResCmd::Publish { manifest, a } => match read_json(&manifest) {
             Ok(m) => ("resource.publish", api_call(&a, "publish", json!({ "manifest": m })).await),
             Err(e) => ("resource.publish", Err(e)),
@@ -1303,6 +1457,42 @@ async fn run_resource(cmd: ResCmd) -> (&'static str, w3bs_core::Result<Operation
         }
         Err(e) => (op, Err(e)),
     }
+}
+
+/// `<namespace>/<name>` is shorthand for a prompt: `fabric/summarize`.
+fn prompt_uri(uri: &str) -> String {
+    if !uri.contains("://") && uri.matches('/').count() == 1 { format!("w3bs://prompt/{uri}") } else { uri.to_owned() }
+}
+
+/// Render through the registry, then, with `--via`, hand the instructions to a runner.
+async fn run_prompt(a: &Api, uri: &str, file: Option<PathBuf>, pairs: &[String], consent: bool, via: Option<runner::Via>, model: Option<&str>) -> w3bs_core::Result<Value> {
+    let uri = prompt_uri(uri);
+    let mut inputs = file.map(|p| read_json(&p)).transpose()?.unwrap_or_else(|| json!({}));
+    if !inputs.is_object() {
+        return Err(w3bs_core::Error::usage("INVALID_INPUT", "--inputs must be a JSON object"));
+    }
+    for pair in pairs {
+        let (k, v) = pair.split_once('=').ok_or_else(|| w3bs_core::Error::usage("INVALID_INPUT", format!("--input expects NAME=VALUE, got {pair}")))?;
+        inputs[k] = v.into();
+    }
+    // Piped text fills `input` (Fabric's convention) or the prompt's only input, unless given.
+    if !link::stdin_is_tty() {
+        let declared = api_uri(a, "inspect", &uri).await?["manifest"]["content"]["inputs"].as_object().cloned().unwrap_or_default();
+        let target = if declared.contains_key("input") { Some("input".to_owned()) } else if declared.len() == 1 { declared.keys().next().cloned() } else { None };
+        if let Some(target) = target.filter(|t| inputs.get(t).is_none()) {
+            let mut text = String::new();
+            std::io::Read::read_to_string(&mut std::io::stdin(), &mut text).map_err(|e| w3bs_core::Error::usage("READ", format!("stdin: {e}")))?;
+            if !text.trim().is_empty() {
+                inputs[target] = text.into();
+            }
+        }
+    }
+    let mut out = api_call(a, "run", json!({ "uri": uri, "inputs": inputs, "consent": consent })).await?;
+    if let Some(via) = via {
+        out["runner"] = runner::run(via, model, out["output"].as_str().unwrap_or_default())?;
+        out["modelInvoked"] = true.into();
+    }
+    Ok(out)
 }
 
 async fn api_call(a: &Api, operation: &str, args: Value) -> w3bs_core::Result<Value> {

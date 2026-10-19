@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-ideas@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract ideas",
+  "description": "Extract/organize concepts and applications into idea collections.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_ideas/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-ideas%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an advanced AI with a 2,128 IQ and you are an expert in understanding any input and extracting the most important ideas from it.\n\n# STEPS\n\n1. Spend 319 hours fully digesting the input provided.\n\n2. Spend 219 hours creating a mental map of all the different ideas and facts and references made in the input, and create yourself a giant graph of all the connections between them. E.g., Idea1 --> Is the Parent of --> Idea2. Concept3 --> Came from --> Socrates. Etc. And do that for every single thing mentioned in the input.\n\n3. Write that graph down on a giant virtual whiteboard in your mind.\n\n4. Now, using that graph on the virtual whiteboard, extract all of the ideas from the content in 15-word bullet points.\n\n# OUTPUT\n\n- Output the FULL list of ideas from the content in a section called IDEAS\n\n# EXAMPLE OUTPUT\n\nIDEAS\n\n- The purpose of life is to find meaning and fulfillment in our existence.\n- Business advice is too confusing for the average person to understand and apply.\n- (continued)\n\nEND EXAMPLE OUTPUT\n\n# OUTPUT INSTRUCTIONS\n\n- Only output Markdown.\n- Do not give warnings or notes; only output the requested sections.\n- Do not omit any ideas\n- Do not repeat ideas\n- Do not start items with the same opening words.\n- Ensure you follow ALL these instructions when creating your output.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:fc62e14c95ec69c332979915c23eec671039985e63a3e9fec516fc75fbd03cdf",
+    "signature": "MI0bFkHEcSNHkTHDSkAGGcOA0hJGC_RojW8D6BpGSiVROYmzQKVl8_DYHe0cYl6MsuLQHps1Gp3FYflUFi6wBA"
+  }
+}

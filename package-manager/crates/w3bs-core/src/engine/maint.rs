@@ -19,6 +19,20 @@ pub fn manager_is_self_managed(layout: &Layout) -> bool {
     layout.package_dir("w3bs-manager").canonicalize().is_ok_and(|d| exe.starts_with(d))
 }
 
+/// Whether this process runs in a container (Docker or Podman).
+pub fn in_container() -> bool {
+    std::path::Path::new("/.dockerenv").exists() || std::path::Path::new("/run/.containerenv").exists()
+}
+
+/// How to get a newer w3bs when this binary is not the managed one. In a container the
+/// binary is baked into the image (W3BS OS builds it for musl, which has no release).
+pub fn external_upgrade_hint() -> String {
+    if in_container() {
+        return "pull the newer image (for W3BS OS: `docker pull w3bs.org/os:server`) and recreate the container".into();
+    }
+    external_owner_hint().unwrap_or_else(|| "reinstall with `curl -fsSL https://w3bs.org/install.sh | sh`".into())
+}
+
 /// Recognize an external owner of the running binary, for actionable instructions.
 pub fn external_owner_hint() -> Option<String> {
     let exe = std::env::current_exe().ok()?.to_string_lossy().into_owned();
@@ -163,7 +177,7 @@ impl Engine {
         }
         let errors = issues.iter().filter(|i| i["severity"] == "error").count();
         res.result = if errors > 0 { Overall::Failure } else { Overall::Ok };
-        res.data = json!({ "issues": issues, "store": layout.data_dir, "bin_dir": layout.bin_dir, "manager_version": super::MANAGER_VERSION });
+        res.data = json!({ "issues": issues, "store": layout.data_dir, "bin_dir": layout.bin_dir, "manager_version": super::MANAGER_VERSION, "platform": w3bs_schema::host_platform() });
         Ok(res)
     }
 
@@ -247,6 +261,25 @@ impl Engine {
             .await?;
         r.operation = "self.install".into();
         Ok(r)
+    }
+
+    /// A newer published w3bs that this binary cannot install over itself, because it is not
+    /// the managed one (baked into an image, cargo, Homebrew, a copied binary). A managed w3bs
+    /// updates itself in `update`, so this is None for it, and on any lookup failure.
+    pub async fn external_manager_notice(&mut self) -> Option<String> {
+        if manager_is_self_managed(&self.layout) {
+            return None;
+        }
+        let (latest, how) = self.newer_manager().await?;
+        Some(format!("w3bs {latest} is available (you have {}): {how}", super::MANAGER_VERSION))
+    }
+
+    /// The newest published w3bs above this one, and how to get it from here.
+    pub async fn newer_manager(&mut self) -> Option<(semver::Version, String)> {
+        let current: semver::Version = super::MANAGER_VERSION.parse().ok()?;
+        let latest = self.published_version(MANAGER_PACKAGE_ID, "w3bs", "stable", &current).await?;
+        let how = if manager_is_self_managed(&self.layout) { "upgrade with `w3bs self update`".into() } else { external_upgrade_hint() };
+        Some((latest, how))
     }
 
     pub async fn self_update(&mut self) -> Result<OperationResult> {

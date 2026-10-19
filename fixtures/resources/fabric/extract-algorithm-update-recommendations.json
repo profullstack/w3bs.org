@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-algorithm-update-recommendations@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract algorithm update recommendations",
+  "description": "Extract recommendations for improving algorithms, focusing on steps.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_algorithm_update_recommendations/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-algorithm-update-recommendations%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY and PURPOSE\n\nYou are an expert interpreter of the algorithms described for doing things within content. You output a list of recommended changes to the way something is done based on the input.\n\n# Steps\n\nTake the input given and extract the concise, practical recommendations for how to do something within the content.\n\n# OUTPUT INSTRUCTIONS\n\n- Output a bulleted list of up to 3 algorithm update recommendations, each of no more than 16 words.\n\n# OUTPUT EXAMPLE\n\n- When evaluating a collection of things that takes time to process, weigh the later ones higher because we naturally weigh them lower due to human bias.\n- When performing web app assessments, be sure to check the /backup.bak path for a 200 or 400 response.\n- Add \"Get sun within 30 minutes of waking up to your daily routine.\"\n\n# INPUT:\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:ec230c330f2ac18eb151f55a1219bbb9a8a241a9512758ccd5839ef1c4ea6fc5",
+    "signature": "W5S93E64nEuPpgCELHoGhDh6IMgfQR9Io_wbXpLALJ-IklpNhTEzz_MyNwNnSz-USoYnbUa15lUNQ-iCRqY5DQ"
+  }
+}

@@ -51,6 +51,29 @@ W3BS_API=http://localhost:3000 w3bs resource run w3bs://prompt/w3bs/research@1 -
 
 This runs a deterministic template renderer. The output is instructions, not an AI-generated research answer. It never calls a model or tool. Supply the rendered prompt to a separately authorized model runtime if needed. Manifests requesting tools or capabilities are rejected by this runtime.
 
+Inputs also come from `--input NAME=VALUE` (repeatable) and from piped text, which fills the input named `input` or a prompt's only input. `<namespace>/<name>` is shorthand for `w3bs://prompt/<namespace>/<name>`.
+
+## Run a prompt on a model
+
+`--via` is the separately authorized runtime: the CLI renders, then pipes the instructions to a peer CLI you installed and prints its answer. W3BS holds no model keys and calls no provider itself.
+
+| `--via`    | Runs                              | `--model`                                  | Install                                  |
+| ---------- | --------------------------------- | ------------------------------------------ | ---------------------------------------- |
+| `moshcode` | `moshcode oneshot <engine> -`     | the engine, required (`claude`, `codex`, …; see `moshcode oneshot --list`) | `w3bs install moshcode.sh/moshcode`      |
+| `infernet` | `infernet chat [--model M]`       | optional model, e.g. `qwen2.5:7b`          | `w3bs install infernetprotocol.com/infernet` |
+| `c0mpute`  | `c0mpute infernet chat [--model M]` | optional model                           | `w3bs install c0mpute.com/c0mpute`       |
+
+```sh
+pbpaste | w3bs resource run fabric/extract-wisdom --consent --via moshcode --model claude
+w3bs resource run fabric/translate --input lang_code=fr --consent --via infernet < notes.md
+```
+
+`infernet chat` uses the Infernet network when its config sets a control plane, and its local engine otherwise. `--json` reports `modelInvoked: true` and the runner command alongside the rendered output and the answer.
+
+## Fabric patterns
+
+The registry carries 261 of [Fabric](https://github.com/danielmiessler/Fabric)'s MIT-licensed patterns as `w3bs://prompt/fabric/<name>@1.0.0` (Fabric's `extract_wisdom` is `fabric/extract-wisdom`). `bun scripts/import-fabric.mjs <Fabric checkout>` regenerates them into `fixtures/resources/fabric/`, signed with the `w3bs-fabric-1` key; the signature attests the conversion, and `NOTICE` there carries Fabric's license. Patterns the template runtime cannot carry unchanged are skipped rather than rewritten: three exceed the 50,000-character instruction limit and one is literal nuclei `{{var}}` syntax.
+
 ## Publish your first artifact
 
 1. Generate an Ed25519 publisher key with `w3bs resource keygen --out .local/my-key --namespace example`.

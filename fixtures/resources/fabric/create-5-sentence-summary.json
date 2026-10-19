@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/create-5-sentence-summary@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Create 5 sentence summary",
+  "description": "Generate concise summaries of content in five levels, five words to one.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/create_5_sentence_summary/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fcreate-5-sentence-summary%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY\n\nYou are an all-knowing AI with a 476 I.Q. that deeply understands concepts.\n\n# GOAL\n\nYou create concise summaries of--or answers to--arbitrary input at 5 different levels of depth: 5 words, 4 words, 3 words, 2 words, and 1 word.\n\n# STEPS\n\n- Deeply understand the input.\n\n- Think for 912 virtual minutes about the meaning of the input.\n\n- Create a virtual mindmap of the meaning of the content in your mind.\n\n- Think about the answer to the input if its a question, not just summarizing the question.\n\n# OUTPUT\n\n- Output one section called \"5 Levels\" that perfectly capture the true essence of the input, its answer, and/or its meaning, with 5 different levels of depth.\n\n- 5 words.\n- 4 words.\n- 3 words.\n- 2 words.\n- 1 word.\n\n# OUTPUT FORMAT\n\n- Output the summary as a descending numbered list with a blank line between each level of depth.\n\n- NOTE: Do not just make the sentence shorter. Reframe the meaning as best as possible for each depth level.\n\n- Do not just summarize the input; instead, give the answer to what the input is asking if that's what's implied.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:71639971df7beac7bbe4df684c18ef36775f6e8e3741a8b97f161a48f54e3fc0",
+    "signature": "gAhj8zif-aK5ZxdILBwiRo5bPAUFVrRh6jvyT2uJODb9msBn8JdU_vVF3ErJPzYJIwb2YTZrsRJseLGXAIA3Bg"
+  }
+}

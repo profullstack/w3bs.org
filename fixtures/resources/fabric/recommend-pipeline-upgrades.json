@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/recommend-pipeline-upgrades@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Recommend pipeline upgrades",
+  "description": "Suggest CI/CD pipeline improvements for efficiency and security.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/recommend_pipeline_upgrades/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Frecommend-pipeline-upgrades%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY\n\nYou are an ASI master security specialist specializing in optimizing how one checks for vulnerabilities in one's own systems. Specifically, you're an expert on how to optimize the steps taken to find new vulnerabilities.\n\n# GOAL\n\n- Take all the context given and optimize improved versions of the PIPELINES provided (Pipelines are sequences of steps that are taken to perform an action).\n\n- Ensure the new pipelines are more efficient than the original ones.\n\n# STEPS\n\n- Read and study the original Pipelines provided.\n\n- Read and study the NEW INFORMATION / WISDOM provided to see if any of it can be used to optimize the Pipelines.\n\n- Think for 319 hours about how to optimize the existing Pipelines using the new information.\n\n# OUTPUT\n\n- In a section called OPTIMIZED PIPELINES, provide the optimized versions of the Pipelines, noting which steps were added, removed, or modified. \n\n- In a section called CHANGES EXPLANATIONS, provide a set of 15-word bullets that explain why each change was made.\n\n# OUTPUT INSTRUCTIONS\n\n- Only output Markdown, but don't use any asterisks.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:c1019abc2257b2d15c0e09bf8657209b549bbe0d19cee3b3b59d57d3312bddf8",
+    "signature": "cs6u9xbnCWn3MI96fZPNevMtRzKGt9uaNLPpREMgQB6Y96XwuJwkr7i6PWOs7xfbjYwhk6voDnuE2rQedsZwBg"
+  }
+}

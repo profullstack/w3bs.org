@@ -7,7 +7,10 @@ use std::process::Command;
 use w3bs_publish::{Expiry, ReleaseSpec, Workspace};
 use w3bs_schema::manifest::ArtifactFormat;
 
-const PLATFORM: &str = "x86_64-unknown-linux-gnu";
+/// Test packages are published for the platform this suite runs on (glibc, musl, either arch).
+fn platform() -> &'static str {
+    w3bs_schema::host_platform()
+}
 
 struct Env {
     dir: tempfile::TempDir,
@@ -82,7 +85,7 @@ fn release(env: &Env, ws: &Workspace, host: &str, name: &str, v: &str) {
         description: format!("{name} fixture"),
         license: "MIT".into(),
         format: ArtifactFormat::TarGz,
-        artifacts: vec![(PLATFORM.into(), art)],
+        artifacts: vec![(platform().into(), art)],
         commands: [(name.to_string(), format!("bin/{name}"))].into(),
         manager_requirement: None,
     })
@@ -129,6 +132,35 @@ fn at01_03_install_update_all_two_publishers() {
     assert_eq!(env.run_cmd("atlas"), "atlas 1.0.1");
     let (_, info, _) = env.w3bs(&["info", "atlas"]);
     assert_eq!(info["data"]["previous_version"], "1.0.0");
+}
+
+// A w3bs that is not the managed one (here the test binary; in W3BS OS the one baked into the
+// image) cannot update itself, so `update` must not call itself up to date over an old w3bs.
+#[test]
+fn update_reports_a_newer_unmanaged_w3bs() {
+    let env = Env::new();
+    let m = publisher(&env, "w3bs.org", "w3bs", &[env!("CARGO_PKG_VERSION")]);
+    add_repo(&env, "w3bs", &m);
+    let (code, v, _) = env.w3bs(&["update", "--yes"]);
+    assert_eq!(code, 0, "{v}");
+    assert!(v["data"].get("manager_update").is_none(), "{v}");
+
+    release(&env, &m, "w3bs.org", "w3bs", "99.0.0");
+    publish(&m);
+    let want = format!("w3bs 99.0.0 is available (you have {})", env!("CARGO_PKG_VERSION"));
+    for op in ["update", "outdated"] {
+        let args: &[&str] = if op == "update" { &["update", "--yes"] } else { &["outdated"] };
+        let (code, v, _) = env.w3bs(args);
+        assert_eq!(code, 0, "{v}");
+        let note = v["data"]["manager_update"].as_str().unwrap_or_default();
+        assert!(note.starts_with(&want), "{op}: {v}");
+    }
+
+    // An unknown command may be a built-in of that newer w3bs.
+    let o = Command::new(env!("CARGO_BIN_EXE_w3bs")).arg("dist-nope").env("W3BS_HOME", env.home()).env("W3BS_DEV_INSECURE_TRANSPORT", "1").output().unwrap();
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(err.contains("unknown command `dist-nope`"), "{err}");
+    assert!(err.contains("is older than the published 99.0.0, which may have `dist-nope`"), "{err}");
 }
 
 #[test]
@@ -873,4 +905,93 @@ fn publish_key_add_and_release_against_the_api_contract() {
     std::fs::remove_file(env.p("config/w3bs/auth.json")).unwrap();
     let (code, v, _) = env.w3bs_env(&["publish", "key", "ls", "--api", &api.origin], &envs);
     assert_eq!((code, v["error"]["code"].as_str()), (1, Some("NOT_SIGNED_IN")), "{v}");
+}
+
+// ------------------------------------------------------------------ install links (§21)
+
+/// `w3bs open` with no terminal never installs: it refuses with exit 3 (and a bad link with
+/// exit 2) before touching the store.
+#[test]
+fn open_link_refuses_without_a_terminal() {
+    let env = Env::new();
+    let a = publisher(&env, "tools.example", "atlas", &["1.0.0"]);
+    add_repo(&env, "tools", &a);
+    let no_desktop = [("DISPLAY", ""), ("WAYLAND_DISPLAY", "")];
+    let (code, v, _) = env.w3bs_env(&["open", "w3bs://install/tools.example/atlas"], &no_desktop);
+    assert_eq!((code, v["error"]["code"].as_str()), (3, Some("NO_TERMINAL")), "{v}");
+    assert!(v["error"]["message"].as_str().unwrap().contains("w3bs install tools.example/atlas"), "{v}");
+    let (code, v, _) = env.w3bs_env(&["open", "https://w3bs.org/i/tools.example/atlas?channel=stable"], &no_desktop);
+    assert_eq!(code, 3, "{v}");
+    assert!(!env.home().join("bin/atlas").exists());
+
+    // Human mode in a desktop session, but --no-terminal: no terminal window, still exit 3.
+    let o = Command::new(env!("CARGO_BIN_EXE_w3bs"))
+        .args(["open", "--no-terminal", "w3bs://install/tools.example/atlas"])
+        .env("W3BS_HOME", env.home())
+        .env("W3BS_DEV_INSECURE_TRANSPORT", "1")
+        .env("DISPLAY", ":99")
+        .output()
+        .unwrap();
+    assert_eq!(o.status.code(), Some(3), "{}", String::from_utf8_lossy(&o.stderr));
+    assert!(String::from_utf8_lossy(&o.stderr).contains("needs a person at a terminal"));
+    assert!(!env.home().join("bin/atlas").exists());
+
+    for bad in [
+        "w3bs://install/../x",
+        "w3bs://install/tools.example/atlas/extra",
+        "W3BS://install/tools.example/atlas",
+        "w3bs://install/tools.example/atlas?channel=x&yes=1",
+    ] {
+        let (code, v, _) = env.w3bs_env(&["open", bad], &no_desktop);
+        assert_eq!((code, v["error"]["code"].as_str()), (2, Some("BAD_INSTALL_LINK")), "{bad}: {v}");
+    }
+}
+
+#[test]
+fn handler_install_writes_desktop_entry() {
+    use std::os::unix::fs::PermissionsExt;
+    let env = Env::new();
+    let data = env.p("xdg-data");
+    let config = env.p("xdg-config");
+    let stubs = env.p("stubs");
+    std::fs::create_dir_all(&stubs).unwrap();
+    let log = env.p("xdg-mime.log");
+    // A stub xdg-mime that records its calls and answers `query default` from a file.
+    let stub = format!(
+        "#!/bin/sh\necho \"$*\" >> '{log}'\nif [ \"$1\" = default ]; then echo \"$2\" > '{state}'; fi\nif [ \"$1\" = query ]; then cat '{state}' 2>/dev/null; fi\nexit 0\n",
+        log = log.display(),
+        state = env.p("xdg-mime.default").display()
+    );
+    std::fs::write(stubs.join("xdg-mime"), stub).unwrap();
+    std::fs::set_permissions(stubs.join("xdg-mime"), std::fs::Permissions::from_mode(0o755)).unwrap();
+    let path = format!("{}:/usr/bin:/bin", stubs.display());
+    let home = env.p("h");
+    let envs = [("XDG_DATA_HOME", data.to_str().unwrap()), ("XDG_CONFIG_HOME", config.to_str().unwrap()), ("HOME", home.to_str().unwrap()), ("PATH", path.as_str())];
+
+    let (code, v, _) = env.w3bs_env(&["handler", "status"], &envs);
+    assert_eq!(code, 0, "{v}");
+    assert_eq!((v["data"]["installed"].as_bool(), v["data"]["registered"].as_bool()), (Some(false), Some(false)), "{v}");
+
+    let (code, v, err) = env.w3bs_env(&["handler", "install"], &envs);
+    assert_eq!(code, 0, "{v} {err}");
+    let file = data.join("applications/w3bs-url-handler.desktop");
+    let entry = std::fs::read_to_string(&file).unwrap();
+    for line in ["[Desktop Entry]\n", "Type=Application\n", "NoDisplay=true\n", "MimeType=x-scheme-handler/w3bs;\n"] {
+        assert!(entry.contains(line), "{line:?} missing from {entry}");
+    }
+    let exec = entry.lines().find_map(|l| l.strip_prefix("Exec=")).unwrap();
+    assert!(exec.starts_with('/') && exec.ends_with(" open %u"), "Exec must run an absolute w3bs: {exec}");
+    assert!(std::fs::read_to_string(&log).unwrap().contains("default w3bs-url-handler.desktop x-scheme-handler/w3bs"));
+    assert_eq!(v["data"]["registered"], true, "{v}");
+
+    let (code, v, _) = env.w3bs_env(&["handler", "status"], &envs);
+    assert_eq!((code, v["data"]["installed"].as_bool(), v["data"]["default"].as_str()), (0, Some(true), Some("w3bs-url-handler.desktop")), "{v}");
+
+    // Uninstall removes the entry and our mimeapps.list association, nothing else.
+    std::fs::create_dir_all(&config).unwrap();
+    std::fs::write(config.join("mimeapps.list"), "[Default Applications]\nx-scheme-handler/w3bs=w3bs-url-handler.desktop\ntext/html=firefox.desktop\n").unwrap();
+    let (code, v, _) = env.w3bs_env(&["handler", "uninstall"], &envs);
+    assert_eq!((code, v["data"]["removed"].as_bool(), v["data"]["association_removed"].as_bool()), (0, Some(true), Some(true)), "{v}");
+    assert!(!file.exists());
+    assert_eq!(std::fs::read_to_string(config.join("mimeapps.list")).unwrap(), "[Default Applications]\ntext/html=firefox.desktop\n");
 }

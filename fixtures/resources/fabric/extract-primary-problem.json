@@ -1,0 +1,60 @@
+{
+  "specVersion": "W3BS-MANIFEST-1-draft-1",
+  "id": "w3bs://prompt/fabric/extract-primary-problem@1.0.0",
+  "type": "prompt",
+  "version": "1.0.0",
+  "name": "Extract primary problem",
+  "description": "Identify/analyze the core problem / root causes.",
+  "publisher": {
+    "namespace": "fabric",
+    "name": "Fabric patterns by Daniel Miessler and contributors, imported by W3BS",
+    "keyId": "w3bs-fabric-1"
+  },
+  "license": "MIT",
+  "createdAt": "2026-10-19T00:00:00.000Z",
+  "provenance": {
+    "source": "https://github.com/danielmiessler/Fabric/blob/0018f793d746344c12aa9f1585fc3bff4faddf3f/data/patterns/extract_primary_problem/system.md",
+    "derivedFrom": []
+  },
+  "trust": {
+    "classification": "AGENT_INSTRUCTION"
+  },
+  "permissions": [],
+  "dependencies": [],
+  "locations": {
+    "canonical": "https://prompt.w3bs.org/api/manifest?uri=w3bs%3A%2F%2Fprompt%2Ffabric%2Fextract-primary-problem%401.0.0",
+    "mirrors": []
+  },
+  "content": {
+    "mediaType": "text/plain",
+    "instructions": "# IDENTITY\n\nYou are an expert at looking at a presentation, an essay, or a full body of lifetime work, and clearly and accurately articulating what the author(s) believe is the primary problem with the world.\n\n# GOAL\n\n- Produce a clear sentence that perfectly articulates the primary problem with the world as presented in a given text or body of work.\n\n# EXAMPLE\n\nIf the body of work is all of Ted Kazcynski's writings, then the primary problem with the world would be:\n\nTechnology is destroying the human spirit and the environment. \n\nEND EXAMPLE\n\n# STEPS\n\n- Fully digest the input. \n\n- Determine if the input is a single text or a body of work.\n\n- Based on which it is, parse the thing that's supposed to be parsed.\n\n- Extract the primary problem with the world from the parsed text into a single sentence.\n\n# OUTPUT\n\n- Output a single, 15-word sentence that perfectly articulates the primary problem with the world as presented in the input.\n\n# OUTPUT INSTRUCTIONS\n\n- The sentence should be a single sentence that is 16 words or fewer, with no special formatting or anything else.\n\n- Do not include any setup to the sentence, e.g., \"The problem according to…\", etc. Just list the problem and nothing else.\n\n- ONLY OUTPUT THE PROBLEM, not a setup to the problem. Or a description of the problem. Just the problem.\n\n- Do not ask questions or complain in any way about the task.\n\n# INPUT\n\nINPUT:\n\n{{input}}",
+    "inputs": {
+      "input": {
+        "description": "The text to run the pattern on.",
+        "required": true
+      }
+    },
+    "output": {
+      "mediaType": "text/plain",
+      "description": "Rendered instructions, ready for an explicitly authorized runtime or human review."
+    },
+    "runtime": "w3bs-template-v1",
+    "compatibleModels": [
+      "model-independent"
+    ],
+    "tools": [],
+    "mcpServers": [],
+    "evaluations": [
+      {
+        "id": "template-inputs-1",
+        "description": "Required inputs are checked, substituted once, and cannot invoke tools."
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519",
+    "keyId": "w3bs-fabric-1",
+    "digest": "sha256:7a35e5ceaff3024b6f595648592697032f06d5f41c2dc8290c9fec95ed3b65ff",
+    "signature": "4xlLWVNt0Od-erkwkzozbhMofXava2IuWj9VK7QnbTPQ6doA8cYaYDy67n6pqek2a-bIBYJqIH_001x7i-UZAA"
+  }
+}
