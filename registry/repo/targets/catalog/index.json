@@ -251,7 +251,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.13.28"
+      "latest_version": "0.13.48"
     },
     {
       "id": "coinpayportal.com/coinpay",
@@ -379,7 +379,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "1.4.0"
+      "latest_version": "1.6.0"
     },
     {
       "id": "pairux.com/pairux",
@@ -560,7 +560,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.14.0"
+      "latest_version": "0.15.0"
     },
     {
       "id": "hdtilt.com/hdtilt",
@@ -1056,7 +1056,7 @@
       "vendor": "Mistral AI",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "2.26.1"
+      "latest_version": "3.0.0"
     },
     {
       "id": "openhands.dev/openhands-cli",
