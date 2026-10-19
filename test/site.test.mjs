@@ -156,7 +156,9 @@ test('/os offers only what exists: Docker now, the ISO from the newest os-v* rel
     assert.match(live, new RegExp(`href="${dl}/w3bs-os-0\\.1\\.0-x86_64\\.iso"`));
     assert.match(live, /Download the ISO \(1\.46 GB\)/);
     assert.match(live, new RegExp(sha));
-    assert.match(live, /NETWORK INSTALLER 0\.1\.0-preview · PREVIEW/);
+    assert.match(live, /PCS, INTEL MACS AND VPS SERVERS · ISO 0\.1\.0-preview · PREVIEW/);
+    assert.equal(live.match(/Download the ISO/g).length, 1, "one ISO, one button");
+    assert.match(live, /APPLE SILICON MACS/);
     const prd = await fetch(`${t.base}/docs/os-prd.md`);
     assert.equal(prd.status, 200);
     assert.match(await prd.text(), /^# W3BS OS Product Requirements/);
