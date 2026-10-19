@@ -374,6 +374,86 @@ fn curl_catalog_entry_runs_publisher_installer() {
 }
 
 #[test]
+fn curl_catalog_skips_current_and_force_reruns() {
+    let env = Env::new();
+    let ws = Workspace::open(env.p("pub-cat"));
+    rt().block_on(ws.init(365)).unwrap();
+    // The installer drops a `scout` that reports 1.2.0 and logs each run.
+    let runs = env.p("runs");
+    let bin = env.home().join("bin");
+    let script = env.p("install.sh");
+    let write_scout = |v: &str| format!("mkdir -p {b} && printf '#!/bin/sh\\necho scout {v}\\n' > {b}/scout && chmod +x {b}/scout", b = bin.display());
+    std::fs::write(&script, format!("#!/bin/sh\necho run >> {}\n{}\n", runs.display(), write_scout("1.2.0"))).unwrap();
+    let entry: w3bs_schema::manifest::CatalogEntry = serde_json::from_value(serde_json::json!({
+        "id": "tools.example/scout", "name": "scout", "description": "scripted", "commands": ["scout"],
+        "install": {"url": "https://example.invalid/install.sh", "shell": "sh"}, "latest_version": "1.2.0"
+    }))
+    .unwrap();
+    ws.set_catalog(vec![entry]).unwrap();
+    let p = ws.staging().join("catalog/index.json");
+    let s = std::fs::read_to_string(&p).unwrap().replace("https://example.invalid/install.sh", &format!("file://{}", script.display()));
+    std::fs::write(&p, s).unwrap();
+    publish(&ws);
+    add_repo(&env, "cat", &ws);
+    let count = || std::fs::read_to_string(&runs).map(|s| s.lines().count()).unwrap_or(0);
+
+    let (code, v, _) = env.w3bs(&["install", "scout", "--yes"]);
+    assert_eq!((code, status(&v, "tools.example/scout"), count()), (0, "installed".into(), 1), "{v}");
+    assert_eq!(v["packages"][0]["to"], "1.2.0", "{v}");
+    // Current: neither update nor install re-runs the installer.
+    let (code, v, _) = env.w3bs(&["update", "--yes"]);
+    assert_eq!((code, status(&v, "tools.example/scout"), count()), (0, "current".into(), 1), "{v}");
+    let (code, v, _) = env.w3bs(&["install", "scout", "--yes"]);
+    assert_eq!((code, status(&v, "tools.example/scout"), count()), (0, "current".into(), 1), "{v}");
+    let (_, v, _) = env.w3bs(&["outdated"]);
+    assert_eq!(status(&v, "tools.example/scout"), "current", "{v}");
+    // --force re-runs it either way; the same version afterwards still reads as current.
+    let (code, v, _) = env.w3bs(&["update", "--force", "--yes"]);
+    assert_eq!((code, status(&v, "tools.example/scout"), count()), (0, "current".into(), 2), "{v}");
+    assert_eq!(v["packages"][0]["reason"], "re-ran the publisher's curl installer; no newer version", "{v}");
+    let (code, v, _) = env.w3bs(&["install", "scout", "--force", "--yes"]);
+    assert_eq!((code, status(&v, "tools.example/scout"), count()), (0, "current".into(), 3), "{v}");
+    // An older command on disk is updated.
+    std::process::Command::new("sh").arg("-c").arg(write_scout("1.1.0")).status().unwrap();
+    let (_, v, _) = env.w3bs(&["outdated"]);
+    assert_eq!((v["packages"][0]["from"].as_str(), v["packages"][0]["to"].as_str()), (Some("1.1.0"), Some("1.2.0")), "{v}");
+    let (code, v, _) = env.w3bs(&["update", "--yes"]);
+    assert_eq!((code, status(&v, "tools.example/scout"), count()), (0, "updated".into(), 4), "{v}");
+    assert_eq!(env.run_cmd("scout"), "scout 1.2.0");
+    // Already on the machine but unknown to W3BS (an OS image): adopted, installer not run.
+    let (code, _, _) = env.w3bs(&["remove", "scout", "--yes"]);
+    assert_eq!(code, 0);
+    let (code, v, _) = env.w3bs(&["install", "scout", "--yes"]);
+    assert_eq!((code, status(&v, "tools.example/scout"), count()), (0, "current".into(), 4), "{v}");
+    let (_, l, _) = env.w3bs(&["list"]);
+    assert_eq!(l["data"]["packages"][0]["id"], "tools.example/scout", "{l}");
+}
+
+#[test]
+fn force_reinstalls_native_release_and_keeps_rollback() {
+    let env = Env::new();
+    let a = publisher(&env, "tools.example", "atlas", &["1.0.0", "1.0.1"]);
+    add_repo(&env, "tools", &a);
+    let (code, _, _) = env.w3bs(&["install", "atlas", "--version", "1.0.0", "--yes"]);
+    assert_eq!(code, 0);
+    let (code, v, _) = env.w3bs(&["update", "--yes"]);
+    assert_eq!((code, status(&v, "tools.example/atlas")), (0, "updated".into()), "{v}");
+    let (code, v, _) = env.w3bs(&["update", "--yes"]);
+    assert_eq!((code, status(&v, "tools.example/atlas")), (0, "current".into()), "{v}");
+    for args in [&["update", "--force", "--yes"][..], &["install", "atlas", "--force", "--yes"][..]] {
+        let (code, v, _) = env.w3bs(args);
+        assert_eq!((code, status(&v, "tools.example/atlas")), (0, "installed".into()), "{args:?}: {v}");
+        assert_eq!(v["packages"][0]["reason"], "reinstalled (--force)", "{v}");
+        assert_eq!(env.run_cmd("atlas"), "atlas 1.0.1");
+    }
+    let (code, _, _) = env.w3bs(&["doctor"]);
+    assert_eq!(code, 0);
+    let (code, v, _) = env.w3bs(&["rollback", "atlas", "--yes"]);
+    assert_eq!(code, 0, "{v}");
+    assert_eq!(env.run_cmd("atlas"), "atlas 1.0.0");
+}
+
+#[test]
 fn packages_lists_the_signed_catalog() {
     let env = Env::new();
     let ws = Workspace::open(env.p("pub-cat"));

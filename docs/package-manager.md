@@ -22,8 +22,11 @@ w3bs info claude-code             # where it came from, what it owns, its histor
 w3bs outdated                     # what has updates, what is pinned or held
 w3bs update                       # update everything eligible
 w3bs update moshcode              # or just one
+w3bs update --force moshcode      # reinstall even when it is already current (install takes --force too)
 w3bs remove claude-code           # remove it (your config and data are kept)
 ```
+
+`install` and `update` check the installed version first and change nothing when it is already the latest; `--force` reinstalls anyway.
 
 The full package manager is `w3bs pkg …` (`w3bs pkg --help`); the common commands above are shortcuts for it.
 
@@ -33,7 +36,7 @@ Exit codes: `0` ok (being current, pinned or held is not an error), `1` a packag
 
 ## Two kinds of package
 
-**Catalog tools** are listed in the [package catalog](/packages). Each one installs with its publisher's own `curl … | sh`; that is the listing rule. `w3bs install` fetches that installer over HTTPS, keeps a copy with its SHA-256, runs it, and records it. `w3bs update` runs it again. The installer may use npm, pip or anything else inside; `w3bs` never calls them itself. W3BS does not own the files a publisher's script writes, so it cannot verify or roll them back, and `w3bs remove` only unregisters the tool and points you at the publisher's uninstall steps.
+**Catalog tools** are listed in the [package catalog](/packages). Each one installs with its publisher's own `curl … | sh`; that is the listing rule. `w3bs install` fetches that installer over HTTPS, keeps a copy with its SHA-256, runs it, and records it. Before running it, `w3bs` asks the tool itself (`<command> --version`) and compares that with the catalog's `latest_version`: when it is already current, `install` records the tool without running anything (so a tool baked into an OS image is picked up as-is) and `update` reports it as current. When either version is unknown, `update` re-runs the installer. The installer may use npm, pip or anything else inside; `w3bs` never calls them itself. W3BS does not own the files a publisher's script writes, so it cannot verify or roll them back, and `w3bs remove` only unregisters the tool and points you at the publisher's uninstall steps.
 
 **Signed packages** come from a publisher's own W3BS repository: [TUF](https://theupdateframework.io/)-signed metadata over prebuilt archives. These get the full lifecycle:
 

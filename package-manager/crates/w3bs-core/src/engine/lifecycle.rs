@@ -25,6 +25,8 @@ pub struct InstallRequest {
     pub version: Option<Version>,
     pub channel: Option<String>,
     pub pin: bool,
+    /// Reinstall a package that is already installed and current.
+    pub force: bool,
     /// Diagnostic origin hint (`native` or `curl`); never affects ownership or security.
     pub origin: Option<String>,
 }
@@ -36,6 +38,8 @@ pub struct UpdateRequest {
     pub version: Option<Version>,
     pub channel: Option<String>,
     pub allow_major: bool,
+    /// Reinstall packages that are already current.
+    pub force: bool,
 }
 
 /// A fully verified, ready-to-apply native change.
@@ -55,6 +59,8 @@ pub(crate) struct PlannedScript {
     pub entry: CatalogEntry,
     pub repo: Rc<LoadedRepo>,
     pub from: Option<ScriptedRow>,
+    /// What `<command> --version` reported before the installer runs.
+    pub installed: Option<String>,
 }
 
 pub(crate) enum Change {
@@ -322,6 +328,12 @@ impl Engine {
     async fn plan_install(&mut self, r: &PackageRef, req: &InstallRequest) -> Result<std::result::Result<Change, PackageOutcome>> {
         // Idempotency: an installed identity is never silently updated, downgraded or moved.
         match self.installed(r)? {
+            Some(Installed::Native(row)) if req.force => return self.plan_native_reinstall(row).await.map(Ok),
+            Some(Installed::Script(row)) if req.force => {
+                let (repo, entry) = self.script_entry(&row).await?;
+                let installed = probe::installed_version(&entry.commands, &self.layout.bin_dir);
+                return Ok(Ok(Change::Script(Box::new(PlannedScript { entry, repo, from: Some(row), installed }))));
+            }
             Some(Installed::Native(row)) => {
                 let same_version = req.version.as_ref().is_none_or(|v| v.to_string() == row.active_version);
                 let same_channel = req.channel.as_ref().is_none_or(|c| *c == row.channel);
@@ -341,7 +353,7 @@ impl Engine {
                 )));
             }
             Some(Installed::Script(row)) => {
-                return Ok(Err(outcome(&row.package_id, None, None, Status::Current, Some("already installed; use `w3bs update` to re-run its installer".into()))));
+                return Ok(Err(outcome(&row.package_id, None, None, Status::Current, Some("already installed; `w3bs update` upgrades it, --force re-runs its installer".into()))));
             }
             None => {}
         }
@@ -351,7 +363,17 @@ impl Engine {
                 if req.version.is_some() || req.channel.is_some() || req.pin {
                     return Err(Error::usage("SCRIPT_NO_VERSIONS", format!("{} installs through its publisher's curl installer; --version, --channel and --pin do not apply", entry.id)));
                 }
-                Ok(Ok(Change::Script(Box::new(PlannedScript { entry, repo, from: None }))))
+                let installed = probe::installed_version(&entry.commands, &self.layout.bin_dir);
+                // Already on this machine (an OS image, a manual `curl | sh`) and current: record it
+                // so `w3bs update` manages it from now on, and do not re-run the installer.
+                if !req.force && probe::is_current(installed.as_deref(), entry.latest_version.as_deref()) {
+                    let v = installed.unwrap();
+                    if !self.opts.dry_run {
+                        self.adopt_script(&entry, &repo)?;
+                    }
+                    return Ok(Err(outcome(&entry.id.to_string(), Some(&v), None, Status::Current, Some(format!("{} {v} is already installed and current; --force re-runs its installer", entry.name)))));
+                }
+                Ok(Ok(Change::Script(Box::new(PlannedScript { entry, repo, from: None, installed }))))
             }
             Resolved::Native(entry) => {
                 let channel = req.channel.clone().unwrap_or_else(|| "stable".into());
@@ -368,6 +390,63 @@ impl Engine {
                 Ok(Ok(Change::Native(Box::new(Planned { id: entry.id, repo, manifest: m, artifact, channel, from: None, pin: req.pin, origin: req.origin.clone() }))))
             }
         }
+    }
+
+    /// `--force` on a native package: the active release again, verified like any other.
+    async fn plan_native_reinstall(&mut self, row: PackageRow) -> Result<Change> {
+        let id: PackageId = row.package_id.parse().unwrap();
+        let active: Version = row.active_version.parse().map_err(|_| Error::preflight("STATE", "invalid installed version"))?;
+        let repo = self.repo(&row.repo_alias).await?;
+        if repo.repo_key != row.repo_key {
+            return Err(Error::package("TRUST_CHANGED", format!("repository `{}` no longer has the trust root {} was installed from", row.repo_alias, row.package_id)));
+        }
+        let index = repo.package_index_or_empty().await?;
+        let entry = index.packages.iter().find(|e| e.id == id).ok_or_else(|| Error::package("PACKAGE_WITHDRAWN", format!("{id} is no longer listed by `{}`", row.repo_alias)))?;
+        let path = entry.channels.get(&row.channel).cloned().ok_or_else(|| Error::package("CHANNEL_NOT_FOUND", format!("{id} has no `{}` channel", row.channel)))?;
+        let m = match self.plan_release(&repo, &id, &row.channel, &path, Some(&active), None, false).await? {
+            Ok(m) => m,
+            Err(o) => return Err(Error::package("REINSTALL_UNAVAILABLE", format!("{id} {active} cannot be reinstalled: {:?}", o.status))),
+        };
+        let artifact = self.check_artifact(&repo, &m, Some(&row))?;
+        Ok(Change::Native(Box::new(Planned { id, repo, artifact, channel: row.channel.clone(), manifest: m, from: Some(row), pin: false, origin: None })))
+    }
+
+    /// The current signed catalog entry for a recorded curl-installed tool.
+    async fn script_entry(&mut self, s: &ScriptedRow) -> Result<(Rc<LoadedRepo>, CatalogEntry)> {
+        let id: PackageId = s.package_id.parse().unwrap();
+        let repo = self.repo(&s.repo_alias).await?;
+        if repo.repo_key != s.repo_key {
+            return Err(Error::package("TRUST_CHANGED", format!("repository `{}` changed trust root", s.repo_alias)));
+        }
+        let cat = repo.catalog().await?;
+        let entry = cat.entries.into_iter().find(|e| e.id == id).ok_or_else(|| Error::package("PACKAGE_WITHDRAWN", format!("{id} is no longer listed by `{}`", s.repo_alias)))?;
+        Ok((repo, entry))
+    }
+
+    /// Record a curl-installed tool found already installed, without running its installer.
+    fn adopt_script(&mut self, entry: &CatalogEntry, repo: &LoadedRepo) -> Result<()> {
+        let t = now();
+        let txn = txn_id();
+        let row = ScriptedRow {
+            package_id: entry.id.to_string(),
+            description: entry.description.clone(),
+            repo_alias: repo.alias.clone(),
+            repo_key: repo.repo_key.clone(),
+            install_url: entry.install.url.clone(),
+            shell: entry.install.shell.clone(),
+            // No installer ran, so there is no script digest to record.
+            script_sha256: String::new(),
+            commands: entry.commands.clone(),
+            installed_at: t.clone(),
+            updated_at: t,
+            transaction_id: txn.clone(),
+        };
+        let conn = self.conn();
+        let tx = conn.unchecked_transaction()?;
+        db::upsert_scripted(&tx, &row)?;
+        db::record_history(&tx, &row.package_id, "adopt", None, None, &txn)?;
+        tx.commit()?;
+        Ok(())
     }
 
     async fn plan_manifest_install(&mut self, url: &str, req: &InstallRequest) -> Result<std::result::Result<Change, PackageOutcome>> {
@@ -442,8 +521,10 @@ impl Engine {
                     p.repo.fingerprint
                 ),
                 Change::Script(s) => format!(
-                    "  {op} {} by running its publisher's installer: {}\n    (listed by {}; the script itself is not verified by W3BS and cannot be rolled back)",
+                    "  {op} {} {} -> {} by running its publisher's installer: {}\n    (listed by {}; the script itself is not verified by W3BS and cannot be rolled back)",
                     s.entry.id,
+                    s.installed.as_deref().unwrap_or("-"),
+                    s.entry.latest_version.as_deref().unwrap_or("latest"),
                     s.entry.install.command(),
                     s.repo.alias
                 ),
@@ -453,7 +534,7 @@ impl Engine {
             for c in &changes {
                 let (from, to) = match c {
                     Change::Native(p) => (p.from.as_ref().map(|f| f.active_version.clone()), Some(p.manifest.release.version.to_string())),
-                    Change::Script(s) => (s.from.as_ref().and_then(|f| probe::installed_version(&f.commands, &self.layout.bin_dir)), None),
+                    Change::Script(s) => (s.installed.clone(), s.entry.latest_version.clone()),
                 };
                 res.packages.push(outcome(&c.id(), from.as_deref(), to.as_deref(), Status::Planned, None));
             }
@@ -464,23 +545,25 @@ impl Engine {
             let id = c.id();
             let r = match &c {
                 Change::Native(p) => self.apply_native(p, txn).await.map(|_| {
-                    let st = if p.from.is_some() { Status::Updated } else { Status::Installed };
-                    outcome(&id, p.from.as_ref().map(|f| f.active_version.as_str()), Some(&p.manifest.release.version.to_string()), st, None)
+                    let to = p.manifest.release.version.to_string();
+                    let (st, reason) = match &p.from {
+                        Some(f) if f.active_version == to => (Status::Installed, Some("reinstalled (--force)".to_owned())),
+                        Some(_) => (Status::Updated, None),
+                        None => (Status::Installed, None),
+                    };
+                    outcome(&id, p.from.as_ref().map(|f| f.active_version.as_str()), Some(&to), st, reason)
                 }),
-                Change::Script(s) => {
+                Change::Script(s) => self.apply_script(s, txn).await.map(|_| {
                     // W3BS does not own these files, so ask the tool itself, before and after.
-                    let bin = self.layout.bin_dir.clone();
-                    let before = s.from.as_ref().and_then(|f| probe::installed_version(&f.commands, &bin));
-                    self.apply_script(s, txn).await.map(|_| {
-                        let after = probe::installed_version(&s.entry.commands, &bin);
-                        let (st, reason) = match (&s.from, &before, &after) {
-                            (None, _, _) => (Status::Installed, "ran the publisher's curl installer"),
-                            (Some(_), Some(b), Some(a)) if a == b => (Status::Current, "re-ran the publisher's curl installer; no newer version"),
-                            (Some(_), _, _) => (Status::Updated, "ran the publisher's curl installer"),
-                        };
-                        outcome(&id, before.as_deref(), after.as_deref(), st, Some(reason.into()))
-                    })
-                }
+                    let after = probe::installed_version(&s.entry.commands, &self.layout.bin_dir);
+                    let before = &s.installed;
+                    let (st, reason) = match (&s.from, before, &after) {
+                        (None, _, _) => (Status::Installed, "ran the publisher's curl installer"),
+                        (Some(_), Some(b), Some(a)) if a == b => (Status::Current, "re-ran the publisher's curl installer; no newer version"),
+                        (Some(_), _, _) => (Status::Updated, "ran the publisher's curl installer"),
+                    };
+                    outcome(&id, before.as_deref(), after.as_deref(), st, Some(reason.into()))
+                }),
             };
             match r {
                 Ok(o) => {
@@ -490,7 +573,7 @@ impl Engine {
                 Err(e) => {
                     let from = match &c {
                         Change::Native(p) => p.from.as_ref().map(|f| f.active_version.clone()),
-                        Change::Script(_) => None,
+                        Change::Script(s) => s.installed.as_ref().map(|v| v.to_string()),
                     };
                     res.packages.push(failure(&id, from.as_deref(), &e, Status::Failed));
                 }
@@ -548,12 +631,22 @@ impl Engine {
             }
         };
         let version = p.manifest.release.version.to_string();
-        let new_target = format!("versions/{version}/{}", p.artifact.sha256);
+        // `--force` of the active release: stage into a fresh directory beside the live one
+        // (activation never overwrites a version directory), then drop the old copy.
+        let reinstall = p.from.as_ref().filter(|f| f.active_version == version);
+        let new_target = match reinstall {
+            Some(_) => format!("versions/{version}/{}.{txn}", p.artifact.sha256),
+            None => format!("versions/{version}/{}", p.artifact.sha256),
+        };
         let new_dir_rel = format!("packages/{key}/{new_target}");
         let links = activate::launch_links(&self.layout, &key, &p.artifact.commands);
         let j = Journal {
             transaction_id: txn.to_owned(),
-            operation: if p.from.is_some() { "update".into() } else { "install".into() },
+            operation: match (&p.from, reinstall) {
+                (_, Some(_)) => "reinstall".into(),
+                (Some(_), None) => "update".into(),
+                (None, None) => "install".into(),
+            },
             package_id: p.id.to_string(),
             package_key: key.clone(),
             old_target: activate::current_target(&pkg_dir),
@@ -586,9 +679,19 @@ impl Engine {
             active_version: version.clone(),
             active_digest: p.artifact.sha256.clone(),
             active_dir: new_dir_rel.clone(),
-            previous_version: p.from.as_ref().map(|f| f.active_version.clone()),
-            previous_digest: p.from.as_ref().map(|f| f.active_digest.clone()),
-            previous_dir: p.from.as_ref().map(|f| f.active_dir.clone()),
+            // A reinstall keeps the rollback target it had; an update makes the old release it.
+            previous_version: match reinstall {
+                Some(f) => f.previous_version.clone(),
+                None => p.from.as_ref().map(|f| f.active_version.clone()),
+            },
+            previous_digest: match reinstall {
+                Some(f) => f.previous_digest.clone(),
+                None => p.from.as_ref().map(|f| f.active_digest.clone()),
+            },
+            previous_dir: match reinstall {
+                Some(f) => f.previous_dir.clone(),
+                None => p.from.as_ref().map(|f| f.active_dir.clone()),
+            },
             platform: platform.clone(),
             commands: p.artifact.commands.keys().cloned().collect(),
             installed_at: p.from.as_ref().map(|f| f.installed_at.clone()).unwrap_or_else(|| t.clone()),
@@ -596,7 +699,11 @@ impl Engine {
             origin: p.from.as_ref().and_then(|f| f.origin.clone()).or_else(|| p.origin.clone()),
             transaction_id: txn.to_owned(),
         };
-        let dropped_dir = p.from.as_ref().and_then(|f| f.previous_dir.clone()).filter(|d| *d != new_dir_rel);
+        let dropped_dir = match reinstall {
+            Some(f) => Some(f.active_dir.clone()),
+            None => p.from.as_ref().and_then(|f| f.previous_dir.clone()),
+        }
+        .filter(|d| *d != new_dir_rel);
         {
             let conn = self.conn();
             let tx = conn.unchecked_transaction()?;
@@ -617,7 +724,8 @@ impl Engine {
                 db::delete_version(&tx, &row.package_id, d)?;
             }
             db::record_observed(&tx, &row.repo_key, &row.package_id, &version, &platform, &row.active_digest)?;
-            db::record_history(&tx, &row.package_id, &j.operation, row.previous_version.as_deref(), Some(&version), txn)?;
+            let hist_from = if reinstall.is_some() { Some(version.as_str()) } else { row.previous_version.as_deref() };
+            db::record_history(&tx, &row.package_id, &j.operation, hist_from, Some(&version), txn)?;
             tx.commit()?;
         }
         checkpoint("committed");
@@ -762,6 +870,16 @@ impl Engine {
             }
             .await;
             let (repo, planned) = match r {
+                Ok((_, Err(o))) if req.force && o.status == Status::Current => match self.plan_native_reinstall(row).await {
+                    Ok(c) => {
+                        changes.push(c);
+                        continue;
+                    }
+                    Err(e) => {
+                        res.packages.push(failure(&id.to_string(), Some(&installed.to_string()), &e, Status::Failed));
+                        continue;
+                    }
+                },
                 Ok(x) => x,
                 Err(e) if e.kind == Kind::Usage => return Err(e),
                 Err(e) => {
@@ -808,22 +926,22 @@ impl Engine {
         if req.version.is_some() && !scripted.is_empty() {
             return Err(Error::usage("SCRIPT_NO_VERSIONS", "curl-installed tools have no selectable versions"));
         }
+        let mut resolved = vec![];
         for s in scripted {
-            let id: PackageId = s.package_id.parse().unwrap();
-            let r = async {
-                let repo = self.repo(&s.repo_alias).await?;
-                if repo.repo_key != s.repo_key {
-                    return Err(Error::package("TRUST_CHANGED", format!("repository `{}` changed trust root", s.repo_alias)));
-                }
-                let cat = repo.catalog().await?;
-                let entry = cat.entries.into_iter().find(|e| e.id == id).ok_or_else(|| Error::package("PACKAGE_WITHDRAWN", format!("{id} is no longer listed by `{}`", s.repo_alias)))?;
-                Ok((repo, entry))
-            }
-            .await;
-            match r {
-                Ok((repo, entry)) => changes.push(Change::Script(Box::new(PlannedScript { entry, repo, from: Some(s) }))),
+            match self.script_entry(&s).await {
+                Ok((repo, entry)) => resolved.push((s, repo, entry)),
                 Err(e) => res.packages.push(failure(&s.package_id, None, &e, Status::Failed)),
             }
+        }
+        // Ask every tool what it is, in parallel; skip installers that have nothing newer.
+        let commands: Vec<Vec<String>> = resolved.iter().map(|(_, _, e)| e.commands.clone()).collect();
+        let versions = probe::installed_versions(&commands, &self.layout.bin_dir);
+        for ((s, repo, entry), installed) in resolved.into_iter().zip(versions) {
+            if !req.force && probe::is_current(installed.as_deref(), entry.latest_version.as_deref()) {
+                res.packages.push(outcome(&s.package_id, installed.as_deref(), None, Status::Current, None));
+                continue;
+            }
+            changes.push(Change::Script(Box::new(PlannedScript { entry, repo, from: Some(s), installed })));
         }
         Ok(changes)
     }
@@ -863,15 +981,6 @@ impl Engine {
         let mut res = OperationResult::new("outdated");
         self.begin_read()?;
         let changes = self.plan_updates(&UpdateRequest { all: true, ..Default::default() }, &mut res).await?;
-        // The installed version of each curl tool, probed in parallel.
-        let scripted: Vec<Vec<String>> = changes
-            .iter()
-            .filter_map(|c| match c {
-                Change::Script(s) => Some(s.from.as_ref().map(|f| f.commands.clone()).unwrap_or_default()),
-                Change::Native(_) => None,
-            })
-            .collect();
-        let mut probed = probe::installed_versions(&scripted, &self.layout.bin_dir).into_iter();
         for c in changes {
             match c {
                 Change::Native(p) => res.packages.push(outcome(
@@ -881,10 +990,16 @@ impl Engine {
                     Status::Planned,
                     Some("eligible".into()),
                 )),
-                Change::Script(s) => {
-                    let installed = probed.next().flatten();
-                    res.packages.push(outcome(&s.entry.id.to_string(), installed.as_deref(), None, Status::Unknown, Some("curl-installed; `w3bs update` re-runs its installer".into())))
-                }
+                Change::Script(s) => match (&s.installed, &s.entry.latest_version) {
+                    (Some(i), Some(l)) => res.packages.push(outcome(&s.entry.id.to_string(), Some(i), Some(l), Status::Planned, Some("eligible".into()))),
+                    (i, _) => res.packages.push(outcome(
+                        &s.entry.id.to_string(),
+                        i.as_deref(),
+                        None,
+                        Status::Unknown,
+                        Some("curl-installed and its version cannot be compared; `w3bs update` re-runs its installer".into()),
+                    )),
+                },
             }
         }
         res.settle();

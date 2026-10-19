@@ -122,6 +122,9 @@ struct InstallArgs {
     /// Pin the installed release
     #[arg(long)]
     pin: bool,
+    /// Reinstall even when the package is already installed and current
+    #[arg(long, conflicts_with_all = ["version", "channel", "pin", "manifest"])]
+    force: bool,
     /// Diagnostic origin hint recorded in the receipt (set by curl installers)
     #[arg(long, hide = true, default_value = "native")]
     origin: String,
@@ -144,6 +147,9 @@ struct UpdateArgs {
     /// Permit incompatible (major, or 0.x minor) stable updates; pins still hold
     #[arg(long)]
     allow_major: bool,
+    /// Reinstall even when the package is already current (pins still hold)
+    #[arg(long, conflicts_with_all = ["version", "channel"])]
+    force: bool,
     #[command(flatten)]
     m: Mutate,
 }
@@ -972,15 +978,15 @@ async fn run_pkg(cmd: PkgCmd, out: Output) -> (&'static str, w3bs_core::Result<O
     let ro = Mutate::default();
     match cmd {
         PkgCmd::Catalog(a) => ("packages", catalog(mk(&ro), a).await),
-        PkgCmd::Install(InstallArgs { packages, version, channel, repository, manifest, pin, origin, m }) => {
-            ("install", mk(&m).install(InstallRequest { packages, manifest, repository, version, channel, pin, origin: Some(origin) }).await)
+        PkgCmd::Install(InstallArgs { packages, version, channel, repository, manifest, pin, force, origin, m }) => {
+            ("install", mk(&m).install(InstallRequest { packages, manifest, repository, version, channel, pin, force, origin: Some(origin) }).await)
         }
         PkgCmd::List => ("list", mk(&ro).list()),
         PkgCmd::Info { package } => ("info", mk(&ro).info(&package)),
         PkgCmd::Search(SearchArgs { query, repository }) => ("search", mk(&ro).search(&query, repository.as_deref()).await),
         PkgCmd::Outdated => ("outdated", mk(&ro).outdated().await),
-        PkgCmd::Update(UpdateArgs { packages, all, version, channel, allow_major, m }) => {
-            ("update", mk(&m).update(UpdateRequest { packages, all, version, channel, allow_major }).await)
+        PkgCmd::Update(UpdateArgs { packages, all, version, channel, allow_major, force, m }) => {
+            ("update", mk(&m).update(UpdateRequest { packages, all, version, channel, allow_major, force }).await)
         }
         PkgCmd::Pin(OnePackage { package, m }) => ("pin", mk(&m).pin(&package, true)),
         PkgCmd::Unpin(OnePackage { package, m }) => ("unpin", mk(&m).pin(&package, false)),
