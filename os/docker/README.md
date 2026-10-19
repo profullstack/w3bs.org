@@ -10,6 +10,13 @@ docker run -it --rm w3bs.org/os:server
 w3bs install hqtui          # any package on w3bs.org/packages
 ```
 
+To keep your shell history (`~/.zsh_history`, Up arrow and `history`) and installed packages
+across runs, give the home directory a volume:
+
+```sh
+docker run -it --rm -v w3bs-home:/home/w3bs w3bs.org/os:server
+```
+
 Alpine stable, zsh with a git-aware prompt, the `w3bs` CLI (built for musl), git, curl,
 OpenSSH client and Node. The official W3BS repository is added on first start, pinned to its
 root fingerprint. Runs as user `w3bs` (uid 1000).
