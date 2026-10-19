@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "adl-broker"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "adl-schema",
  "base64",
@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "adl-linux"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "adl-broker",
  "adl-schema",
@@ -33,7 +33,7 @@ dependencies = [
 
 [[package]]
 name = "adl-macos"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "adl-broker",
  "adl-schema",
@@ -44,7 +44,7 @@ dependencies = [
 
 [[package]]
 name = "adl-schema"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -53,7 +53,7 @@ dependencies = [
 
 [[package]]
 name = "adl-windows"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "adl-broker",
  "adl-schema",
@@ -1303,7 +1303,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "w3bs-desktop"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "adl-broker",
  "adl-linux",

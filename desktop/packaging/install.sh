@@ -20,6 +20,8 @@
 #
 # Environment: W3BS_DESKTOP_VERSION (default below), W3BS_BIN_DIR,
 #              W3BS_DESKTOP_NO_SERVICE=1 (install the files only, start nothing),
+#              W3BS_LIBC=gnu|musl (override the detected C library; Alpine and postmarketOS
+#              get the static musl build),
 #              W3BS_DESKTOP_ARCHIVE=PATH with W3BS_DESKTOP_SHA256=HEX (install that local
 #              archive instead of downloading, still checksum-verified; for testing).
 # Uninstall (macOS):  curl -fsSL https://w3bs.org/desktop/install.sh | sh -s -- --uninstall
@@ -42,8 +44,27 @@ adl_main() {
     esac
   done
 
+  # musl (Alpine, postmarketOS) or glibc. ldd names its C library; without ldd, a glibc libc.so.6
+  # wins over a musl loader (Debian's `musl` package adds one; Alpine's gcompat fakes the glibc
+  # loader, not libc.so.6). W3BS_LIBC=gnu|musl overrides.
+  linux_libc() {
+    case "${W3BS_LIBC:-}" in gnu | musl) echo "$W3BS_LIBC"; return ;; esac
+    v="$(ldd --version 2>&1 || true)"
+    case "$v" in
+      *musl*) echo musl; return ;;
+      *GNU* | *GLIBC* | *glibc*) echo gnu; return ;;
+    esac
+    for f in /lib/*-linux-gnu/libc.so.6 /lib64/libc.so.6 /usr/lib64/libc.so.6 /usr/lib/libc.so.6; do
+      [ -e "$f" ] && { echo gnu; return; }
+    done
+    for f in /lib/ld-musl-*.so.1; do
+      [ -e "$f" ] && { echo musl; return; }
+    done
+    echo gnu
+  }
+
   case "$(uname -s)" in
-    Linux) os=unknown-linux-gnu ;;
+    Linux) os="unknown-linux-$(linux_libc)" ;;
     Darwin) os=apple-darwin ;;
     *) die "unsupported system $(uname -s); on Windows run in PowerShell:  irm https://w3bs.org/desktop/install.ps1 | iex" ;;
   esac
@@ -115,11 +136,16 @@ adl_main() {
     # Testing: a local archive, checked against the checksum given with it.
     want="${W3BS_DESKTOP_SHA256:-}"
     [ -n "$want" ] || die "W3BS_DESKTOP_ARCHIVE needs W3BS_DESKTOP_SHA256 (an archive is never installed unchecked)"
-    say "Installing Agentic Desktop Layer from $W3BS_DESKTOP_ARCHIVE"
+    say "Installing Agentic Desktop Layer for $triple from $W3BS_DESKTOP_ARCHIVE"
     cp "$W3BS_DESKTOP_ARCHIVE" "$tmp/$archive" || die "cannot read $W3BS_DESKTOP_ARCHIVE"
   else
     say "Downloading Agentic Desktop Layer $VERSION for $triple"
-    fetch "$BASE/$archive" "$tmp/$archive" || die "download failed: $BASE/$archive"
+    if ! fetch "$BASE/$archive" "$tmp/$archive"; then
+      case "$triple" in
+        *-musl) die "download failed: $BASE/$archive (desktop-v$VERSION may predate musl builds; set W3BS_DESKTOP_VERSION to a newer release)" ;;
+        *) die "download failed: $BASE/$archive" ;;
+      esac
+    fi
     fetch "$BASE/SHA256SUMS" "$tmp/SHA256SUMS" || die "download failed: $BASE/SHA256SUMS"
     want="$(grep " $archive\$" "$tmp/SHA256SUMS" | cut -d' ' -f1)"
     [ -n "$want" ] || die "$archive is not listed in SHA256SUMS"
@@ -241,7 +267,22 @@ EOF
         say "Broker service installed; it starts with your next graphical login"
       fi
     else
-      say "systemd user services are not available; start the broker with: $bin/w3bs-desktop daemon"
+      # No systemd user manager (Alpine and postmarketOS use OpenRC): start the broker with the
+      # graphical session through XDG autostart instead. It still starts Disabled.
+      autostart="${XDG_CONFIG_HOME:-$HOME/.config}/autostart"
+      mkdir -p "$autostart"
+      cat > "$autostart/w3bs-desktop-broker.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Agentic Desktop Layer broker
+Comment=Starts Disabled; enable agent access from the tray. https://w3bs.org/desktop
+Exec=$bin/w3bs-desktop daemon --adapter auto --mcp-http 127.0.0.1:7801
+Icon=input-mouse
+X-GNOME-Autostart-enabled=true
+NoDisplay=true
+EOF
+      say "systemd user services are not available; the broker starts with your next graphical login"
+      say "  ($autostart/w3bs-desktop-broker.desktop). To start it now:  $bin/w3bs-desktop daemon &"
     fi
 
     case ":${XDG_CURRENT_DESKTOP:-}:" in
@@ -273,6 +314,25 @@ EOF
         fi
         ;;
     esac
+  fi
+
+  # Alpine and postmarketOS: name the session packages the Linux backend talks to (portal,
+  # PipeWire, D-Bus) that are missing. Printed, never installed: system packages are yours.
+  if [ "$os" != apple-darwin ] && command -v apk >/dev/null 2>&1; then
+    case ":${XDG_CURRENT_DESKTOP:-}:" in
+      *:GNOME:*) want_pkgs="xdg-desktop-portal xdg-desktop-portal-gnome pipewire wireplumber dbus" ;;
+      *) want_pkgs="xdg-desktop-portal xdg-desktop-portal-kde pipewire wireplumber dbus" ;;
+    esac
+    missing=""
+    for p in $want_pkgs; do
+      apk info -e "$p" >/dev/null 2>&1 || missing="$missing $p"
+    done
+    if [ -n "$missing" ]; then
+      say ""
+      say "Alpine / postmarketOS: the desktop layer needs your session's portal and PipeWire. Install them with:"
+      say "  doas apk add$missing"
+      say "  (or sudo; on GNOME the portal is xdg-desktop-portal-gnome, on Plasma xdg-desktop-portal-kde)"
+    fi
   fi
 
   # shellcheck disable=SC2088 # shown to the user, not expanded
