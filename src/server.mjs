@@ -20,6 +20,7 @@ import { mountTraining } from '../training/hosted-routes.mjs';
 import { mountAbTest } from './abtest-routes.mjs';
 import { mountPublishing } from './publishing-routes.mjs';
 import { mountInstallLinks } from './install-links.mjs';
+import { mountRegistryFront } from './registry-front.mjs';
 
 export function createApp({
   store,
@@ -276,6 +277,7 @@ export function createApp({
   mountAbTest(app, { store, origin, helpers });
   mountPublishing(app, { store, helpers });
   mountInstallLinks(app, { store, origin, mailer, helpers });
+  mountRegistryFront(app);
   const hostedTraining =
     training?.databaseUrl && training?.masterKey
       ? createHostedTraining(training)
