@@ -1,6 +1,6 @@
 # W3BS OS Product Requirements and Architecture
 
-**Version:** 0.2 (adds §16 native app runtime, §17 publisher distribution, §18 package-manager providers and wrappers, §19 W3BS Studio)  
+**Version:** 0.3 (base changed from Ubuntu to Alpine Linux, phones on Nura/postmarketOS, §20 Docker editions as the first release; v0.2 added §16 to §19)  
 **Date:** October 19, 2026  
 **Owner:** Profullstack, Inc.  
 **Product home:** https://w3bs.org/os  
@@ -8,9 +8,9 @@
 
 ## 1 Product direction
 
-Build **W3BS OS** as a lightweight Ubuntu-based operating-system family with a configurable installation wizard, a desktop that people and agents can operate, and the complete Profullstack CLI and desktop collection distributed through W3BS Packages.
+Build **W3BS OS** as a lightweight Alpine Linux-based operating-system family with a configurable installation wizard, a desktop that people and agents can operate, and the complete Profullstack CLI and desktop collection distributed through W3BS Packages.
 
-Use a minimal Ubuntu 26.04 LTS base for PCs. Make KDE Plasma the default desktop and zsh the default user shell. Offer GNOME and additional qualified desktop profiles. Include Qt and GTK application support, the W3BS Agentic Desktop Layer, W3BS Training, MoshCode, PairUX, DiskPush, and every other Profullstack CLI or desktop package in the release's approved catalog snapshot.
+Use Alpine Linux (current stable branch) as the one base for containers, servers, PCs and Macs, and Nura (formerly postmarketOS, itself Alpine-based) for phones and tablets. Make KDE Plasma the default desktop and zsh the default user shell. Offer GNOME and additional qualified desktop profiles. Include Qt and GTK application support, the W3BS Agentic Desktop Layer, W3BS Training, MoshCode, PairUX, DiskPush, and every other Profullstack CLI or desktop package in the release's approved catalog snapshot.
 
 Native installation expands through hardware-specific editions: PCs, Intel Macs, supported Apple Silicon Macs, and selected mobile devices. Application compatibility is a separate capability. Ship practical Windows and Android runtimes, native Linux/Nix support, and clearly identified Apple-app access routes.
 
@@ -20,7 +20,7 @@ The product goal is broad device coverage. General replacement-OS installation o
 
 | Area | Requirement |
 | --- | --- |
-| Base | Minimal Ubuntu LTS userspace, retaining normal Ubuntu development and package workflows |
+| Base | Alpine Linux stable userspace (musl, apk); Nura on mobile hardware; Docker images first (§20) |
 | Desktop | KDE Plasma selected initially; GNOME selectable; LXQt and Xfce offered when their profile passes qualification |
 | Toolkits | Qt and GTK runtimes and integration installed for supported desktop applications |
 | Shell | zsh for newly created human users; bash and fish selectable |
@@ -38,21 +38,38 @@ A user may customize their software selection. The primary advertised installati
 
 ## 3 Base architecture and desktop profiles
 
-The PC base should be assembled from minimal Ubuntu 26.04 LTS components and versioned package seeds. Reuse Kubuntu's desktop integration for KDE. The current official KDE reference is Kubuntu 26.04.1; its release notes specify a supported Wayland session and maintenance through April 2029. That desktop lifecycle is distinct from maintenance of Ubuntu's underlying components. [Kubuntu release notes](https://kubuntu.org/news/kubuntu-26-04-release-notes/) · [Official image directory](https://cdimage.ubuntu.com/kubuntu/releases/resolute/release/)
+### Base decision (v0.3, October 19, 2026)
+
+W3BS OS is built on **Alpine Linux**. The previous draft used Ubuntu 26.04; it was replaced because one small base must cover containers, servers, desktops and phones. Measured the same day:
+
+| Base | Container base size | KDE Plasma | GNOME | Waydroid in archive | Phones | Mac hardware |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Alpine 3.24** (Nura on phones) | **13 MB** | 6.6.6 (edge 6.8) | 50.3 (edge 51) | yes | widest mobile Linux device list (Nura) | Apple Silicon M1/M2 via Nura's Asahi kernel package; T2 Intel needs a port |
+| Ubuntu 26.04 | 163 MB | 6.6.6 | 50.1 | no | none | t2linux images; Asahi via a 9-month Ubuntu Asahi |
+| Debian 13 (Mobian on phones) | 119 MB | 6.3.6 | 48.7 | no | a handful | t2linux apt repo; no Asahi port |
+| Fedora 43 | 272 MB | - | - | - | tablets | Fedora Asahi Remix (Asahi flagship) |
+
+Alpine is also the most common base for Docker images, so the server edition and the containers people already run are the same OS. Alpine stable branches are released every six months with two years of support for main; W3BS tracks the newest stable branch and moves to the next within one release cycle.
+
+Consequences that the build must handle:
+
+- **musl, not glibc.** Prebuilt glibc binaries do not run directly. Electron desktop apps (PairUX, DiskPush, HDTilt and others) ship as Flatpaks, whose runtimes carry glibc. Steam/Proton use Flatpak as well. Bun-compiled CLIs use Bun's musl target; the Rust desktop layer and `w3bs` CLI build for `*-linux-musl`. Nix brings its own glibc closure. `gcompat` is not a support route.
+- **Init.** Alpine uses OpenRC; GNOME requires systemd and W3BS desktop components use systemd user units. Desktop profiles follow Nura's systemd variant; server and container editions may stay on OpenRC with an OpenRC service for each W3BS daemon.
+- **T2 Intel Macs** need the t2linux kernel patches and drivers carried in a W3BS kernel package (Alpine has none today).
 
 | Component | Proposed implementation |
 | --- | --- |
-| PC kernel and boot packages | Ubuntu-maintained kernel, firmware, bootloader and driver packages |
+| Kernel and boot packages | Alpine `linux-lts`/`linux-stable` on PCs; Nura device kernels (including the Asahi kernel) on phones and Apple Silicon; a W3BS T2 kernel package |
 | Desktop shell | KDE Plasma/KWin by default, with a separate GNOME profile |
 | Additional desktops | LXQt and Xfce profiles with explicit session and agent-capability qualification |
-| Installer | Calamares configuration plus focused W3BS selection and hardware modules |
+| Installer | Calamares on PCs (packaged in Alpine) with W3BS modules; Nura's flashing tools on phones; `docker run` for containers |
 | Qt system interfaces | Qt/QML or native desktop integration for installer, panel controls and OS settings |
 | Existing product interfaces | Preserve each product's existing desktop implementation and bundled CLI |
 | Desktop automation | Reuse the existing W3BS broker and adapters |
 | App catalog and receipts | Extend the existing W3BS package manager |
-| OS package ownership | APT/dpkg for Ubuntu system files; small signed W3BS repository for distro integration |
-| Desktop app backends | Explicitly owned native W3BS packages, Debian packages, Flatpak, AppImage or other qualified formats |
-| Developer environments | Nix alongside normal Ubuntu development tools |
+| OS package ownership | apk for Alpine system files; a small signed W3BS apk repository for distro integration |
+| Desktop app backends | Native W3BS packages, apk packages, Flatpak (glibc and Electron apps) or other qualified formats |
+| Developer environments | Nix alongside Alpine development tools |
 | Web and registry services | Extend the current W3BS repository and deployment |
 
 The current Profullstack desktop blueprint uses Electron with the CLI bundled inside the desktop installation. A Qt-based OS desktop does not require rewriting those products. Preserve product implementations and use Qt where it serves the OS interface. [Profullstack stack](https://profullstack.com/stack)
@@ -69,7 +86,7 @@ Wayland is the primary KDE/GNOME path. XWayland compatibility for older Linux ap
 
 ### Shell behavior
 
-Set zsh as the selected user's login and interactive shell. Keep Ubuntu's system script interpreters intact. Generate shell completions and PATH integration for installed W3BS tools, and validate the same commands in bash and fish.
+Set zsh as the selected user's login and interactive shell. Keep the system's `/bin/sh` (busybox ash) intact for system scripts. Generate shell completions and PATH integration for installed W3BS tools, and validate the same commands in bash and fish.
 
 Use a simple, fast prompt with useful git information. Optional plugins must not require network access during shell startup. Changing shells after installation preserves user files and configuration.
 
@@ -188,10 +205,10 @@ W3BS is the common catalog, identity and user-facing lifecycle. Each backend rem
 
 | Package class | Authoritative owner |
 | --- | --- |
-| Ubuntu kernel, drivers, libraries and desktop packages | APT/dpkg |
-| W3BS OS integration and default settings packages | Signed W3BS APT repository |
+| Alpine kernel, drivers, libraries and desktop packages | apk |
+| W3BS OS integration and default settings packages | Signed W3BS apk repository |
 | Native signed W3BS application bundles | Existing W3BS native package engine |
-| Debian-packaged Profullstack applications | APT/dpkg with W3BS catalog receipts and orchestration |
+| apk-packaged Profullstack applications | apk with W3BS catalog receipts and orchestration |
 | Flatpak applications | Flatpak |
 | Nix packages and developer profiles | Nix |
 | Windows app configurations | A managed runner and per-application environment |
@@ -202,7 +219,7 @@ The current package documentation distinguishes publisher scripts from native si
 
 ### User-facing commands
 
-Preserve the existing `w3bs install <package>` and shared `w3bs update` behavior. The OS adds a unified update view that can orchestrate registered backends while reporting separate results. Extending the CLI to cover system providers is implementation work; the current package updater must not be described as already owning the Ubuntu base.
+Preserve the existing `w3bs install <package>` and shared `w3bs update` behavior. The OS adds a unified update view that can orchestrate registered backends while reporting separate results. Extending the CLI to cover system providers is implementation work; the current package updater must not be described as already owning the Alpine base.
 
 The following are proposed OS/suite extensions, not currently available installation instructions:
 
@@ -224,7 +241,7 @@ Multi-backend updates are not one atomic transaction. Persist a journal that can
 
 Provide a tested recovery boot path and consistent restoration of the OS files, package database and associated kernel/boot files. A package rollback or root snapshot must not be represented as restoring every user document or cloud change.
 
-Nix can run alongside Ubuntu through its supported installation model. Its profiles provide package generations; this does not make the Ubuntu system a NixOS system with whole-system generations. Use Linux-target Nix packages on Linux. [Nix installation](https://nixos.org/download/) · [Nix and NixOS architecture](https://nixos.org/guides/how-nix-works/)
+Nix can run alongside Alpine through its supported installation model. Its profiles provide package generations; this does not make the Alpine system a NixOS system with whole-system generations. Use Linux-target Nix packages on Linux. [Nix installation](https://nixos.org/download/) · [Nix and NixOS architecture](https://nixos.org/guides/how-nix-works/)
 
 ## 7 Application compatibility
 
@@ -260,7 +277,7 @@ CPU compatibility is separate from OS API compatibility. Translation or emulatio
 
 | Hardware family | Proposed route | Initial product position |
 | --- | --- | --- |
-| x86-64 PCs and laptops | Ubuntu-based UEFI USB installer | Primary release target; certify named reference devices |
+| x86-64 PCs and laptops | Alpine-based UEFI USB installer | Primary release target; certify named reference devices |
 | Intel Macs without T2 | Model-qualified x86-64 installation | Separate firmware/peripheral checks |
 | Intel Macs with T2 | T2-enabled Linux image and preparation flow | Separate driver and boot-policy qualification |
 | Apple Silicon M1/M2 | Asahi-enabled ARM64 hardware stack | First Mac ARM certification targets, model by model |
@@ -277,7 +294,7 @@ T2 Macs need hardware-specific drivers and preparation; PC Secure Boot assumptio
 
 Asahi added M3-family installer support in September 2026, but the current M3 matrix still records incomplete GPU/display support. Use model-specific certification, not an all-Mac claim. [Asahi M3 announcement](https://asahilinux.org/2026/09/m2-episode-1/) · [Current M3 feature matrix](https://asahilinux.org/docs/platform/feature-support/m3/)
 
-Ubuntu Asahi provides a possible Ubuntu userspace route, but its stated support period is nine months. W3BS must maintain its own Apple hardware stack or follow the upstream hardware-enablement cadence; the PC LTS label does not settle Mac support. [Ubuntu Asahi support](https://ubuntuasahi.org/support/)
+Nura already packages an Asahi-based kernel for Apple Silicon (`linux-postmarketos-asahi`), which is the starting point for M1/M2. W3BS follows the Asahi upstream cadence for Mac hardware enablement; the Alpine branch lifecycle does not settle Mac support. [Nura Asahi kernel](https://pkgs.postmarketos.org/package/master/postmarketos/aarch64/linux-postmarketos-asahi)
 
 For Apple Silicon, use an Asahi-compatible preparation flow from macOS, then an appropriate W3BS image or installer. Preserve required macOS, APFS, firmware and recovery structures. A generic PC ISO or generic ARM64 ISO is not sufficient. [Asahi distribution guidelines](https://asahilinux.org/docs/alt/policy/)
 
@@ -289,21 +306,19 @@ Do not infer native hardware support from a successful virtual-machine boot. Con
 
 ## 9 Mobile roadmap
 
-### W3BS Mobile based on Android
+### W3BS Mobile on Nura (primary)
 
-Start the practical Android-phone track from AOSP or a suitable device-supported derivative. This preserves Android application compatibility and the device-specific foundations required for a usable phone.
+Phones and tablets run the same Alpine base through Nura (formerly postmarketOS), with Plasma Mobile as the default shell and Waydroid for Android apps. This keeps one package base, one `w3bs` CLI and one Agentic Desktop Layer across server, desktop and phone.
 
-Share W3BS package identities, account/API contracts, sync, agent protocols and reusable application code. Build separate Android application packages and signed OS images. Desktop Ubuntu executables are not automatically Android executables.
-
-Offer a W3BS terminal environment opening zsh while retaining Android's required system environment. Port Qt/GTK applications individually where their Android backends and user interfaces are suitable.
-
-The installer must detect exact model/variant, required firmware, unlock support and image identity. AOSP explicitly allows devices that do not support bootloader unlocking, and the normal unlock transition wipes user data. [AOSP bootloader requirements](https://source.android.com/docs/core/architecture/bootloader/locking_unlocking)
+Use Nura's device ports and flashing tools. A device is offered only from Nura's best-supported categories, and W3BS certifies each model itself. The installer must detect exact model/variant, required firmware, unlock support and image identity; bootloader unlocking normally wipes user data and some devices cannot be unlocked at all. [Nura/postmarketOS devices](https://wiki.postmarketos.org/wiki/Devices) · [AOSP bootloader requirements](https://source.android.com/docs/core/architecture/bootloader/locking_unlocking)
 
 Before calling a phone supported, qualify calls, emergency calling, SMS, mobile data, cameras, audio, charging, power management, Wi-Fi, Bluetooth, GPS, sensors, encryption and signed OTA recovery. Define who maintains vendor components and security updates.
 
-### Mobile Linux
+Share W3BS package identities, account/API contracts, sync and agent protocols across editions. Port Qt/GTK applications to Plasma Mobile form factors individually. KDE's installation guidance lists Nura among the supported distributions. [Plasma Mobile installation](https://plasma-mobile.org/get/)
 
-A later Plasma Mobile edition can provide a more direct Linux desktop/tooling relationship on suitable hardware. It remains a separate hardware and application qualification program. KDE's own installation guidance directs users to distribution-specific device and feature matrices. [Plasma Mobile installation](https://plasma-mobile.org/get/)
+### Android-based track (secondary)
+
+Devices that Nura cannot support well but that need full phone function can get a later AOSP-derived W3BS image with W3BS apps as Android packages. This is a separate build and signing program; Alpine executables are not Android executables.
 
 ### iPhone and iPad
 
@@ -339,7 +354,7 @@ Measure the base, installed suite and running workloads separately. The full app
 
 Keep one ordinary desktop session installed, remove duplicate default applications where the suite supplies the chosen equivalent, and avoid unnecessary application autostart. Launch Android containers, VMs, agent sessions, media indexing and heavy local models on demand.
 
-Retain ordinary Ubuntu tools, documentation and developer compatibility. Optimize the actual processes, package dependencies and boot services that measurements identify.
+Retain ordinary developer tools, documentation and compatibility (Nix and Flatpak cover glibc-only software). Optimize the actual processes, package dependencies and boot services that measurements identify.
 
 Record the following against a matching upstream desktop on the same hardware and configuration:
 
@@ -362,18 +377,19 @@ Use a dedicated image-build project, proposed as `profullstack/w3bs-os`, for ima
 
 Build in disposable environments from pinned inputs. Retain source revisions, package versions, suite membership, artifact hashes, image configuration and provenance. Produce a complete software bill of materials and license/source notices for each image.
 
-Publish signed image checksums and signed update metadata. Retain upstream signed PC boot components where the chosen distribution arrangement permits; rebuilding boot binaries changes their signature status. Secure Boot must be tested on the W3BS image and installed system. [Ubuntu Secure Boot](https://documentation.ubuntu.com/security/security-features/platform-protections/secure-boot/)
+Publish signed image checksums and signed update metadata. Alpine does not ship a Microsoft-signed shim, so Secure Boot on PCs needs either a W3BS shim accepted through the public shim review and signed by Microsoft, or a documented key-enrollment (MOK) step in the installer; until one exists, PC installs require Secure Boot off and the download page says so. Secure Boot must be tested on the W3BS image and installed system.
 
 Create machine IDs, host keys, local secrets, training encryption keys and any optional local trust material on the installed device when needed. Never clone build-system identities, credentials or shared private keys into images.
 
-Canonical's trademark and redistribution policy requires review for the exact modified image. Use independent W3BS OS branding while honoring component licenses and source obligations. The policy expressly preserves rights granted by individual open-source licenses. [Canonical policy](https://canonical.com/legal/intellectual-property-policy)
+Use independent W3BS OS branding and do not present the images as official Alpine or Nura releases, while honoring every component's license and source obligations (Alpine's own packages are almost entirely free software; ship source or a written offer for GPL components in every image).
 
 ## 13 Delivery milestones
 
 | Stage | Deliverable | Exit condition |
 | --- | --- | --- |
 | M0 Catalog and package foundation | Frozen full-suite manifest, app-surface mapping, scoped receipts, explicit MoshCode/PairUX/DiskPush inclusion | Required artifacts/dependencies resolved and missing packages recorded as blocking work |
-| M1 PC developer alpha | Minimal Ubuntu build, KDE and GNOME profiles, zsh, full suite, desktop layer, configurable installer | Clean installation and representative application/agent workflows pass |
+| M0.5 Docker editions | §20 `server` and `desktop` images on Alpine with the w3bs CLI and the Agentic Desktop Layer | Images build reproducibly, pass the §20 checks and are published with signed digests |
+| M1 PC developer alpha | Minimal Alpine build, KDE and GNOME profiles, zsh, full suite, desktop layer, configurable installer | Clean installation and representative application/agent workflows pass |
 | M2 PC public beta | Offline/network delivery, update/recovery workflows, qualified compatibility recipes and reference laptops | Upgrade, recovery, graphics, power and signed-image checks pass |
 | M3 Additional desktop and Intel Mac support | Qualified LXQt/Xfce profiles and Intel/T2 model tracks | Each profile/device passes its own installation and agent checks |
 | M4 Apple Silicon preview and certification | Asahi-enabled image and supported-model wizard | Device-specific boot, graphics, audio, storage and recovery qualification |
@@ -459,7 +475,8 @@ The `w3bs` CLI runs on every OS and drives that system's own package managers as
 
 | OS | Providers |
 | --- | --- |
-| Ubuntu/Debian (incl. W3BS OS minimal) | apt, snap, flatpak, nix, w3bs native |
+| Alpine (incl. W3BS OS) | apk, flatpak, nix, w3bs native |
+| Ubuntu/Debian | apt, snap, flatpak, nix, w3bs native |
 | Fedora/RHEL | dnf, flatpak, nix |
 | Arch | pacman, AUR helper if present, flatpak, nix |
 | openSUSE | zypper, flatpak |
@@ -486,9 +503,9 @@ w3bs apt|brew|winget|dnf|pacman|flatpak|nix ... # passthrough wrapper: runs the 
 Rules:
 
 1. Detection is by OS, distro ID/version (os-release), architecture and available binaries, never by guess. Missing providers are offered with the official bootstrap (Homebrew, winget, Nix), never installed silently.
-2. Wrappers do not shadow the real binaries. On W3BS OS, an APT `DPkg::Post-Invoke` hook and equivalent hooks for other providers keep receipts current when the user runs `apt` directly.
+2. Wrappers do not shadow the real binaries. On W3BS OS, an apk commit hook (`/etc/apk/commit_hooks.d`), an APT `DPkg::Post-Invoke` hook on Debian-family systems and equivalent hooks for other providers keep receipts current when the user runs `apt` directly.
 3. Privilege: the CLI asks for elevation only for the provider step that needs it (sudo/pkexec/UAC) and never stores passwords.
-4. W3BS OS minimal ships apt, flatpak and nix providers; the others are installed on first use.
+4. W3BS OS ships the apk, flatpak and nix providers; the others are installed on first use.
 5. Output is stable JSON with `--json`; exit codes distinguish not-found, provider-missing, permission and conflict.
 
 ## 19 W3BS Studio (open-source cross-platform IDE)
@@ -511,6 +528,23 @@ Goal: an open-source Xcode equivalent that builds, runs and debugs one project o
 - Apple toolchains are never redistributed; macOS/iOS targets require the user's Apple hardware and Apple developer account, and the UI says so before setup.
 
 Milestones: S0 Linux + Android build/run/debug; S1 Windows via Wine + remote Windows; S2 remote Mac host for macOS/iOS; S3 agent workflows and publish integration. These run in parallel with M1 to M3 and ship as a W3BS package installable on any OS, not only W3BS OS.
+
+## 20 Docker editions (first release)
+
+The first published W3BS OS artifacts are container images, because Alpine is already the common Docker base and the images need no hardware qualification. They are labelled as container editions, never as native installs (§8).
+
+| Image | Contents | Use |
+| --- | --- | --- |
+| `ghcr.io/profullstack/w3bs-os:server` | Alpine stable, zsh, the `w3bs` CLI, the suite's CLIs that have musl builds, OpenRC-free single-process entry | Servers, CI, agent sandboxes; `w3bs fleet join` works inside |
+| `ghcr.io/profullstack/w3bs-os:desktop` | `server` + KDE Plasma (Wayland, software rendering) + the Agentic Desktop Layer installed and visible in the panel + a VNC/noVNC endpoint | A desktop agents can operate, viewable from w3bs.org/fleet screens |
+
+Rules:
+
+1. Built from pinned Alpine digests and package versions in `profullstack/w3bs-os`, multi-arch (`linux/amd64`, `linux/arm64`), with an SBOM and a signed digest per tag.
+2. No credentials, machine IDs, SSH host keys or desktop-layer secrets in the image; each is generated on first start.
+3. The desktop layer is installed but its control starts **off**: observation and input need the same human authorization as on any other machine (§10). An environment flag may pre-authorize only in disposable CI.
+4. Checks before a tag is published: the container starts, `w3bs --version` and `w3bs doctor` pass, and on `desktop` the layer completes a bounded mouse/keyboard task over its MCP interface and is stopped from its control.
+5. w3bs.org/os lists the images, their digests and the `docker run` lines once these checks pass.
 
 ## Appendix Current Profullstack catalog inventory
 
