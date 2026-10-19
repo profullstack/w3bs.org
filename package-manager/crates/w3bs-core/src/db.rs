@@ -97,6 +97,23 @@ CREATE TABLE IF NOT EXISTS scripted(
   updated_at TEXT NOT NULL,
   transaction_id TEXT NOT NULL
 );
+-- W3BS-SIGN-1 trust on first use: the publisher keys seen for each namespace. Survives
+-- `remove`, so reinstalling never silently accepts a new key.
+CREATE TABLE IF NOT EXISTS publisher_keys(
+  namespace TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  first_package TEXT NOT NULL,
+  pinned_at TEXT NOT NULL,
+  PRIMARY KEY(namespace, fingerprint)
+);
+-- The publisher signature that covered a curl-installed tool's last installer run.
+CREATE TABLE IF NOT EXISTS release_signatures(
+  package_id TEXT PRIMARY KEY,
+  version TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  installer_sha256 TEXT NOT NULL,
+  verified_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS history(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   package_id TEXT NOT NULL,
@@ -439,5 +456,49 @@ pub fn upsert_scripted(conn: &Connection, s: &ScriptedRow) -> Result<()> {
 
 pub fn delete_scripted(conn: &Connection, id: &str) -> Result<()> {
     conn.execute("DELETE FROM scripted WHERE package_id=?1", [id])?;
+    conn.execute("DELETE FROM release_signatures WHERE package_id=?1", [id])?;
     Ok(())
+}
+
+/// Publisher key fingerprints pinned for a namespace (W3BS-SIGN-1 §6.3).
+pub fn publisher_keys(conn: &Connection, namespace: &str) -> Result<Vec<String>> {
+    let mut st = conn.prepare("SELECT fingerprint FROM publisher_keys WHERE namespace=?1 ORDER BY pinned_at")?;
+    let rows = st.query_map([namespace], |r| r.get(0))?.collect::<Result<Vec<String>, _>>()?;
+    Ok(rows)
+}
+
+pub fn pin_publisher_key(conn: &Connection, namespace: &str, fingerprint: &str, package_id: &str, at: &str) -> Result<()> {
+    conn.execute(
+        "INSERT OR IGNORE INTO publisher_keys(namespace, fingerprint, first_package, pinned_at) VALUES (?1,?2,?3,?4)",
+        params![namespace, fingerprint, package_id, at],
+    )?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SignatureRow {
+    pub version: String,
+    pub fingerprint: String,
+    pub installer_sha256: String,
+    pub verified_at: String,
+}
+
+/// Record the signature that covered an installer run; `None` records an unsigned run.
+pub fn set_release_signature(conn: &Connection, package_id: &str, sig: Option<&SignatureRow>) -> Result<()> {
+    match sig {
+        Some(s) => conn.execute(
+            "INSERT OR REPLACE INTO release_signatures(package_id, version, fingerprint, installer_sha256, verified_at) VALUES (?1,?2,?3,?4,?5)",
+            params![package_id, s.version, s.fingerprint, s.installer_sha256, s.verified_at],
+        )?,
+        None => conn.execute("DELETE FROM release_signatures WHERE package_id=?1", [package_id])?,
+    };
+    Ok(())
+}
+
+pub fn release_signature(conn: &Connection, package_id: &str) -> Result<Option<SignatureRow>> {
+    Ok(conn
+        .query_row("SELECT version, fingerprint, installer_sha256, verified_at FROM release_signatures WHERE package_id=?1", [package_id], |r| {
+            Ok(SignatureRow { version: r.get(0)?, fingerprint: r.get(1)?, installer_sha256: r.get(2)?, verified_at: r.get(3)? })
+        })
+        .optional()?)
 }

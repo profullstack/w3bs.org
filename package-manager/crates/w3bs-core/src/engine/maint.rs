@@ -89,8 +89,13 @@ impl Engine {
             }
             Some(Installed::Script(s)) => {
                 let c = self.read_state()?.unwrap();
+                let signature = match db::release_signature(c, &s.package_id)? {
+                    Some(sig) => json!({ "status": "signed", "version": sig.version, "fingerprint": sig.fingerprint, "installer_sha256": sig.installer_sha256, "verified_at": sig.verified_at }),
+                    None => json!("unsigned"),
+                };
                 res.data = json!({
                     "id": s.package_id, "kind": "curl", "description": s.description, "repository": s.repo_alias,
+                    "signature": signature,
                     "installer": format!("curl -fsSL {} | {}", s.install_url, s.shell), "installer_sha256": s.script_sha256,
                     "commands": s.commands, "owner": "publisher-installer",
                     "note": "installed by the publisher's own script; W3BS records it and re-runs the installer on update, but does not own, verify or roll back its files",

@@ -326,6 +326,26 @@ pub struct CatalogEntry {
     /// when it is already current. Without it, W3BS cannot tell and re-runs the installer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_version: Option<String>,
+    /// The publisher's W3BS-SIGN-1 release signature (SSHSIG over the JCS bytes of
+    /// `statement`). Absent for unsigned entries, which install as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signed: Option<SignedRelease>,
+}
+
+/// A publisher-signed release statement (W3BS-SIGN-1 §3, §6).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SignedRelease {
+    /// The statement exactly as signed; kept as JSON so unknown fields still verify.
+    pub statement: serde_json::Value,
+    /// Armored SSHSIG (`-----BEGIN SSH SIGNATURE-----`), namespace `w3bs-release@w3bs.org`.
+    pub signature: String,
+    /// The signing key in `authorized_keys` form.
+    pub public_key: String,
+    /// `SHA256:…` fingerprint of `public_key`.
+    pub fingerprint: String,
+    /// Set when the publisher revoked the signing key; clients refuse such releases.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revoked_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -384,5 +404,24 @@ impl CatalogEntry {
             validate_command(c, false).map_err(|e| SchemaError::Invalid(e.to_string()))?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod catalog_tests {
+    use super::*;
+
+    #[test]
+    fn signed_is_optional_and_round_trips() {
+        let plain = serde_json::json!({ "id": "tools.example/scout", "name": "scout", "install": {"url": "https://tools.example/i.sh", "shell": "sh"} });
+        let e: CatalogEntry = serde_json::from_value(plain.clone()).unwrap();
+        assert!(e.signed.is_none());
+        // Existing catalogs serialize exactly as before.
+        assert!(serde_json::to_value(&e).unwrap().get("signed").is_none());
+        let mut signed = plain;
+        signed["signed"] = serde_json::json!({ "statement": {"type": "w3bs-release/1", "extra": [1, 2]}, "signature": "-----BEGIN SSH SIGNATURE-----\n-----END SSH SIGNATURE-----\n", "public_key": "ssh-ed25519 AAAA", "fingerprint": "SHA256:x" });
+        let e: CatalogEntry = serde_json::from_value(signed.clone()).unwrap();
+        assert_eq!(e.signed.as_ref().unwrap().statement["extra"], serde_json::json!([1, 2]));
+        assert_eq!(serde_json::to_value(&e).unwrap()["signed"], signed["signed"]);
     }
 }

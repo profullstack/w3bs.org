@@ -5,6 +5,7 @@ mod ab;
 mod auth;
 mod desktop;
 mod fleet;
+mod publish;
 mod screen;
 mod render;
 
@@ -39,7 +40,10 @@ Apps:
              w3bs fleet --help        status, agent, leave, rm
   ab         w3bs ab ls               your A/B tests on w3bs.org/ab-testing (OpenABTest)
              w3bs ab new <id> --variant a --variant b   then start, show, pause, close
-             w3bs ab --help           assign, resume, export, rm";
+             w3bs ab --help           assign, resume, export, rm
+  publish    w3bs publish key add <domain>   register your SSH key for a publisher namespace
+             w3bs publish release --package <ns/name> --version <v> --install \"curl … | sh\"
+                                      sign a release with that key (W3BS-SIGN-1)";
 
 const AFTER_HELP: &str = "\
 Every command takes --json for one versioned result object on stdout.
@@ -128,6 +132,10 @@ struct InstallArgs {
     /// Diagnostic origin hint recorded in the receipt (set by curl installers)
     #[arg(long, hide = true, default_value = "native")]
     origin: String,
+    /// Accept a publisher signing key this machine has not seen for the package's namespace
+    /// (only after checking the publisher really rotated its key)
+    #[arg(long)]
+    accept_new_key: bool,
     #[command(flatten)]
     m: Mutate,
 }
@@ -150,6 +158,9 @@ struct UpdateArgs {
     /// Reinstall even when the package is already current (pins still hold)
     #[arg(long, conflicts_with_all = ["version", "channel"])]
     force: bool,
+    /// Accept a publisher signing key this machine has not seen for a package's namespace
+    #[arg(long)]
+    accept_new_key: bool,
     #[command(flatten)]
     m: Mutate,
 }
@@ -465,6 +476,93 @@ enum AbCmd {
 }
 
 #[derive(Subcommand, Clone)]
+enum PublishCmd {
+    /// Your publisher signing keys (SSH keys bound to a domain)
+    #[command(subcommand)]
+    Key(PublishKeyCmd),
+    /// Sign a release statement with your SSH key and submit it to w3bs.org/packages
+    Release(Box<ReleaseFlags>),
+}
+
+#[derive(Args, Clone)]
+struct ReleaseFlags {
+    /// Package identity, `<namespace>/<name>` (e.g. pairux.com/pairux)
+    #[arg(long, value_name = "NS/NAME")]
+    package: Option<String>,
+    /// The release's semver version
+    #[arg(long = "version", value_name = "SEMVER")]
+    release_version: Option<String>,
+    /// The install line: curl -fsSL https://…/install.sh | sh
+    #[arg(long, value_name = "LINE")]
+    install: Option<String>,
+    /// Display name (default: the listing's, else the package name)
+    #[arg(long)]
+    name: Option<String>,
+    /// One-line description (default: the current listing's)
+    #[arg(long)]
+    description: Option<String>,
+    #[arg(long, value_name = "URL")]
+    homepage: Option<String>,
+    #[arg(long, value_name = "URL")]
+    repository: Option<String>,
+    /// SPDX license expression
+    #[arg(long)]
+    license: Option<String>,
+    /// A command the package installs (repeat for several)
+    #[arg(long = "command", value_name = "NAME")]
+    commands: Vec<String>,
+    /// A downloadable artifact, target=https-url (repeat; each is downloaded and hashed)
+    #[arg(long = "artifact", value_name = "TARGET=URL")]
+    artifacts: Vec<String>,
+    /// SSH key to sign with (default: ~/.ssh/id_ed25519, id_ecdsa, id_ed25519_sk, id_ecdsa_sk)
+    #[arg(long, value_name = "PATH")]
+    key: Option<PathBuf>,
+    /// Read unset fields from a w3bs.toml ([package] id, version, install, description, …)
+    #[arg(long, value_name = "W3BS.TOML")]
+    from: Option<PathBuf>,
+    /// Build, hash and sign, then print the statement and signature without submitting
+    #[arg(short = 'n', long)]
+    dry_run: bool,
+    #[command(flatten)]
+    a: Api,
+}
+
+#[derive(Subcommand, Clone)]
+enum PublishKeyCmd {
+    /// Register an SSH key for a publisher namespace (a domain you control), then prove the
+    /// domain with a .well-known line or a DNS TXT record
+    Add {
+        /// The namespace, e.g. pairux.com
+        namespace: String,
+        /// SSH key (private key, or its .pub to sign through ssh-agent)
+        #[arg(long, value_name = "PATH")]
+        key: Option<PathBuf>,
+        #[command(flatten)]
+        a: Api,
+    },
+    /// List your registered keys and whether their domain proof holds
+    #[command(visible_alias = "list")]
+    Ls {
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Re-check the domain proof of a key (all your keys when none is named)
+    Verify {
+        /// SHA256:… fingerprint
+        fingerprint: Option<String>,
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Revoke a key: its releases stay listed but clients refuse to install them
+    Revoke {
+        /// SHA256:… fingerprint
+        fingerprint: String,
+        #[command(flatten)]
+        a: Api,
+    },
+}
+
+#[derive(Subcommand, Clone)]
 enum FleetCmd {
     /// Add this machine to your fleet with a one-time token from w3bs.org/fleet, and start
     /// its agent as a systemd service
@@ -718,6 +816,9 @@ enum Cmd {
     /// Your A/B tests on w3bs.org/ab-testing: create, start, read results, export OpenABTest
     #[command(subcommand)]
     Ab(AbCmd),
+    /// Sign package releases with your SSH key (W3BS-SIGN-1): register keys, publish releases
+    #[command(subcommand)]
+    Publish(PublishCmd),
 
     // The CLI itself.
     /// Check this machine's W3BS state, trust and environment
@@ -865,6 +966,7 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
         Err(Cmd::Whoami { a }) => ("whoami", account("whoami", &a, |o| async move { auth::whoami(&o).await }).await),
         Err(Cmd::Fleet(f)) => run_fleet(f).await,
         Err(Cmd::Ab(c)) => run_ab(c).await,
+        Err(Cmd::Publish(c)) => run_publish(c).await,
         Err(Cmd::SelfCmd(s)) => {
             let (layout, mk) = match engine_factory(&out) {
                 Ok(x) => x,
@@ -879,6 +981,40 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
         }
         Err(Cmd::External(_)) => unreachable!("external commands exec before the runtime starts"),
         Err(_) => unreachable!("every command is dispatched"),
+    }
+}
+
+async fn run_publish(cmd: PublishCmd) -> (&'static str, w3bs_core::Result<OperationResult>) {
+    match cmd {
+        PublishCmd::Key(PublishKeyCmd::Add { namespace, key, a }) => {
+            ("publish.key.add", account("publish.key.add", &a, |o| async move { publish::key_add(&o, &namespace, key.as_deref()).await }).await)
+        }
+        PublishCmd::Key(PublishKeyCmd::Ls { a }) => ("publish.key.ls", account("publish.key.ls", &a, |o| async move { publish::key_ls(&o).await }).await),
+        PublishCmd::Key(PublishKeyCmd::Verify { fingerprint, a }) => {
+            ("publish.key.verify", account("publish.key.verify", &a, |o| async move { publish::key_verify(&o, fingerprint.as_deref()).await }).await)
+        }
+        PublishCmd::Key(PublishKeyCmd::Revoke { fingerprint, a }) => {
+            ("publish.key.revoke", account("publish.key.revoke", &a, |o| async move { publish::key_revoke(&o, &fingerprint).await }).await)
+        }
+        PublishCmd::Release(f) => {
+            let f = *f;
+            let args = publish::ReleaseArgs {
+                package: f.package,
+                version: f.release_version,
+                install: f.install,
+                name: f.name,
+                description: f.description,
+                homepage: f.homepage,
+                repository: f.repository,
+                license: f.license,
+                commands: f.commands,
+                artifacts: f.artifacts,
+                key: f.key,
+                from: f.from,
+                dry_run: f.dry_run,
+            };
+            ("publish.release", account("publish.release", &f.a, |o| async move { publish::release(&o, args).await }).await)
+        }
     }
 }
 
@@ -978,15 +1114,15 @@ async fn run_pkg(cmd: PkgCmd, out: Output) -> (&'static str, w3bs_core::Result<O
     let ro = Mutate::default();
     match cmd {
         PkgCmd::Catalog(a) => ("packages", catalog(mk(&ro), a).await),
-        PkgCmd::Install(InstallArgs { packages, version, channel, repository, manifest, pin, force, origin, m }) => {
-            ("install", mk(&m).install(InstallRequest { packages, manifest, repository, version, channel, pin, force, origin: Some(origin) }).await)
+        PkgCmd::Install(InstallArgs { packages, version, channel, repository, manifest, pin, force, origin, accept_new_key, m }) => {
+            ("install", mk(&m).install(InstallRequest { packages, manifest, repository, version, channel, pin, force, origin: Some(origin), accept_new_key }).await)
         }
         PkgCmd::List => ("list", mk(&ro).list()),
         PkgCmd::Info { package } => ("info", mk(&ro).info(&package)),
         PkgCmd::Search(SearchArgs { query, repository }) => ("search", mk(&ro).search(&query, repository.as_deref()).await),
         PkgCmd::Outdated => ("outdated", mk(&ro).outdated().await),
-        PkgCmd::Update(UpdateArgs { packages, all, version, channel, allow_major, force, m }) => {
-            ("update", mk(&m).update(UpdateRequest { packages, all, version, channel, allow_major, force }).await)
+        PkgCmd::Update(UpdateArgs { packages, all, version, channel, allow_major, force, accept_new_key, m }) => {
+            ("update", mk(&m).update(UpdateRequest { packages, all, version, channel, allow_major, force, accept_new_key }).await)
         }
         PkgCmd::Pin(OnePackage { package, m }) => ("pin", mk(&m).pin(&package, true)),
         PkgCmd::Unpin(OnePackage { package, m }) => ("unpin", mk(&m).pin(&package, false)),

@@ -5,6 +5,7 @@ use super::{Engine, MANAGER_VERSION, checkpoint, txn_id};
 use crate::db::{self, PackageRow, ScriptedRow};
 use crate::error::{Error, Kind, Result};
 use crate::fsutil;
+use crate::release::{self, VerifiedRelease};
 use crate::repo::LoadedRepo;
 use crate::{archive, now, probe};
 use semver::Version;
@@ -29,6 +30,8 @@ pub struct InstallRequest {
     pub force: bool,
     /// Diagnostic origin hint (`native` or `curl`); never affects ownership or security.
     pub origin: Option<String>,
+    /// Accept a publisher signing key this machine has not pinned for the namespace.
+    pub accept_new_key: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -40,6 +43,8 @@ pub struct UpdateRequest {
     pub allow_major: bool,
     /// Reinstall packages that are already current.
     pub force: bool,
+    /// Accept a publisher signing key this machine has not pinned for the namespace.
+    pub accept_new_key: bool,
 }
 
 /// A fully verified, ready-to-apply native change.
@@ -61,6 +66,21 @@ pub(crate) struct PlannedScript {
     pub from: Option<ScriptedRow>,
     /// What `<command> --version` reported before the installer runs.
     pub installed: Option<String>,
+    /// The verified W3BS-SIGN-1 publisher signature, if the entry is signed.
+    pub signed: Option<VerifiedRelease>,
+}
+
+impl PlannedScript {
+    fn signature_note(&self) -> String {
+        signature_note(self.signed.as_ref())
+    }
+}
+
+fn signature_note(v: Option<&VerifiedRelease>) -> String {
+    match v {
+        Some(v) => format!("signed by {}", v.fingerprint),
+        None => "unsigned".into(),
+    }
 }
 
 pub(crate) enum Change {
@@ -78,11 +98,11 @@ impl Change {
 }
 
 fn outcome(id: &str, from: Option<&str>, to: Option<&str>, status: Status, reason: Option<String>) -> PackageOutcome {
-    PackageOutcome { id: id.into(), from: from.map(Into::into), to: to.map(Into::into), status, reason, error: None }
+    PackageOutcome { id: id.into(), from: from.map(Into::into), to: to.map(Into::into), status, reason, error: None, signature: None }
 }
 
 fn failure(id: &str, from: Option<&str>, e: &Error, status: Status) -> PackageOutcome {
-    PackageOutcome { id: id.into(), from: from.map(Into::into), to: None, status, reason: None, error: Some(e.info()) }
+    PackageOutcome { id: id.into(), from: from.map(Into::into), to: None, status, reason: None, error: Some(e.info()), signature: None }
 }
 
 fn manager_satisfies(m: &Manifest) -> bool {
@@ -164,7 +184,7 @@ impl Engine {
             for e in catalog.entries.into_iter().filter(|e| r.matches(&e.id)) {
                 // A native package wins over a catalog entry for the same identity in one repository.
                 if !found.iter().any(|(rr, x)| rr.alias == repo.alias && *x.id() == e.id) {
-                    found.push((repo.clone(), Resolved::Script(e)));
+                    found.push((repo.clone(), Resolved::Script(Box::new(e))));
                 }
             }
         }
@@ -331,8 +351,9 @@ impl Engine {
             Some(Installed::Native(row)) if req.force => return self.plan_native_reinstall(row).await.map(Ok),
             Some(Installed::Script(row)) if req.force => {
                 let (repo, entry) = self.script_entry(&row).await?;
+                let signed = self.check_publisher(&entry, req.accept_new_key)?;
                 let installed = probe::installed_version(&entry.commands, &self.layout.bin_dir);
-                return Ok(Ok(Change::Script(Box::new(PlannedScript { entry, repo, from: Some(row), installed }))));
+                return Ok(Ok(Change::Script(Box::new(PlannedScript { entry, repo, from: Some(row), installed, signed }))));
             }
             Some(Installed::Native(row)) => {
                 let same_version = req.version.as_ref().is_none_or(|v| v.to_string() == row.active_version);
@@ -360,20 +381,24 @@ impl Engine {
         let (repo, resolved) = self.resolve_new(r, req.repository.as_deref()).await?;
         match resolved {
             Resolved::Script(entry) => {
+                let entry = *entry;
                 if req.version.is_some() || req.channel.is_some() || req.pin {
                     return Err(Error::usage("SCRIPT_NO_VERSIONS", format!("{} installs through its publisher's curl installer; --version, --channel and --pin do not apply", entry.id)));
                 }
+                let signed = self.check_publisher(&entry, req.accept_new_key)?;
                 let installed = probe::installed_version(&entry.commands, &self.layout.bin_dir);
                 // Already on this machine (an OS image, a manual `curl | sh`) and current: record it
                 // so `w3bs update` manages it from now on, and do not re-run the installer.
                 if !req.force && probe::is_current(installed.as_deref(), entry.latest_version.as_deref()) {
                     let v = installed.unwrap();
                     if !self.opts.dry_run {
-                        self.adopt_script(&entry, &repo)?;
+                        self.adopt_script(&entry, &repo, signed.as_ref())?;
                     }
-                    return Ok(Err(outcome(&entry.id.to_string(), Some(&v), None, Status::Current, Some(format!("{} {v} is already installed and current; --force re-runs its installer", entry.name)))));
+                    let mut o = outcome(&entry.id.to_string(), Some(&v), None, Status::Current, Some(format!("{} {v} is already installed and current; --force re-runs its installer", entry.name)));
+                    o.signature = Some(signature_note(signed.as_ref()));
+                    return Ok(Err(o));
                 }
-                Ok(Ok(Change::Script(Box::new(PlannedScript { entry, repo, from: None, installed }))))
+                Ok(Ok(Change::Script(Box::new(PlannedScript { entry, repo, from: None, installed, signed }))))
             }
             Resolved::Native(entry) => {
                 let channel = req.channel.clone().unwrap_or_else(|| "stable".into());
@@ -423,8 +448,63 @@ impl Engine {
         Ok((repo, entry))
     }
 
+    /// Verify a catalog entry's publisher signature (W3BS-SIGN-1 §6) and check its key
+    /// against this machine's pins for the namespace. Nothing is pinned here; that happens
+    /// once the installer has been checked and has run.
+    fn check_publisher(&mut self, entry: &CatalogEntry, accept_new_key: bool) -> Result<Option<VerifiedRelease>> {
+        let Some(v) = release::verify_entry(entry)? else {
+            // A namespace this machine has pinned keys for must stay signed: an unsigned entry
+            // there is either a stripped signature or a revoked key, and both need a person.
+            let namespace = entry.id.publisher();
+            let pins = match self.read_state()? {
+                Some(c) => db::publisher_keys(c, namespace)?,
+                None => vec![],
+            };
+            if !pins.is_empty() && !accept_new_key {
+                return Err(Error::approval(
+                    "PUBLISHER_SIGNATURE_MISSING",
+                    format!(
+                        "{} is unsigned, but this machine trusts {} for {}. The signature was removed or the publisher revoked its key; re-run with --accept-new-key only if you know why",
+                        entry.id,
+                        pins.join(", "),
+                        namespace
+                    ),
+                ));
+            }
+            return Ok(None);
+        };
+        let pins = match self.read_state()? {
+            Some(c) => db::publisher_keys(c, &v.namespace)?,
+            None => vec![],
+        };
+        if !pins.is_empty() && !pins.contains(&v.fingerprint) && !accept_new_key {
+            return Err(Error::approval(
+                "PUBLISHER_KEY_CHANGED",
+                format!(
+                    "{} {} is signed by {}, but this machine trusts only {} for {}. If the publisher rotated its key, re-run with --accept-new-key; otherwise do not install it",
+                    entry.id,
+                    v.version,
+                    v.fingerprint,
+                    pins.join(", "),
+                    v.namespace
+                ),
+            ));
+        }
+        Ok(Some(v))
+    }
+
+    /// Pin the signing key and record the signature (inside the caller's transaction).
+    fn record_publisher(conn: &rusqlite::Connection, id: &str, signed: Option<&VerifiedRelease>, installer_sha256: &str) -> Result<()> {
+        let t = now();
+        if let Some(v) = signed {
+            db::pin_publisher_key(conn, &v.namespace, &v.fingerprint, id, &t)?;
+        }
+        let row = signed.map(|v| db::SignatureRow { version: v.version.clone(), fingerprint: v.fingerprint.clone(), installer_sha256: installer_sha256.to_owned(), verified_at: t });
+        db::set_release_signature(conn, id, row.as_ref())
+    }
+
     /// Record a curl-installed tool found already installed, without running its installer.
-    fn adopt_script(&mut self, entry: &CatalogEntry, repo: &LoadedRepo) -> Result<()> {
+    fn adopt_script(&mut self, entry: &CatalogEntry, repo: &LoadedRepo, signed: Option<&VerifiedRelease>) -> Result<()> {
         let t = now();
         let txn = txn_id();
         let row = ScriptedRow {
@@ -444,6 +524,7 @@ impl Engine {
         let conn = self.conn();
         let tx = conn.unchecked_transaction()?;
         db::upsert_scripted(&tx, &row)?;
+        Self::record_publisher(&tx, &row.package_id, signed, signed.map(|v| v.installer_sha256.as_str()).unwrap_or_default())?;
         db::record_history(&tx, &row.package_id, "adopt", None, None, &txn)?;
         tx.commit()?;
         Ok(())
@@ -521,22 +602,27 @@ impl Engine {
                     p.repo.fingerprint
                 ),
                 Change::Script(s) => format!(
-                    "  {op} {} {} -> {} by running its publisher's installer: {}\n    (listed by {}; the script itself is not verified by W3BS and cannot be rolled back)",
+                    "  {op} {} {} -> {} by running its publisher's installer: {}\n    ({})",
                     s.entry.id,
                     s.installed.as_deref().unwrap_or("-"),
                     s.entry.latest_version.as_deref().unwrap_or("latest"),
                     s.entry.install.command(),
-                    s.repo.alias
+                    match &s.signed {
+                        Some(v) => format!("listed by {}; release {} signed by the publisher's key {}; the installer is checked against that signature before it runs, and cannot be rolled back", s.repo.alias, v.version, v.fingerprint),
+                        None => format!("listed by {}; unsigned: the script itself is not verified by W3BS and cannot be rolled back", s.repo.alias),
+                    }
                 ),
             });
         }
         if self.opts.dry_run {
             for c in &changes {
-                let (from, to) = match c {
-                    Change::Native(p) => (p.from.as_ref().map(|f| f.active_version.clone()), Some(p.manifest.release.version.to_string())),
-                    Change::Script(s) => (s.installed.clone(), s.entry.latest_version.clone()),
+                let (from, to, sig) = match c {
+                    Change::Native(p) => (p.from.as_ref().map(|f| f.active_version.clone()), Some(p.manifest.release.version.to_string()), None),
+                    Change::Script(s) => (s.installed.clone(), s.entry.latest_version.clone(), Some(s.signature_note())),
                 };
-                res.packages.push(outcome(&c.id(), from.as_deref(), to.as_deref(), Status::Planned, None));
+                let mut o = outcome(&c.id(), from.as_deref(), to.as_deref(), Status::Planned, None);
+                o.signature = sig;
+                res.packages.push(o);
             }
             return Ok(());
         }
@@ -562,7 +648,9 @@ impl Engine {
                         (Some(_), Some(b), Some(a)) if a == b => (Status::Current, "re-ran the publisher's curl installer; no newer version"),
                         (Some(_), _, _) => (Status::Updated, "ran the publisher's curl installer"),
                     };
-                    outcome(&id, before.as_deref(), after.as_deref(), st, Some(reason.into()))
+                    let mut o = outcome(&id, before.as_deref(), after.as_deref(), st, Some(reason.into()));
+                    o.signature = Some(s.signature_note());
+                    o
                 }),
             };
             match r {
@@ -571,11 +659,13 @@ impl Engine {
                     res.packages.push(o);
                 }
                 Err(e) => {
-                    let from = match &c {
-                        Change::Native(p) => p.from.as_ref().map(|f| f.active_version.clone()),
-                        Change::Script(s) => s.installed.as_ref().map(|v| v.to_string()),
+                    let (from, sig) = match &c {
+                        Change::Native(p) => (p.from.as_ref().map(|f| f.active_version.clone()), None),
+                        Change::Script(s) => (s.installed.as_ref().map(|v| v.to_string()), Some(s.signature_note())),
                     };
-                    res.packages.push(failure(&id, from.as_deref(), &e, Status::Failed));
+                    let mut o = failure(&id, from.as_deref(), &e, Status::Failed);
+                    o.signature = sig;
+                    res.packages.push(o);
                 }
             }
         }
@@ -783,6 +873,16 @@ impl Engine {
             return Err(Error::package("INSTALLER_EMPTY", format!("{url} returned an empty installer")));
         }
         let sha = fsutil::sha256_bytes(&script);
+        // W3BS-SIGN-1 §6.4: a signed release's installer must be the one the publisher
+        // signed. Checked before the script is even saved; on a mismatch nothing runs.
+        if let Some(v) = &s.signed
+            && sha != v.installer_sha256
+        {
+            return Err(Error::package(
+                "INSTALLER_DIGEST_MISMATCH",
+                format!("{} installer at {url} has sha256 {sha}, but the publisher signed {} ({}); refusing to run it", s.entry.id, v.installer_sha256, v.fingerprint),
+            ));
+        }
         let path = self.layout.cache_dir.join("installers").join(format!("{sha}.sh"));
         fsutil::write_durable(&path, &script)?;
         let shell = if s.entry.install.shell == "bash" { "bash" } else { "sh" };
@@ -813,6 +913,7 @@ impl Engine {
         let conn = self.conn();
         let tx = conn.unchecked_transaction()?;
         db::upsert_scripted(&tx, &row)?;
+        Self::record_publisher(&tx, &row.package_id, s.signed.as_ref(), &row.script_sha256)?;
         db::record_history(&tx, &row.package_id, if s.from.is_some() { "update" } else { "install" }, None, None, txn)?;
         tx.commit()?;
         Ok(())
@@ -929,19 +1030,25 @@ impl Engine {
         let mut resolved = vec![];
         for s in scripted {
             match self.script_entry(&s).await {
-                Ok((repo, entry)) => resolved.push((s, repo, entry)),
+                Ok((repo, entry)) => match self.check_publisher(&entry, req.accept_new_key) {
+                    Ok(signed) => resolved.push((s, repo, entry, signed)),
+                    Err(e) => {
+                        let st = if e.kind == Kind::Approval || e.code == "SIGNING_KEY_REVOKED" { Status::Blocked } else { Status::Failed };
+                        res.packages.push(failure(&s.package_id, None, &e, st));
+                    }
+                },
                 Err(e) => res.packages.push(failure(&s.package_id, None, &e, Status::Failed)),
             }
         }
         // Ask every tool what it is, in parallel; skip installers that have nothing newer.
-        let commands: Vec<Vec<String>> = resolved.iter().map(|(_, _, e)| e.commands.clone()).collect();
+        let commands: Vec<Vec<String>> = resolved.iter().map(|(_, _, e, _)| e.commands.clone()).collect();
         let versions = probe::installed_versions(&commands, &self.layout.bin_dir);
-        for ((s, repo, entry), installed) in resolved.into_iter().zip(versions) {
+        for ((s, repo, entry, signed), installed) in resolved.into_iter().zip(versions) {
             if !req.force && probe::is_current(installed.as_deref(), entry.latest_version.as_deref()) {
                 res.packages.push(outcome(&s.package_id, installed.as_deref(), None, Status::Current, None));
                 continue;
             }
-            changes.push(Change::Script(Box::new(PlannedScript { entry, repo, from: Some(s), installed })));
+            changes.push(Change::Script(Box::new(PlannedScript { entry, repo, from: Some(s), installed, signed })));
         }
         Ok(changes)
     }
@@ -1243,7 +1350,7 @@ impl Engine {
 
 pub(crate) enum Resolved {
     Native(w3bs_schema::manifest::IndexEntry),
-    Script(CatalogEntry),
+    Script(Box<CatalogEntry>),
 }
 
 impl Resolved {
