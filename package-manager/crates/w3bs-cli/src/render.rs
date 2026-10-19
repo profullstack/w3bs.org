@@ -45,12 +45,61 @@ pub fn human(r: &OperationResult) {
             return;
         }
         eprintln!("error: {} ({})", e.message, e.code);
-        if r.result == Overall::ApprovalRequired {
+        if e.code == "PUBLISHER_KEY_CHANGED" {
+            eprintln!("hint: check with the publisher that the key change is genuine before using --accept-new-key");
+        } else if r.result == Overall::ApprovalRequired {
             eprintln!("hint: re-run interactively, or add --yes (and a pre-provisioned trust root for new repositories)");
         }
         return;
     }
     match r.operation.as_str() {
+        "publish.key.add" => {
+            let d = &r.data;
+            let p = &d["proof"];
+            println!("Registered {} for {} on {}{}", s(&d["fingerprint"]), s(&d["namespace"]), s(&d["origin"]), if d["agent"] == true { " (signed through ssh-agent)" } else { "" });
+            if d["domain_verified"] == true {
+                println!("Domain proof found: this key can sign releases for {} now.", s(&d["namespace"]));
+            } else {
+                println!("\nProve you control {} with either of these, then run: {}\n", s(&d["namespace"]), s(&d["next"]));
+                println!("  1. Serve {} containing the line:\n       {}", s(&p["well_known"]), s(&p["line"]));
+                println!("  2. Or add a DNS TXT record:\n       {}  TXT  \"{}\"", s(&p["dns"]), s(&p["line"]));
+            }
+            return;
+        }
+        "publish.key.ls" | "publish.key.verify" => {
+            let keys = r.data["keys"].as_array().cloned().unwrap_or_default();
+            if keys.is_empty() {
+                println!("No publisher keys yet. Add one: w3bs publish key add <your-domain>");
+                return;
+            }
+            let rows = keys
+                .iter()
+                .map(|k| {
+                    let state = if !k["revoked_at"].is_null() { "revoked" } else if k["domain_verified"] == true { "verified" } else { "domain proof missing" };
+                    vec![s(&k["namespace"]), s(&k["fingerprint"]), s(&k["type"]), state.into()]
+                })
+                .collect();
+            table(&["NAMESPACE", "FINGERPRINT", "TYPE", "STATE"], rows);
+            return;
+        }
+        "publish.key.revoke" => {
+            println!("Revoked {}. Releases it signed stay listed, and clients refuse to install them.", s(&r.data["fingerprint"]));
+            return;
+        }
+        "publish.release" => {
+            let d = &r.data;
+            if d["dry_run"] == true {
+                println!("{}", serde_json::to_string_pretty(&d["statement"]).unwrap_or_default());
+                print!("{}", s(&d["signature"]));
+                println!("Signed {} {} with {} (dry run: not submitted)", s(&d["package"]), s(&d["version"]), s(&d["fingerprint"]));
+            } else {
+                println!("Published {} {} signed by {}", s(&d["package"]), s(&d["version"]), s(&d["fingerprint"]));
+                if !d["url"].is_null() {
+                    println!("{}", s(&d["url"]));
+                }
+            }
+            return;
+        }
         "login" | "whoami" => {
             let u = &r.data["user"];
             let who = match u["email"].as_str() {
@@ -432,6 +481,9 @@ pub fn human(r: &OperationResult) {
                     }
                     if let Some(e) = &p.error {
                         result = format!("{result}: {} ({})", e.message, e.code);
+                    }
+                    if let Some(sig) = &p.signature {
+                        result = format!("{result} [{sig}]");
                     }
                     vec![p.id.clone(), p.from.clone().unwrap_or("-".into()), p.to.clone().unwrap_or("-".into()), result]
                 })

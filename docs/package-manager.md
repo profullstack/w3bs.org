@@ -115,4 +115,41 @@ w3bs-publish installer --package tools.example/atlas --repo-alias tools \
 
 The generated `install.sh` installs (or reuses) `w3bs`, registers your repository, and runs `w3bs install` for your package, so curl users and `w3bs install` users end up with the same verified installation. Re-run `w3bs-publish build` before your metadata expires (timestamp: 30 days by default); a weekly cron is enough.
 
+### Publishing a signed release
+
+A catalog listing can carry your own signature, made with an ordinary SSH key ([W3BS-SIGN-1](W3BS-SIGN-1.md)). The registry then proves the listing came from w3bs.org, and your signature proves the release came from you: w3bs.org can list a release but cannot forge one. Any OpenSSH 8.2+ key of type `ssh-ed25519`, `ecdsa-sha2-nistp256` or their hardware (`sk-`) forms works; RSA and DSA are refused. Sign in first with `w3bs login`.
+
+```sh
+# 1. Register a key for your domain (default key: ~/.ssh/id_ed25519, id_ecdsa, id_ed25519_sk,
+#    id_ecdsa_sk; --key picks another, and a key that only exists in ssh-agent works too
+#    if its .pub file is on disk)
+w3bs publish key add pairux.com
+#    It prints the proof to add, either of:
+#      https://pairux.com/.well-known/w3bs-publisher.txt containing  w3bs-publisher=SHA256:…
+#      DNS TXT record  _w3bs.pairux.com  "w3bs-publisher=SHA256:…"
+w3bs publish key verify               # re-check the proof once it is up
+w3bs publish key ls                   # your keys and their state
+
+# 2. Sign and submit a release
+w3bs publish release --package pairux.com/pairux --version 0.17.0 \
+  --install "curl -fsSL https://pairux.com/install.sh | sh" \
+  --artifact linux-x86_64=https://pairux.com/dl/pairux.AppImage
+#    Description, name, homepage, repository, license and commands default to the current
+#    listing; set them with --description, --command pairux, … or keep them in a w3bs.toml
+#    ([package] id, version, install, description, commands, [[artifacts]] target/url) and
+#    pass --from w3bs.toml. --dry-run prints the statement and signature without submitting.
+
+# Lost or leaked key: its releases stay listed but clients refuse to install them
+w3bs publish key revoke SHA256:…
+```
+
+`w3bs publish release` downloads your installer and every artifact to record their SHA-256, signs the JCS bytes of the statement with `ssh-keygen -Y sign -n w3bs-release@w3bs.org`, checks its own signature, then submits it. Your private key never leaves `ssh-keygen` or ssh-agent. Every command takes `--json`.
+
+On install, `w3bs` verifies the signature, pins your namespace's key on first use, and checks the installer's SHA-256 against the signed one before running it: a changed installer is refused and nothing runs. A release signed by a key this machine has not pinned for your namespace is refused until the user passes `--accept-new-key`, so rotate keys deliberately and say so. Unsigned listings install as before and are shown as `unsigned` by `w3bs install` and `w3bs info`. Anyone can check a release offline:
+
+```sh
+echo "pairux.com namespaces=\"w3bs-release@w3bs.org\" ssh-ed25519 AAAA…" > allowed_signers
+ssh-keygen -Y verify -f allowed_signers -I pairux.com -n w3bs-release@w3bs.org -s release.sig < release.jcs.json
+```
+
 The formats (manifest, package index, channel index, catalog, receipt, repository profile) are the open [OpenPkg](https://logicsrc.com/docs/openpkg) specification. `w3bs` is its reference implementation. Source: [`package-manager/`](https://github.com/profullstack/w3bs.org/tree/main/package-manager).
