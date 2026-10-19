@@ -19,6 +19,7 @@ import { createHostedTraining } from '../training/hosted.mjs';
 import { mountTraining } from '../training/hosted-routes.mjs';
 import { mountAbTest } from './abtest-routes.mjs';
 import { mountPublishing } from './publishing-routes.mjs';
+import { mountInstallLinks } from './install-links.mjs';
 
 export function createApp({
   store,
@@ -274,6 +275,7 @@ export function createApp({
   mountSocial(app, { store, helpers, config: social, fetchImpl: socialFetch });
   mountAbTest(app, { store, origin, helpers });
   mountPublishing(app, { store, helpers });
+  mountInstallLinks(app, { store, origin, mailer, helpers });
   const hostedTraining =
     training?.databaseUrl && training?.masterKey
       ? createHostedTraining(training)
