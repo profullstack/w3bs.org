@@ -38,6 +38,15 @@ jobs:
             w3bs repo list | grep -q "$(cat /usr/share/w3bs-os/FINGERPRINT)"
             w3bs install hqtui --yes >/dev/null
             hqtui --version'
+      - name: the shell keeps history and Up walks it
+        run: |
+          docker run --rm -t w3bs-os:server zsh -lic '
+            set -e
+            [[ $HISTFILE == $HOME/.zsh_history && $SAVEHIST -ge 10000 ]]
+            [[ $(bindkey "^[[A") == *up-line-or-beginning-search ]]
+            [[ $(bindkey "^[OA") == *up-line-or-beginning-search ]]
+            print -s "w3bs update"; fc -W
+            grep -q "w3bs update" $HISTFILE'
 
   build:
     if: github.event_name != 'pull_request'
