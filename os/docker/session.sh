@@ -37,8 +37,8 @@ if [ -z "$DRM" ]; then
   done
 fi
 [ -n "$DRM" ] || {
-  say "no virtual display: on the Linux host run 'sudo modprobe vkms', then pass the card with"
-  say "  docker run --device /dev/dri/cardN ...   (ls -l /sys/class/drm/*/device | grep vkms)"
+  say "no virtual display: on the Linux host run 'sudo modprobe vkms', then pass the DRM cards in with"
+  say "  docker run -v /dev/dri:/dev/dri --device-cgroup-rule 'c 226:* rwm' ..."
   exit 2
 }
 
