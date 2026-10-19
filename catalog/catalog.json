@@ -1043,16 +1043,24 @@
     "does": "Render a Markdown file to the terminal in color"
    },
    {
+    "run": "readm3 edit .",
+    "does": "Open this folder in the readm3 desktop editor, like subl ."
+   },
+   {
+    "run": "readm3 paste <file>",
+    "does": "Share a file behind a private link, no account needed"
+   },
+   {
     "run": "readm3 login",
     "does": "Sign in to sync and save documents to your account"
    }
   ],
-  "description": "Terminal markdown reader and editor with sharing, version history, an API and an MCP server.",
+  "description": "Plain text editor for Markdown and code: terminal reader, web and desktop editor (Linux, macOS, Windows), sharing, version history, an API and an MCP server.",
   "homepage": "https://readm3.com",
   "repository": "https://github.com/profullstack/readm3",
   "license": "MIT",
   "agentic": false,
-  "latest_version": "0.10.0",
+  "latest_version": "0.13.0",
   "vendor": "Profullstack",
   "install": "curl -fsSL https://readm3.com/install.sh | sh",
   "evidence": "https://readm3.com/install.sh 200, installed from a clean env (no Node) 2026-10-13; examples: /home/anthony/src/profullstack/readm3/README.md",
