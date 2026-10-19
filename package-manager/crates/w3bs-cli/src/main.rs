@@ -768,6 +768,7 @@ enum Cmd {
     Update(UpdateArgs),
     /// Upgrade the whole machine: the system packages (apk, apt, dnf, pacman, zypper or brew),
     /// then every W3BS package and the w3bs CLI
+    #[command(visible_alias = "upgrade")]
     DistUpgrade(DistUpgradeArgs),
     /// List installed packages (shortcut for `w3bs pkg list`)
     List,
