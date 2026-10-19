@@ -119,3 +119,22 @@ test('CrawlProof: only for https://w3bs.org, never on pages that can carry accou
     else process.env.W3BS_CRAWLPROOF_SITE = saved;
   }
 });
+
+test('/os is a specification page with no download button, fed by the suite manifest', async () => {
+  const t = await boot();
+  try {
+    const res = await fetch(`${t.base}/os`);
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, /W3BS OS · SPECIFICATION/);
+    assert.match(html, /There are no images to download yet/);
+    assert.match(html, /resolves <strong>\d+<\/strong> Profullstack packages/);
+    assert.doesNotMatch(html, /\.iso"/);
+    const prd = await fetch(`${t.base}/docs/os-prd.md`);
+    assert.equal(prd.status, 200);
+    assert.match(await prd.text(), /^# W3BS OS Product Requirements/);
+    assert.match(await (await fetch(`${t.base}/sitemap.xml`)).text(), /\/os<\/loc>/);
+  } finally {
+    await t.close();
+  }
+});
