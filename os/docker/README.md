@@ -6,7 +6,7 @@ CLI and, on `desktop`, KDE Plasma with the Agentic Desktop Layer installed.
 ## server
 
 ```sh
-docker run -it --rm ghcr.io/profullstack/w3bs-os:server
+docker run -it --rm w3bs.org/os:server
 w3bs install hqtui          # any package on w3bs.org/packages
 ```
 
@@ -23,7 +23,7 @@ Linux host with the `vkms` module (no GPU required):
 sudo modprobe vkms
 card=$(for c in /sys/class/drm/card*; do readlink -f $c/device | grep -q vkms && basename $c; done | head -1)
 docker run -d --name w3bs-desktop --device /dev/dri/$card --group-add video --shm-size 512m \
-  -e W3BS_VNC_PASSWORD=change-me -p 5900:5900 ghcr.io/profullstack/w3bs-os:desktop
+  -e W3BS_VNC_PASSWORD=change-me -p 5900:5900 w3bs.org/os:desktop
 ```
 
 Then connect any VNC viewer to port 5900. Or, with `--network host` and no password, share

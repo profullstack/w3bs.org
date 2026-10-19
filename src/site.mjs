@@ -575,7 +575,7 @@ export async function renderPage({ path, host, query, store, origin }) {
 // What can be installed today (docs/os-prd.md §15, §20): set each once its artifact exists and
 // has passed its checks; until then the page says it is coming instead of offering a link.
 export const OS_RELEASES = {
-  docker: 'ghcr.io/profullstack/w3bs-os', // server + desktop images, signed with cosign
+  docker: 'w3bs.org/os', // server + desktop images (built and cosign-signed in CI, served by w3bs.org/v2)
   iso: null, // { version, url, sha256, size } for the x86-64 installer ISO
   musl: false, // `curl -fsSL https://w3bs.org/install.sh | sh` works on Alpine and Nura
 };

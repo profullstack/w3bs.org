@@ -128,7 +128,7 @@ test('/os offers only what exists: Docker now, the ISO and phones as coming, no 
     const html = await res.text();
     assert.match(html, /W3BS OS · SPECIFICATION/);
     assert.match(html, /resolves <strong>\d+<\/strong> Profullstack packages/);
-    assert.match(html, /docker run -it --rm ghcr\.io\/profullstack\/w3bs-os:server/);
+    assert.match(html, /docker run -it --rm w3bs\.org\/os:server/);
     // No ISO link until OS_RELEASES.iso is set by a release that passed its checks.
     assert.match(html, /PCS AND MACS · COMING/);
     assert.doesNotMatch(html, /\.iso"/);
