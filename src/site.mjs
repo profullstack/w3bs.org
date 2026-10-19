@@ -726,7 +726,7 @@ export async function renderPage({ path, host, query, store, origin, browser }) 
 export const OS_RELEASES = {
   docker: 'w3bs.org/os', // server + desktop images (built and cosign-signed in CI, served by w3bs.org/v2)
   // iso: read live from the newest os-v* GitHub release (src/os-releases.mjs)
-  musl: false, // `curl -fsSL https://w3bs.org/install.sh | sh` works on Alpine and Nura
+  musl: true, // `curl -fsSL https://w3bs.org/install.sh | sh` works on Alpine and Nura (w3bs 0.1.16)
 };
 function osInstall(iso) {
   const { docker, musl } = OS_RELEASES;
@@ -754,7 +754,7 @@ function osInstall(iso) {
     `<article><span class="card-index">APPLE SILICON MACS (M1, M2) · COMING</span><h3>Not from the ISO.</h3><p>Apple Silicon Macs are ARM and never boot an ISO: Linux goes on them through the Asahi Linux installer, run from macOS, which sets up dual boot. W3BS OS for M1 and M2 will install that way, on the Asahi kernel; M3 follows Asahi's support.</p></article>`,
   );
   routes.push(
-    `<article><span class="card-index">ANDROID PHONES AND TABLETS · ${musl ? 'AVAILABLE' : 'COMING'}</span><h3>Install on a phone.</h3><p>Install <a class="inline-link" href="https://postmarketos.org/download/" rel="noopener">Nura (postmarketOS)</a> with Plasma Mobile on a supported, unlockable device, then add W3BS. Unlocking the bootloader erases the phone. A W3BS-branded phone image follows.</p>${musl ? code('curl -fsSL https://w3bs.org/install.sh | sh\nw3bs install agentic-desktop-layer') : '<p class="muted">The W3BS installer for Alpine and Nura is in testing.</p>'}</article>`,
+    `<article><span class="card-index">ANDROID PHONES AND TABLETS · ${musl ? 'AVAILABLE' : 'COMING'}</span><h3>Install on a phone.</h3><p>Install <a class="inline-link" href="https://postmarketos.org/download/" rel="noopener">Nura (postmarketOS)</a> with Plasma Mobile on a supported, unlockable device, then add W3BS. Unlocking the bootloader erases the phone. A W3BS-branded phone image follows.</p>${musl ? `${code('curl -fsSL https://w3bs.org/install.sh | sh\nw3bs install agentic-desktop-layer')}<p class="muted">The same two commands work on any Alpine Linux machine. Tested on Alpine 3.24 (x86_64 and ARM64); not yet on a phone. The desktop layer prints the <code>apk add</code> line for anything Plasma Mobile is missing.</p>` : '<p class="muted">The W3BS installer for Alpine and Nura is in testing.</p>'}</article>`,
   );
   routes.push(
     `<article><span class="card-index">IPHONE AND IPAD</span><h3>Not as an operating system.</h3><p>Stock iPhones and iPads only boot software Apple signs, so nothing can replace iOS. They will get the W3BS companion app and remote access to your other devices.</p></article>`,
