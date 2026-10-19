@@ -29,7 +29,7 @@ const fail = (res, error) =>
     .status(error.status >= 400 ? error.status : 500)
     .json({ error: { code: error.code || 'REQUEST_FAILED', message: error.message } });
 
-export function mountTraining(app, { helpers, hosted, origin }) {
+export function mountTraining(app, { helpers, hosted, origin, publishTask }) {
   const { accountUser, currentUser } = helpers;
   const listeners = new Map(); // userId -> Set(send)
 
@@ -203,6 +203,10 @@ export function mountTraining(app, { helpers, hosted, origin }) {
       actorFor: (req) => req.training.actor,
       hosted: true,
       uploadLimit: '64mb',
+      // Straight into w3bs.org/tasks under the signed-in account (src/tasks.mjs).
+      publish:
+        publishTask &&
+        ((task, req, { workflow }) => publishTask(req.training.userId, { task, workflow })),
       onChange: (kind, req) => {
         for (const send of listeners.get(req?.training?.userId) ?? []) send(kind);
       },

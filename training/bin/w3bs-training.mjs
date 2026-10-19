@@ -38,6 +38,9 @@ const help = `W3BS Training ${VERSION}: review, curate and consume demonstration
   w3bs training deletions REQUEST_ID | audit
   w3bs training push EPISODE_ID... | --all-reviewed [--api https://w3bs.org]
                                                        send episodes to your w3bs.org workspace
+  w3bs training publish EPISODE_ID [--workflow TITLE] [--window-titles] [--api https://w3bs.org]
+                                                       a reviewed task, public on w3bs.org/tasks as an OpenTask
+  w3bs training unpublish TASK_ID [--api https://w3bs.org]
   w3bs training mcp serve --stdio --consumer NAME
   w3bs training setup claude-code|claude|codex|opencode --consumer NAME
                                                        claude = Claude's desktop app
@@ -142,6 +145,8 @@ const { values, positionals } = (() => {
         filename: { type: 'string' },
         'all-reviewed': { type: 'boolean' },
         api: { type: 'string' },
+        workflow: { type: 'string' },
+        'window-titles': { type: 'boolean' },
       },
     });
   } catch (error) {
@@ -523,6 +528,35 @@ try {
           filename: `push-${Date.now()}.w3bs-training.zip`,
         }),
       );
+      break;
+    }
+    case 'publish': {
+      // Public on the web: the person confirms, and window titles stay home unless they say so.
+      const origin = new URL(values.api ?? process.env.W3BS_API ?? 'https://w3bs.org').origin;
+      const id = need(sub, 'EPISODE_ID');
+      const { accessToken, publishTask } = await import('../core/remote.mjs');
+      const token = await accessToken(origin);
+      const keep = Boolean(values['window-titles']);
+      const actor = await humanActor(
+        `Publish ${id} at ${origin}/tasks as a public OpenTask${values.workflow ? ` in the workflow "${values.workflow}"` : ''}.
+Anyone can read its goal, your explanation, the app names and the step list.
+Window titles: ${keep ? 'KEPT (they can carry addresses, subjects, order numbers)' : 'removed'}. No screenshots, coordinates or typed text.
+Deleting the episode does not unpublish it: run w3bs training unpublish.`,
+      );
+      const result = await service.publishTask(id, actor, {
+        windowTitles: keep,
+        destination: `${origin}/tasks`,
+      });
+      out({
+        export_id: result.export_id,
+        ...(await publishTask(origin, result.task, { token, workflow: values.workflow })),
+      });
+      break;
+    }
+    case 'unpublish': {
+      const origin = new URL(values.api ?? process.env.W3BS_API ?? 'https://w3bs.org').origin;
+      const { accessToken, unpublishTask } = await import('../core/remote.mjs');
+      out(await unpublishTask(origin, need(sub, 'TASK_ID'), { token: await accessToken(origin) }));
       break;
     }
     case 'deletions':

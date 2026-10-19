@@ -45,45 +45,28 @@ export function moshscriptFilename(goal, episodeId) {
   return `${slug || 'task'}-${episodeId.replace(/^ep_/, '').slice(0, 8)}.mosh`;
 }
 
-export function toMoshscript({
-  episodeId,
-  goal,
-  family,
-  explanation,
-  steps,
-  gaps = [],
-  stopConditions,
-  humanApprovals,
-  exportedAt,
-  version,
-}) {
-  const collapsed = collapseSteps(steps);
-  const focusOnly = collapsed.every((s) => s.type === 'focus');
-  const captured = focusOnly
-    ? 'window focus changes and titles: no clicks, keystrokes, typed text or coordinates'
-    : 'semantic steps (app, control, shortcut): no coordinates, and typed text only as placeholders';
-  const task = {
-    episode_id: episodeId,
-    goal: line(goal, 500),
-    ...(family ? { workflow_family: line(family, 200) } : {}),
-    ...(explanation ? { explanation: String(explanation).slice(0, 4000) } : {}),
-    apps: [...new Set(collapsed.map((s) => s.app).filter(Boolean))],
-    steps: collapsed,
-    captured,
-    capture_gaps: [...new Set(gaps.map((g) => g.kind))],
-    stop_conditions: stopConditions,
-    human_approvals: humanApprovals,
-  };
+// The script carries the OpenTask itself (training/core/opentask.mjs) as its data.
+export function toMoshscript(task, { exportedAt, version, filename }) {
+  const focusOnly = task.steps.every((s) => s.action === 'focus');
+  const captured =
+    task.capture?.profile === 'visual-review' && focusOnly
+      ? 'window focus changes: no clicks, keystrokes, typed text or coordinates'
+      : 'semantic steps (app, control, shortcut): no coordinates, and typed text only as placeholders';
   const json = JSON.stringify(task, null, 2)
     .replace(/\u2028/g, '\\u2028')
     .replace(/\u2029/g, '\\u2029');
+  const file = filename ?? `${task.id}.mosh`;
+  const from = task.source?.episode
+    ? `W3BS Training episode ${line(task.source.episode, 100)}`
+    : `OpenTask ${task.id}`;
   return `#!/usr/bin/env moshscript
-// ${line(goal)}
-// Exported from W3BS Training episode ${episodeId} on ${exportedAt.slice(0, 10)} (w3bs-training ${version}).
+// ${line(task.title)}
+// Exported from ${from} on ${exportedAt.slice(0, 10)} (w3bs-training ${line(version, 40)}).
+// The task below is an OpenTask 0.1 document: https://logicsrc.com/docs/opentask
 //
-//   moshcode run ${moshscriptFilename(goal, episodeId)}             opens claude with this task
-//   moshcode run ${moshscriptFilename(goal, episodeId)} codex       or another engine
-//   moshcode run ${moshscriptFilename(goal, episodeId)} --dry-run   shows what it would do
+//   moshcode run ${file}             opens claude with this task
+//   moshcode run ${file} codex       or another engine
+//   moshcode run ${file} --dry-run   shows what it would do
 //
 // The recording holds ${captured}.
 // Nothing here is replayed. The engine does the task through
@@ -96,17 +79,20 @@ export function toMoshscript({
 const task = ${json};
 
 const engine = (argv[0] || "claude").toLowerCase();
+const apps = task.apps.map((a) => a.name);
+const gaps = (task.capture && task.capture.gaps) || [];
 
 say(\`🎸 \${task.goal}\`);
-say(\`   \${task.steps.length} step(s) across \${task.apps.join(", ") || "the desktop"}\`);
+say(\`   \${task.steps.length} step(s) across \${apps.join(", ") || "the desktop"}\`);
 const describe = (s) =>
   [
-    s.type,
+    s.action,
     s.app,
     s.window && \`(window: \${s.window})\`,
-    (s.role || s.name) && \`[\${[s.role, s.name].filter(Boolean).join(" ")}]\`,
+    s.target && \`[\${[s.target.role, s.target.name].filter(Boolean).join(" ")}]\`,
     s.keys && \`keys \${s.keys.join("+")}\`,
-    s.text && \`text <\${s.text}>\`,
+    s.text && \`text \${s.text}\`,
+    s.note && \`(\${s.note})\`,
   ]
     .filter(Boolean)
     .join(" ");
@@ -116,21 +102,24 @@ const prompt = [
   \`Do this task on my desktop: \${task.goal}\`,
   task.explanation ? \`In my words: \${task.explanation}\` : "",
   "",
-  \`I recorded it once with W3BS Training. The recording holds \${task.captured},\`,
+  \`I recorded it once with W3BS Training. The recording holds ${captured},\`,
   "so work out each action from what is on screen. The steps I took:",
   ...task.steps.map((s) => \`\${s.n}. \${describe(s)}\`),
-  task.steps.some((s) => s.text)
-    ? "Text in <angle brackets> is a placeholder, not what I typed: ask me for the value."
+  (task.parameters || []).length
+    ? \`Text in {{braces}} is a value you must ask me for: \${task.parameters.map((p) => p.name).join(", ")}.\`
     : "",
-  task.capture_gaps.length
-    ? \`Parts were not captured (\${task.capture_gaps.join(", ")}); do not guess what happened there, ask me.\`
+  gaps.length
+    ? \`Parts were not captured (\${gaps.join(", ")}); do not guess what happened there, ask me.\`
     : "",
   "",
   "Use the w3bs-desktop MCP tools. Observe the screen before every action and never reuse old",
-  "coordinates. If the w3bs-training MCP is connected, training_get_frames with episode_id",
-  \`\${task.episode_id} shows the screenshots I recorded.\`,
+  "coordinates.",
+  task.source && task.source.episode
+    ? \`If the w3bs-training MCP is connected, training_get_frames with episode_id \${task.source.episode} shows the screenshots I recorded.\`
+    : "",
   \`Stop and tell me if: \${task.stop_conditions.join("; ")}.\`,
-  \`Ask me \${task.human_approvals.join("; ")}.\`,
+  task.approvals.length ? \`Ask me \${task.approvals.join("; ")}.\` : "",
+  \`It worked when: \${task.success.check}\`,
   "When you finish or stop, say what you did and what is left, and report it with",
   "training_report_run if that tool is available.",
 ]

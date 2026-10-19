@@ -93,3 +93,34 @@ export async function pushBundle(origin, bundle, { token, filename, fetchImpl = 
   });
   return { ...committed, preview: preview.preview, review: `${origin}/training/app/#/inbox` };
 }
+
+async function callApi(origin, path, { token, method, body, fetchImpl = fetch }) {
+  const res = await fetchImpl(`${origin}${path}`, {
+    method,
+    headers: {
+      authorization: `Bearer ${token}`,
+      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const v = await res.json().catch(() => ({}));
+  if (!res.ok)
+    throw new W3bsError(
+      v.error?.code || 'REQUEST_FAILED',
+      v.error?.message || `HTTP ${res.status}`,
+      res.status,
+    );
+  return v;
+}
+
+// Publish an OpenTask (made by service.publishTask after the person confirmed) to
+// <origin>/tasks, optionally adding it to one of their workflows by title.
+export const publishTask = (origin, task, { token, workflow, fetchImpl }) =>
+  callApi(origin, '/api/v1/tasks', { token, method: 'POST', body: { task, workflow }, fetchImpl });
+
+export const unpublishTask = (origin, id, { token, fetchImpl }) =>
+  callApi(origin, `/api/v1/tasks/${encodeURIComponent(id)}`, {
+    token,
+    method: 'DELETE',
+    fetchImpl,
+  });

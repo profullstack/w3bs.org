@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openTraining } from '../training/core/service.mjs';
 import { collapseSteps, moshscriptFilename, toMoshscript } from '../training/core/moshscript.mjs';
+import { validate } from '@logicsrc/validators';
+import { toOpenTask } from '../training/core/opentask.mjs';
 import { createLocalApp } from '../training/ui/server.mjs';
 import { sampleBundle } from '../training/fixtures/sample.mjs';
 
@@ -92,23 +94,112 @@ test('the exported script hands the steps to an engine and replays nothing', asy
   }
 });
 
-test('hostile store text stays data inside the script', async () => {
-  const goal = 'it\'s `${process.exit(1)}` "quoted"\n// newline sep';
-  const script = toMoshscript({
-    episodeId: 'ep_0123456789abcdef',
-    goal,
-    explanation: "'); shell('rm -rf ~'); ('",
-    steps: [
-      { n: 1, type: 'focus', target: { app: 'TronBrowser', window: "a'b" }, evidence: 'observed' },
-      { n: 2, type: 'focus', target: { app: 'TronBrowser', window: "a'b" }, evidence: 'observed' },
-      { n: 3, type: 'focus', target: { app: 'hqterm' }, evidence: 'observed' },
+const base = (over = {}) => ({
+  episodeId: 'ep_0123456789abcdef',
+  goal: 'Publish the draft',
+  steps: [
+    {
+      n: 1,
+      type: 'focus',
+      target: { app: 'TronBrowser', window: 'Inbox - me@example.com' },
+      evidence: 'observed',
+    },
+    {
+      n: 2,
+      type: 'focus',
+      target: { app: 'TronBrowser', window: 'Inbox - me@example.com' },
+      evidence: 'observed',
+    },
+    {
+      n: 3,
+      type: 'text_edit',
+      target: { app: 'TronBrowser', role: 'text field', name: 'Title' },
+      text: '{{post_title}}',
+      evidence: 'observed',
+    },
+    {
+      n: 4,
+      type: 'text_edit',
+      target: { app: 'TronBrowser', role: 'text field', name: 'Body' },
+      text: '[text omitted by capture policy]',
+      evidence: 'inferred',
+    },
+    {
+      n: 5,
+      type: 'key_shortcut',
+      target: { app: 'hqterm' },
+      keys: ['ctrl', 's'],
+      evidence: 'observed',
+    },
+  ],
+  parameters: [{ name: 'api_key', type: 'secret_ref' }],
+  gaps: [{ kind: 'paused' }],
+  profile: 'semantic-demonstration',
+  outcome: { value: 'success', evidence_type: 'ui_confirmation' },
+  stopConditions: ['x'],
+  humanApprovals: ['before sending anything'],
+  version: 'test',
+  ...over,
+});
+
+test('an episode becomes an OpenTask with no window titles unless kept', () => {
+  const task = toOpenTask(base());
+  assert.equal(task.type, 'logicsrc.opentask');
+  assert.equal(task.id, 'publish-the-draft');
+  assert.ok(!JSON.stringify(task).includes('example.com'), 'window titles removed');
+  assert.equal(task.capture.window_titles, 'removed');
+  assert.deepEqual(
+    task.steps.map((s) => [s.n, s.action, s.recorded ?? null]),
+    [
+      [1, 'focus', '1-2'],
+      [2, 'type', '3'],
+      [3, 'type', '4'],
+      [4, 'key', '5'],
     ],
-    gaps: [{ kind: 'paused' }],
-    stopConditions: ['x'],
-    humanApprovals: ['y'],
-    exportedAt: '2026-10-17T00:00:00.000Z',
-    version: 'test',
-  });
+  );
+  assert.equal(task.steps[1].text, '{{post_title}}');
+  assert.equal(task.steps[2].text, undefined, 'omitted text never becomes a value');
+  assert.match(task.steps[2].note, /did not keep it/);
+  assert.deepEqual(task.parameters, [
+    { name: 'api_key', sensitivity: 'secret' },
+    { name: 'post_title', sensitivity: 'personal' },
+  ]);
+  assert.deepEqual(task.apps, [
+    { name: 'TronBrowser', kind: 'browser' },
+    { name: 'hqterm', kind: 'terminal' },
+  ]);
+  assert.equal(task.success.evidence, 'screen');
+  const kept = toOpenTask(base(), { windowTitles: true });
+  assert.equal(kept.steps[0].window, 'Inbox - me@example.com');
+  assert.equal(kept.capture.window_titles, 'kept');
+});
+
+test('hostile store text stays data inside the script', async () => {
+  const goal = 'it\'s `${process.exit(1)}` "quoted"\n// newline {{x}} sep';
+  const task = toOpenTask(
+    base({
+      goal,
+      explanation: "'); shell('rm -rf ~'); ('",
+      steps: [
+        {
+          n: 1,
+          type: 'focus',
+          target: { app: 'TronBrowser', window: "a'b" },
+          evidence: 'observed',
+        },
+        {
+          n: 2,
+          type: 'focus',
+          target: { app: 'TronBrowser', window: "a'b" },
+          evidence: 'observed',
+        },
+        { n: 3, type: 'focus', target: { app: 'hqterm' }, evidence: 'observed' },
+      ],
+    }),
+    { windowTitles: true },
+  );
+  assert.ok(!task.goal.includes('{{'), 'free text cannot smuggle a placeholder');
+  const script = toMoshscript(task, { exportedAt: '2026-10-17T00:00:00.000Z', version: 'test' });
   const { shells, said } = await runMosh(script);
   assert.equal(shells.length, 2);
   assert.ok(said[0].includes('`${process.exit(1)}`'));
@@ -117,7 +208,7 @@ test('hostile store text stays data inside the script', async () => {
   assert.ok(script.split('\n')[1].startsWith('// it'));
   assert.equal(
     moshscriptFilename(goal, 'ep_0123456789abcdef'),
-    'it-s-process-exit-1-quoted-newline-sep-01234567.mosh',
+    'it-s-process-exit-1-quoted-newline-x-sep-01234567.mosh',
   );
 });
 
@@ -162,6 +253,57 @@ test('local app downloads the .mosh as an attachment', async () => {
       await fetch(`${base}/api/v1/training/exports`, { headers: { cookie } })
     ).json();
     assert.equal(exports.length, 1);
+  } finally {
+    server.close();
+    t.close();
+  }
+});
+
+test('publishing makes a valid OpenTask, needs a person and is recorded as an export', async () => {
+  const { t, episode } = await store();
+  await t.review(episode, { decision: 'complete', confirm_goal: true }, human);
+  await assert.rejects(
+    t.publishTask(episode, { kind: 'agent', id: 'claude-code' }),
+    /needs a person/,
+  );
+  const sent = [];
+  const local = createLocalApp(t, {
+    user: 'reviewer',
+    publish: async (task, _req, { workflow }) => {
+      sent.push({ task, workflow });
+      return { id: 'x-abc123', url: 'https://w3bs.org/tasks/x-abc123' };
+    },
+  });
+  const server = await new Promise((done) => {
+    const s = local.app.listen(0, '127.0.0.1', () => done(s));
+  });
+  local.setPort(server.address().port);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const launch = await fetch(base + local.launchPath(), { redirect: 'manual' });
+    const cookie = launch.headers.get('set-cookie').split(';')[0];
+    const res = await fetch(`${base}/api/v1/training/episodes/${episode}/publish`, {
+      method: 'POST',
+      headers: { cookie, 'x-w3bs-training': '1', origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ workflow: 'Release a package' }),
+    });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).url, 'https://w3bs.org/tasks/x-abc123');
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].workflow, 'Release a package');
+    const { task } = sent[0];
+    assert.equal(
+      validate('opentask', task).ok,
+      true,
+      JSON.stringify(validate('opentask', task).errors),
+    );
+    assert.equal(task.capture.window_titles, 'removed');
+    assert.ok(task.steps.every((s) => s.window === undefined));
+    const exports = await (
+      await fetch(`${base}/api/v1/training/exports`, { headers: { cookie } })
+    ).json();
+    assert.equal(exports.length, 1);
+    assert.equal(JSON.parse(exports[0].detail).format, 'opentask');
   } finally {
     server.close();
     t.close();

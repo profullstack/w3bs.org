@@ -23,12 +23,13 @@ import {
 import { decrypt, encrypt, keyProvider } from './crypto.mjs';
 import { newId, sha256, stageBundle, stageEvents, stageVideo } from './ingest.mjs';
 import { moshscriptFilename, toMoshscript } from './moshscript.mjs';
+import { toOpenTask } from './opentask.mjs';
 import { scrubRecord } from './privacy.mjs';
 import { defaultHome } from './store.mjs';
 import { fsBlobs, openSqliteDb } from './db.mjs';
 import { writeZip } from './zip.mjs';
 
-export const VERSION = '0.2.6';
+export const VERSION = '0.2.7';
 const DAY = 86400000;
 const RETRIEVAL_PURPOSES = ['private_retrieval', 'external_retrieval'];
 // Purposes that send data beyond the person's own private use need declared rights.
@@ -2458,49 +2459,72 @@ export async function openTraining({
         JSON.parse(r.body),
       );
     },
-    // A reviewed, successful episode as a .mosh for `moshcode run`. The file leaves
-    // W3BS, so it is recorded as an export and named in later deletion reports.
-    async exportMoshscript(episodeId, actor) {
-      requireHuman(actor, 'Exporting a moshscript');
+    // A reviewed, successful episode as an OpenTask (logicsrc.com/docs/opentask).
+    async openTask(episodeId, actor, { windowTitles = false, what = 'Publishing a task' } = {}) {
+      requireHuman(actor, what);
       const row = await episodeRow(episodeId);
       if (row.state !== 'reviewed' || row.body.outcome.value !== 'success')
-        throw error('INVALID_STATE', 'A moshscript needs a reviewed, successful episode.', 409);
-      const sessions = [...new Set(row.body.segments.map((s) => s.session_id))];
-      const exportedAt = iso();
-      const filename = moshscriptFilename(row.body.goal.value, episodeId);
-      const script = toMoshscript({
-        episodeId,
-        goal: row.body.goal.value,
-        family: row.body.workflow_family,
-        explanation: row.body.explanation?.text,
-        steps: (await stepsOf(row.body)).map((s, i) => describeStep(s, i + 1)),
-        gaps: (await mapSeries(sessions, async (sid) => (await sessionOf(sid))?.gaps ?? [])).flat(),
-        stopConditions: STOP_CONDITIONS,
-        humanApprovals: HUMAN_APPROVALS,
-        exportedAt,
-        version: VERSION,
-      });
+        throw error('INVALID_STATE', `${what} needs a reviewed, successful episode.`, 409);
+      const sessions = await mapSeries(
+        [...new Set(row.body.segments.map((s) => s.session_id))],
+        sessionOf,
+      );
+      return toOpenTask(
+        {
+          episodeId,
+          goal: row.body.goal.value,
+          explanation: row.body.explanation?.text,
+          parameters: row.body.parameters,
+          steps: (await stepsOf(row.body)).map((s, i) => describeStep(s, i + 1)),
+          gaps: sessions.flatMap((s) => s?.gaps ?? []),
+          profile: row.body.capture_profile,
+          recordedAt: sessions
+            .map((s) => s?.started_at)
+            .filter(Boolean)
+            .sort()[0],
+          outcome: row.body.outcome,
+          stopConditions: STOP_CONDITIONS,
+          humanApprovals: HUMAN_APPROVALS,
+          version: VERSION,
+        },
+        { windowTitles },
+      );
+    },
+    // Copies that leave W3BS are recorded as exports, so deletion reports name them.
+    async recordExport(episodeId, actor, { format, purpose, destination, bytes }) {
       const exportId = newId('exp');
-      const destination = `download:${filename}`;
       await db.run(
         'INSERT INTO exports (export_id, dataset_id, version, format, purpose, destination, created_by, created_at, episodes, body) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           exportId,
           '',
           0,
-          'moshscript',
-          'human_review',
+          format,
+          purpose,
           destination,
           actor.id,
-          exportedAt,
+          iso(),
           JSON.stringify([episodeId]),
-          JSON.stringify({ sha256: sha256(Buffer.from(script)) }),
+          JSON.stringify({ sha256: sha256(Buffer.from(bytes)) }),
         ],
       );
-      await audit(actor, 'export', exportId, {
+      await audit(actor, 'export', exportId, { format, destination, episode: episodeId });
+      return exportId;
+    },
+    // A reviewed, successful episode as a .mosh for `moshcode run`. The file stays with the
+    // person, so it keeps window titles; it is still recorded as an export.
+    async exportMoshscript(episodeId, actor) {
+      const task = await service.openTask(episodeId, actor, {
+        windowTitles: true,
+        what: 'Exporting a moshscript',
+      });
+      const filename = moshscriptFilename(task.goal, episodeId);
+      const script = toMoshscript(task, { exportedAt: iso(), version: VERSION, filename });
+      const exportId = await service.recordExport(episodeId, actor, {
         format: 'moshscript',
-        destination,
-        episode: episodeId,
+        purpose: 'human_review',
+        destination: `download:${filename}`,
+        bytes: script,
       });
       return {
         export_id: exportId,
@@ -2508,6 +2532,27 @@ export async function openTraining({
         script,
         run: `moshcode run ${filename}`,
         warning: 'This script lives outside W3BS. Deleting the episode cannot recall it.',
+      };
+    },
+    // The OpenTask for w3bs.org/tasks, and the publish recorded as an export. Window titles go
+    // only when the person chose to keep them. The caller sends it (remote.mjs or hosted).
+    async publishTask(
+      episodeId,
+      actor,
+      { windowTitles = false, destination = 'https://w3bs.org/tasks' } = {},
+    ) {
+      const task = await service.openTask(episodeId, actor, { windowTitles });
+      const exportId = await service.recordExport(episodeId, actor, {
+        format: 'opentask',
+        purpose: 'public_distribution',
+        destination,
+        bytes: JSON.stringify(task),
+      });
+      return {
+        export_id: exportId,
+        task,
+        warning:
+          'This task is public once published. Deleting the episode does not unpublish it: run w3bs training unpublish.',
       };
     },
 

@@ -75,6 +75,22 @@ with `w3bs desktop agents add claude-code --preset broad` and
 `w3bs desktop setup claude-code --agent claude-code`. The file is an export: it
 lives outside W3BS and deleting the task lists it but cannot recall it.
 
+The script carries the task as an [OpenTask](https://logicsrc.com/docs/opentask):
+the goal, the apps, the values it asks for by name, and the steps as meaning.
+
+### Publish a task to w3bs.org/tasks
+
+**Publish to w3bs.org/tasks…** in the app (or `w3bs training publish EPISODE_ID`
+after `w3bs login`) makes a reviewed, successful task public as an OpenTask, with
+a moshscript anyone can run. What goes: the goal, your explanation, app names and
+the step list. What stays: screenshots, coordinates, typed text and window titles
+(pass `--window-titles` or tick the box to keep them; they can show addresses,
+subjects and order numbers). `--workflow "Release a package"` also adds it to that
+workflow of yours on [w3bs.org/workflows](https://w3bs.org/workflows), an
+[OpenWorkflow](https://logicsrc.com/docs/openworkflow) listing each task by URL and
+SHA-256. `w3bs training unpublish TASK_ID` takes it down; deleting the episode does
+not. The publish is recorded as an export, so deletion reports name it.
+
 ## Status (2026-10-15)
 
 The data side of the M1 local vertical slice is in `training/`: format 0.1,

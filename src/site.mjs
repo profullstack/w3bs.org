@@ -121,7 +121,7 @@ function footer() {
 }
 
 function siteFooter() {
-  return `<footer><div><a class="wordmark" href="/mission">w3bs<span class="wordmark-dot">.</span></a><p>Human-friendly. Agent-native.<br>Device-friendly. Open by design.</p><p class="footer-support"><strong>Need help?</strong> Email <a href="mailto:hello@w3bs.org">hello@w3bs.org</a> or ask on the <a href="/bbs/f/help">Help board</a>.</p></div><div><span class="eyebrow">FLEET AND ACCOUNTS</span><a href="/fleet">Your fleet</a><a href="/ab-testing">A/B testing</a><a href="/pricing">Pricing: Fleet is free</a><a href="/signup?next=%2Ffleet">Create an account</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><span class="eyebrow footer-gap">THE INITIATIVE</span><a href="/governance">Governance & participation</a><a href="/bbs">Community forums</a><a href="/social">W3BS Social (AT Protocol)</a><a href="/desktop">Agentic Desktop Layer</a><a href="/training">W3BS Training</a><a href="/os">W3BS OS (specification)</a></div><div><span class="eyebrow">FOR IMPLEMENTERS</span><a href="/developers">Developer guide</a><a href="/packages">Packages and the w3bs CLI</a><a href="/docs/founding-prd.md">Founding PRD · v2.0</a><a href="/docs/roadmap.md">Implementation status</a><a href="/.well-known/w3bs.json">Machine discovery ↗</a><a href="/api">API reference ↗</a><a href="https://github.com/profullstack/w3bs.org" rel="noopener">Source on GitHub ↗</a><span class="eyebrow footer-gap">COMMUNITY</span>${SOCIALS.map(([label, href]) => `<a href="${href}" rel="noopener">${label} ↗</a>`).join('')}</div><div class="footer-bottom"><span>Operated by Profullstack, Inc. Open standards for the Agentic Era.</span><span>Community drafts · No Recommendations issued</span></div></footer>`;
+  return `<footer><div><a class="wordmark" href="/mission">w3bs<span class="wordmark-dot">.</span></a><p>Human-friendly. Agent-native.<br>Device-friendly. Open by design.</p><p class="footer-support"><strong>Need help?</strong> Email <a href="mailto:hello@w3bs.org">hello@w3bs.org</a> or ask on the <a href="/bbs/f/help">Help board</a>.</p></div><div><span class="eyebrow">FLEET AND ACCOUNTS</span><a href="/fleet">Your fleet</a><a href="/ab-testing">A/B testing</a><a href="/pricing">Pricing: Fleet is free</a><a href="/signup?next=%2Ffleet">Create an account</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><span class="eyebrow footer-gap">THE INITIATIVE</span><a href="/governance">Governance & participation</a><a href="/bbs">Community forums</a><a href="/social">W3BS Social (AT Protocol)</a><a href="/desktop">Agentic Desktop Layer</a><a href="/training">W3BS Training</a><a href="/tasks">Tasks</a><a href="/workflows">Workflows</a><a href="/os">W3BS OS (specification)</a></div><div><span class="eyebrow">FOR IMPLEMENTERS</span><a href="/developers">Developer guide</a><a href="/packages">Packages and the w3bs CLI</a><a href="/docs/founding-prd.md">Founding PRD · v2.0</a><a href="/docs/roadmap.md">Implementation status</a><a href="/.well-known/w3bs.json">Machine discovery ↗</a><a href="/api">API reference ↗</a><a href="https://github.com/profullstack/w3bs.org" rel="noopener">Source on GitHub ↗</a><span class="eyebrow footer-gap">COMMUNITY</span>${SOCIALS.map(([label, href]) => `<a href="${href}" rel="noopener">${label} ↗</a>`).join('')}</div><div class="footer-bottom"><span>Operated by Profullstack, Inc. Open standards for the Agentic Era.</span><span>Community drafts · No Recommendations issued</span></div></footer>`;
 }
 const INSTALL = 'curl -fsSL https://w3bs.org/install.sh | sh';
 // The campaign path: install the CLI, sign in, join a server, watch it on /fleet.
@@ -648,7 +648,8 @@ function osStudio() {
 }
 function osSuiteSummary() {
   try {
-    return buildSuite(JSON.parse(readFileSync(resolve(ROOT, 'catalog/catalog.json'), 'utf8'))).summary;
+    return buildSuite(JSON.parse(readFileSync(resolve(ROOT, 'catalog/catalog.json'), 'utf8')))
+      .summary;
   } catch {
     return null;
   }
@@ -656,29 +657,51 @@ function osSuiteSummary() {
 async function osPage() {
   const iso = await latestOsIso();
   const suite = osSuiteSummary();
-  const rows = (list) => list.map(([a, b]) => `<tr><th scope="row">${a}</th><td>${b}</td></tr>`).join('');
+  const rows = (list) =>
+    list.map(([a, b]) => `<tr><th scope="row">${a}</th><td>${b}</td></tr>`).join('');
   const defaults = [
-    ['Base', 'Alpine Linux (13 MB base): the same OS in Docker, on servers, PCs and Macs; Nura (postmarketOS) on phones'],
-    ['First release', 'Docker images: <code>w3bs-os:server</code> and <code>w3bs-os:desktop</code> with the Agentic Desktop Layer installed'],
+    [
+      'Base',
+      'Alpine Linux (13 MB base): the same OS in Docker, on servers, PCs and Macs; Nura (postmarketOS) on phones',
+    ],
+    [
+      'First release',
+      'Docker images: <code>w3bs-os:server</code> and <code>w3bs-os:desktop</code> with the Agentic Desktop Layer installed',
+    ],
     ['Desktop', 'KDE Plasma by default; GNOME selectable; LXQt and Xfce once qualified'],
     ['Shell', 'zsh for new users; bash and fish selectable'],
-    ['Installer', 'Terminal and graphical wizards on one engine, with sane defaults: largest disk erased, LUKS2 encryption, KDE, zsh, the full suite; one review screen before anything is written'],
-    ['Apps', 'The full Profullstack CLI and desktop suite, selected by default and present offline at first boot'],
-    ['Agents', 'Agentic Desktop Layer and W3BS Training preinstalled; observing, input and recording each need your permission'],
+    [
+      'Installer',
+      'Terminal and graphical wizards on one engine, with sane defaults: largest disk erased, LUKS2 encryption, KDE, zsh, the full suite; one review screen before anything is written',
+    ],
+    [
+      'Apps',
+      'The full Profullstack CLI and desktop suite, selected by default and present offline at first boot',
+    ],
+    [
+      'Agents',
+      'Agentic Desktop Layer and W3BS Training preinstalled; observing, input and recording each need your permission',
+    ],
     ['Account', 'Local login and installed apps work without a W3BS account'],
   ];
   const runtimes = [
     ['Linux, Nix', 'Native'],
     ['Windows', 'Wine/Proton per app; optional Windows guest with app windows'],
     ['Android', 'Waydroid: real Android in a container, apps as desktop windows'],
-    ['macOS', 'Darling for command-line tools (GUI is research); otherwise your own Mac, labelled remote'],
+    [
+      'macOS',
+      'Darling for command-line tools (GUI is research); otherwise your own Mac, labelled remote',
+    ],
     ['iOS/iPadOS', 'Remote only: eligible apps on your Apple Silicon Mac, labelled'],
   ];
   const hardware = [
     ['Docker (any OS)', 'First release: server and desktop images'],
     ['x86-64 PCs and laptops', 'Primary hardware target; certified reference devices'],
     ['Intel Macs', 'Without T2: ordinary x86-64; with T2: needs a W3BS kernel port'],
-    ['Apple Silicon M1/M2, M3', 'Asahi kernel (already packaged by Nura), model by model; M3 preview'],
+    [
+      'Apple Silicon M1/M2, M3',
+      'Asahi kernel (already packaged by Nura), model by model; M3 preview',
+    ],
     ['Android phones/tablets', 'Nura with Plasma Mobile on named unlockable models'],
     ['Stock iPhone/iPad', 'Companion app, not an OS install'],
   ];
