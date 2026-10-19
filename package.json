@@ -25,7 +25,7 @@
     "training:schemas": "bun training/schema/generate.mjs"
   },
   "dependencies": {
-    "@logicsrc/validators": "0.5.0",
+    "@logicsrc/validators": "0.6.0",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@profullstack/bridges": "0.2.0",
     "@profullstack/footer": "0.2.5",
