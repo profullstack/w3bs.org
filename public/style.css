@@ -2303,3 +2303,17 @@ footer > div > .eyebrow.footer-gap {
   align-items: center;
   margin: 18px 0 8px;
 }
+
+/* @profullstack/footer (rendered with css:false: the CSP is style-src 'self').
+   Its rules, copied from template.json, then the site's own `footer` grid
+   undone on it. */
+.pfs-footer{--pfs-footer-muted:color-mix(in srgb,currentColor 62%,transparent);--pfs-footer-gap:.5rem 1.25rem;--pfs-footer-size:.875rem;border-top:1px solid color-mix(in srgb,currentColor 14%,transparent);font-size:var(--pfs-footer-size);line-height:1.5;color:inherit}.pfs-footer__inner{max-width:72rem;margin:0 auto;padding:1.5rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem;text-align:center}.pfs-footer a{color:var(--pfs-footer-muted);text-decoration:none}.pfs-footer a:hover,.pfs-footer a:focus-visible{color:inherit;text-decoration:underline}.pfs-footer__links{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--pfs-footer-gap)}.pfs-footer__ring{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:.6rem}.pfs-footer a.pfs-footer__badge{display:inline-block;line-height:0}.pfs-footer__badge img{display:block;width:200px;height:44px;max-width:100%}.pfs-footer__copy{margin:0;color:var(--pfs-footer-muted)}.pfs-footer__copy a{color:inherit}
+footer.pfs-footer {
+  display: block;
+  padding: 0;
+  gap: 0;
+  font-size: 12px;
+}
+footer.pfs-footer p {
+  margin-top: 0;
+}

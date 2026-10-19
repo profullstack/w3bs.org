@@ -87,6 +87,32 @@ test('every page has the support line in the footer', async () => {
   }
 });
 
+test('the footer links our socials and carries the Profullstack webring', async () => {
+  const t = await boot();
+  try {
+    for (const path of ['/mission', '/login']) {
+      const html = await (await fetch(`${t.base}${path}`)).text();
+      const footer = html.slice(html.indexOf('<footer'));
+      for (const href of [
+        'https://www.reddit.com/r/w3bs/',
+        'https://github.com/profullstack',
+        'https://discord.gg/U7dEXfBA3s',
+        'https://x.com/profullstackinc',
+        'https://youtube.com/@profullstack',
+      ]) {
+        assert.ok(footer.includes(`href="${href}"`), `${path} ${href}`);
+      }
+      assert.match(footer, /rssamplifier\.com\/ring\/profullstack\/next/, path);
+      // The CSP is style-src 'self': no inline <style> may ride in with it.
+      assert.doesNotMatch(footer, /<style/, path);
+    }
+    const ring = await (await fetch(`${t.base}/.well-known/openwebring.json`)).json();
+    assert.equal(ring.site.url, 'https://w3bs.org/');
+  } finally {
+    await t.close();
+  }
+});
+
 test('CrawlProof: only for https://w3bs.org, never on pages that can carry account data', async () => {
   assert.equal(trackerSite({ PUBLIC_ORIGIN: 'https://w3bs.org' }), CRAWLPROOF_SITE_ID);
   assert.equal(trackerSite({ PUBLIC_ORIGIN: 'https://w3bs.org/' }), CRAWLPROOF_SITE_ID);
