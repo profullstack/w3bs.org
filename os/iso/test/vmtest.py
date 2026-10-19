@@ -345,7 +345,9 @@ def cmd_installed(a):
         if a.desktop != "none":
             dm = {"plasma": "sddm", "gnome": "gdm", "xfce": "lightdm"}[a.desktop]
             checks.append(("display-manager",
-                           f"for i in $(seq 1 60); do pgrep -x {dm} >/dev/null && break; sleep 5; done; pgrep -a -x {dm} || echo NO_DM",
+                           # busybox pgrep -x misses daemons started by full path; pidof matches the name.
+                           f"for i in $(seq 1 60); do pidof {dm} >/dev/null && break; sleep 5; done; "
+                           f"p=$(pidof {dm}) && echo \"$p {dm}\" || echo NO_DM",
                            rf"\d+ \S*{dm}"))
         failed = []
         for name, cmd, want in checks:
@@ -363,7 +365,7 @@ def cmd_installed(a):
             log(f"[installed] typed the password at the greeter; waiting {a.desktop_wait}s for the desktop")
             time.sleep(a.desktop_wait)
             vm.screenshot(os.path.join(a.out, "installed-desktop.png"))
-            rc, out = vm.sh("pgrep -a -x plasmashell || pgrep -a kwin_wayland || pgrep -a -f startplasma || echo NO_PLASMA", 60)
+            rc, out = vm.sh("pidof plasmashell || pgrep -a kwin_wayland || pgrep -a -f startplasma || echo NO_PLASMA", 60)
             log(f"[installed] desktop session: {out.strip()[-300:]}")
         if failed:
             raise SystemExit(f"installed system checks failed: {', '.join(failed)}")
