@@ -7,7 +7,10 @@ use std::process::Command;
 use w3bs_publish::{Expiry, ReleaseSpec, Workspace};
 use w3bs_schema::manifest::ArtifactFormat;
 
-const PLATFORM: &str = "x86_64-unknown-linux-gnu";
+/// Test packages are published for the platform this suite runs on (glibc, musl, either arch).
+fn platform() -> &'static str {
+    w3bs_schema::host_platform()
+}
 
 struct Env {
     dir: tempfile::TempDir,
@@ -82,7 +85,7 @@ fn release(env: &Env, ws: &Workspace, host: &str, name: &str, v: &str) {
         description: format!("{name} fixture"),
         license: "MIT".into(),
         format: ArtifactFormat::TarGz,
-        artifacts: vec![(PLATFORM.into(), art)],
+        artifacts: vec![(platform().into(), art)],
         commands: [(name.to_string(), format!("bin/{name}"))].into(),
         manager_requirement: None,
     })
