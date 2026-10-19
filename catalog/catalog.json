@@ -3556,5 +3556,44 @@
       "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAez4qg5udt/Up5vDVEYlsEkvE7vn9yyDPYL9kZl1eqI",
       "fingerprint": "SHA256:npzZn9uzA1DcUWJB5tYYlPS821edxaOcTGUeQkrJTDw"
     }
+  },
+  {
+    "id": "hanzo.sh/hanzo",
+    "name": "Hanzo",
+    "commands": [
+      "hanzo",
+      "hanzo-mcp",
+      "dev",
+      "gen",
+      "zt"
+    ],
+    "examples": [
+      {
+        "run": "hanzo auth login",
+        "does": "Sign in to Hanzo (or bring an OpenAI or Anthropic account)"
+      },
+      {
+        "run": "hanzo \"<task>\"",
+        "does": "Hand a coding task to the agent in the current repo"
+      },
+      {
+        "run": "hanzo dev --claude \"<task>\"",
+        "does": "Run the task through Claude Code on your own Claude account"
+      },
+      {
+        "run": "hanzo usage summary",
+        "does": "Show your Hanzo usage"
+      }
+    ],
+    "description": "Hanzo AI's CLI: a coding agent and every Hanzo cloud product in one Rust binary. The installer also adds the Hanzo MCP server, Hanzo Dev, Hanzo Gen and ZT, each a checksummed native binary.",
+    "homepage": "https://hanzo.ai",
+    "repository": "https://github.com/hanzoai/cli",
+    "license": "Apache-2.0",
+    "agentic": true,
+    "latest_version": "8.5.751",
+    "vendor": "Hanzo AI",
+    "install": "curl -fsSL https://hanzo.sh | sh",
+    "evidence": "https://hanzo.sh 200 (POSIX sh installer, sha256-verified binaries); gh release view -R hanzoai/cli v8.5.751; LICENSE.txt Apache-2.0; examples: https://github.com/hanzoai/cli (README)",
+    "publisher": "third-party"
   }
 ]
