@@ -8,6 +8,7 @@ import { TTL } from './accounts.mjs';
 import { buildSuite } from './os-suite.mjs';
 import { latestOsIso } from './os-releases.mjs';
 import { footerHtml, footerHtmlSync } from '@profullstack/footer';
+import { MOSHPIT_EXAMPLES, WEB_EXAMPLES } from './browse-examples.mjs';
 
 const e = (value) =>
   String(value ?? '').replace(
@@ -176,16 +177,133 @@ async function promptCards(store, query) {
   const categories = new Map(catalog.map((item) => [item.id, item.category]));
   return `<section class="page-head"><div class="eyebrow">THE OPEN PROMPT REGISTRY</div><h1>Good instructions<br>should <em>travel.</em></h1><p>Portable, versioned, signed artifacts. Inspect their source, understand their permissions and make them your own.</p></section><form class="search-bar" action="/prompts" role="search"><label class="sr-only" for="prompt-search">Search prompts</label><input id="prompt-search" name="q" type="search" value="${e(query.q || '')}" placeholder="Search by name, topic or URI…"><button class="button dark" type="submit">Search <span aria-hidden="true">→</span></button></form><div class="catalog-heading"><span>${resources.length} ${resources.length === 1 ? 'resource' : 'resources'}</span><span>Open examples · MIT licensed · v1.0.0</span></div><div class="prompt-grid">${resources.map((item) => `<a class="prompt-card" href="${resourceLink(item.id)}"><div class="prompt-top">${pill(categories.get(item.id) || item.type)}<span class="verified-small">${item.verification.valid ? '✓ Signed' : 'Verification failed'}</span></div><h2>${e(item.name)}</h2><p>${e(item.description)}</p><code>${e(item.id.replace('w3bs://', ''))}</code><div class="prompt-bottom"><span>${e(item.publisher.namespace)} <span class="muted">/ ${e(item.version)}</span></span><span aria-hidden="true">↗</span></div></a>`).join('') || '<div class="empty"><h2>No matching resources.</h2><p>Try another phrase or <a href="/prompts">view all prompts</a>.</p></div>'}</div><aside class="callout"><strong>A registry is an implementation, not the standard.</strong><p>Host your own compatible registry. Your resource identity and signed manifest remain portable.</p><a href="/developers">Build with W3BS →</a></aside>`;
 }
-async function browse(store, query) {
+const BROWSE_COMMANDS = [
+  {
+    run: `w3bs resolve ${canonicalExample}`,
+    does: 'Resolve, verify and print a signed W3BS resource',
+  },
+  {
+    run: 'w3bs install hqtui.com/hqtui-demo-rust',
+    does: 'Install a package from the signed repository',
+  },
+  { run: 'w3bs packages', does: 'The package catalog, as on w3bs.org/packages' },
+  {
+    run: 'w3bs publish key add example.com',
+    does: 'Register your SSH key for a domain you publish under',
+  },
+  {
+    run: 'w3bs open https://w3bs.org/i/hqtui.com/hqtui-demo-rust',
+    does: 'Install from an install link (always asks first)',
+  },
+  { run: 'curl -s https://w3bs.org/.well-known/w3bs.json', does: 'The W3BS discovery document' },
+  {
+    run: 'dig +https @dns.moshcode.sh chovy.hacker TXT +short',
+    does: 'Look up a Moshpit name over DNS over HTTPS',
+  },
+  {
+    run: "curl -s 'https://pit.moshcode.sh/api/moshpit/resolve?name=chovy.hacker'",
+    does: 'Ask the Moshpit registry where a name points',
+  },
+  {
+    run: "curl -s 'https://w3bs.org/api/browse?q=chovy.hacker'",
+    does: 'This page as JSON, for agents (also the w3bs_browse MCP tool)',
+  },
+];
+const browseLink = (q) => `/browse?q=${encodeURIComponent(q)}`;
+const browseCopy = (text) =>
+  `<button class="small-button" type="button" data-copy="${e(text)}" aria-label="Copy: ${e(text)}">Copy</button>`;
+function browseExamples() {
+  const card = (q, label, blurb, host, tag) =>
+    `<a class="prompt-card browse-card" href="${browseLink(q)}"><div class="prompt-top">${pill(tag)}</div><h2>${e(label)}</h2><p>${e(blurb)}</p><code>${e(host)}</code><div class="prompt-bottom"><span>Browse</span><span aria-hidden="true">→</span></div></a>`;
+  return `<section class="section browse-examples" aria-labelledby="browse-examples-title"><div class="section-heading"><div><div class="eyebrow">EXAMPLES</div><h2 id="browse-examples-title">Try one of ours.</h2></div><p>Moshpit names open as themselves when your resolver speaks Moshpit, and through their pit.world gateway when it does not.</p></div><h3 class="browse-group">Moshpit names</h3><div class="prompt-grid">${MOSHPIT_EXAMPLES.map(
+    ({ name, blurb }) => card(name, name, blurb, `${name}.pit.world`, 'Moshpit'),
+  ).join(
+    '',
+  )}</div><h3 class="browse-group">On the Web</h3><div class="prompt-grid">${WEB_EXAMPLES.map(({ host, blurb }) => card(host, host, blurb, `https://${host}`, 'ICANN')).join('')}</div></section>`;
+}
+function browseCli() {
+  return `<section class="section browse-cli" aria-labelledby="browse-cli-title"><div class="section-heading"><div><div class="eyebrow">FROM A TERMINAL</div><h2 id="browse-cli-title">The same, on the command line.</h2></div><p>No <code>w3bs</code> yet? <code>${e(INSTALL)}</code></p></div><section class="inspector-panel"><ol class="usage-steps">${BROWSE_COMMANDS.map(
+    ({ run, does }) =>
+      `<li><div><code>${e(run)}</code><span class="muted">${e(does)}</span></div>${browseCopy(run)}</li>`,
+  ).join('')}</ol></section></section>`;
+}
+const list = (values) =>
+  values?.length ? values.map((v) => `<code class="break">${e(v)}</code>`).join('<br>') : 'None';
+const safeHref = (value) =>
+  typeof value === 'string' && /^https:\/\/[^\s"'<>]+$/.test(value)
+    ? `<a class="break" href="${e(value)}" rel="noopener nofollow">${e(value)}</a>`
+    : `<code class="break">${e(String(value).slice(0, 300))}</code>`;
+const DISCOVERY_FIELDS = [
+  'specVersion',
+  'status',
+  'registry',
+  'resolution',
+  'manifest',
+  'search',
+  'mcp',
+  'trust',
+  'specs',
+];
+function discoveryPanel(found) {
+  if (!found.found)
+    return `<section class="inspector-panel"><h3>W3BS discovery</h3><p>No discovery document at <code class="break">${e(found.url)}</code>${found.status ? ` (HTTP ${e(found.status)})` : ''}${found.error ? ` (${e(found.error)})` : ''}. A site publishes one so agents can find its registry, MCP endpoint and surfaces: see <a href="/specs/W3BS-DISCOVERY-1">W3BS-DISCOVERY-1</a>.</p></section>`;
+  const d = found.document;
+  const rows = DISCOVERY_FIELDS.filter((key) => typeof d[key] === 'string').map(
+    (key) => `<dt>${e(key)}</dt><dd>${safeHref(d[key])}</dd>`,
+  );
+  if (d.surfaces && typeof d.surfaces === 'object')
+    for (const [key, value] of Object.entries(d.surfaces).slice(0, 12))
+      if (typeof value === 'string')
+        rows.push(`<dt>surface: ${e(key)}</dt><dd>${safeHref(value)}</dd>`);
+  if (Array.isArray(d.operations))
+    rows.push(
+      `<dt>Operations</dt><dd>${e(
+        d.operations
+          .filter((op) => typeof op === 'string')
+          .slice(0, 40)
+          .join(', '),
+      )}</dd>`,
+    );
+  return `<section class="inspector-panel metadata"><h3>W3BS discovery</h3><p>Declared by <code class="break">${e(found.url)}</code>. What a site declares is information, not authority.</p><dl>${rows.join('') || '<dt>Fields</dt><dd>None this browser knows</dd>'}</dl><details><summary>Document</summary><pre class="json-source">${e(JSON.stringify(d, null, 2).slice(0, 20000))}</pre></details></section>`;
+}
+function browseDetail(r) {
+  const moshpit = r.kind === 'moshpit';
+  const g = r.gateway;
+  const gatewayHost = r.fallback ? new URL(r.fallback).host : null;
+  const summary = moshpit
+    ? r.moshpit?.minted
+      ? `A Moshpit name, registered and pointing at <code>${e(r.moshpit.target)}</code>.`
+      : r.moshpit
+        ? 'Its ending is on Moshpit, but nobody has claimed this name yet.'
+        : 'The Moshpit resolver has no record for this name.'
+    : 'An ICANN site, shown as it is.';
+  const status = g.ok
+    ? pill(moshpit ? 'Gateway answers' : 'Site answers', 'green')
+    : pill(moshpit ? 'Gateway not answering' : 'Site not answering', 'red');
+  const open = moshpit
+    ? `<a class="button primary" href="${e(r.primary)}" rel="noopener">Open ${e(r.name)} <span aria-hidden="true">↗</span></a><a class="text-link" href="${e(r.fallback)}" rel="noopener">via ${e(gatewayHost)} <span aria-hidden="true">↗</span></a>`
+    : `<a class="button primary" href="${e(r.primary)}" rel="noopener">Open ${e(r.name)} <span aria-hidden="true">↗</span></a>`;
+  const dns = r.dns;
+  return `<section class="resource-detail browse-detail"><div class="resource-title"><div><div class="eyebrow">${moshpit ? 'MOSHPIT NAME' : 'WEB SITE'}</div><h2>${e(r.name)}</h2><p>${summary}</p></div>${status}</div><div class="identity-line browse-open"><span class="eyebrow">${moshpit ? 'NAME' : 'URL'}</span><code>${e(moshpit ? r.name : r.primary)}</code>${open}</div>${moshpit ? `<p class="muted browse-note"><code>${e(r.name)}</code> opens directly when your resolver speaks Moshpit (<code>dns.moshcode.sh</code>); everywhere else, use <code>${e(gatewayHost)}</code>.</p>` : ''}<div class="inspector-grid"><div><section class="inspector-panel metadata"><h3>${moshpit ? 'pit.world gateway' : 'Site'}</h3><dl><dt>Checked</dt><dd>${safeHref(g.url)}</dd><dt>Status</dt><dd>${g.status ? `HTTP ${e(g.status)}` : e(g.error || 'No answer')}</dd>${g.finalUrl && g.finalUrl !== g.url ? `<dt>Landed on</dt><dd>${safeHref(g.finalUrl)}</dd>` : ''}${g.redirects?.length ? `<dt>Redirects</dt><dd>${e(g.redirects.length)}</dd>` : ''}${g.title ? `<dt>Title</dt><dd>${e(g.title)}</dd>` : ''}${g.contentType ? `<dt>Type</dt><dd>${e(g.contentType)}</dd>` : ''}</dl></section>${discoveryPanel(r.discovery)}</div><aside><section class="inspector-panel metadata"><h3>DNS</h3><p>Asked over DNS over HTTPS (RFC 8484) at <code class="break">${e(dns.resolver)}</code>.</p><dl>${dns.CNAME.length ? `<dt>CNAME</dt><dd>${list(dns.CNAME)}</dd>` : ''}<dt>A</dt><dd>${list(dns.A)}</dd><dt>AAAA</dt><dd>${list(dns.AAAA)}</dd><dt>TXT</dt><dd>${list(dns.TXT)}</dd>${dns.errors?.length ? `<dt>Errors</dt><dd>${e(dns.errors.join('; '))}</dd>` : ''}</dl></section>${r.moshpit ? `<section class="inspector-panel metadata"><h3>Moshpit record</h3><dl><dt>Name</dt><dd>${e(r.name)}</dd><dt>Claimed</dt><dd>${r.moshpit.minted ? 'Yes' : 'No'}</dd>${r.moshpit.target ? `<dt>Target</dt><dd><code class="break">${e(r.moshpit.target)}</code></dd>` : ''}<dt>Gateway</dt><dd>${safeHref(r.fallback)}</dd></dl></section>` : ''}<section class="inspector-panel"><h3>For agents</h3><p>The same answer as JSON.</p><a class="text-link" href="/api/browse?q=${encodeURIComponent(r.input)}">/api/browse?q=${e(r.input)} <span aria-hidden="true">↗</span></a></section></aside></div></section>`;
+}
+async function browse(store, query, browser) {
+  const q = String(query.q ?? query.uri ?? '').trim();
   let result, error;
-  if (query.uri) {
+  if (q) {
     try {
-      result = await store.inspect(query.uri);
+      result = await browser.resolve(q, { inspect: (uri) => store.inspect(uri) });
     } catch (failure) {
       error = failure.message;
     }
   }
-  return `<section class="page-head compact"><div class="eyebrow">THE REFERENCE RESOLVER</div><h1>A window into<br>the <em>Agentic Web.</em></h1><p>Enter a W3BS URI to inspect its canonical artifact, publisher, provenance and verification state.</p></section><form class="search-bar resolver" action="/browse"><label class="sr-only" for="resolve-uri">W3BS resource URI</label><input id="resolve-uri" name="uri" value="${e(query.uri || canonicalExample)}" required spellcheck="false"><button class="button primary" type="submit">Resolve <span aria-hidden="true">→</span></button></form>${error ? `<div class="error" role="alert"><strong>Could not resolve this resource.</strong><p>${e(error)}</p><a href="/prompts">Browse available resources →</a></div>` : ''}${result ? resourceDetail(result) : `<div class="resolver-empty"><span class="large-mark">w3bs<span>://</span></span><h2>The URI is canonical.<br>The surface is optional.</h2><p>Try <a href="${resourceLink(canonicalExample)}">the research prompt</a>, or <a href="/prompts">explore the registry</a>.</p></div>`}`;
+  const body = error
+    ? `<div class="error" role="alert"><strong>${/^w3bs:\/\//i.test(q) ? 'Could not resolve this resource.' : 'Could not browse this.'}</strong><p>${e(error)}</p><a href="/browse">Try an example →</a></div>`
+    : result?.kind === 'w3bs'
+      ? resourceDetail(result.resource)
+      : result
+        ? browseDetail(result)
+        : `<div class="resolver-empty"><span class="large-mark">w3bs<span>://</span></span><h2>The URI is canonical.<br>The surface is optional.</h2><p>Try <a href="${resourceLink(canonicalExample)}">the research prompt</a>, a Moshpit name like <a href="${browseLink('chovy.hacker')}">chovy.hacker</a>, or <a href="/prompts">explore the registry</a>.</p></div>`;
+  return `<section class="page-head compact"><div class="eyebrow">THE BROWSER</div><h1>A window into<br>the <em>Agentic Web.</em></h1><p>Enter a W3BS URI, a Moshpit name like chovy.hacker, a pit.world URL or any https URL. Moshpit names resolve on the server over Moshpit DNS.</p></section><form class="search-bar resolver" action="/browse" role="search"><label class="sr-only" for="resolve-uri">W3BS URI, Moshpit name or URL</label><input id="resolve-uri" name="q" value="${e(q || canonicalExample)}" required spellcheck="false" autocapitalize="off" maxlength="2048"><button class="button primary" type="submit">Browse <span aria-hidden="true">→</span></button></form>${body}${browseExamples()}${browseCli()}`;
 }
 function resourceDetail(result) {
   const { manifest: m, verification: v } = result;
@@ -522,7 +640,7 @@ function privacyPage() {
 <h2>Removing your data</h2><p>Remove a machine on <a href="/fleet">/fleet</a> or with <code>w3bs fleet rm</code>. Sign the CLI out on <a href="/account">your account page</a> or with <code>w3bs logout</code>. To delete your account, email <a href="mailto:hello@w3bs.org">hello@w3bs.org</a> from the address on it. That removes your profile, passkeys, sessions, sign-ins, machines and their history. W3BS Social has its own notes on <a href="/social#policy">its page</a>, because posts there are public on the AT Protocol network.</p>
 </article>`;
 }
-export async function renderPage({ path, host, query, store, origin }) {
+export async function renderPage({ path, host, query, store, origin, browser }) {
   if (path === '/')
     path = host.startsWith('browse.')
       ? '/browse'
@@ -546,7 +664,7 @@ export async function renderPage({ path, host, query, store, origin }) {
     content = await promptCards(store, query);
   } else if (path === '/browse') {
     title = 'Resource Browser';
-    content = await browse(store, query);
+    content = await browse(store, query, browser);
   } else if (path === '/packages') {
     title = 'Packages · the w3bs CLI';
     content = await packagesPage(store, query);
@@ -648,7 +766,8 @@ function osStudio() {
 }
 function osSuiteSummary() {
   try {
-    return buildSuite(JSON.parse(readFileSync(resolve(ROOT, 'catalog/catalog.json'), 'utf8'))).summary;
+    return buildSuite(JSON.parse(readFileSync(resolve(ROOT, 'catalog/catalog.json'), 'utf8')))
+      .summary;
   } catch {
     return null;
   }
@@ -656,30 +775,55 @@ function osSuiteSummary() {
 async function osPage() {
   const iso = await latestOsIso();
   const suite = osSuiteSummary();
-  const rows = (list) => list.map(([a, b]) => `<tr><th scope="row">${a}</th><td>${b}</td></tr>`).join('');
+  const rows = (list) =>
+    list.map(([a, b]) => `<tr><th scope="row">${a}</th><td>${b}</td></tr>`).join('');
   const defaults = [
-    ['Base', 'Alpine Linux (13 MB base): the same OS in Docker, on servers, PCs and Macs; Nura (postmarketOS) on phones'],
-    ['First release', 'Docker images: <code>w3bs-os:server</code> and <code>w3bs-os:desktop</code> with the Agentic Desktop Layer installed'],
+    [
+      'Base',
+      'Alpine Linux (13 MB base): the same OS in Docker, on servers, PCs and Macs; Nura (postmarketOS) on phones',
+    ],
+    [
+      'First release',
+      'Docker images: <code>w3bs-os:server</code> and <code>w3bs-os:desktop</code> with the Agentic Desktop Layer installed',
+    ],
     ['Desktop', 'KDE Plasma by default; GNOME selectable; LXQt and Xfce once qualified'],
     ['Shell', 'zsh for new users; bash and fish selectable'],
-    ['Web server', 'Caddy: hosts, reverse proxies and static sites with automatic HTTPS and IPv6 by default; drop a file in /etc/caddy/sites to add a site'],
-    ['Installer', 'Terminal and graphical wizards on one engine, with sane defaults: largest disk erased, LUKS2 encryption, KDE, zsh, the full suite; one review screen before anything is written'],
-    ['Apps', 'The full Profullstack CLI and desktop suite, selected by default and present offline at first boot'],
-    ['Agents', 'Agentic Desktop Layer and W3BS Training preinstalled; observing, input and recording each need your permission'],
+    [
+      'Web server',
+      'Caddy: hosts, reverse proxies and static sites with automatic HTTPS and IPv6 by default; drop a file in /etc/caddy/sites to add a site',
+    ],
+    [
+      'Installer',
+      'Terminal and graphical wizards on one engine, with sane defaults: largest disk erased, LUKS2 encryption, KDE, zsh, the full suite; one review screen before anything is written',
+    ],
+    [
+      'Apps',
+      'The full Profullstack CLI and desktop suite, selected by default and present offline at first boot',
+    ],
+    [
+      'Agents',
+      'Agentic Desktop Layer and W3BS Training preinstalled; observing, input and recording each need your permission',
+    ],
     ['Account', 'Local login and installed apps work without a W3BS account'],
   ];
   const runtimes = [
     ['Linux, Nix', 'Native'],
     ['Windows', 'Wine/Proton per app; optional Windows guest with app windows'],
     ['Android', 'Waydroid: real Android in a container, apps as desktop windows'],
-    ['macOS', 'Darling for command-line tools (GUI is research); otherwise your own Mac, labelled remote'],
+    [
+      'macOS',
+      'Darling for command-line tools (GUI is research); otherwise your own Mac, labelled remote',
+    ],
     ['iOS/iPadOS', 'Remote only: eligible apps on your Apple Silicon Mac, labelled'],
   ];
   const hardware = [
     ['Docker (any OS)', 'First release: server and desktop images'],
     ['x86-64 PCs and laptops', 'Primary hardware target; certified reference devices'],
     ['Intel Macs', 'Without T2: ordinary x86-64; with T2: needs a W3BS kernel port'],
-    ['Apple Silicon M1/M2, M3', 'Asahi kernel (already packaged by Nura), model by model; M3 preview'],
+    [
+      'Apple Silicon M1/M2, M3',
+      'Asahi kernel (already packaged by Nura), model by model; M3 preview',
+    ],
     ['Android phones/tablets', 'Nura with Plasma Mobile on named unlockable models'],
     ['Stock iPhone/iPad', 'Companion app, not an OS install'],
   ];

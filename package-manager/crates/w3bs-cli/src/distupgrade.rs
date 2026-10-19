@@ -3,7 +3,6 @@
 //! the installed release; moving a W3BS OS machine to a new release is `w3bs os upgrade`.
 
 use serde_json::{Value, json};
-use std::path::Path;
 use std::process::{Command, Stdio};
 use w3bs_core::{Error, Result};
 
@@ -53,9 +52,7 @@ fn is_root() -> bool {
     false
 }
 
-fn in_container() -> bool {
-    Path::new("/.dockerenv").exists() || Path::new("/run/.containerenv").exists()
-}
+use w3bs_core::engine::in_container;
 
 const CONTAINER_NOTE: &str = "in a container the base system comes from its image: pull the newer image (for W3BS OS: docker pull w3bs.org/os:server) and recreate the container";
 
