@@ -274,6 +274,72 @@ pub fn logs() -> Result<Value> {
     Ok(json!({ "container": CONTAINER, "log": text, "session_logs": data_dir()?.join("home/.local/state/w3bs-desktop/logs") }))
 }
 
+/// Set (or with `off`, remove) the desktop's VNC password, read from stdin. The session gives it
+/// to w0vncserver as a VncAuth password file in the desktop's home, so the w3bs.org page asks for
+/// it; VNC uses only the first 8 characters. Restarts the desktop so it takes effect.
+pub fn password(off: bool) -> Result<Value> {
+    require_docker()?;
+    let file = data_dir()?.join("home/.config/tigervnc/passwd");
+    let tag = image_tag();
+    let mut notes = Vec::new();
+    if off {
+        let _ = std::fs::remove_file(&file);
+    } else {
+        if docker(&["image", "inspect", &tag]).is_err() {
+            return Err(fail("DESKTOP_IMAGE", "the desktop image is not built yet; run: w3bs fleet desktop start"));
+        }
+        let mut line = String::new();
+        std::io::stdin().read_line(&mut line).map_err(|e| fail("PASSWORD_READ", e.to_string()))?;
+        let pw = line.trim_end_matches(['\r', '\n']);
+        if pw.is_empty() {
+            return Err(Error::usage("EMPTY_PASSWORD", "give the password on stdin, e.g. read -rs p; printf '%s' \"$p\" | w3bs fleet desktop password"));
+        }
+        if pw.chars().count() > 8 {
+            notes.push("VNC uses only the first 8 characters; typing the whole password still works".to_string());
+        }
+        let mut child = Command::new("docker")
+            .args(["run", "--rm", "-i", "--network", "none", "--entrypoint", "vncpasswd", &tag, "-f"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| fail("DOCKER_UNAVAILABLE", e.to_string()))?;
+        {
+            use std::io::Write;
+            let mut stdin = child.stdin.take().expect("piped stdin");
+            stdin.write_all(pw.as_bytes()).map_err(|e| fail("DESKTOP_PASSWORD", e.to_string()))?;
+        }
+        let out = child.wait_with_output().map_err(|e| fail("DESKTOP_PASSWORD", e.to_string()))?;
+        if !out.status.success() || out.stdout.is_empty() {
+            return Err(fail("DESKTOP_PASSWORD", "vncpasswd failed in the desktop image; rebuild it: w3bs fleet desktop start --rebuild"));
+        }
+        let dir = file.parent().expect("passwd has a parent");
+        let mut b = std::fs::DirBuilder::new();
+        b.recursive(true);
+        #[cfg(unix)]
+        std::os::unix::fs::DirBuilderExt::mode(&mut b, 0o700);
+        b.create(dir).map_err(|e| fail("DESKTOP_DIR", format!("{}: {e}", dir.display())))?;
+        let mut o = std::fs::OpenOptions::new();
+        o.write(true).create(true).truncate(true);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut o, 0o600);
+        {
+            use std::io::Write;
+            o.open(&file).and_then(|mut f| f.write_all(&out.stdout)).map_err(|e| fail("DESKTOP_PASSWORD", format!("{}: {e}", file.display())))?;
+        }
+    }
+    let running = docker(&["inspect", "-f", "{{.Config.Image}}", CONTAINER]).ok();
+    let restarted = match running.as_deref() {
+        Some(image) if image == tag => docker(&["restart", CONTAINER]).is_ok(),
+        Some(_) => {
+            notes.push("the desktop runs an older image that ignores the password; run: w3bs fleet desktop start".to_string());
+            false
+        }
+        None => false,
+    };
+    Ok(json!({ "container": CONTAINER, "password": !off, "file": file, "restarted": restarted, "notes": notes }))
+}
+
 /// Register an agent on the desktop's layer and give the MCP line for it, with the token file
 /// as seen from the host.
 pub fn agent(name: &str, preset: &str) -> Result<Value> {

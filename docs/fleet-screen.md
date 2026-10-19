@@ -57,7 +57,7 @@ What is in the container:
   `http://127.0.0.1:7802/mcp` (not 7801, so it never clashes with a desktop layer on the host).
 - **TigerVNC's `w0vncserver`**, built from source in the image (Ubuntu's TigerVNC is too old to
   have it), listening only on a Unix socket in `~/.local/share/w3bs/desktop/vnc/` that only
-  your user can open. No TCP port, no VNC password to manage.
+  your user can open. No TCP port, and no VNC password unless you set one (below).
 - Its home directory is `~/.local/share/w3bs/desktop/home` on the host, kept across restarts.
 
 Give an AI agent the desktop:
@@ -76,6 +76,14 @@ w3bs fleet desktop logs              # container log; session logs are under hom
 w3bs fleet desktop start --rebuild   # rebuild the image (after a w3bs update changes it)
 w3bs fleet desktop start --geometry 2560x1440
 w3bs fleet desktop stop              # remove the container and stop sharing; home is kept
+```
+
+To have the screen page ask for a VNC password as well, give one on stdin; the desktop restarts
+with it (VNC uses only the first 8 characters, and typing the whole password still works):
+
+```sh
+read -rs p; printf '%s\n' "$p" | w3bs fleet desktop password
+w3bs fleet desktop password --off    # back to no password
 ```
 
 ## Turn it on (your own VNC server)

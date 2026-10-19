@@ -37,6 +37,7 @@ Apps:
              w3bs fleet screen on     let the fleet owner watch this desktop (VNC, view only)
              w3bs fleet view <m>      watch a machine's desktop in the browser
              w3bs fleet desktop start a headless Kubuntu desktop (Docker) for AI agents, shared there
+             w3bs fleet desktop password  ask for a VNC password on its screen page
              w3bs fleet --help        status, agent, leave, rm
   ab         w3bs ab ls               your A/B tests on w3bs.org/ab-testing (OpenABTest)
              w3bs ab new <id> --variant a --variant b   then start, show, pause, close
@@ -669,6 +670,12 @@ enum DesktopCmd {
     Status,
     /// The container's recent log, and where the session logs are
     Logs,
+    /// Ask for a VNC password on w3bs.org/fleet (read from stdin; first 8 characters count)
+    Password {
+        /// Remove the password (the owner-only socket is then the only lock)
+        #[arg(long)]
+        off: bool,
+    },
     /// Register an AI agent on the desktop and print its MCP setup (Claude Code)
     Agent {
         /// Agent name
@@ -1067,6 +1074,7 @@ async fn run_fleet(cmd: FleetCmd) -> (&'static str, w3bs_core::Result<OperationR
             DesktopCmd::Stop => local("fleet.desktop.stop", desktop::stop()),
             DesktopCmd::Status => local("fleet.desktop.status", desktop::status()),
             DesktopCmd::Logs => local("fleet.desktop.logs", desktop::logs()),
+            DesktopCmd::Password { off } => local("fleet.desktop.password", desktop::password(off)),
             DesktopCmd::Agent { name, preset } => local("fleet.desktop.agent", desktop::agent(&name, &preset)),
         },
         FleetCmd::View { machine, no_open, a } => ("fleet.view", account("fleet.view", &a, |o| async move { fleet::view(&o, &machine, !no_open).await }).await),

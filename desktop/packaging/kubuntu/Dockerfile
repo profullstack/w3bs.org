@@ -26,7 +26,8 @@ RUN curl -fsSL -o /tmp/tigervnc.tar.gz "https://github.com/TigerVNC/tigervnc/arc
 WORKDIR /build
 RUN cmake /src -DCMAKE_BUILD_TYPE=Release -DBUILD_VIEWER=OFF -DENABLE_NLS=OFF -DENABLE_GNUTLS=OFF \
       -DENABLE_NETTLE=OFF -DENABLE_H264=OFF -DENABLE_WAYLAND=ON -DINSTALL_SYSTEMD_UNITS=OFF \
-    && make -j"$(nproc)" w0vncserver && install -m 0755 unix/w0vncserver/w0vncserver /usr/local/bin/
+    && make -j"$(nproc)" w0vncserver vncpasswd \
+    && install -m 0755 unix/w0vncserver/w0vncserver unix/vncpasswd/vncpasswd /usr/local/bin/
 
 FROM ubuntu:26.04
 ARG DESKTOP_VERSION=0.5.0
@@ -48,7 +49,7 @@ RUN install -d -m 0755 /etc/apt/keyrings \
 COPY browser.sh /usr/local/bin/w3bs-browser
 # KWin asks for real-time scheduling, which a container's capability set does not grant.
 RUN setcap -r /usr/bin/kwin_wayland 2>/dev/null || true
-COPY --from=w0vncserver /usr/local/bin/w0vncserver /usr/local/bin/w0vncserver
+COPY --from=w0vncserver /usr/local/bin/w0vncserver /usr/local/bin/vncpasswd /usr/local/bin/
 RUN arch="$(uname -m)" \
     && base="https://github.com/profullstack/w3bs.org/releases/download/desktop-v${DESKTOP_VERSION}" \
     && file="w3bs-desktop-${DESKTOP_VERSION}-${arch}-unknown-linux-gnu.tar.gz" \
