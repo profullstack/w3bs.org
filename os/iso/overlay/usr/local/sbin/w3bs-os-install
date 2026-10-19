@@ -76,6 +76,7 @@ fail() {
 cleanup() {
 	[ -n "${CLEANED:-}" ] && return 0
 	CLEANED=1
+	[ -n "${SHIMDIR:-}" ] && rm -rf "$SHIMDIR"
 	if [ -d "$TARGET" ]; then
 		for m in dev/pts dev proc sys boot/efi boot ""; do
 			mountpoint -q "$TARGET/$m" 2>/dev/null && umount -l "$TARGET/$m" 2>/dev/null
@@ -402,26 +403,34 @@ log "answer file:"; cat "$WORK/answers" >>"$LOG"
 
 # setup-disk runs cryptsetup interactively; this shim feeds it the passphrase from a keyfile
 # in RAM so it is typed once, never passed on a command line, and never logged.
-mkdir -p "$WORK/bin"
+# Not under $WORK: Alpine mounts /run noexec, so the shell would skip the shim and run the
+# real cryptsetup, which then waits for a passphrase on a closed stdin. /tmp is on the live
+# root (tmpfs, exec allowed).
+SHIMDIR=/tmp/w3bs-os-install-bin
+rm -rf "$SHIMDIR" && mkdir -m 700 "$SHIMDIR" || fail "cannot create $SHIMDIR"
 REAL_CRYPTSETUP=$(command -v cryptsetup || echo /sbin/cryptsetup)
 if [ -n "$ENCRYPT" ]; then
 	(umask 077; printf '%s' "$LUKS_PASS" >"$WORK/luks.key")
-	cat >"$WORK/bin/cryptsetup" <<EOF
+	cat >"$SHIMDIR/cryptsetup" <<EOF
 #!/bin/sh
 real=\$(PATH=/usr/sbin:/sbin:/usr/bin:/bin command -v cryptsetup)
 case "\$1" in
-	luksFormat) shift; exec "\$real" luksFormat --key-file "$WORK/luks.key" "\$@" ;;
+	luksFormat)
+		shift
+		# --verify-passphrase is for typed passphrases; the key file is already verified.
+		for a do shift; [ "\$a" = --verify-passphrase ] || set -- "\$@" "\$a"; done
+		exec "\$real" luksFormat --key-file "$WORK/luks.key" "\$@" ;;
 	open|luksOpen) exec "\$real" "\$@" --key-file "$WORK/luks.key" ;;
 	*) exec "\$real" "\$@" ;;
 esac
 EOF
-	chmod 700 "$WORK/bin/cryptsetup"
+	chmod 700 "$SHIMDIR/cryptsetup"
 fi
 
 rm -f "$WORK/rc"
 KOPTS=quiet
 [ -n "$SERIAL" ] && KOPTS="quiet console=ttyS0,115200 console=tty0"
-( PATH="$WORK/bin:$PATH" ERASE_DISKS="$DISK" KERNELOPTS="$KOPTS" setup-alpine -e -f "$WORK/answers" </dev/null 2>&1; echo $? >"$WORK/rc" ) \
+( PATH="$SHIMDIR:$PATH" ERASE_DISKS="$DISK" KERNELOPTS="$KOPTS" setup-alpine -e -f "$WORK/answers" </dev/null 2>&1; echo $? >"$WORK/rc" ) \
 	| tee -a "$LOG"
 rc=$(cat "$WORK/rc" 2>/dev/null || echo 1)
 [ "$rc" = 0 ] || fail "setup-alpine/setup-disk exited with status $rc"
