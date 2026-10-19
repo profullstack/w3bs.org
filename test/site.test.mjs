@@ -120,16 +120,20 @@ test('CrawlProof: only for https://w3bs.org, never on pages that can carry accou
   }
 });
 
-test('/os is a specification page with no download button, fed by the suite manifest', async () => {
+test('/os offers only what exists: Docker now, the ISO and phones as coming, no iOS install', async () => {
   const t = await boot();
   try {
     const res = await fetch(`${t.base}/os`);
     assert.equal(res.status, 200);
     const html = await res.text();
     assert.match(html, /W3BS OS · SPECIFICATION/);
-    assert.match(html, /There are no images to download yet/);
     assert.match(html, /resolves <strong>\d+<\/strong> Profullstack packages/);
+    assert.match(html, /docker run -it --rm ghcr\.io\/profullstack\/w3bs-os:server/);
+    // No ISO link until OS_RELEASES.iso is set by a release that passed its checks.
+    assert.match(html, /PCS AND MACS · COMING/);
     assert.doesNotMatch(html, /\.iso"/);
+    assert.match(html, /nothing can replace iOS/);
+    assert.match(html, /Debug desktop and phone apps in one place/);
     const prd = await fetch(`${t.base}/docs/os-prd.md`);
     assert.equal(prd.status, 200);
     assert.match(await prd.text(), /^# W3BS OS Product Requirements/);
