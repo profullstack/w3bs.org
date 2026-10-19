@@ -5,6 +5,7 @@ import { ROOT } from './store.mjs';
 import { W3bsError } from './core.mjs';
 import { FLEET_LIMITS } from './fleet.mjs';
 import { TTL } from './accounts.mjs';
+import { buildSuite } from './os-suite.mjs';
 
 const e = (value) =>
   String(value ?? '').replace(
@@ -86,7 +87,7 @@ function header(active) {
     )}</nav><a class="header-account" href="/account" ${active === '/account' ? 'aria-current="page"' : ''}>Account</a><a class="header-action" href="/developers">Start building <span aria-hidden="true">↗</span></a></header>`;
 }
 function footer() {
-  return `<footer><div><a class="wordmark" href="/mission">w3bs<span class="wordmark-dot">.</span></a><p>Human-friendly. Agent-native.<br>Device-friendly. Open by design.</p><p class="footer-support"><strong>Need help?</strong> Email <a href="mailto:hello@w3bs.org">hello@w3bs.org</a> or ask on the <a href="/bbs/f/help">Help board</a>.</p></div><div><span class="eyebrow">FLEET AND ACCOUNTS</span><a href="/fleet">Your fleet</a><a href="/ab-testing">A/B testing</a><a href="/pricing">Pricing: Fleet is free</a><a href="/signup?next=%2Ffleet">Create an account</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><span class="eyebrow footer-gap">THE INITIATIVE</span><a href="/governance">Governance & participation</a><a href="/bbs">Community forums</a><a href="/social">W3BS Social (AT Protocol)</a><a href="/desktop">Agentic Desktop Layer</a><a href="/training">W3BS Training</a></div><div><span class="eyebrow">FOR IMPLEMENTERS</span><a href="/developers">Developer guide</a><a href="/packages">Packages and the w3bs CLI</a><a href="/docs/founding-prd.md">Founding PRD · v2.0</a><a href="/docs/roadmap.md">Implementation status</a><a href="/.well-known/w3bs.json">Machine discovery ↗</a><a href="/api">API reference ↗</a><a href="https://github.com/profullstack/w3bs.org" rel="noopener">Source on GitHub ↗</a></div><div class="footer-bottom"><span>Operated by Profullstack, Inc. Open standards for the Agentic Era.</span><span>Community drafts · No Recommendations issued</span></div></footer>`;
+  return `<footer><div><a class="wordmark" href="/mission">w3bs<span class="wordmark-dot">.</span></a><p>Human-friendly. Agent-native.<br>Device-friendly. Open by design.</p><p class="footer-support"><strong>Need help?</strong> Email <a href="mailto:hello@w3bs.org">hello@w3bs.org</a> or ask on the <a href="/bbs/f/help">Help board</a>.</p></div><div><span class="eyebrow">FLEET AND ACCOUNTS</span><a href="/fleet">Your fleet</a><a href="/ab-testing">A/B testing</a><a href="/pricing">Pricing: Fleet is free</a><a href="/signup?next=%2Ffleet">Create an account</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><span class="eyebrow footer-gap">THE INITIATIVE</span><a href="/governance">Governance & participation</a><a href="/bbs">Community forums</a><a href="/social">W3BS Social (AT Protocol)</a><a href="/desktop">Agentic Desktop Layer</a><a href="/training">W3BS Training</a><a href="/os">W3BS OS (specification)</a></div><div><span class="eyebrow">FOR IMPLEMENTERS</span><a href="/developers">Developer guide</a><a href="/packages">Packages and the w3bs CLI</a><a href="/docs/founding-prd.md">Founding PRD · v2.0</a><a href="/docs/roadmap.md">Implementation status</a><a href="/.well-known/w3bs.json">Machine discovery ↗</a><a href="/api">API reference ↗</a><a href="https://github.com/profullstack/w3bs.org" rel="noopener">Source on GitHub ↗</a></div><div class="footer-bottom"><span>Operated by Profullstack, Inc. Open standards for the Agentic Era.</span><span>Community drafts · No Recommendations issued</span></div></footer>`;
 }
 const INSTALL = 'curl -fsSL https://w3bs.org/install.sh | sh';
 // The campaign path: install the CLI, sign in, join a server, watch it on /fleet.
@@ -528,6 +529,11 @@ export async function renderPage({ path, host, query, store, origin }) {
   } else if (path === '/developers') {
     title = 'Build with W3BS';
     content = document('developers', title);
+  } else if (path === '/os') {
+    title = 'W3BS OS';
+    description =
+      'W3BS OS: a lightweight Ubuntu-based OS with KDE, zsh, the full Profullstack suite and an agent-operable desktop. Specification stage, no images yet.';
+    content = osPage();
   } else if (path === '/training') {
     title = 'W3BS Training';
     description =
@@ -544,6 +550,44 @@ export async function renderPage({ path, host, query, store, origin }) {
     active = '/specs';
   } else throw new W3bsError('NOT_FOUND', 'Page not found.', 404);
   return pageShell({ title, description, active, content, scripts });
+}
+function osSuiteSummary() {
+  try {
+    return buildSuite(JSON.parse(readFileSync(resolve(ROOT, 'catalog/catalog.json'), 'utf8'))).summary;
+  } catch {
+    return null;
+  }
+}
+function osPage() {
+  const suite = osSuiteSummary();
+  const rows = (list) => list.map(([a, b]) => `<tr><th scope="row">${a}</th><td>${b}</td></tr>`).join('');
+  const defaults = [
+    ['Base', 'Minimal Ubuntu 26.04 LTS'],
+    ['Desktop', 'KDE Plasma by default; GNOME selectable; LXQt and Xfce once qualified'],
+    ['Shell', 'zsh for new users; bash and fish selectable'],
+    ['Installer', 'Calamares wizard: hardware, language, keyboard, network, desktop, shell, account, disks and encryption, apps, review'],
+    ['Apps', 'The full Profullstack CLI and desktop suite, selected by default and present offline at first boot'],
+    ['Agents', 'Agentic Desktop Layer and W3BS Training preinstalled; observing, input and recording each need your permission'],
+    ['Account', 'Local login and installed apps work without a W3BS account'],
+  ];
+  const runtimes = [
+    ['Linux, Nix', 'Native'],
+    ['Windows', 'Wine/Proton per app; optional Windows guest with app windows'],
+    ['Android', 'Waydroid: real Android in a container, apps as desktop windows'],
+    ['macOS', 'Darling for command-line tools (GUI is research); otherwise your own Mac, labelled remote'],
+    ['iOS/iPadOS', 'Remote only: eligible apps on your Apple Silicon Mac, labelled'],
+  ];
+  const hardware = [
+    ['x86-64 PCs and laptops', 'Primary target; certified reference devices'],
+    ['Intel Macs (incl. T2)', 'Separate model tracks'],
+    ['Apple Silicon M1/M2, M3', 'Asahi-based, model by model; M3 preview'],
+    ['Android phones/tablets', 'W3BS Mobile on named unlockable models'],
+    ['Stock iPhone/iPad', 'Companion app, not an OS install'],
+  ];
+  const suiteLine = suite
+    ? `The draft suite manifest resolves <strong>${suite.entries}</strong> Profullstack packages from the <a class="inline-link" href="/packages">catalog</a>, including all ${suite.named} named inclusions (MoshCode, PairUX, DiskPush, the Agentic Desktop Layer, Training and more). <strong>${suite.blocking_tasks}</strong> packaging tasks block M0: ${suite.publisher_scripts} packages install only through publisher scripts and need signed artifacts, ${suite.unpinned} has no pinned release, and ${suite.command_collisions.length} command names have two claimants.`
+    : 'The draft suite manifest is generated from the package catalog.';
+  return `<section class="page-head"><div class="eyebrow">W3BS OS · SPECIFICATION</div><h1>An OS people<br><em>and agents can run.</em></h1><p>A lightweight Ubuntu-based operating system with KDE Plasma, zsh, a full setup wizard and every Profullstack app installed, plus a desktop agents can operate under your control. There are no images to download yet: this page tracks the specification and its progress.</p><div class="actions"><a class="button primary" href="/docs/os-prd.md">Read the specification <span aria-hidden="true">→</span></a><a class="text-link" href="https://github.com/profullstack/w3bs.org/blob/main/os/suite-manifest.json" rel="noopener">Suite manifest ↗</a></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">DEFAULTS</div><h2>What you get.</h2></div></div><div class="table-wrap"><table class="platform-table"><tbody>${rows(defaults)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">INCLUDED SOFTWARE</div><h2>The whole suite, offline.</h2></div></div><p>${suiteLine}</p></section><section class="section"><div class="section-heading"><div><div class="eyebrow">APPS FROM OTHER PLATFORMS</div><h2>One launcher, honest labels.</h2></div></div><p><code>w3bs run</code> picks the best route for each app and labels its window, so a remote or guest app is never passed off as local.</p><div class="table-wrap"><table class="platform-table"><tbody>${rows(runtimes)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">HARDWARE</div><h2>Certified, preview, research, unsupported.</h2></div></div><p>Only certified devices get an install button. A device with no supported image is offered the companion app instead.</p><div class="table-wrap"><table class="platform-table"><tbody>${rows(hardware)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">ALSO IN THE SPEC</div><h2>For publishers and developers.</h2></div></div><p><strong>W3BS Publish:</strong> ship one signed release and reach users on every OS, with deb, Flatpak, Homebrew, winget, MSIX, dmg and APK built from it. <strong>Providers:</strong> <code>w3bs install</code> drives apt, dnf, pacman, Homebrew, winget, Flatpak, Nix and the app stores, and records what it installed. <strong>W3BS Studio:</strong> an open-source IDE to build, run and debug for Linux, Android, Windows, macOS and iOS (Apple targets through your own Mac).</p></section><div class="draft-note"><strong>Status: specification.</strong> Milestone M0 (catalog and package foundation) is in progress. Image links and supported-hardware results appear here only once those artifacts and checks exist.</div>`;
 }
 const TRAINING_INSTALL = 'curl -fsSL https://w3bs.org/training/install.sh | sh';
 const TRAINING_INSTALL_WIN = 'irm https://w3bs.org/training/install.ps1 | iex';

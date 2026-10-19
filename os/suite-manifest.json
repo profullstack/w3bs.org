@@ -1,0 +1,2502 @@
+{
+  "format": "w3bs-os-suite/0.1",
+  "milestone": "M0",
+  "status": "draft",
+  "catalog_revision": null,
+  "summary": {
+    "entries": 64,
+    "named": 12,
+    "publisher_scripts": 64,
+    "unpinned": 1,
+    "command_collisions": [
+      {
+        "name": "openmcp",
+        "claimants": [
+          "logicsrc.com/openmcp",
+          "profullstack.com/cli-tools"
+        ],
+        "owner": "logicsrc.com/openmcp"
+      },
+      {
+        "name": "proxy",
+        "claimants": [
+          "profullstack.com/cli-tools",
+          "profullstack.com/proxy"
+        ],
+        "owner": "profullstack.com/proxy"
+      }
+    ],
+    "missing_named": [],
+    "uncataloged": [
+      "media2markdown"
+    ],
+    "blocking_tasks": 204
+  },
+  "entries": [
+    {
+      "id": "ad.network.pit.world/adnetwork",
+      "name": "adnetwork",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "adnetwork",
+          "owner": "ad.network.pit.world/adnetwork"
+        }
+      ],
+      "version": "0.1.3",
+      "repository": "https://github.com/moshcoder/ad.network",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "agenticjobs.work/agenticjobs",
+      "name": "agenticjobs",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "agenticjobs",
+          "owner": "agenticjobs.work/agenticjobs"
+        },
+        {
+          "name": "agenticjobs-mcp",
+          "owner": "agenticjobs.work/agenticjobs"
+        }
+      ],
+      "version": "0.22.4",
+      "repository": "https://github.com/profullstack/agenticjobs",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "b1dz.com/b1dz",
+      "name": "b1dz",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "b1dz",
+          "owner": "b1dz.com/b1dz"
+        }
+      ],
+      "version": "0.3.10",
+      "repository": "https://github.com/profullstack/b1dz.com",
+      "license": null,
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "bl0ggers.com/bl0ggers",
+      "name": "bl0ggers",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "bl0ggers",
+          "owner": "bl0ggers.com/bl0ggers"
+        }
+      ],
+      "version": "0.1.0",
+      "repository": null,
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "bufferoverride.com/bufferoverride",
+      "name": "bufferoverride",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "bo",
+          "owner": "bufferoverride.com/bufferoverride"
+        }
+      ],
+      "version": "0.1.0",
+      "repository": "https://github.com/profullstack/bufferoverride",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "built.indie.pit.world/builtindie",
+      "name": "builtindie",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "builtindie",
+          "owner": "built.indie.pit.world/builtindie"
+        }
+      ],
+      "version": "0.1.2",
+      "repository": "https://github.com/moshcoder/built.indie",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "c0mpute.com/c0mpute",
+      "name": "c0mpute",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "c0mpute",
+          "owner": "c0mpute.com/c0mpute"
+        }
+      ],
+      "version": "0.2.28",
+      "repository": "https://github.com/profullstack/c0mpute",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "c0upons.com/c0upons",
+      "name": "c0upons",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "c0upons",
+          "owner": "c0upons.com/c0upons"
+        }
+      ],
+      "version": "1.9.0",
+      "repository": "https://github.com/profullstack/c0upons",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "coinpayportal.com/coinpay",
+      "name": "coinpay",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "coinpay",
+          "owner": "coinpayportal.com/coinpay"
+        }
+      ],
+      "version": "0.16.0",
+      "repository": "https://github.com/profullstack/coinpayportal",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "crawlproof.com/crawlproof",
+      "name": "crawlproof",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "crawlproof",
+          "owner": "crawlproof.com/crawlproof"
+        }
+      ],
+      "version": "0.5.0",
+      "repository": "https://github.com/profullstack/crawlproof.com",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "d0rz.com/d0rz",
+      "name": "d0rz",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "d0rz",
+          "owner": "d0rz.com/d0rz"
+        }
+      ],
+      "version": "0.1.0",
+      "repository": null,
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "demo.movie/demomovie",
+      "name": "demomovie",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "mkdemo",
+          "owner": "demo.movie/demomovie"
+        }
+      ],
+      "version": "0.1.1",
+      "repository": null,
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "diskpush.com/diskpush",
+      "name": "diskpush",
+      "named": true,
+      "required_surfaces": [
+        "desktop",
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "diskpush",
+          "owner": "diskpush.com/diskpush"
+        }
+      ],
+      "version": "0.12.5",
+      "repository": "https://github.com/profullstack/diskpush",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "hdtilt.com/hdtilt",
+      "name": "hdtilt",
+      "named": true,
+      "required_surfaces": [
+        "desktop",
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "hdtilt",
+          "owner": "hdtilt.com/hdtilt"
+        }
+      ],
+      "version": "0.2.11",
+      "repository": "https://github.com/profullstack/hdtilt.com",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "hqterm.sh/hqterm",
+      "name": "hqterm",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "hqterm",
+          "owner": "hqterm.sh/hqterm"
+        },
+        {
+          "name": "hqsh",
+          "owner": "hqterm.sh/hqterm"
+        }
+      ],
+      "version": "0.4.1",
+      "repository": "https://github.com/profullstack/hqterm",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "hqtui.com/hqtui",
+      "name": "hqtui",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "hqtui",
+          "owner": "hqtui.com/hqtui"
+        }
+      ],
+      "version": "0.10.3",
+      "repository": "https://github.com/profullstack/hqtui",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "infernetprotocol.com/infernet",
+      "name": "infernet",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "infernet",
+          "owner": "infernetprotocol.com/infernet"
+        }
+      ],
+      "version": "0.1.59",
+      "repository": "https://github.com/InfernetProtocol/infernet-protocol",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "logicsrc.com/logicsrc",
+      "name": "logicsrc",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "logicsrc",
+          "owner": "logicsrc.com/logicsrc"
+        }
+      ],
+      "version": "0.7.0",
+      "repository": "https://github.com/profullstack/logicsrc",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "logicsrc.com/opencontext",
+      "name": "opencontext",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "opencontext",
+          "owner": "logicsrc.com/opencontext"
+        }
+      ],
+      "version": "0.1.0",
+      "repository": "https://github.com/profullstack/logicsrc",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "logicsrc.com/openmcp",
+      "name": "openmcp",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "openmcp",
+          "owner": "logicsrc.com/openmcp",
+          "alternates": [
+            "profullstack.com/cli-tools"
+          ]
+        }
+      ],
+      "version": "0.4.0",
+      "repository": "https://github.com/logicsrc/openmcp",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "mediaanalyzer.pro/mediaanalyzer",
+      "name": "mediaanalyzer",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "mediaanalyzer",
+          "owner": "mediaanalyzer.pro/mediaanalyzer"
+        }
+      ],
+      "version": "0.4.0",
+      "repository": null,
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "moshcode.sh/moshcode",
+      "name": "moshcode",
+      "named": true,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "moshcode",
+          "owner": "moshcode.sh/moshcode"
+        },
+        {
+          "name": "moshscript",
+          "owner": "moshcode.sh/moshcode"
+        }
+      ],
+      "version": "0.115.0",
+      "repository": "https://github.com/moshcoder/moshcode",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "mynaposter.com/myna",
+      "name": "myna",
+      "named": true,
+      "required_surfaces": [
+        "desktop",
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "myna",
+          "owner": "mynaposter.com/myna"
+        }
+      ],
+      "version": "0.44.2",
+      "repository": "https://github.com/profullstack/mynaposter",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "nichedb.dev/nichedb",
+      "name": "nichedb",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "nichedb",
+          "owner": "nichedb.dev/nichedb"
+        }
+      ],
+      "version": "0.42.0",
+      "repository": "https://github.com/profullstack/niche-db",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "nightcell7.com/nightcell7",
+      "name": "nightcell7",
+      "named": true,
+      "required_surfaces": [
+        "desktop"
+      ],
+      "commands": [
+        {
+          "name": "nightcell7",
+          "owner": "nightcell7.com/nightcell7"
+        }
+      ],
+      "version": "0.5.1",
+      "repository": "https://github.com/profullstack/nightcell7",
+      "license": "proprietary",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "nixamp.com/nixamp",
+      "name": "nixamp",
+      "named": true,
+      "required_surfaces": [
+        "desktop",
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "nixamp",
+          "owner": "nixamp.com/nixamp"
+        }
+      ],
+      "version": "0.28.44",
+      "repository": "https://github.com/profullstack/nixamp",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "outreachgraph.com/outreachgraph",
+      "name": "outreachgraph",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "og",
+          "owner": "outreachgraph.com/outreachgraph"
+        }
+      ],
+      "version": "0.16.3",
+      "repository": "https://github.com/profullstack/outreachgraph",
+      "license": "proprietary",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "p0dcasters.com/p0dcasters",
+      "name": "p0dcasters",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "p0d",
+          "owner": "p0dcasters.com/p0dcasters"
+        }
+      ],
+      "version": "0.1.0",
+      "repository": "https://github.com/profullstack/p0dcasters",
+      "license": null,
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "pairux.com/pairux",
+      "name": "pairux",
+      "named": true,
+      "required_surfaces": [
+        "desktop",
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "pairux",
+          "owner": "pairux.com/pairux"
+        }
+      ],
+      "version": null,
+      "repository": "https://github.com/profullstack/pairux.com",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "profullstack.com/ai",
+      "name": "ai",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "ai",
+          "owner": "profullstack.com/ai"
+        }
+      ],
+      "version": "1.1.1",
+      "repository": "https://github.com/profullstack/ai",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "profullstack.com/billing",
+      "name": "billing",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "billing",
+          "owner": "profullstack.com/billing"
+        }
+      ],
+      "version": "0.3.1",
+      "repository": "https://github.com/profullstack/billing",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "profullstack.com/cli-tools",
+      "name": "cli-tools",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "cli-tools",
+          "owner": "profullstack.com/cli-tools"
+        },
+        {
+          "name": "gh-prs",
+          "owner": "profullstack.com/cli-tools"
+        },
+        {
+          "name": "gh-prs-merge",
+          "owner": "profullstack.com/cli-tools"
+        },
+        {
+          "name": "websearch",
+          "owner": "profullstack.com/cli-tools"
+        },
+        {
+          "name": "ask-web",
+          "owner": "profullstack.com/cli-tools"
+        },
+        {
+          "name": "domainjson",
+          "owner": "profullstack.com/cli-tools"
+        },
+        {
+          "name": "domainfree",
+          "owner": "profullstack.com/cli-tools"
+        },
+        {
+          "name": "openinstall",
+          "owner": "profullstack.com/cli-tools"
+        },
+        {
+          "name": "openmcp",
+          "owner": "logicsrc.com/openmcp",
+          "shadowed": true,
+          "invoke_as": "cli-tools openmcp"
+        },
+        {
+          "name": "proxy",
+          "owner": "profullstack.com/proxy",
+          "shadowed": true,
+          "invoke_as": "cli-tools proxy"
+        },
+        {
+          "name": "codeburn",
+          "owner": "profullstack.com/cli-tools"
+        },
+        {
+          "name": "jobhunt",
+          "owner": "profullstack.com/cli-tools"
+        },
+        {
+          "name": "img",
+          "owner": "profullstack.com/cli-tools"
+        },
+        {
+          "name": "vid",
+          "owner": "profullstack.com/cli-tools"
+        },
+        {
+          "name": "dl",
+          "owner": "profullstack.com/cli-tools"
+        },
+        {
+          "name": "tts",
+          "owner": "profullstack.com/cli-tools"
+        }
+      ],
+      "version": "0.68.0",
+      "repository": "https://github.com/profullstack/cli-tools",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "profullstack.com/encrypt",
+      "name": "encrypt",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "pfencrypt",
+          "owner": "profullstack.com/encrypt"
+        }
+      ],
+      "version": "0.1.0",
+      "repository": "https://github.com/profullstack/encrypt",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "profullstack.com/g1tz",
+      "name": "g1tz",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "g1tz",
+          "owner": "profullstack.com/g1tz"
+        }
+      ],
+      "version": "0.2.2",
+      "repository": "https://github.com/profullstack/g1tz",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "profullstack.com/kali",
+      "name": "kali",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "kali",
+          "owner": "profullstack.com/kali"
+        }
+      ],
+      "version": "0.1.0",
+      "repository": "https://github.com/profullstack/kali",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "profullstack.com/orgs",
+      "name": "orgs",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "orgs",
+          "owner": "profullstack.com/orgs"
+        }
+      ],
+      "version": "0.2.0",
+      "repository": "https://github.com/profullstack/orgs",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "profullstack.com/proxy",
+      "name": "proxy",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "proxy",
+          "owner": "profullstack.com/proxy",
+          "alternates": [
+            "profullstack.com/cli-tools"
+          ]
+        }
+      ],
+      "version": "0.2.0",
+      "repository": "https://github.com/profullstack/proxy",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "profullstack.com/r3q",
+      "name": "r3q",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "r3q",
+          "owner": "profullstack.com/r3q"
+        }
+      ],
+      "version": "0.1.4",
+      "repository": "https://github.com/profullstack/r3q",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "profullstack.com/scanner",
+      "name": "scanner",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "scanner",
+          "owner": "profullstack.com/scanner"
+        }
+      ],
+      "version": "1.1.2",
+      "repository": "https://github.com/profullstack/scanner",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "profullstack.com/summary-forge",
+      "name": "summary-forge",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "summary",
+          "owner": "profullstack.com/summary-forge"
+        }
+      ],
+      "version": "1.10.2",
+      "repository": "https://github.com/profullstack/summary-forge-module",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "profullstack.com/timer",
+      "name": "timer",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "timer",
+          "owner": "profullstack.com/timer"
+        }
+      ],
+      "version": "0.2.0",
+      "repository": "https://github.com/profullstack/timer",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "profullstack.com/transcoder",
+      "name": "transcoder",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "transcoder",
+          "owner": "profullstack.com/transcoder"
+        },
+        {
+          "name": "install-ffmpeg",
+          "owner": "profullstack.com/transcoder"
+        },
+        {
+          "name": "install-imagemagick",
+          "owner": "profullstack.com/transcoder"
+        }
+      ],
+      "version": "1.9.14",
+      "repository": "https://github.com/profullstack/transcoder",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "profullstack.com/watchdog",
+      "name": "watchdog",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "watchdog-autoheal",
+          "owner": "profullstack.com/watchdog"
+        }
+      ],
+      "version": "0.3.0",
+      "repository": "https://github.com/profullstack/watchdog",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "profullstack.com/x402",
+      "name": "x402-client",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "x402",
+          "owner": "profullstack.com/x402"
+        }
+      ],
+      "version": "0.2.0",
+      "repository": "https://github.com/profullstack/x402-client",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "pwamart.com/pwamart",
+      "name": "pwamart",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "pwamart",
+          "owner": "pwamart.com/pwamart"
+        }
+      ],
+      "version": "0.6.0",
+      "repository": "https://github.com/profullstack/pwamart.com",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "qrypt.chat/qryptchat",
+      "name": "qryptchat",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "qc",
+          "owner": "qrypt.chat/qryptchat"
+        },
+        {
+          "name": "qryptchat",
+          "owner": "qrypt.chat/qryptchat"
+        }
+      ],
+      "version": "0.8.0",
+      "repository": "https://github.com/profullstack/qryptchat-web",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "r4ck.dev/r4ck",
+      "name": "r4ck",
+      "named": true,
+      "required_surfaces": [
+        "desktop",
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "r4ck",
+          "owner": "r4ck.dev/r4ck"
+        }
+      ],
+      "version": "0.1.0",
+      "repository": "https://github.com/profullstack/r4ck.dev",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "readm3.com/readm3",
+      "name": "readm3",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "readm3",
+          "owner": "readm3.com/readm3"
+        }
+      ],
+      "version": "0.14.0",
+      "repository": "https://github.com/profullstack/readm3",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "reeleel.com/reeleel",
+      "name": "reeleel",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "reeleel",
+          "owner": "reeleel.com/reeleel"
+        }
+      ],
+      "version": "0.4.0",
+      "repository": "https://github.com/profullstack/reeleel",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "ringhuman.com/ringhuman",
+      "name": "ringhuman",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "ringhuman",
+          "owner": "ringhuman.com/ringhuman"
+        }
+      ],
+      "version": "0.1.0",
+      "repository": null,
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "rssamplifier.com/rssamplifier",
+      "name": "rssamplifier",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "rssamplifier",
+          "owner": "rssamplifier.com/rssamplifier"
+        },
+        {
+          "name": "rssamp",
+          "owner": "rssamplifier.com/rssamplifier"
+        }
+      ],
+      "version": "0.4.0",
+      "repository": "https://github.com/profullstack/rssamplifier.com",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "saasrow.com/saasrow",
+      "name": "saasrow",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "saasrow",
+          "owner": "saasrow.com/saasrow"
+        }
+      ],
+      "version": "0.1.0",
+      "repository": "https://github.com/profullstack/saasrow-web",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "sh1pt.com/sh1pt",
+      "name": "sh1pt",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "sh1pt",
+          "owner": "sh1pt.com/sh1pt"
+        }
+      ],
+      "version": "0.3.5",
+      "repository": "https://github.com/profullstack/sh1pt",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "smshub.dev/smshub",
+      "name": "smshub",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "smshub-cli",
+          "owner": "smshub.dev/smshub"
+        }
+      ],
+      "version": "1.4.0",
+      "repository": "https://github.com/profullstack/smshub",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "submitfleet.com/submitfleet",
+      "name": "submitfleet",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "submitfleet",
+          "owner": "submitfleet.com/submitfleet"
+        }
+      ],
+      "version": "0.3.0",
+      "repository": "https://github.com/profullstack/submitfleet",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "threatcrush.com/threatcrush",
+      "name": "threatcrush",
+      "named": true,
+      "required_surfaces": [
+        "desktop",
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "threatcrush",
+          "owner": "threatcrush.com/threatcrush"
+        }
+      ],
+      "version": "0.13.28",
+      "repository": "https://github.com/profullstack/threatcrush",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "tleehealth.com/tleehealth",
+      "name": "tleehealth",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "tleehealth",
+          "owner": "tleehealth.com/tleehealth"
+        }
+      ],
+      "version": "0.4.1",
+      "repository": "https://github.com/profullstack/tleehealth.com",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "tronbrowser.dev/tronbrowser",
+      "name": "tronbrowser",
+      "named": true,
+      "required_surfaces": [
+        "desktop",
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "tron",
+          "owner": "tronbrowser.dev/tronbrowser"
+        },
+        {
+          "name": "tronbrowser",
+          "owner": "tronbrowser.dev/tronbrowser"
+        }
+      ],
+      "version": "3.16.1",
+      "repository": "https://github.com/profullstack/tronbrowser.dev",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "typeheard.com/typeheard",
+      "name": "typeheard",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "typeheard",
+          "owner": "typeheard.com/typeheard"
+        }
+      ],
+      "version": "0.1.0",
+      "repository": "https://github.com/profullstack/typeheard.com",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "ugig.net/ugig",
+      "name": "ugig",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "ugig",
+          "owner": "ugig.net/ugig"
+        }
+      ],
+      "version": "0.3.0",
+      "repository": "https://github.com/profullstack/ugig.net",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "w3bs.org/agentic-desktop-layer",
+      "name": "agentic-desktop-layer",
+      "named": true,
+      "required_surfaces": [
+        "desktop",
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "w3bs-desktop",
+          "owner": "w3bs.org/agentic-desktop-layer"
+        }
+      ],
+      "version": "0.5.0",
+      "repository": "https://github.com/profullstack/w3bs.org/tree/main/desktop",
+      "license": "Apache-2.0",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "w3bs.org/w3bs-training",
+      "name": "w3bs-training",
+      "named": true,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "w3bs-training",
+          "owner": "w3bs.org/w3bs-training"
+        }
+      ],
+      "version": "0.2.5",
+      "repository": "https://github.com/profullstack/w3bs.org/tree/main/training",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "wx93.me/wx93",
+      "name": "wx93",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "wx93",
+          "owner": "wx93.me/wx93"
+        }
+      ],
+      "version": "0.1.0",
+      "repository": "https://github.com/profullstack/wx93.me",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    },
+    {
+      "id": "wx93.me/wx93-mcp",
+      "name": "wx93-mcp",
+      "named": false,
+      "required_surfaces": [
+        "cli"
+      ],
+      "commands": [
+        {
+          "name": "wx93-mcp",
+          "owner": "wx93.me/wx93-mcp"
+        }
+      ],
+      "version": "0.1.0",
+      "repository": "https://github.com/profullstack/wx93.me",
+      "license": "MIT",
+      "install_today": "publisher-script",
+      "update_owner": null,
+      "targets": {
+        "linux-x86_64": "unqualified",
+        "linux-aarch64": "unqualified"
+      },
+      "status": "unresolved"
+    }
+  ],
+  "blocking": [
+    {
+      "id": "ad.network.pit.world/adnetwork",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "ad.network.pit.world/adnetwork",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "ad.network.pit.world/adnetwork",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "agenticjobs.work/agenticjobs",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "agenticjobs.work/agenticjobs",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "agenticjobs.work/agenticjobs",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "b1dz.com/b1dz",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "b1dz.com/b1dz",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "b1dz.com/b1dz",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "bl0ggers.com/bl0ggers",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "bl0ggers.com/bl0ggers",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "bl0ggers.com/bl0ggers",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "bufferoverride.com/bufferoverride",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "bufferoverride.com/bufferoverride",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "bufferoverride.com/bufferoverride",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "built.indie.pit.world/builtindie",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "built.indie.pit.world/builtindie",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "built.indie.pit.world/builtindie",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "c0mpute.com/c0mpute",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "c0mpute.com/c0mpute",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "c0mpute.com/c0mpute",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "c0upons.com/c0upons",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "c0upons.com/c0upons",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "c0upons.com/c0upons",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "coinpayportal.com/coinpay",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "coinpayportal.com/coinpay",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "coinpayportal.com/coinpay",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "crawlproof.com/crawlproof",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "crawlproof.com/crawlproof",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "crawlproof.com/crawlproof",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "d0rz.com/d0rz",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "d0rz.com/d0rz",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "d0rz.com/d0rz",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "demo.movie/demomovie",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "demo.movie/demomovie",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "demo.movie/demomovie",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "diskpush.com/diskpush",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "diskpush.com/diskpush",
+      "task": "qualify the Linux desktop artifact and .desktop entry"
+    },
+    {
+      "id": "diskpush.com/diskpush",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "diskpush.com/diskpush",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "hdtilt.com/hdtilt",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "hdtilt.com/hdtilt",
+      "task": "qualify the Linux desktop artifact and .desktop entry"
+    },
+    {
+      "id": "hdtilt.com/hdtilt",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "hdtilt.com/hdtilt",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "hqterm.sh/hqterm",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "hqterm.sh/hqterm",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "hqterm.sh/hqterm",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "hqtui.com/hqtui",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "hqtui.com/hqtui",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "hqtui.com/hqtui",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "infernetprotocol.com/infernet",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "infernetprotocol.com/infernet",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "infernetprotocol.com/infernet",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "logicsrc.com/logicsrc",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "logicsrc.com/logicsrc",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "logicsrc.com/logicsrc",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "logicsrc.com/opencontext",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "logicsrc.com/opencontext",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "logicsrc.com/opencontext",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "logicsrc.com/openmcp",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "logicsrc.com/openmcp",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "logicsrc.com/openmcp",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "mediaanalyzer.pro/mediaanalyzer",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "mediaanalyzer.pro/mediaanalyzer",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "mediaanalyzer.pro/mediaanalyzer",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "moshcode.sh/moshcode",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "moshcode.sh/moshcode",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "moshcode.sh/moshcode",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "mynaposter.com/myna",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "mynaposter.com/myna",
+      "task": "qualify the Linux desktop artifact and .desktop entry"
+    },
+    {
+      "id": "mynaposter.com/myna",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "mynaposter.com/myna",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "nichedb.dev/nichedb",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "nichedb.dev/nichedb",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "nichedb.dev/nichedb",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "nightcell7.com/nightcell7",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "nightcell7.com/nightcell7",
+      "task": "qualify the Linux desktop artifact and .desktop entry"
+    },
+    {
+      "id": "nightcell7.com/nightcell7",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "nightcell7.com/nightcell7",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "nixamp.com/nixamp",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "nixamp.com/nixamp",
+      "task": "qualify the Linux desktop artifact and .desktop entry"
+    },
+    {
+      "id": "nixamp.com/nixamp",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "nixamp.com/nixamp",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "outreachgraph.com/outreachgraph",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "outreachgraph.com/outreachgraph",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "outreachgraph.com/outreachgraph",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "p0dcasters.com/p0dcasters",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "p0dcasters.com/p0dcasters",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "p0dcasters.com/p0dcasters",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "pairux.com/pairux",
+      "task": "pin a release version"
+    },
+    {
+      "id": "pairux.com/pairux",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "pairux.com/pairux",
+      "task": "qualify the Linux desktop artifact and .desktop entry"
+    },
+    {
+      "id": "pairux.com/pairux",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "pairux.com/pairux",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "profullstack.com/ai",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "profullstack.com/ai",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "profullstack.com/ai",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "profullstack.com/billing",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "profullstack.com/billing",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "profullstack.com/billing",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "profullstack.com/cli-tools",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "profullstack.com/cli-tools",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "profullstack.com/cli-tools",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "profullstack.com/encrypt",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "profullstack.com/encrypt",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "profullstack.com/encrypt",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "profullstack.com/g1tz",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "profullstack.com/g1tz",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "profullstack.com/g1tz",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "profullstack.com/kali",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "profullstack.com/kali",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "profullstack.com/kali",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "profullstack.com/orgs",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "profullstack.com/orgs",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "profullstack.com/orgs",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "profullstack.com/proxy",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "profullstack.com/proxy",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "profullstack.com/proxy",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "profullstack.com/r3q",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "profullstack.com/r3q",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "profullstack.com/r3q",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "profullstack.com/scanner",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "profullstack.com/scanner",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "profullstack.com/scanner",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "profullstack.com/summary-forge",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "profullstack.com/summary-forge",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "profullstack.com/summary-forge",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "profullstack.com/timer",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "profullstack.com/timer",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "profullstack.com/timer",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "profullstack.com/transcoder",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "profullstack.com/transcoder",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "profullstack.com/transcoder",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "profullstack.com/watchdog",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "profullstack.com/watchdog",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "profullstack.com/watchdog",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "profullstack.com/x402",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "profullstack.com/x402",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "profullstack.com/x402",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "pwamart.com/pwamart",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "pwamart.com/pwamart",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "pwamart.com/pwamart",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "qrypt.chat/qryptchat",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "qrypt.chat/qryptchat",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "qrypt.chat/qryptchat",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "r4ck.dev/r4ck",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "r4ck.dev/r4ck",
+      "task": "qualify the Linux desktop artifact and .desktop entry"
+    },
+    {
+      "id": "r4ck.dev/r4ck",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "r4ck.dev/r4ck",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "readm3.com/readm3",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "readm3.com/readm3",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "readm3.com/readm3",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "reeleel.com/reeleel",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "reeleel.com/reeleel",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "reeleel.com/reeleel",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "ringhuman.com/ringhuman",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "ringhuman.com/ringhuman",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "ringhuman.com/ringhuman",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "rssamplifier.com/rssamplifier",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "rssamplifier.com/rssamplifier",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "rssamplifier.com/rssamplifier",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "saasrow.com/saasrow",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "saasrow.com/saasrow",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "saasrow.com/saasrow",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "sh1pt.com/sh1pt",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "sh1pt.com/sh1pt",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "sh1pt.com/sh1pt",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "smshub.dev/smshub",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "smshub.dev/smshub",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "smshub.dev/smshub",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "submitfleet.com/submitfleet",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "submitfleet.com/submitfleet",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "submitfleet.com/submitfleet",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "threatcrush.com/threatcrush",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "threatcrush.com/threatcrush",
+      "task": "qualify the Linux desktop artifact and .desktop entry"
+    },
+    {
+      "id": "threatcrush.com/threatcrush",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "threatcrush.com/threatcrush",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "tleehealth.com/tleehealth",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "tleehealth.com/tleehealth",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "tleehealth.com/tleehealth",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "tronbrowser.dev/tronbrowser",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "tronbrowser.dev/tronbrowser",
+      "task": "qualify the Linux desktop artifact and .desktop entry"
+    },
+    {
+      "id": "tronbrowser.dev/tronbrowser",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "tronbrowser.dev/tronbrowser",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "typeheard.com/typeheard",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "typeheard.com/typeheard",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "typeheard.com/typeheard",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "ugig.net/ugig",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "ugig.net/ugig",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "ugig.net/ugig",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "w3bs.org/agentic-desktop-layer",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "w3bs.org/agentic-desktop-layer",
+      "task": "qualify the Linux desktop artifact and .desktop entry"
+    },
+    {
+      "id": "w3bs.org/agentic-desktop-layer",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "w3bs.org/agentic-desktop-layer",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "w3bs.org/w3bs-training",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "w3bs.org/w3bs-training",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "w3bs.org/w3bs-training",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "wx93.me/wx93",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "wx93.me/wx93",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "wx93.me/wx93",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "wx93.me/wx93-mcp",
+      "task": "publish a signed artifact (deb or W3BS native) for linux-x86_64 and linux-aarch64"
+    },
+    {
+      "id": "wx93.me/wx93-mcp",
+      "task": "record checksum, license, executables and receipt owner"
+    },
+    {
+      "id": "wx93.me/wx93-mcp",
+      "task": "pass CLI discovery + launch check in a W3BS OS image"
+    },
+    {
+      "id": "media2markdown",
+      "task": "add a catalog entry (desktop product missing from the catalog)"
+    }
+  ]
+}
