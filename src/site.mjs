@@ -789,6 +789,10 @@ async function osPage() {
     ['Desktop', 'KDE Plasma by default; GNOME selectable; LXQt and Xfce once qualified'],
     ['Shell', 'zsh for new users; bash and fish selectable'],
     [
+      'Web server',
+      'Caddy: hosts, reverse proxies and static sites with automatic HTTPS and IPv6 by default; drop a file in /etc/caddy/sites to add a site',
+    ],
+    [
       'Installer',
       'Terminal and graphical wizards on one engine, with sane defaults: largest disk erased, LUKS2 encryption, KDE, zsh, the full suite; one review screen before anything is written',
     ],
