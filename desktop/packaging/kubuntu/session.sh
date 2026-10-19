@@ -75,8 +75,12 @@ flatpak permission-set screenshot screenshot "" yes
 plasmashell >"$LOGS/plasmashell.log" 2>&1 &
 konsole >"$LOGS/konsole.log" 2>&1 &
 
-# The VNC server: a Unix socket only, owner-only (0600), no password (the socket is the lock).
-w0vncserver -rfbport -1 -rfbunixpath /vnc/vnc.sock -SecurityTypes None -AlwaysShared \
+# The VNC server: a Unix socket only, owner-only (0600). No password (the socket is the lock)
+# unless `w3bs fleet desktop password` set one; then the w3bs.org page asks for it.
+PASSWD=$HOME/.config/tigervnc/passwd
+if [ -s "$PASSWD" ]; then SECURITY="-SecurityTypes VncAuth -PasswordFile $PASSWD"; else SECURITY="-SecurityTypes None"; fi
+# shellcheck disable=SC2086
+w0vncserver -rfbport -1 -rfbunixpath /vnc/vnc.sock $SECURITY -AlwaysShared \
   -desktop "w3bs desktop" >"$LOGS/w0vncserver.log" 2>&1 &
 W0=$!
 
