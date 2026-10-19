@@ -76,7 +76,7 @@ fail() {
 cleanup() {
 	[ -n "${CLEANED:-}" ] && return 0
 	CLEANED=1
-	[ -n "${SHIMDIR:-}" ] && rm -rf "$SHIMDIR"
+	[ -n "${SHIM:-}" ] && rm -f "$SHIM"
 	if [ -d "$TARGET" ]; then
 		for m in dev/pts dev proc sys boot/efi boot ""; do
 			mountpoint -q "$TARGET/$m" 2>/dev/null && umount -l "$TARGET/$m" 2>/dev/null
@@ -403,15 +403,14 @@ log "answer file:"; cat "$WORK/answers" >>"$LOG"
 
 # setup-disk runs cryptsetup interactively; this shim feeds it the passphrase from a keyfile
 # in RAM so it is typed once, never passed on a command line, and never logged.
-# Not under $WORK: Alpine mounts /run noexec, so the shell would skip the shim and run the
-# real cryptsetup, which then waits for a passphrase on a closed stdin. /tmp is on the live
-# root (tmpfs, exec allowed).
-SHIMDIR=/tmp/w3bs-os-install-bin
-rm -rf "$SHIMDIR" && mkdir -m 700 "$SHIMDIR" || fail "cannot create $SHIMDIR"
+# It is /usr/local/sbin/cryptsetup on the live system (RAM), not a directory prepended to
+# PATH: setup-alpine sources /etc/profile, which resets PATH, and /usr/local/sbin is first
+# in that PATH. The shim finds the real cryptsetup outside /usr/local; cleanup removes it.
+SHIM=/usr/local/sbin/cryptsetup
 REAL_CRYPTSETUP=$(command -v cryptsetup || echo /sbin/cryptsetup)
 if [ -n "$ENCRYPT" ]; then
 	(umask 077; printf '%s' "$LUKS_PASS" >"$WORK/luks.key")
-	cat >"$SHIMDIR/cryptsetup" <<EOF
+	cat >"$SHIM" <<EOF
 #!/bin/sh
 real=\$(PATH=/usr/sbin:/sbin:/usr/bin:/bin command -v cryptsetup)
 case "\$1" in
@@ -424,13 +423,13 @@ case "\$1" in
 	*) exec "\$real" "\$@" ;;
 esac
 EOF
-	chmod 700 "$SHIMDIR/cryptsetup"
+	chmod 700 "$SHIM"
 fi
 
 rm -f "$WORK/rc"
 KOPTS=quiet
 [ -n "$SERIAL" ] && KOPTS="quiet console=ttyS0,115200 console=tty0"
-( PATH="$SHIMDIR:$PATH" ERASE_DISKS="$DISK" KERNELOPTS="$KOPTS" setup-alpine -e -f "$WORK/answers" </dev/null 2>&1; echo $? >"$WORK/rc" ) \
+( ERASE_DISKS="$DISK" KERNELOPTS="$KOPTS" setup-alpine -e -f "$WORK/answers" </dev/null 2>&1; echo $? >"$WORK/rc" ) \
 	| tee -a "$LOG"
 rc=$(cat "$WORK/rc" 2>/dev/null || echo 1)
 [ "$rc" = 0 ] || fail "setup-alpine/setup-disk exited with status $rc"
@@ -619,7 +618,7 @@ in_target /usr/local/bin/w3bs-desktop --version >>"$LOG" 2>&1 || fail "w3bs-desk
 
 # --- remove live-only configuration that setup-disk copied over -------------------------
 step "Finishing"
-rm -f "$TARGET/etc/profile.d/w3bs-os-live.sh" "$TARGET/usr/local/sbin/w3bs-os-install" \
+rm -f "$TARGET/usr/local/sbin/cryptsetup" "$TARGET/etc/profile.d/w3bs-os-live.sh" "$TARGET/usr/local/sbin/w3bs-os-install" \
 	"$TARGET/usr/local/sbin/w3bs-os-serial-getty" "$TARGET/etc/w3bs-os/live" "$TARGET/etc/motd.w3bs-live"
 install -m 0644 /usr/share/w3bs-os/inittab.installed "$TARGET/etc/inittab" || fail "cannot write /etc/inittab"
 if [ -n "$SERIAL" ]; then
