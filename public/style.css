@@ -2316,4 +2316,61 @@ footer.pfs-footer {
 }
 footer.pfs-footer p {
   margin-top: 0;
+/* /browse: Moshpit names, pit.world gateways, examples and CLI */
+.browse-open .button {
+  margin-left: auto;
+}
+.browse-open .text-link {
+  font-size: 13px;
+}
+.browse-note {
+  font-size: 13px;
+  margin: -12px 0 24px;
+}
+.browse-group {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 28px 0 14px;
+}
+.browse-card h2 {
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+.browse-cli .inspector-panel {
+  padding-top: 8px;
+}
+.browse-detail .metadata dd {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 720px) {
+  .browse-open .button {
+    margin-left: 0;
+  }
+  .browse-examples .prompt-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .browse-card {
+    padding: 14px 14px 0;
+  }
+  .browse-card h2 {
+    font-size: 18px;
+    margin: 14px 0 8px;
+  }
+  .browse-card p {
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
+  .browse-card > code {
+    display: none;
+  }
+  .browse-card .prompt-bottom {
+    padding: 10px 0;
+    margin-top: 8px;
+  }
+  .browse-cli .usage-steps code {
+    font-size: 12px;
+  }
 }

@@ -79,10 +79,14 @@ export async function conformance() {
       ['stdio', stdioClient],
     ]) {
       const tools = await client.listTools();
-      assert.equal(tools.tools.length, 10, `${name} missing shared operations`);
+      assert.equal(tools.tools.length, 11, `${name} missing shared operations`);
       assert.ok(
         tools.tools.some((tool) => tool.name === 'w3bs_packages'),
         `${name} is missing the package catalog`,
+      );
+      assert.ok(
+        tools.tools.some((tool) => tool.name === 'w3bs_browse'),
+        `${name} is missing browse`,
       );
       const denied = await client.callTool({
         name: 'w3bs_run',
