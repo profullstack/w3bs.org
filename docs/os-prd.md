@@ -62,7 +62,7 @@ Consequences that the build must handle:
 | Kernel and boot packages | Alpine `linux-lts`/`linux-stable` on PCs; Nura device kernels (including the Asahi kernel) on phones and Apple Silicon; a W3BS T2 kernel package |
 | Desktop shell | KDE Plasma/KWin by default, with a separate GNOME profile |
 | Additional desktops | LXQt and Xfce profiles with explicit session and agent-capability qualification |
-| Installer | Calamares on PCs (packaged in Alpine) with W3BS modules; Nura's flashing tools on phones; `docker run` for containers |
+| Installer | The W3BS installer (§4): one engine with a terminal wizard and a Qt/QML graphical wizard; Nura's flashing tools on phones; `docker run` for containers |
 | Qt system interfaces | Qt/QML or native desktop integration for installer, panel controls and OS settings |
 | Existing product interfaces | Preserve each product's existing desktop implementation and bundled CLI |
 | Desktop automation | Reuse the existing W3BS broker and adapters |
@@ -92,7 +92,26 @@ Use a simple, fast prompt with useful git information. Optional plugins must not
 
 ## 4 Installation wizard
 
-Use Calamares for the ordinary Linux installation framework. Its module architecture covers the standard setup sequence and can be extended with W3BS-specific configuration. Desktop-profile resolution and a visible shell selector are product work, not capabilities to assume already wired together. [Calamares user's guide](https://calamares.io/docs/users-guide/)
+Alpine installs natively on hardware and runs full desktops (`setup-desktop` offers Plasma, GNOME and Xfce), but its only installer is `setup-alpine`, a sequence of text prompts, and Calamares is not packaged in Alpine (checked on 3.24 and edge, October 19, 2026). W3BS OS therefore ships its own installer:
+
+- **One engine, `w3bs-installer`,** that takes an install plan (JSON: disk layout, encryption, filesystem, desktop, shell, user, hostname, locale, keyboard, packages) and carries it out with Alpine's own tools (`setup-disk`, `apk`, `setup-user`, bootloader install), reporting progress as JSON lines. Both wizards only build plans; neither touches a disk itself.
+- **Terminal wizard, `w3bs os install`,** built on hqtui. It works on the console, over serial and over SSH. `w3bs os install --defaults --disk /dev/nvme0n1` installs unattended; `--plan plan.json` replays a saved plan.
+- **Graphical wizard** on the live desktop USB: a Qt/QML app (matching the KDE default) with the same steps, launched automatically when the live session starts, with "Try W3BS OS" beside it.
+
+Sane defaults, so a person can press Install after one review screen:
+
+| Choice | Default |
+| --- | --- |
+| Disk | The largest internal disk, erased (other layouts on request) |
+| Encryption | LUKS2 full-disk encryption on, passphrase asked once |
+| Filesystem | btrfs with `@` and `@home` subvolumes, zstd compression |
+| Boot | UEFI with systemd-boot; legacy BIOS with GRUB only when UEFI is absent |
+| Desktop | KDE Plasma (Wayland) |
+| Shell | zsh |
+| Software | The full Profullstack suite (§5) |
+| Agents | Agentic Desktop Layer installed, agent access off |
+| Locale, keyboard, timezone | Detected from the live session or the network, shown for confirmation |
+| Swap | zram |
 
 | Step | User choices and required behavior |
 | --- | --- |
@@ -536,7 +555,7 @@ The first published W3BS OS artifacts are container images, because Alpine is al
 | Image | Contents | Use |
 | --- | --- | --- |
 | `ghcr.io/profullstack/w3bs-os:server` | Alpine stable, zsh, the `w3bs` CLI, the suite's CLIs that have musl builds, OpenRC-free single-process entry | Servers, CI, agent sandboxes; `w3bs fleet join` works inside |
-| `ghcr.io/profullstack/w3bs-os:desktop` | `server` + KDE Plasma (Wayland, software rendering) + the Agentic Desktop Layer installed and visible in the panel + a VNC/noVNC endpoint | A desktop agents can operate, viewable from w3bs.org/fleet screens |
+| `ghcr.io/profullstack/w3bs-os:desktop` | `server` + KDE Plasma (Wayland, software rendering on a host vkms display) + the Agentic Desktop Layer + Chromium + VNC on an owner-only socket, and on TCP 5900 when a password is set | A desktop agents can operate, viewable from w3bs.org/fleet screens or any VNC viewer |
 
 Rules:
 
