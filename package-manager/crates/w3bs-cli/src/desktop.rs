@@ -25,6 +25,8 @@ const DOCKERFILE: &str = include_str!("../../../../desktop/packaging/kubuntu/Doc
 const SESSION: &str = include_str!("../../../../desktop/packaging/kubuntu/session.sh");
 const BROWSER: &str = include_str!("../../../../desktop/packaging/kubuntu/browser.sh");
 const START_TIMEOUT: Duration = Duration::from_secs(120);
+/// Every DRM device node (major 226), whatever number it gets.
+const DRM_RULE: &str = "c 226:* rwm";
 
 fn fail(code: &'static str, msg: impl Into<String>) -> Error {
     Error::package(code, msg.into())
@@ -197,13 +199,16 @@ pub fn start(control: bool, geometry: Option<&str>, rebuild: bool) -> Result<Val
     let _ = docker(&["rm", "-f", CONTAINER]);
     let (uid, gid) = ids();
     let user = format!("{uid}:{gid}");
+    // /dev/dri bound whole with a DRM cgroup rule, not `--device /dev/dri/cardN`: card numbers
+    // change across reboots, and Docker will not restart a container whose device has gone, so
+    // the desktop stayed down after one. session.sh finds the vkms card itself.
     let device = card.display().to_string();
     let card_gid = gid_of(&card).map(|g| g.to_string());
     let home = format!("{}:/home/desktop", dir.join("home").display());
     let vnc = format!("{}:/vnc", dir.join("vnc").display());
     let geometry_env = format!("W3BS_GEOMETRY={}", geometry.unwrap_or("1920x1080"));
     let mcp_env = format!("W3BS_MCP={MCP}");
-    let mut args = vec!["run", "-d", "--name", CONTAINER, "--restart", "unless-stopped", "--network", "host", "--user", &user, "--shm-size", "512m", "--device", &device];
+    let mut args = vec!["run", "-d", "--name", CONTAINER, "--restart", "unless-stopped", "--network", "host", "--user", &user, "--shm-size", "512m", "--device-cgroup-rule", DRM_RULE, "-v", "/dev/dri:/dev/dri"];
     if let Some(g) = card_gid.as_deref() {
         args.extend(["--group-add", g]);
     }
