@@ -17,7 +17,8 @@
       "repository": "https://github.com/moshcoder/moshcode",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.119.0"
     },
     {
       "id": "profullstack.com/cli-tools",
@@ -49,7 +50,8 @@
       "repository": "https://github.com/profullstack/cli-tools",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.69.0"
     },
     {
       "id": "mynaposter.com/myna",
@@ -66,7 +68,8 @@
       "repository": "https://github.com/profullstack/mynaposter",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.44.4"
     },
     {
       "id": "sh1pt.com/sh1pt",
@@ -83,7 +86,8 @@
       "repository": "https://github.com/profullstack/sh1pt",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.3.5"
     },
     {
       "id": "logicsrc.com/logicsrc",
@@ -100,7 +104,8 @@
       "repository": "https://github.com/profullstack/logicsrc",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.7.0"
     },
     {
       "id": "logicsrc.com/openmcp",
@@ -117,7 +122,8 @@
       "repository": "https://github.com/logicsrc/openmcp",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.4.0"
     },
     {
       "id": "agenticjobs.work/agenticjobs",
@@ -135,7 +141,8 @@
       "repository": "https://github.com/profullstack/agenticjobs",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.22.5"
     },
     {
       "id": "hqterm.sh/hqterm",
@@ -153,7 +160,8 @@
       "repository": "https://github.com/profullstack/hqterm",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.4.2"
     },
     {
       "id": "c0mpute.com/c0mpute",
@@ -170,7 +178,8 @@
       "repository": "https://github.com/profullstack/c0mpute",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.2.31"
     },
     {
       "id": "infernetprotocol.com/infernet",
@@ -187,7 +196,8 @@
       "repository": "https://github.com/InfernetProtocol/infernet-protocol",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.1.61"
     },
     {
       "id": "diskpush.com/diskpush",
@@ -204,7 +214,8 @@
       "repository": "https://github.com/profullstack/diskpush",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.16.2"
     },
     {
       "id": "nixamp.com/nixamp",
@@ -221,7 +232,8 @@
       "repository": "https://github.com/profullstack/nixamp",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.44.0"
     },
     {
       "id": "threatcrush.com/threatcrush",
@@ -238,7 +250,8 @@
       "repository": "https://github.com/profullstack/threatcrush",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.13.28"
     },
     {
       "id": "coinpayportal.com/coinpay",
@@ -255,7 +268,8 @@
       "repository": "https://github.com/profullstack/coinpayportal",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "1.0.0"
     },
     {
       "id": "ugig.net/ugig",
@@ -272,7 +286,8 @@
       "repository": "https://github.com/profullstack/ugig.net",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "1.1.19"
     },
     {
       "id": "rssamplifier.com/rssamplifier",
@@ -290,7 +305,8 @@
       "repository": "https://github.com/profullstack/rssamplifier.com",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.4.0"
     },
     {
       "id": "wx93.me/wx93",
@@ -307,7 +323,8 @@
       "repository": "https://github.com/profullstack/wx93.me",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.1.0"
     },
     {
       "id": "tronbrowser.dev/tronbrowser",
@@ -325,7 +342,8 @@
       "repository": "https://github.com/profullstack/tronbrowser.dev",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "3.17.1"
     },
     {
       "id": "logicsrc.com/opencontext",
@@ -342,7 +360,8 @@
       "repository": "https://github.com/profullstack/logicsrc",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.3.0"
     },
     {
       "id": "smshub.dev/smshub",
@@ -359,7 +378,8 @@
       "repository": "https://github.com/profullstack/smshub",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "1.4.0"
     },
     {
       "id": "pairux.com/pairux",
@@ -376,7 +396,8 @@
       "repository": "https://github.com/profullstack/pairux.com",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.17.0"
     },
     {
       "id": "wx93.me/wx93-mcp",
@@ -393,7 +414,8 @@
       "repository": "https://github.com/profullstack/wx93.me",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.1.0"
     },
     {
       "id": "profullstack.com/x402",
@@ -411,7 +433,8 @@
       "repository": "https://github.com/profullstack/x402-client",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.3.0"
     },
     {
       "id": "profullstack.com/ai",
@@ -428,7 +451,8 @@
       "repository": "https://github.com/profullstack/ai",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "1.1.1"
     },
     {
       "id": "profullstack.com/summary-forge",
@@ -445,7 +469,8 @@
       "repository": "https://github.com/profullstack/summary-forge-module",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "1.10.2"
     },
     {
       "id": "hqtui.com/hqtui",
@@ -462,7 +487,8 @@
       "repository": "https://github.com/profullstack/hqtui",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.10.3"
     },
     {
       "id": "bl0ggers.com/bl0ggers",
@@ -478,7 +504,8 @@
       "homepage": "https://bl0ggers.com",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.1.0"
     },
     {
       "id": "crawlproof.com/crawlproof",
@@ -495,7 +522,8 @@
       "repository": "https://github.com/profullstack/crawlproof.com",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.5.0"
     },
     {
       "id": "qrypt.chat/qryptchat",
@@ -513,7 +541,8 @@
       "repository": "https://github.com/profullstack/qryptchat-web",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.9.1"
     },
     {
       "id": "readm3.com/readm3",
@@ -530,7 +559,8 @@
       "repository": "https://github.com/profullstack/readm3",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.14.0"
     },
     {
       "id": "hdtilt.com/hdtilt",
@@ -547,7 +577,8 @@
       "repository": "https://github.com/profullstack/hdtilt.com",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.4.0"
     },
     {
       "id": "profullstack.com/g1tz",
@@ -564,7 +595,8 @@
       "repository": "https://github.com/profullstack/g1tz",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.2.2"
     },
     {
       "id": "profullstack.com/r3q",
@@ -581,7 +613,8 @@
       "repository": "https://github.com/profullstack/r3q",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.1.4"
     },
     {
       "id": "profullstack.com/timer",
@@ -598,7 +631,8 @@
       "repository": "https://github.com/profullstack/timer",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.2.0"
     },
     {
       "id": "profullstack.com/billing",
@@ -615,7 +649,8 @@
       "repository": "https://github.com/profullstack/billing",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.3.1"
     },
     {
       "id": "profullstack.com/proxy",
@@ -632,7 +667,8 @@
       "repository": "https://github.com/profullstack/proxy",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.2.0"
     },
     {
       "id": "profullstack.com/kali",
@@ -649,7 +685,8 @@
       "repository": "https://github.com/profullstack/kali",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.1.0"
     },
     {
       "id": "profullstack.com/orgs",
@@ -666,7 +703,8 @@
       "repository": "https://github.com/profullstack/orgs",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.2.0"
     },
     {
       "id": "profullstack.com/watchdog",
@@ -683,7 +721,8 @@
       "repository": "https://github.com/profullstack/watchdog",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.3.0"
     },
     {
       "id": "profullstack.com/encrypt",
@@ -700,7 +739,8 @@
       "repository": "https://github.com/profullstack/encrypt",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.1.0"
     },
     {
       "id": "profullstack.com/scanner",
@@ -717,7 +757,8 @@
       "repository": "https://github.com/profullstack/scanner",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "1.1.2"
     },
     {
       "id": "profullstack.com/transcoder",
@@ -736,7 +777,8 @@
       "repository": "https://github.com/profullstack/transcoder",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "1.9.14"
     },
     {
       "id": "anthropic.com/claude-code",
@@ -754,7 +796,8 @@
       "repository": "https://github.com/anthropics/claude-code",
       "vendor": "Anthropic",
       "license": "proprietary",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "2.1.303"
     },
     {
       "id": "openai.com/codex",
@@ -772,7 +815,8 @@
       "repository": "https://github.com/openai/codex",
       "vendor": "OpenAI",
       "license": "Apache-2.0",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.162.1"
     },
     {
       "id": "github.com/copilot-cli",
@@ -790,7 +834,8 @@
       "repository": "https://github.com/github/copilot-cli",
       "vendor": "GitHub",
       "license": "proprietary",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "1.0.98"
     },
     {
       "id": "aider.chat/aider",
@@ -808,7 +853,8 @@
       "repository": "https://github.com/Aider-AI/aider",
       "vendor": "Aider-AI",
       "license": "Apache-2.0",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.86.2"
     },
     {
       "id": "opencode.ai/opencode",
@@ -826,7 +872,8 @@
       "repository": "https://github.com/anomalyco/opencode",
       "vendor": "Anomaly (formerly SST)",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "2.0.27"
     },
     {
       "id": "block.xyz/goose",
@@ -843,7 +890,8 @@
       "repository": "https://github.com/aaif-goose/goose",
       "vendor": "AAIF (originally Block)",
       "license": "Apache-2.0",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "1.55.0"
     },
     {
       "id": "ampcode.com/amp",
@@ -895,7 +943,8 @@
       "repository": "https://github.com/QwenLM/qwen-code",
       "vendor": "Alibaba Qwen",
       "license": "Apache-2.0",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.25.3"
     },
     {
       "id": "kiro.dev/kiro-cli",
@@ -931,7 +980,8 @@
       "repository": "https://github.com/openinterpreter/openinterpreter",
       "vendor": "Open Interpreter",
       "license": "Apache-2.0",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.0.56"
     },
     {
       "id": "continue.dev/cli",
@@ -949,7 +999,8 @@
       "repository": "https://github.com/continuedev/continue",
       "vendor": "Continue",
       "license": "Apache-2.0",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "1.5.47"
     },
     {
       "id": "factory.ai/droid",
@@ -966,7 +1017,8 @@
       "homepage": "https://factory.ai",
       "vendor": "Factory",
       "license": "proprietary",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.239.1"
     },
     {
       "id": "moonshot.ai/kimi-code",
@@ -984,7 +1036,8 @@
       "repository": "https://github.com/MoonshotAI/kimi-code",
       "vendor": "Moonshot AI",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "2.1.1"
     },
     {
       "id": "mistral.ai/vibe",
@@ -1002,7 +1055,8 @@
       "repository": "https://github.com/mistralai/mistral-vibe",
       "vendor": "Mistral AI",
       "license": "Apache-2.0",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "2.26.1"
     },
     {
       "id": "openhands.dev/openhands-cli",
@@ -1020,7 +1074,8 @@
       "repository": "https://github.com/OpenHands/OpenHands-CLI",
       "vendor": "OpenHands (All Hands AI)",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "1.16.0"
     },
     {
       "id": "gptme.org/gptme",
@@ -1037,7 +1092,8 @@
       "repository": "https://github.com/gptme/gptme",
       "vendor": "gptme (Erik Bjareholt)",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.35.1"
     },
     {
       "id": "kilo.ai/kilo",
@@ -1056,7 +1112,8 @@
       "repository": "https://github.com/Kilo-Org/kilocode",
       "vendor": "Kilo Code",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "7.8.12"
     },
     {
       "id": "jetbrains.com/junie",
@@ -1091,7 +1148,8 @@
       "repository": "https://github.com/superagent-ai/grok-cli",
       "vendor": "Superagent",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "1.1.7"
     },
     {
       "id": "plandex.ai/plandex",
@@ -1110,7 +1168,8 @@
       "repository": "https://github.com/plandex-ai/plandex",
       "vendor": "Plandex",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "2.2.1"
     },
     {
       "id": "ollama.com/ollama",
@@ -1128,7 +1187,8 @@
       "repository": "https://github.com/ollama/ollama",
       "vendor": "Ollama",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.40.6"
     },
     {
       "id": "github.com/fabric",
@@ -1146,7 +1206,8 @@
       "repository": "https://github.com/danielmiessler/Fabric",
       "vendor": "Daniel Miessler",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "1.4.526"
     },
     {
       "id": "w3bs.org/agentic-desktop-layer",
@@ -1163,7 +1224,8 @@
       "repository": "https://github.com/profullstack/w3bs.org/tree/main/desktop",
       "vendor": "Profullstack",
       "license": "Apache-2.0",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.5.0"
     },
     {
       "id": "w3bs.org/w3bs-training",
@@ -1180,7 +1242,8 @@
       "repository": "https://github.com/profullstack/w3bs.org/tree/main/training",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.2.5"
     },
     {
       "id": "submitfleet.com/submitfleet",
@@ -1197,7 +1260,8 @@
       "repository": "https://github.com/profullstack/submitfleet",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.3.0"
     },
     {
       "id": "b1dz.com/b1dz",
@@ -1213,7 +1277,8 @@
       "homepage": "https://b1dz.com",
       "repository": "https://github.com/profullstack/b1dz.com",
       "vendor": "Profullstack",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.3.10"
     },
     {
       "id": "bufferoverride.com/bufferoverride",
@@ -1230,7 +1295,8 @@
       "repository": "https://github.com/profullstack/bufferoverride",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.1.0"
     },
     {
       "id": "c0upons.com/c0upons",
@@ -1247,7 +1313,8 @@
       "repository": "https://github.com/profullstack/c0upons",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "1.9.0"
     },
     {
       "id": "d0rz.com/d0rz",
@@ -1263,7 +1330,8 @@
       "homepage": "https://d0rz.com",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.1.0"
     },
     {
       "id": "demo.movie/demomovie",
@@ -1279,7 +1347,8 @@
       "homepage": "https://demo.movie",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.1.1"
     },
     {
       "id": "mediaanalyzer.pro/mediaanalyzer",
@@ -1295,7 +1364,8 @@
       "homepage": "https://mediaanalyzer.pro",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.4.0"
     },
     {
       "id": "nichedb.dev/nichedb",
@@ -1312,7 +1382,8 @@
       "repository": "https://github.com/profullstack/niche-db",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.48.0"
     },
     {
       "id": "nightcell7.com/nightcell7",
@@ -1329,7 +1400,8 @@
       "repository": "https://github.com/profullstack/nightcell7",
       "vendor": "Profullstack",
       "license": "proprietary",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.5.1"
     },
     {
       "id": "outreachgraph.com/outreachgraph",
@@ -1346,7 +1418,8 @@
       "repository": "https://github.com/profullstack/outreachgraph",
       "vendor": "Profullstack",
       "license": "proprietary",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.17.0"
     },
     {
       "id": "p0dcasters.com/p0dcasters",
@@ -1362,7 +1435,8 @@
       "homepage": "https://p0dcasters.com",
       "repository": "https://github.com/profullstack/p0dcasters",
       "vendor": "Profullstack",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.2.0"
     },
     {
       "id": "pwamart.com/pwamart",
@@ -1379,7 +1453,8 @@
       "repository": "https://github.com/profullstack/pwamart.com",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.6.0"
     },
     {
       "id": "r4ck.dev/r4ck",
@@ -1396,7 +1471,8 @@
       "repository": "https://github.com/profullstack/r4ck.dev",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.1.0"
     },
     {
       "id": "reeleel.com/reeleel",
@@ -1413,7 +1489,8 @@
       "repository": "https://github.com/profullstack/reeleel",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.4.0"
     },
     {
       "id": "ringhuman.com/ringhuman",
@@ -1429,7 +1506,8 @@
       "homepage": "https://ringhuman.com",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.1.0"
     },
     {
       "id": "saasrow.com/saasrow",
@@ -1446,7 +1524,8 @@
       "repository": "https://github.com/profullstack/saasrow-web",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "1.1.1"
     },
     {
       "id": "tleehealth.com/tleehealth",
@@ -1463,7 +1542,8 @@
       "repository": "https://github.com/profullstack/tleehealth.com",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.4.1"
     },
     {
       "id": "typeheard.com/typeheard",
@@ -1480,7 +1560,8 @@
       "repository": "https://github.com/profullstack/typeheard.com",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": false
+      "agentic": false,
+      "latest_version": "0.1.0"
     },
     {
       "id": "ad.network.pit.world/adnetwork",
@@ -1497,7 +1578,8 @@
       "repository": "https://github.com/moshcoder/ad.network",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.1.3"
     },
     {
       "id": "built.indie.pit.world/builtindie",
@@ -1514,7 +1596,8 @@
       "repository": "https://github.com/moshcoder/built.indie",
       "vendor": "Profullstack",
       "license": "MIT",
-      "agentic": true
+      "agentic": true,
+      "latest_version": "0.1.2"
     }
   ]
 }
