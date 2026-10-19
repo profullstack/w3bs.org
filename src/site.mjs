@@ -618,15 +618,20 @@ function osInstall(iso) {
     );
   const vpsSteps =
     'Upload the ISO in your provider\u2019s panel (on netcup: Media \u203a DVD drive, upload by FTP, pick it under Own DVDs and turn on DVD boot), boot the server from it, open the provider\u2019s web console and run <code>w3bs-os-install</code>. KVM servers with virtio disks, BIOS or UEFI, are what we test on.';
+  if (iso)
+    routes.push(
+      `<article><span class="card-index">PCS, INTEL MACS AND VPS SERVERS · ISO ${e(iso.version)}${iso.preview ? ' · PREVIEW' : ''}</span><h3>One installer ISO for x86-64.</h3><p>The same ISO installs on Intel and AMD PCs, Intel Macs and VPS servers. Boot it with Secure Boot off and run <code>w3bs-os-install</code>: KDE, zsh, encrypted disk and the desktop layer by default, with one review screen before anything is written. Packages download during the install.</p><p><a class="button primary" href="${e(iso.url)}">Download the ISO (${e(iso.size)})</a></p><p class="muted">SHA-256 <code class="break">${e(iso.sha256)}</code></p>${code(`curl -fLO ${iso.url}\ncurl -fLO ${iso.sumsUrl} && sha256sum -c SHA256SUMS`)}<p><strong>PC or Intel Mac:</strong> write it to a USB stick and boot from it.</p>${code(`sudo dd if=${iso.name} of=/dev/sdX bs=4M status=progress oflag=sync`)}<p><strong>VPS:</strong> ${vpsSteps}</p>${iso.preview ? '<p class="muted">Preview build: its automated install test is still running. Use it on a machine or server you can wipe.</p>' : ''}</article>`,
+    );
+  else {
+    routes.push(
+      `<article><span class="card-index">VPS AND CLOUD SERVERS · ${docker ? 'DOCKER NOW, ISO COMING' : 'COMING'}</span><h3>Run it on a VPS.</h3><p>${docker ? `Today: on any Linux VPS with Docker, run the server image above, or the desktop image and watch it from <a class="inline-link" href="/fleet">Fleet</a>.` : ''} Once the installer ISO passes its checks, it installs on any VPS that lets you mount your own ISO: ${vpsSteps.charAt(0).toLowerCase()}${vpsSteps.slice(1)}</p>${docker ? code(`docker run -it --rm ${docker}:server`) : ''}</article>`,
+    );
+    routes.push(
+      `<article><span class="card-index">PCS AND MACS · COMING</span><h3>A bootable installer ISO.</h3><p>The x86-64 installer ISO is being built and tested. It appears here with its checksum once it boots and installs in our checks. Secure Boot will need to be off at first: Alpine ships no Microsoft-signed boot shim.</p></article>`,
+    );
+  }
   routes.push(
-    iso
-      ? `<article><span class="card-index">VPS AND CLOUD SERVERS \u00b7 ISO ${e(iso.version)}${iso.preview ? ' \u00b7 PREVIEW' : ''}</span><h3>Install on a VPS.</h3><p>${vpsSteps}</p><p><a class="button primary" href="${e(iso.url)}">Download the ISO (${e(iso.size)})</a></p>${code(`curl -fLO ${iso.url}\ncurl -fLO ${iso.sumsUrl} && sha256sum -c SHA256SUMS`)}${iso.preview ? '<p class="muted">Preview build: its automated install test is still running. Use it on a server you can wipe.</p>' : ''}</article>`
-      : `<article><span class="card-index">VPS AND CLOUD SERVERS \u00b7 ${docker ? 'DOCKER NOW, ISO COMING' : 'COMING'}</span><h3>Run it on a VPS.</h3><p>${docker ? `Today: on any Linux VPS with Docker, run the server image above, or the desktop image and watch it from <a class="inline-link" href="/fleet">Fleet</a>.` : ''} Once the installer ISO passes its checks, it installs on any VPS that lets you mount your own ISO: ${vpsSteps.charAt(0).toLowerCase()}${vpsSteps.slice(1)}</p>${docker ? code(`docker run -it --rm ${docker}:server`) : ''}</article>`,
-  );
-  routes.push(
-    iso
-      ? `<article><span class="card-index">PCS AND MACS · NETWORK INSTALLER ${e(iso.version)}${iso.preview ? ' · PREVIEW' : ''}</span><h3>Install on a PC or Intel Mac.</h3><p>Write the ISO to a USB stick, boot from it with Secure Boot off, and run <code>w3bs-os-install</code>: KDE, zsh, encrypted disk and the desktop layer by default, with one review screen before anything is written. Packages download during the install.</p><p><a class="button primary" href="${e(iso.url)}">Download the ISO (${e(iso.size)})</a></p>${code(`sha256sum ${iso.name}   # ${iso.sha256}\nsudo dd if=${iso.name} of=/dev/sdX bs=4M status=progress oflag=sync`)}</article>`
-      : `<article><span class="card-index">PCS AND MACS · COMING</span><h3>A bootable installer ISO.</h3><p>The x86-64 installer ISO is being built and tested. It appears here with its checksum once it boots and installs in our checks. Secure Boot will need to be off at first: Alpine ships no Microsoft-signed boot shim.</p></article>`,
+    `<article><span class="card-index">APPLE SILICON MACS (M1, M2) · COMING</span><h3>Not from the ISO.</h3><p>Apple Silicon Macs are ARM and never boot an ISO: Linux goes on them through the Asahi Linux installer, run from macOS, which sets up dual boot. W3BS OS for M1 and M2 will install that way, on the Asahi kernel; M3 follows Asahi's support.</p></article>`,
   );
   routes.push(
     `<article><span class="card-index">ANDROID PHONES AND TABLETS · ${musl ? 'AVAILABLE' : 'COMING'}</span><h3>Install on a phone.</h3><p>Install <a class="inline-link" href="https://postmarketos.org/download/" rel="noopener">Nura (postmarketOS)</a> with Plasma Mobile on a supported, unlockable device, then add W3BS. Unlocking the bootloader erases the phone. A W3BS-branded phone image follows.</p>${musl ? code('curl -fsSL https://w3bs.org/install.sh | sh\nw3bs install agentic-desktop-layer') : '<p class="muted">The W3BS installer for Alpine and Nura is in testing.</p>'}</article>`,
