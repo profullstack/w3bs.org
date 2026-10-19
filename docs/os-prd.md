@@ -417,6 +417,7 @@ Use independent W3BS OS branding and do not present the images as official Alpin
 | P1 Providers and publishing | §18 providers on Ubuntu, Fedora, Arch, macOS, Windows; §17 `w3bs publish` with signed multi-format artifacts | Install/update/remove pass per provider in clean VMs; one release reaches every declared target |
 | R1 W3BS Run | §16 launcher with Wine, Proton, Waydroid and labelled remote routes | Per-app receipts drive the public compatibility list |
 | S0 to S3 W3BS Studio | §19 IDE stages | Build, run and debug pass per target |
+| L1 to L5 Link install | §21 links, confirm screen, dual-boot helper, web flasher | Each route installs from one link with one confirmation on its target devices |
 
 These are dependency stages, not promised dates. PC delivery should proceed while Mac and mobile hardware work follows its own track.
 
@@ -564,6 +565,56 @@ Rules:
 3. The desktop layer is installed but its control starts **off**: observation and input need the same human authorization as on any other machine (§10). An environment flag may pre-authorize only in disposable CI.
 4. Checks before a tag is published: the container starts, `w3bs --version` and `w3bs doctor` pass, and on `desktop` the layer completes a bounded mouse/keyboard task over its MCP interface and is stopped from its control.
 5. w3bs.org/os lists the images, their digests and the `docker run` lines once these checks pass.
+
+## 21 Install from a link
+
+Goal: installing an app, or W3BS OS itself, starts from one link sent by email or SMS or shared anywhere. A link never installs anything silently: it opens a confirm screen that shows what is actually signed, and the person taps once.
+
+### Links
+
+- `https://w3bs.org/i/<package>` for apps, `https://w3bs.org/i/os` for the operating system. The page detects the device and offers the right route (§15: a device with no supported route never gets a generic button).
+- `w3bs://install/<package>` and `w3bs://os` are handled by the `w3bs` CLI, the W3BS desktop apps and the Android W3BS app once any of them is installed; the web page hands off to the handler when it is present.
+- A link carries only the package identity (and an optional channel). The confirm screen shows the publisher domain, the W3BS-SIGN-1 key fingerprint, the version and what will run, read from the signed catalog, so a forged or altered link can at most propose a real, signed package.
+- **Send to my phone / email:** a button on every package page and on /os. Only for a signed-in account, only to that account's verified email or phone (SMS through smshub), rate limited per account and per destination, with no free-text message. It must never become a way to send messages to others.
+
+### Apps, by device
+
+| Device | First link (nothing installed) | Later links |
+| --- | --- | --- |
+| Android | Installs the W3BS app (APK from w3bs.org with Android's "install unknown apps" prompt, or a store listing where available) | Opens the W3BS app at the confirm screen; one tap installs (APK, Play Store intent, Waydroid or Flatpak as the package declares) |
+| iPhone / iPad | App Store page of the W3BS companion app (one tap Get) | The companion app opens App Store pages for listed iOS apps; it cannot install anything else |
+| macOS, Windows, Linux | Offers the signed native installer (notarized dmg, MSIX, AppImage or apk) that sets up `w3bs` and the handler, or the one-line command | `w3bs://` opens the confirm screen; one click installs |
+
+### W3BS OS on a PC or Mac: dual boot from the running system
+
+`https://w3bs.org/i/os` on a computer that already runs an OS offers the **W3BS OS helper**, a signed native app (Windows MSIX, macOS app, Linux AppImage). Asahi Linux's `curl https://alx.sh | sh` run from macOS is the precedent: the helper prepares dual boot from inside the current OS.
+
+1. Checks the device against the hardware support list (§8) and stops on unsupported hardware.
+2. Checks the boot mode (UEFI required), BitLocker or FileVault state, free space (at least 40 GB for a dual boot), and that a recent backup exists, asking the person to confirm it.
+3. Shrinks the current system partition with the OS's own tools (Windows volume shrink, macOS `diskutil apfs resizeContainer`, Linux filesystem resize), never by writing filesystems itself.
+4. Downloads and verifies the installer, places it in a small boot partition or the EFI system partition, and adds a one-time UEFI boot entry (Windows `bcdedit`/firmware BootNext, Asahi's stub on Apple Silicon).
+5. Reboots into the installer in **install alongside** mode: it only uses the freed space, keeps the existing EFI entries, and adds a boot menu with both systems. The existing OS stays the default until the person changes it.
+6. Every step is reversible until the reboot, and the helper shows the exact partition changes before making them. BitLocker recovery keys are shown and confirmed before any resize. Secure Boot must be off until W3BS has a signed shim (§12), and the helper says so first.
+
+Erase-and-install (the whole disk) is a separate, explicit choice in the same helper.
+
+### W3BS OS on a phone, and devices with no OS: a helper device
+
+A phone cannot unlock its own bootloader, and a PC with an empty disk cannot run a helper. Any other device opens the link instead:
+
+- **Computer or Android phone with Chrome:** `w3bs.org/i/os` runs a **web flasher** over WebUSB (the GrapheneOS web installer and Android Flash Tool approach). Plug the target phone in (USB-C to USB-C works phone to phone through OTG), follow the steps on screen: identify the exact model, unlock the bootloader (which erases the phone, stated before it starts), flash the signed Nura/W3BS image, relock where the device supports it. Only models on the certified list are offered.
+- **Making a USB installer for a PC with no OS:** the same page on any computer writes the ISO to a USB stick (the desktop helper, or the browser via the File System Access API where available), and an Android phone can write it over OTG.
+- **iPhone as the helper:** it can show the steps and send the link to a computer, but iOS gives the browser no USB access, so it cannot flash or write anything.
+
+### Milestones
+
+| Stage | Deliverable |
+| --- | --- |
+| L1 | `w3bs.org/i/<package>` with device detection, `w3bs://` handler in the CLI, confirm screen, Send to my phone/email |
+| L2 | Android W3BS app as the link target; signed desktop installers that register the handler |
+| L3 | W3BS OS helper for Linux and Windows (dual boot, install alongside) |
+| L4 | Web flasher for the first certified phone; USB writer on web and Android |
+| L5 | macOS/Apple Silicon helper on the Asahi flow |
 
 ## Appendix Current Profullstack catalog inventory
 
