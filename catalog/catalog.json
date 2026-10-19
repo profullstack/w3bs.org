@@ -433,7 +433,7 @@
     "repository": "https://github.com/profullstack/nixamp",
     "license": "MIT",
     "agentic": false,
-    "latest_version": "0.44.0",
+    "latest_version": "0.45.5",
     "vendor": "Profullstack",
     "install": "curl -fsSL https://nixamp.com/install.sh | sh",
     "evidence": "npm view nixamp; nixamp.com/install.sh 200; examples: https://github.com/profullstack/nixamp (README)",
@@ -468,7 +468,7 @@
     "repository": "https://github.com/profullstack/threatcrush",
     "license": "MIT",
     "agentic": false,
-    "latest_version": "0.13.48",
+    "latest_version": "0.13.49",
     "vendor": "Profullstack",
     "install": "curl -fsSL https://threatcrush.com/install.sh | sh",
     "evidence": "npm view @profullstack/threatcrush; installer 200; examples: /home/anthony/src/profullstack/threatcrush/README.md",
@@ -538,7 +538,7 @@
     "repository": "https://github.com/profullstack/ugig.net",
     "license": "MIT",
     "agentic": false,
-    "latest_version": "1.1.19",
+    "latest_version": "1.1.20",
     "vendor": "Profullstack",
     "install": "curl -fsSL https://ugig.net/install.sh | bash",
     "evidence": "ugig.net/cli/package.json; installer 200; examples: /home/anthony/src/profullstack/ugig.net/src/app/docs/cli/page.tsx + cli/src/commands (login.ts, auth.ts, gigs.ts, applications.ts)",
@@ -1065,7 +1065,7 @@
     "repository": "https://github.com/profullstack/readm3",
     "license": "MIT",
     "agentic": false,
-    "latest_version": "0.15.0",
+    "latest_version": "0.17.0",
     "vendor": "Profullstack",
     "install": "curl -fsSL https://readm3.com/install.sh | sh",
     "evidence": "https://readm3.com/install.sh 200, installed from a clean env (no Node) 2026-10-13; 0.14.0 via `w3bs install` from a clean HOME 2026-10-19; examples: /home/anthony/src/profullstack/readm3/README.md",
@@ -1519,7 +1519,7 @@
     "repository": "https://github.com/anthropics/claude-code",
     "license": "proprietary",
     "agentic": true,
-    "latest_version": "2.1.303",
+    "latest_version": "2.1.304",
     "vendor": "Anthropic",
     "install": "curl -fsSL https://claude.ai/install.sh | bash",
     "evidence": "https://github.com/anthropics/claude-code README; npm view @anthropic-ai/claude-code; examples: https://code.claude.com/docs/en/cli-reference",
@@ -1585,7 +1585,7 @@
     "repository": "https://github.com/github/copilot-cli",
     "license": "proprietary",
     "agentic": true,
-    "latest_version": "1.0.98",
+    "latest_version": "1.0.100",
     "vendor": "GitHub",
     "install": "curl -fsSL https://gh.io/copilot-install | bash",
     "evidence": "https://github.com/github/copilot-cli README; npm view @github/copilot; examples: https://github.com/github/copilot-cli (README); https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli",
@@ -2265,7 +2265,7 @@
     "repository": "https://github.com/danielmiessler/Fabric",
     "license": "MIT",
     "agentic": false,
-    "latest_version": "1.4.526",
+    "latest_version": "1.4.528",
     "vendor": "Daniel Miessler",
     "install": "curl -fsSL https://raw.githubusercontent.com/danielmiessler/fabric/main/scripts/installer/install.sh | bash",
     "evidence": "https://github.com/danielmiessler/Fabric README; gh release view; examples: https://github.com/danielmiessler/Fabric (README)",
@@ -2756,7 +2756,7 @@
     "repository": "https://github.com/profullstack/p0dcasters",
     "license": null,
     "agentic": false,
-    "latest_version": "0.2.0",
+    "latest_version": "0.2.3",
     "vendor": "Profullstack",
     "install": "curl -fsSL https://p0dcasters.com/install.sh | sh",
     "evidence": "p0dcasters.com/install.sh 200 downloads https://p0dcasters.com/cli/p0d.mjs (200, node script, VERSION 0.1.0) to ~/.local/bin/p0d; examples: command table in p0d.mjs; no license declared in repo",
@@ -2795,7 +2795,7 @@
     "repository": "https://github.com/profullstack/pwamart.com",
     "license": "MIT",
     "agentic": false,
-    "latest_version": "0.6.0",
+    "latest_version": "0.7.0",
     "vendor": "Profullstack",
     "install": "curl -fsSL https://pwamart.com/install.sh | sh",
     "evidence": "npm view @profullstack/pwamart version = 0.6.0; pwamart.com/install.sh 200 (installs the latest @profullstack/pwamart with bun or npm); examples: @profullstack/pwamart README and src/cli.js",
@@ -3595,5 +3595,45 @@
     "install": "curl -fsSL https://hanzo.sh | sh",
     "evidence": "https://hanzo.sh 200 (POSIX sh installer, sha256-verified binaries); gh release view -R hanzoai/cli v8.5.751; LICENSE.txt Apache-2.0; examples: https://github.com/hanzoai/cli (README)",
     "publisher": "third-party"
+  },
+  {
+    "id": "profullstack.com/root-w3bs-os",
+    "name": "root-w3bs-os",
+    "commands": [
+      "root-w3bs-os"
+    ],
+    "description": "Set up and maintain a W3BS OS box as root: accounts, SSH keys, zsh, Caddy sites, firewall, swap and confinement. Safe to re-run.",
+    "homepage": "https://w3bs.org/os",
+    "repository": "https://github.com/profullstack/cli-tools",
+    "license": "MIT",
+    "agentic": false,
+    "latest_version": "0.1.0",
+    "vendor": "profullstack.com",
+    "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/cli-tools/root-w3bs-os-v0.1.0/install-root-w3bs-os.sh | sh",
+    "publisher": "profullstack.com",
+    "signed": {
+      "statement": {
+        "commands": [
+          "root-w3bs-os"
+        ],
+        "created_at": "2026-10-19T23:16:52Z",
+        "description": "Set up and maintain a W3BS OS box as root: accounts, SSH keys, zsh, Caddy sites, firewall, swap and confinement. Safe to re-run.",
+        "homepage": "https://w3bs.org/os",
+        "install": "curl -fsSL https://raw.githubusercontent.com/profullstack/cli-tools/root-w3bs-os-v0.1.0/install-root-w3bs-os.sh | sh",
+        "installer": {
+          "sha256": "54f8d04f9abc8a0d11cd0f77564991519a555f412b8fa125b13ba91f59e7ddeb",
+          "url": "https://raw.githubusercontent.com/profullstack/cli-tools/root-w3bs-os-v0.1.0/install-root-w3bs-os.sh"
+        },
+        "license": "MIT",
+        "name": "root-w3bs-os",
+        "package": "profullstack.com/root-w3bs-os",
+        "repository": "https://github.com/profullstack/cli-tools",
+        "type": "w3bs-release/1",
+        "version": "0.1.0"
+      },
+      "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgd22dMTD9clHZ+RPC5MDNqe5wTO\nRqVrWzMLzsE+86O98AAAAVdzNicy1yZWxlYXNlQHczYnMub3JnAAAAAAAAAAZzaGE1MTIA\nAABTAAAAC3NzaC1lZDI1NTE5AAAAQMWbQPDgSiEMNFD2n13hzakNGbac4Y3U0w+R1vvg6J\ntLNOwHdyNtDXisfoY7ScPFzaQltZT0Objo30KdfuT55wo=\n-----END SSH SIGNATURE-----",
+      "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHdtnTEw/XJR2fkTwuTAzanucEzkala1szC87BPvOjvf",
+      "fingerprint": "SHA256:Uhmgw2yMQFBJIsp9vM5WfbZtBwnWk9hSvu3atWtdodA"
+    }
   }
 ]
