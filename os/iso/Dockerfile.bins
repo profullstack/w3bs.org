@@ -1,0 +1,23 @@
+# syntax=docker/dockerfile:1
+# The w3bs CLI and w3bs-desktop built natively for musl (Alpine 3.24), the same way as the
+# Docker editions' rust stage. Build from the repository root and export the binaries:
+#   docker build -f os/iso/Dockerfile.bins --output type=local,dest=os/iso/out/bin .
+ARG ALPINE=alpine:3.24
+FROM ${ALPINE} AS rust
+RUN apk add --no-cache rust cargo build-base cmake perl pkgconf linux-headers
+WORKDIR /src
+COPY package-manager/ package-manager/
+COPY desktop/ desktop/
+COPY fixtures/ fixtures/
+RUN --mount=type=cache,target=/root/.cargo/registry \
+    --mount=type=cache,target=/src/package-manager/target \
+    --mount=type=cache,target=/src/desktop/target \
+    mkdir -p /out \
+    && cd package-manager && cargo build --locked --release --bin w3bs \
+    && install -m 0755 target/release/w3bs /out/w3bs \
+    && cd ../desktop && cargo build --locked --release -p w3bs-desktop \
+    && install -m 0755 target/release/w3bs-desktop /out/w3bs-desktop \
+    && strip /out/w3bs /out/w3bs-desktop
+
+FROM scratch
+COPY --from=rust /out/ /

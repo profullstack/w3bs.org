@@ -6,8 +6,6 @@ import { W3bsError } from './core.mjs';
 import { FLEET_LIMITS } from './fleet.mjs';
 import { TTL } from './accounts.mjs';
 import { buildSuite } from './os-suite.mjs';
-import { latestOsIso } from './os-releases.mjs';
-import { footerHtml, footerHtmlSync } from '@profullstack/footer';
 
 const e = (value) =>
   String(value ?? '').replace(
@@ -76,7 +74,6 @@ const specs = [
 function header(active) {
   return `<a class="skip" href="#main">Skip to content</a><header class="header"><a class="wordmark" href="/mission" aria-label="W3BS home"><img src="/assets/mark.svg" alt="" width="28" height="28">w3bs<span class="wordmark-dot">.</span></a><nav aria-label="Main navigation">${[
     ['/packages', 'Packages'],
-    ['/os', 'OS'],
     ['/specs', 'Standards'],
     ['/browse', 'Browse'],
     ['/prompts', 'Prompts'],
@@ -95,33 +92,8 @@ function header(active) {
       '',
     )}</nav><a class="header-account" href="/account" ${active === '/account' ? 'aria-current="page"' : ''}>Account</a><a class="header-action" href="/developers">Start building <span aria-hidden="true">↗</span></a></header>`;
 }
-// W3BS's own community first, then Profullstack's accounts (the same list as
-// profullstack.com's footer).
-const SOCIALS = [
-  ['r/w3bs on Reddit', 'https://www.reddit.com/r/w3bs/'],
-  ['r/fleetcoding on Reddit', 'https://www.reddit.com/r/fleetcoding/'],
-  ['Profullstack on GitHub', 'https://github.com/profullstack'],
-  ['Profullstack on Discord', 'https://discord.gg/U7dEXfBA3s'],
-  ['Profullstack on X', 'https://x.com/profullstackinc'],
-  ['Profullstack on YouTube', 'https://youtube.com/@profullstack'],
-];
-
-// The fleet-wide Profullstack footer (webring, built.indie badge, copyright)
-// from @profullstack/footer. Pages render synchronously, so this starts as the
-// bundled template and refreshHouseFooter() swaps in @latest from the CDN.
-// css:false because the CSP is style-src 'self'; its rules live in style.css.
-const HOUSE_FOOTER = { site: 'https://w3bs.org/', name: 'W3BS', since: 2026, css: false };
-let houseFooter = footerHtmlSync(HOUSE_FOOTER);
-export async function refreshHouseFooter() {
-  houseFooter = await footerHtml(HOUSE_FOOTER);
-}
-
 function footer() {
-  return `${siteFooter()}${houseFooter}`;
-}
-
-function siteFooter() {
-  return `<footer><div><a class="wordmark" href="/mission">w3bs<span class="wordmark-dot">.</span></a><p>Human-friendly. Agent-native.<br>Device-friendly. Open by design.</p><p class="footer-support"><strong>Need help?</strong> Email <a href="mailto:hello@w3bs.org">hello@w3bs.org</a> or ask on the <a href="/bbs/f/help">Help board</a>.</p></div><div><span class="eyebrow">FLEET AND ACCOUNTS</span><a href="/fleet">Your fleet</a><a href="/ab-testing">A/B testing</a><a href="/pricing">Pricing: Fleet is free</a><a href="/signup?next=%2Ffleet">Create an account</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><span class="eyebrow footer-gap">THE INITIATIVE</span><a href="/governance">Governance & participation</a><a href="/bbs">Community forums</a><a href="/social">W3BS Social (AT Protocol)</a><a href="/desktop">Agentic Desktop Layer</a><a href="/training">W3BS Training</a><a href="/os">W3BS OS (specification)</a></div><div><span class="eyebrow">FOR IMPLEMENTERS</span><a href="/developers">Developer guide</a><a href="/packages">Packages and the w3bs CLI</a><a href="/docs/founding-prd.md">Founding PRD · v2.0</a><a href="/docs/roadmap.md">Implementation status</a><a href="/.well-known/w3bs.json">Machine discovery ↗</a><a href="/api">API reference ↗</a><a href="https://github.com/profullstack/w3bs.org" rel="noopener">Source on GitHub ↗</a><span class="eyebrow footer-gap">COMMUNITY</span>${SOCIALS.map(([label, href]) => `<a href="${href}" rel="noopener">${label} ↗</a>`).join('')}</div><div class="footer-bottom"><span>Operated by Profullstack, Inc. Open standards for the Agentic Era.</span><span>Community drafts · No Recommendations issued</span></div></footer>`;
+  return `<footer><div><a class="wordmark" href="/mission">w3bs<span class="wordmark-dot">.</span></a><p>Human-friendly. Agent-native.<br>Device-friendly. Open by design.</p><p class="footer-support"><strong>Need help?</strong> Email <a href="mailto:hello@w3bs.org">hello@w3bs.org</a> or ask on the <a href="/bbs/f/help">Help board</a>.</p></div><div><span class="eyebrow">FLEET AND ACCOUNTS</span><a href="/fleet">Your fleet</a><a href="/ab-testing">A/B testing</a><a href="/pricing">Pricing: Fleet is free</a><a href="/signup?next=%2Ffleet">Create an account</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><span class="eyebrow footer-gap">THE INITIATIVE</span><a href="/governance">Governance & participation</a><a href="/bbs">Community forums</a><a href="/social">W3BS Social (AT Protocol)</a><a href="/desktop">Agentic Desktop Layer</a><a href="/training">W3BS Training</a><a href="/os">W3BS OS (specification)</a></div><div><span class="eyebrow">FOR IMPLEMENTERS</span><a href="/developers">Developer guide</a><a href="/packages">Packages and the w3bs CLI</a><a href="/docs/founding-prd.md">Founding PRD · v2.0</a><a href="/docs/roadmap.md">Implementation status</a><a href="/.well-known/w3bs.json">Machine discovery ↗</a><a href="/api">API reference ↗</a><a href="https://github.com/profullstack/w3bs.org" rel="noopener">Source on GitHub ↗</a></div><div class="footer-bottom"><span>Operated by Profullstack, Inc. Open standards for the Agentic Era.</span><span>Community drafts · No Recommendations issued</span></div></footer>`;
 }
 const INSTALL = 'curl -fsSL https://w3bs.org/install.sh | sh';
 // The campaign path: install the CLI, sign in, join a server, watch it on /fleet.
@@ -434,7 +406,7 @@ async function packageDetail(store, id, origin) {
     pending:
       'This version has not been scanned yet. Scans run when a package is submitted and whenever it changes.',
   }[scan.status];
-  return `<section class="resource-detail"><div class="resource-title"><div><div class="eyebrow"><a href="/packages">PACKAGES</a> / ${e(item.vendor || item.publisher)}</div><h2>${e(item.name)}</h2><p>${e(item.description)}</p></div>${scanPill(scan)}</div><div class="identity-line"><span class="eyebrow">INSTALL</span><code>${e(item.w3bs)}</code>${copy(item.w3bs)}</div><p class="muted install-hint">No <code>w3bs</code> yet? <code>${e(INSTALL)}</code></p><div class="inspector-grid"><div>${usagePanel(item, copy)}<section class="inspector-panel" id="scan"><h3>Malware scan</h3><p>${explanation}</p>${scan.status === 'passed' || scan.status === 'flagged' ? `<dl class="scan-facts"><dt>Scanned</dt><dd>${e(scan.scannedAt?.slice(0, 16).replace('T', ' '))} UTC · ${e(scan.scanner)}</dd><dt>Files</dt><dd>${e(scan.filesScanned)} (installer${scan.sources?.repository ? ` + ${e(scan.sources.repository)}${scan.sources.commit ? `@${e(scan.sources.commit.slice(0, 12))}` : ''}` : ''})</dd><dt>Findings</dt><dd>${e(counts)}${scan.malware ? ` · <strong>${e(scan.malware)} malware indicator${scan.malware === 1 ? '' : 's'}</strong>` : ''}</dd></dl>` : ''}${(scan.notes || []).map((note) => `<p class="muted">${e(note)}</p>`).join('')}${malwareFindings ? `<ul class="scan-findings">${malwareFindings}</ul>` : ''}${otherFindings}</section><section class="inspector-panel"><h3>Badge for your README</h3><p><img src="/api/packages/${e(id)}/badge.svg" alt="ThreatCrush: ${e(scanLabel(scan)[0])}" height="20"></p><pre class="instructions">${e(badgeMarkdown)}</pre>${copy(badgeMarkdown)}</section></div><aside><section class="inspector-panel metadata"><h3>Package details</h3><dl><dt>ID</dt><dd>${e(item.id)}</dd><dt>Version</dt><dd>${e(item.latest_version || 'Publisher managed')}</dd><dt>Vendor</dt><dd>${e(item.vendor || '')}</dd><dt>License</dt><dd>${e(item.license || 'Not stated')}</dd><dt>Commands</dt><dd>${e((item.commands || []).join(', '))}</dd><dt>Kind</dt><dd>${item.agentic ? 'Agentic' : 'CLI'}</dd><dt>Publisher's installer</dt><dd><code class="break">${e(item.install)}</code></dd></dl>${item.homepage ? `<a class="text-link" href="${e(item.homepage)}" rel="noopener">Website ↗</a>` : ''}${item.repository ? `<a class="text-link" href="${e(item.repository)}" rel="noopener">Source ↗</a>` : ''}<a class="text-link" href="/api/packages/${e(id)}">Package JSON ↗</a></section><section class="inspector-panel"><h3>Install link</h3><p>Share or email one link that opens the right install steps on any device.</p><div class="identity-line"><code class="break">${e(origin)}/i/${e(id)}</code>${copy(`${origin}/i/${id}`)}</div><a class="text-link" href="/i/${e(id)}">Open it <span aria-hidden="true">→</span></a></section>${signaturePanel(item)}</aside></div></section>`;
+  return `<section class="resource-detail"><div class="resource-title"><div><div class="eyebrow"><a href="/packages">PACKAGES</a> / ${e(item.vendor || item.publisher)}</div><h2>${e(item.name)}</h2><p>${e(item.description)}</p></div>${scanPill(scan)}</div><div class="identity-line"><span class="eyebrow">INSTALL</span><code>${e(item.w3bs)}</code>${copy(item.w3bs)}</div><p class="muted install-hint">No <code>w3bs</code> yet? <code>${e(INSTALL)}</code></p><div class="inspector-grid"><div>${usagePanel(item, copy)}<section class="inspector-panel" id="scan"><h3>Malware scan</h3><p>${explanation}</p>${scan.status === 'passed' || scan.status === 'flagged' ? `<dl class="scan-facts"><dt>Scanned</dt><dd>${e(scan.scannedAt?.slice(0, 16).replace('T', ' '))} UTC · ${e(scan.scanner)}</dd><dt>Files</dt><dd>${e(scan.filesScanned)} (installer${scan.sources?.repository ? ` + ${e(scan.sources.repository)}${scan.sources.commit ? `@${e(scan.sources.commit.slice(0, 12))}` : ''}` : ''})</dd><dt>Findings</dt><dd>${e(counts)}${scan.malware ? ` · <strong>${e(scan.malware)} malware indicator${scan.malware === 1 ? '' : 's'}</strong>` : ''}</dd></dl>` : ''}${(scan.notes || []).map((note) => `<p class="muted">${e(note)}</p>`).join('')}${malwareFindings ? `<ul class="scan-findings">${malwareFindings}</ul>` : ''}${otherFindings}</section><section class="inspector-panel"><h3>Badge for your README</h3><p><img src="/api/packages/${e(id)}/badge.svg" alt="ThreatCrush: ${e(scanLabel(scan)[0])}" height="20"></p><pre class="instructions">${e(badgeMarkdown)}</pre>${copy(badgeMarkdown)}</section></div><aside><section class="inspector-panel metadata"><h3>Package details</h3><dl><dt>ID</dt><dd>${e(item.id)}</dd><dt>Version</dt><dd>${e(item.latest_version || 'Publisher managed')}</dd><dt>Vendor</dt><dd>${e(item.vendor || '')}</dd><dt>License</dt><dd>${e(item.license || 'Not stated')}</dd><dt>Commands</dt><dd>${e((item.commands || []).join(', '))}</dd><dt>Kind</dt><dd>${item.agentic ? 'Agentic' : 'CLI'}</dd><dt>Publisher's installer</dt><dd><code class="break">${e(item.install)}</code></dd></dl>${item.homepage ? `<a class="text-link" href="${e(item.homepage)}" rel="noopener">Website ↗</a>` : ''}${item.repository ? `<a class="text-link" href="${e(item.repository)}" rel="noopener">Source ↗</a>` : ''}<a class="text-link" href="/api/packages/${e(id)}">Package JSON ↗</a></section>${signaturePanel(item)}</aside></div></section>`;
 }
 // W3BS-SIGN-1: who signed this release, and how to check it without trusting w3bs.org.
 function signaturePanel(item) {
@@ -582,8 +554,7 @@ export async function renderPage({ path, host, query, store, origin }) {
     title = 'W3BS OS';
     description =
       'W3BS OS: a lightweight Alpine Linux-based OS for containers, servers, desktops and phones, with KDE, zsh, the full Profullstack suite and an agent-operable desktop. Specification stage; Docker editions come first.';
-    content = await osPage();
-    active = '/os';
+    content = osPage();
   } else if (path === '/training') {
     title = 'W3BS Training';
     description =
@@ -601,49 +572,6 @@ export async function renderPage({ path, host, query, store, origin }) {
   } else throw new W3bsError('NOT_FOUND', 'Page not found.', 404);
   return pageShell({ title, description, active, content, scripts });
 }
-// What can be installed today (docs/os-prd.md §15, §20): set each once its artifact exists and
-// has passed its checks; until then the page says it is coming instead of offering a link.
-export const OS_RELEASES = {
-  docker: 'w3bs.org/os', // server + desktop images (built and cosign-signed in CI, served by w3bs.org/v2)
-  // iso: read live from the newest os-v* GitHub release (src/os-releases.mjs)
-  musl: false, // `curl -fsSL https://w3bs.org/install.sh | sh` works on Alpine and Nura
-};
-function osInstall(iso) {
-  const { docker, musl } = OS_RELEASES;
-  const code = (text) => `<pre class="instructions">${e(text)}</pre>`;
-  const routes = [];
-  if (docker)
-    routes.push(
-      `<article><span class="card-index">DOCKER · AVAILABLE</span><h3>Run it in a container.</h3><p>The server image is Alpine with zsh and the <code>w3bs</code> CLI. The desktop image adds KDE Plasma and the Agentic Desktop Layer, with agent access off until you turn it on.</p>${code(`docker run -it --rm ${docker}:server`)}${code(`sudo modprobe vkms   # a virtual display, no GPU needed\ndocker run -d --name w3bs-desktop --restart unless-stopped \\\n  -v /dev/dri:/dev/dri --device-cgroup-rule 'c 226:* rwm' --group-add video \\\n  --shm-size 512m -e W3BS_VNC_PASSWORD=change-me -p 5900:5900 ${docker}:desktop`)}<p class="muted">Then connect a VNC viewer to port 5900. The container finds the vkms card itself, and binding <code>/dev/dri</code> (not one <code>cardN</code>) keeps it starting after a reboot renumbers the cards. <a class="inline-link" href="https://github.com/profullstack/w3bs.org/tree/main/os/docker" rel="noopener">All options</a>.</p></article>`,
-    );
-  const vpsSteps =
-    'Upload the ISO in your provider\u2019s panel (on netcup: Media \u203a DVD drive, upload by FTP, pick it under Own DVDs and turn on DVD boot), boot the server from it, open the provider\u2019s web console and run <code>w3bs-os-install</code>. KVM servers with virtio disks, BIOS or UEFI, are what we test on.';
-  if (iso)
-    routes.push(
-      `<article><span class="card-index">PCS, INTEL MACS AND VPS SERVERS · ISO ${e(iso.version)}${iso.preview ? ' · PREVIEW' : ''}</span><h3>One installer ISO for x86-64.</h3><p>The same ISO installs on Intel and AMD PCs, Intel Macs and VPS servers. Boot it with Secure Boot off and run <code>w3bs-os-install</code>: KDE, zsh, encrypted disk and the desktop layer by default, with one review screen before anything is written. Packages download during the install.</p><p><a class="button primary" href="${e(iso.url)}">Download the ISO (${e(iso.size)})</a></p><p class="muted">SHA-256 <code class="break">${e(iso.sha256)}</code></p>${code(`curl -fLO ${iso.url}\ncurl -fLO ${iso.sumsUrl} && sha256sum -c SHA256SUMS`)}<p><strong>PC or Intel Mac:</strong> write it to a USB stick and boot from it.</p>${code(`sudo dd if=${iso.name} of=/dev/sdX bs=4M status=progress oflag=sync`)}<p><strong>VPS:</strong> ${vpsSteps}</p>${iso.preview ? '<p class="muted">Preview build: its automated install test is still running. Use it on a machine or server you can wipe.</p>' : ''}</article>`,
-    );
-  else {
-    routes.push(
-      `<article><span class="card-index">VPS AND CLOUD SERVERS · ${docker ? 'DOCKER NOW, ISO COMING' : 'COMING'}</span><h3>Run it on a VPS.</h3><p>${docker ? `Today: on any Linux VPS with Docker, run the server image above, or the desktop image and watch it from <a class="inline-link" href="/fleet">Fleet</a>.` : ''} Once the installer ISO passes its checks, it installs on any VPS that lets you mount your own ISO: ${vpsSteps.charAt(0).toLowerCase()}${vpsSteps.slice(1)}</p>${docker ? code(`docker run -it --rm ${docker}:server`) : ''}</article>`,
-    );
-    routes.push(
-      `<article><span class="card-index">PCS AND MACS · COMING</span><h3>A bootable installer ISO.</h3><p>The x86-64 installer ISO is being built and tested. It appears here with its checksum once it boots and installs in our checks. Secure Boot will need to be off at first: Alpine ships no Microsoft-signed boot shim.</p></article>`,
-    );
-  }
-  routes.push(
-    `<article><span class="card-index">APPLE SILICON MACS (M1, M2) · COMING</span><h3>Not from the ISO.</h3><p>Apple Silicon Macs are ARM and never boot an ISO: Linux goes on them through the Asahi Linux installer, run from macOS, which sets up dual boot. W3BS OS for M1 and M2 will install that way, on the Asahi kernel; M3 follows Asahi's support.</p></article>`,
-  );
-  routes.push(
-    `<article><span class="card-index">ANDROID PHONES AND TABLETS · ${musl ? 'AVAILABLE' : 'COMING'}</span><h3>Install on a phone.</h3><p>Install <a class="inline-link" href="https://postmarketos.org/download/" rel="noopener">Nura (postmarketOS)</a> with Plasma Mobile on a supported, unlockable device, then add W3BS. Unlocking the bootloader erases the phone. A W3BS-branded phone image follows.</p>${musl ? code('curl -fsSL https://w3bs.org/install.sh | sh\nw3bs install agentic-desktop-layer') : '<p class="muted">The W3BS installer for Alpine and Nura is in testing.</p>'}</article>`,
-  );
-  routes.push(
-    `<article><span class="card-index">IPHONE AND IPAD</span><h3>Not as an operating system.</h3><p>Stock iPhones and iPads only boot software Apple signs, so nothing can replace iOS. They will get the W3BS companion app and remote access to your other devices.</p></article>`,
-  );
-  return `<section class="section" id="install"><div class="section-heading"><div><div class="eyebrow">INSTALL</div><h2>Where it runs today.</h2></div></div><div class="principle-grid">${routes.join('')}</div></section>`;
-}
-function osStudio() {
-  return `<section class="section" id="studio"><div class="section-heading"><div><div class="eyebrow">W3BS STUDIO · COMING</div><h2>Debug desktop and phone apps in one place.</h2></div></div><p>An open-source Xcode for every platform: build, run and debug your app on Android emulators and devices, iOS simulators and iPhones (through your own Mac), Windows, KDE and GNOME, from one target picker, with agents able to run the same builds and tests over MCP. <a class="inline-link" href="/docs/os-prd.md">Read §19 of the spec</a>.</p></section>`;
-}
 function osSuiteSummary() {
   try {
     return buildSuite(JSON.parse(readFileSync(resolve(ROOT, 'catalog/catalog.json'), 'utf8'))).summary;
@@ -651,8 +579,7 @@ function osSuiteSummary() {
     return null;
   }
 }
-async function osPage() {
-  const iso = await latestOsIso();
+function osPage() {
   const suite = osSuiteSummary();
   const rows = (list) => list.map(([a, b]) => `<tr><th scope="row">${a}</th><td>${b}</td></tr>`).join('');
   const defaults = [
@@ -660,7 +587,7 @@ async function osPage() {
     ['First release', 'Docker images: <code>w3bs-os:server</code> and <code>w3bs-os:desktop</code> with the Agentic Desktop Layer installed'],
     ['Desktop', 'KDE Plasma by default; GNOME selectable; LXQt and Xfce once qualified'],
     ['Shell', 'zsh for new users; bash and fish selectable'],
-    ['Installer', 'Terminal and graphical wizards on one engine, with sane defaults: largest disk erased, LUKS2 encryption, KDE, zsh, the full suite; one review screen before anything is written'],
+    ['Installer', 'Calamares wizard: hardware, language, keyboard, network, desktop, shell, account, disks and encryption, apps, review'],
     ['Apps', 'The full Profullstack CLI and desktop suite, selected by default and present offline at first boot'],
     ['Agents', 'Agentic Desktop Layer and W3BS Training preinstalled; observing, input and recording each need your permission'],
     ['Account', 'Local login and installed apps work without a W3BS account'],
@@ -683,7 +610,7 @@ async function osPage() {
   const suiteLine = suite
     ? `The draft suite manifest resolves <strong>${suite.entries}</strong> Profullstack packages from the <a class="inline-link" href="/packages">catalog</a>, including all ${suite.named} named inclusions (MoshCode, PairUX, DiskPush, the Agentic Desktop Layer, Training and more). <strong>${suite.blocking_tasks}</strong> packaging tasks block M0: ${suite.publisher_scripts} packages install only through publisher scripts and need signed artifacts, ${suite.unpinned} has no pinned release, and ${suite.command_collisions.length} command names have two claimants.`
     : 'The draft suite manifest is generated from the package catalog.';
-  return `<section class="page-head"><div class="eyebrow">W3BS OS · SPECIFICATION</div><h1>An OS people<br><em>and agents can run.</em></h1><p>A lightweight Alpine Linux-based operating system with KDE Plasma, zsh, a full setup wizard and every Profullstack app installed, plus a desktop agents can operate under your control. ${OS_RELEASES.docker ? 'Docker images are the first release; the hardware installer and phone builds follow.' : 'There are no images to download yet: this page tracks the specification and its progress.'}</p><div class="actions"><a class="button primary" href="/docs/os-prd.md">Read the specification <span aria-hidden="true">→</span></a><a class="text-link" href="https://github.com/profullstack/w3bs.org/blob/main/os/suite-manifest.json" rel="noopener">Suite manifest ↗</a></div></section>${osInstall(iso)}${osStudio()}<section class="section"><div class="section-heading"><div><div class="eyebrow">DEFAULTS</div><h2>What you get.</h2></div></div><div class="table-wrap"><table class="platform-table"><tbody>${rows(defaults)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">INCLUDED SOFTWARE</div><h2>The whole suite, offline.</h2></div></div><p>${suiteLine}</p></section><section class="section"><div class="section-heading"><div><div class="eyebrow">APPS FROM OTHER PLATFORMS</div><h2>One launcher, honest labels.</h2></div></div><p><code>w3bs run</code> picks the best route for each app and labels its window, so a remote or guest app is never passed off as local.</p><div class="table-wrap"><table class="platform-table"><tbody>${rows(runtimes)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">HARDWARE</div><h2>Certified, preview, research, unsupported.</h2></div></div><p>Only certified devices get an install button. A device with no supported image is offered the companion app instead.</p><div class="table-wrap"><table class="platform-table"><tbody>${rows(hardware)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">ALSO IN THE SPEC</div><h2>For publishers and developers.</h2></div></div><p><strong>W3BS Publish:</strong> ship one signed release and reach users on every OS, with deb, Flatpak, Homebrew, winget, MSIX, dmg and APK built from it. <strong>Providers:</strong> <code>w3bs install</code> drives apt, dnf, pacman, Homebrew, winget, Flatpak, Nix and the app stores, and records what it installed. <strong>W3BS Fleet:</strong> one desktop app and cloud app for every server, desktop, laptop and phone you own (<a class="inline-link" href="/docs/fleet-prd.md">spec</a>).</p></section><div class="draft-note"><strong>Status: specification.</strong> Docker editions are out; the installer ISO and phone builds are in testing. Links and supported-hardware results appear here only once those artifacts and checks exist.</div>`;
+  return `<section class="page-head"><div class="eyebrow">W3BS OS · SPECIFICATION</div><h1>An OS people<br><em>and agents can run.</em></h1><p>A lightweight Alpine Linux-based operating system with KDE Plasma, zsh, a full setup wizard and every Profullstack app installed, plus a desktop agents can operate under your control. There are no images to download yet: this page tracks the specification and its progress.</p><div class="actions"><a class="button primary" href="/docs/os-prd.md">Read the specification <span aria-hidden="true">→</span></a><a class="text-link" href="https://github.com/profullstack/w3bs.org/blob/main/os/suite-manifest.json" rel="noopener">Suite manifest ↗</a></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">DEFAULTS</div><h2>What you get.</h2></div></div><div class="table-wrap"><table class="platform-table"><tbody>${rows(defaults)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">INCLUDED SOFTWARE</div><h2>The whole suite, offline.</h2></div></div><p>${suiteLine}</p></section><section class="section"><div class="section-heading"><div><div class="eyebrow">APPS FROM OTHER PLATFORMS</div><h2>One launcher, honest labels.</h2></div></div><p><code>w3bs run</code> picks the best route for each app and labels its window, so a remote or guest app is never passed off as local.</p><div class="table-wrap"><table class="platform-table"><tbody>${rows(runtimes)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">HARDWARE</div><h2>Certified, preview, research, unsupported.</h2></div></div><p>Only certified devices get an install button. A device with no supported image is offered the companion app instead.</p><div class="table-wrap"><table class="platform-table"><tbody>${rows(hardware)}</tbody></table></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">ALSO IN THE SPEC</div><h2>For publishers and developers.</h2></div></div><p><strong>W3BS Publish:</strong> ship one signed release and reach users on every OS, with deb, Flatpak, Homebrew, winget, MSIX, dmg and APK built from it. <strong>Providers:</strong> <code>w3bs install</code> drives apt, dnf, pacman, Homebrew, winget, Flatpak, Nix and the app stores, and records what it installed. <strong>W3BS Studio:</strong> an open-source IDE to build, run and debug for Linux, Android, Windows, macOS and iOS (Apple targets through your own Mac).</p></section><div class="draft-note"><strong>Status: specification.</strong> Milestone M0 (catalog and package foundation) is in progress. Image links and supported-hardware results appear here only once those artifacts and checks exist.</div>`;
 }
 const TRAINING_INSTALL = 'curl -fsSL https://w3bs.org/training/install.sh | sh';
 const TRAINING_INSTALL_WIN = 'irm https://w3bs.org/training/install.ps1 | iex';

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Agentic Desktop Layer
+Comment=Your desktop. Your agents. Your switch.
+Exec=/usr/local/bin/w3bs-desktop tray --wait-for-broker 60
+Icon=input-mouse
+X-KDE-autostart-phase=2
+X-GNOME-Autostart-enabled=true

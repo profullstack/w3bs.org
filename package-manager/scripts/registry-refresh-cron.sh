@@ -14,7 +14,7 @@ export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:/usr/local/bin:/usr/
 
 repo="$HOME/src/profullstack/w3bs.org"
 wt="$HOME/.local/share/w3bs-publish/refresh-worktree"
-branch="chore/registry-refresh-$(date -u +%Y%m%d-%H%M)"
+branch="chore/registry-refresh-$(date -u +%Y%m%d)"
 export W3BS_PUBLISH_BIN="$HOME/.local/share/w3bs-publish/bin/w3bs-publish"
 
 echo "== $(date -u +%FT%TZ) registry refresh"

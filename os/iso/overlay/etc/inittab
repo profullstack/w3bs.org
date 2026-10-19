@@ -1,0 +1,17 @@
+# /etc/inittab (W3BS OS live installer)
+
+::sysinit:/sbin/openrc sysinit
+::sysinit:/sbin/openrc boot
+::wait:/sbin/openrc default
+
+# tty1 logs in as root automatically and offers the installer
+tty1::respawn:/bin/login -f root
+tty2::respawn:/sbin/getty 38400 tty2
+tty3::respawn:/sbin/getty 38400 tty3
+tty4::respawn:/sbin/getty 38400 tty4
+tty5::respawn:/sbin/getty 38400 tty5
+tty6::respawn:/sbin/getty 38400 tty6
+ttyS0::respawn:/usr/local/sbin/w3bs-os-serial-getty
+
+::ctrlaltdel:/sbin/reboot
+::shutdown:/sbin/openrc shutdown

@@ -163,7 +163,7 @@ impl Engine {
         }
         let errors = issues.iter().filter(|i| i["severity"] == "error").count();
         res.result = if errors > 0 { Overall::Failure } else { Overall::Ok };
-        res.data = json!({ "issues": issues, "store": layout.data_dir, "bin_dir": layout.bin_dir, "manager_version": super::MANAGER_VERSION, "platform": w3bs_schema::host_platform() });
+        res.data = json!({ "issues": issues, "store": layout.data_dir, "bin_dir": layout.bin_dir, "manager_version": super::MANAGER_VERSION });
         Ok(res)
     }
 

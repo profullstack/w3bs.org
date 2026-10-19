@@ -4,10 +4,7 @@
 mod ab;
 mod auth;
 mod desktop;
-mod distupgrade;
 mod fleet;
-mod handler;
-mod link;
 mod publish;
 mod screen;
 mod render;
@@ -29,8 +26,6 @@ Apps:
   packages   w3bs packages            the package catalog (same list as w3bs.org/packages)
              w3bs install <pkg>       install, then `w3bs update` keeps everything current
              w3bs pkg --help          the whole package manager
-             w3bs open <w3bs://install/…>  install from a link (always asks first)
-             w3bs handler install     let the browser open w3bs:// links with `w3bs open`
   resources  w3bs resolve <w3bs://…>  resolve, inspect, verify and run signed W3BS resources
              w3bs resource --help     the whole resource client (search, publish, fork, sign…)
   account    w3bs login               sign in to your W3BS account (opens the browser; works
@@ -164,18 +159,6 @@ struct UpdateArgs {
     /// Reinstall even when the package is already current (pins still hold)
     #[arg(long, conflicts_with_all = ["version", "channel"])]
     force: bool,
-    /// Accept a publisher signing key this machine has not seen for a package's namespace
-    #[arg(long)]
-    accept_new_key: bool,
-    #[command(flatten)]
-    m: Mutate,
-}
-
-#[derive(Args, Clone)]
-struct DistUpgradeArgs {
-    /// Permit incompatible (major, or 0.x minor) W3BS package updates; pins still hold
-    #[arg(long)]
-    allow_major: bool,
     /// Accept a publisher signing key this machine has not seen for a package's namespace
     #[arg(long)]
     accept_new_key: bool,
@@ -719,16 +702,6 @@ enum ScreenCmd {
 }
 
 #[derive(Subcommand, Clone)]
-enum HandlerCmd {
-    /// Register `w3bs open` as this user's handler for w3bs:// links
-    Install,
-    /// Remove the w3bs:// handler registration
-    Uninstall,
-    /// Show whether the handler is registered and which app is the default
-    Status,
-}
-
-#[derive(Subcommand, Clone)]
 enum SelfCmd {
     /// Update the w3bs CLI through its own signed repository
     Update {
@@ -766,9 +739,6 @@ enum Cmd {
     Install(InstallArgs),
     /// Update everything, or the named packages (shortcut for `w3bs pkg update`)
     Update(UpdateArgs),
-    /// Upgrade the whole machine: the system packages (apk, apt, dnf, pacman, zypper or brew),
-    /// then every W3BS package and the w3bs CLI
-    DistUpgrade(DistUpgradeArgs),
     /// List installed packages (shortcut for `w3bs pkg list`)
     List,
     /// Search packages (shortcut for `w3bs pkg search`)
@@ -797,18 +767,6 @@ enum Cmd {
     },
     #[command(subcommand, hide = true)]
     Repo(RepoCmd),
-    /// Install from a link: w3bs://install/<namespace>/<name>[?channel=<c>] or
-    /// https://w3bs.org/i/<namespace>/<name>. Shows the install plan, with the publisher
-    /// signature, and always asks; opens a terminal window when started by a browser.
-    Open {
-        url: String,
-        /// Never open a terminal window; refuse when not run in one
-        #[arg(long)]
-        no_terminal: bool,
-    },
-    /// The w3bs:// link handler: install, uninstall, status
-    #[command(subcommand)]
-    Handler(HandlerCmd),
 
     // Resources: the second app.
     /// W3BS resources: search, resolve, inspect, verify, run, publish, fork, sign
@@ -1013,51 +971,9 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
         }
         Err(Cmd::Logout { a }) => ("logout", account("logout", &a, |o| async move { auth::logout(&o).await }).await),
         Err(Cmd::Whoami { a }) => ("whoami", account("whoami", &a, |o| async move { auth::whoami(&o).await }).await),
-        Err(Cmd::DistUpgrade(DistUpgradeArgs { allow_major, accept_new_key, m })) => {
-            let (_, mk) = match engine_factory(&out) {
-                Ok(x) => x,
-                Err(e) => return ("startup", Err(e)),
-            };
-            let tty = Tty { out: out.clone() };
-            let system = match distupgrade::system(m.yes, m.dry_run, |p| tty.confirm(p), |msg| tty.progress(msg)) {
-                Ok(v) => v,
-                Err(e) => return ("dist-upgrade", Err(e)),
-            };
-            // Approving the system step approves the whole upgrade; when it was skipped, the
-            // package step asks for itself.
-            let m = Mutate { yes: m.yes || system["status"] == "upgraded", dry_run: m.dry_run };
-            let r = mk(&m).update(UpdateRequest { packages: vec![], all: true, version: None, channel: None, allow_major, force: false, accept_new_key }).await;
-            (
-                "dist-upgrade",
-                r.map(|mut res| {
-                    res.operation = "dist-upgrade".into();
-                    res.data["system"] = system;
-                    res
-                }),
-            )
-        }
         Err(Cmd::Fleet(f)) => run_fleet(f).await,
         Err(Cmd::Ab(c)) => run_ab(c).await,
         Err(Cmd::Publish(c)) => run_publish(c).await,
-        Err(Cmd::Open { url, no_terminal }) => run_open(&url, no_terminal, out).await,
-        Err(Cmd::Handler(h)) => {
-            let (op, r) = match h {
-                HandlerCmd::Install => ("handler.install", handler::install()),
-                HandlerCmd::Uninstall => ("handler.uninstall", handler::uninstall()),
-                HandlerCmd::Status => ("handler.status", handler::status()),
-            };
-            (
-                op,
-                r.map(|data| {
-                    let mut res = OperationResult::new(op);
-                    if let Some(w) = data["warnings"].as_array() {
-                        res.warnings.extend(w.iter().filter_map(|x| x.as_str().map(str::to_owned)));
-                    }
-                    res.data = data;
-                    res
-                }),
-            )
-        }
         Err(Cmd::SelfCmd(s)) => {
             let (layout, mk) = match engine_factory(&out) {
                 Ok(x) => x,
@@ -1073,58 +989,6 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
         Err(Cmd::External(_)) => unreachable!("external commands exec before the runtime starts"),
         Err(_) => unreachable!("every command is dispatched"),
     }
-}
-
-/// `w3bs open <link>`: the normal interactive install for the package a link names. Never
-/// `--yes`: a person always sees the plan and the signature status and answers.
-async fn run_open(url: &str, no_terminal: bool, out: Output) -> (&'static str, w3bs_core::Result<OperationResult>) {
-    let l = match link::parse(url) {
-        Ok(l) => l,
-        Err(e) => return ("open", Err(w3bs_core::Error::usage("BAD_INSTALL_LINK", e))),
-    };
-    let manual = format!("run `w3bs install {}{}` in a terminal", l.id, l.channel.as_ref().map(|c| format!(" --channel {c}")).unwrap_or_default());
-    if !link::stdin_is_tty() {
-        // Started by a browser: no terminal to ask in. Re-run in a terminal window.
-        if no_terminal || out.json || out.non_interactive || !link::has_desktop() {
-            return ("open", Err(w3bs_core::Error::approval("NO_TERMINAL", format!("an install link needs a person at a terminal to confirm; {manual}"))));
-        }
-        let exe = match std::env::current_exe() {
-            Ok(e) => e,
-            Err(e) => return ("open", Err(w3bs_core::Error::preflight("NO_EXE", format!("cannot find the w3bs binary: {e}")))),
-        };
-        return match link::relaunch_in_terminal(&exe, &l) {
-            Ok(terminal) => {
-                let mut res = OperationResult::new("open");
-                res.data = json!({ "package": l.id.to_string(), "channel": l.channel, "terminal": terminal, "relaunched": true });
-                ("open", Ok(res))
-            }
-            Err(e) => ("open", Err(w3bs_core::Error::approval("NO_TERMINAL", format!("{e}; {manual}")))),
-        };
-    }
-    if out.json || out.non_interactive {
-        return ("open", Err(w3bs_core::Error::approval("APPROVAL_REQUIRED", format!("an install link always asks for confirmation, so it cannot run with --json or --non-interactive; {manual}"))));
-    }
-    eprintln!(
-        "w3bs: this link asks to install {}{}. Check the plan below, including who signed it; nothing changes unless you answer yes.",
-        l.id,
-        l.channel.as_ref().map(|c| format!(" from the {c} channel")).unwrap_or_default()
-    );
-    let (_, mk) = match engine_factory(&out) {
-        Ok(x) => x,
-        Err(e) => return ("startup", Err(e)),
-    };
-    let req = InstallRequest {
-        packages: vec![l.id.to_string()],
-        manifest: None,
-        repository: None,
-        version: None,
-        channel: l.channel,
-        pin: false,
-        force: false,
-        origin: Some("link".into()),
-        accept_new_key: false,
-    };
-    ("install", mk(&Mutate::default()).install(req).await)
 }
 
 async fn run_publish(cmd: PublishCmd) -> (&'static str, w3bs_core::Result<OperationResult>) {

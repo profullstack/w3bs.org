@@ -26,7 +26,7 @@ Every installer is per-user (no root or administrator), checks the release archi
 release's `SHA256SUMS`, starts the broker **Disabled** and never enables access; you enable it
 from the native control.
 
-**Linux** (x86_64, aarch64; glibc 2.28+ or musl):
+**Linux** (x86_64, aarch64; glibc 2.28+):
 
 ```bash
 curl --proto '=https' --proto-redir '=https' -fsSL https://w3bs.org/desktop/install.sh | sh
@@ -34,18 +34,6 @@ curl --proto '=https' --proto-redir '=https' -fsSL https://w3bs.org/desktop/inst
 
 Installs `~/.local/bin/w3bs-desktop`, a systemd user service for the broker, and the tray (KDE
 and others) or the GNOME Shell extension (GNOME) in your session.
-
-**Alpine / postmarketOS** (musl; x86_64, aarch64), same command. The installer detects musl and
-installs the static `*-unknown-linux-musl` build (override with `W3BS_LIBC=gnu|musl`). Without a
-systemd user manager (OpenRC) the broker starts with your graphical session from
-`~/.config/autostart/w3bs-desktop-broker.desktop`, still Disabled. The Linux backend talks to your
-session's portal and PipeWire; the installer installs no system packages and instead prints the
-`apk add` line for whichever of these are missing:
-
-```bash
-doas apk add xdg-desktop-portal xdg-desktop-portal-kde pipewire wireplumber dbus    # Plasma
-doas apk add xdg-desktop-portal xdg-desktop-portal-gnome pipewire wireplumber dbus  # GNOME
-```
 
 **macOS** 11+ (Apple silicon and Intel), same command. It installs `~/.local/bin/w3bs-desktop`
 and two LaunchAgents in your login session, and starts both:
@@ -344,7 +332,6 @@ cargo test --workspace   # broker conformance, Vela fake socket, KWin and GNOME 
 desktop/tests/rig/kde-portal.sh     # KDE Plasma in a container (TRAY=1 adds the tray stage)
 desktop/tests/rig/gnome-portal.sh   # GNOME Shell in a container, with the W3BS Shell extension
 desktop/tests/rig/macos-e2e.sh      # macOS logged-in session (GitHub macos-latest job `macos-e2e`)
-desktop/tests/installer/alpine.sh    # install.sh on Alpine (musl, no systemd) in alpine:3.24, x86_64 + aarch64 (job `installer-alpine`)
 desktop/tests/installer/macos.sh     # install.sh on macOS: LaunchAgents, launchd broker, menu bar, uninstall (job `installer-macos`)
 desktop/tests/installer/windows.ps1  # install.ps1 on Windows: autostart, windowless broker + tray, uninstall (job `installer-windows`)
 ```
