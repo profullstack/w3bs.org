@@ -995,3 +995,150 @@ fn handler_install_writes_desktop_entry() {
     assert!(!file.exists());
     assert_eq!(std::fs::read_to_string(config.join("mimeapps.list")).unwrap(), "[Default Applications]\ntext/html=firefox.desktop\n");
 }
+
+// ------------------------------------------------------------------ w3bs os setup
+
+/// The catalog entry for `profullstack.com/root-w3bs-os` at `version`. Its installer logs the
+/// run to `runs` and drops a stub `root-w3bs-os` into `sbin` (the W3BS_OS_SETUP_DIRS stand-in
+/// for /usr/local/sbin) that reports `version`, records its argv and exits $STUB_EXIT.
+fn root_os_entry(env: &Env, version: &str) -> Value {
+    let sbin = env.p("sbin");
+    let stub = env.p(&format!("root-w3bs-os-{version}"));
+    std::fs::write(
+        &stub,
+        format!(
+            "#!/bin/sh\nif [ \"$1\" = --version ]; then echo \"root-w3bs-os {version}\"; exit 0; fi\necho \"root-w3bs-os $*\" >> {log}\necho \"root-w3bs-os {version} ran\"\nexit ${{STUB_EXIT:-0}}\n",
+            log = env.p("argv").display()
+        ),
+    )
+    .unwrap();
+    let script = env.p(&format!("install-root-os-{version}.sh"));
+    std::fs::write(&script, format!("#!/bin/sh\necho {version} >> {runs}\nmkdir -p {s} && cp {stub} {s}/root-w3bs-os && chmod 755 {s}/root-w3bs-os\n", runs = env.p("runs").display(), s = sbin.display(), stub = stub.display())).unwrap();
+    serde_json::json!({
+        "id": "profullstack.com/root-w3bs-os", "name": "root-w3bs-os", "description": "set up a W3BS OS box", "commands": ["root-w3bs-os"],
+        "install": {"url": format!("file://{}", script.display()), "shell": "sh"}, "latest_version": version
+    })
+}
+
+/// Run `w3bs <args>` for os setup with a PATH whose doas (and sudo) record their argv and
+/// run the rest, so nothing reaches the real ones. No `--json` is appended.
+fn os_setup(env: &Env, args: &[&str], exit: &str) -> (i32, String, String) {
+    let stubs = env.p("stubs");
+    std::fs::create_dir_all(&stubs).unwrap();
+    for b in ["doas", "sudo"] {
+        let p = stubs.join(b);
+        std::fs::write(&p, format!("#!/bin/sh\necho \"{b} $*\" >> {}\nexec \"$@\"\n", env.p("argv").display())).unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let o = Command::new(env!("CARGO_BIN_EXE_w3bs"))
+        .args(args)
+        .env("W3BS_HOME", env.home())
+        .env("HOME", env.p("userhome"))
+        .env("W3BS_DEV_INSECURE_TRANSPORT", "1")
+        .env("W3BS_LOCK_TIMEOUT_SECS", "1")
+        .env("W3BS_OS_SETUP_DIRS", env.p("sbin"))
+        .env("PATH", format!("{}:/usr/bin:/bin", stubs.display()))
+        .env("STUB_EXIT", exit)
+        .stdin(std::process::Stdio::null())
+        .output()
+        .unwrap();
+    (o.status.code().unwrap_or(-1), String::from_utf8_lossy(&o.stdout).into_owned(), String::from_utf8_lossy(&o.stderr).into_owned())
+}
+
+fn argv_log(env: &Env) -> Vec<String> {
+    let l = std::fs::read_to_string(env.p("argv")).map(|s| s.lines().map(str::to_owned).collect()).unwrap_or_default();
+    let _ = std::fs::remove_file(env.p("argv"));
+    l
+}
+
+#[test]
+fn os_setup_installs_root_w3bs_os_then_runs_it_as_root() {
+    let env = Env::new();
+    let ws = catalog_repo(&env);
+    set_raw_catalog(&ws, vec![root_os_entry(&env, "1.0.0")]);
+    add_repo(&env, "cat", &ws);
+    let root = Command::new("id").arg("-u").output().map(|o| String::from_utf8_lossy(&o.stdout).trim() == "0").unwrap_or(false);
+    let script = env.p("sbin/root-w3bs-os");
+    // What the log shows for one run: doas's argv (unless root), then the script's.
+    let ran = |args: &str| {
+        let mut v = vec![];
+        if !root {
+            v.push(format!("doas {} {args}", script.display()));
+        }
+        v.push(format!("root-w3bs-os {args}"));
+        v
+    };
+
+    // Not Alpine: refused before anything is installed, unless --force.
+    if !Path::new("/etc/alpine-release").exists() {
+        let (code, _, err) = os_setup(&env, &["os", "setup", "--yes", "--", "anthony"], "0");
+        assert_eq!(code, 4, "{err}");
+        assert!(err.contains("root-ubuntu.sh"), "{err}");
+        assert!(runs(&env).is_empty() && argv_log(&env).is_empty());
+    }
+
+    // Missing: installed through the engine (the publisher's installer), then run with the
+    // arguments after `--` verbatim, w3bs-looking ones included.
+    let (code, out, err) = os_setup(&env, &["os", "setup", "--force", "--yes", "--", "anthony", "preshy", "--groups", "wheel", "--yes"], "0");
+    assert_eq!(code, 0, "{err}");
+    assert_eq!(runs(&env), vec!["1.0.0"]);
+    assert_eq!(argv_log(&env), ran("anthony preshy --groups wheel --yes"));
+    assert_eq!(out.trim(), "root-w3bs-os 1.0.0 ran", "the script owns stdout");
+    let (_, l, _) = env.w3bs(&["list"]);
+    assert_eq!(l["data"]["packages"][0]["id"], "profullstack.com/root-w3bs-os", "{l}");
+
+    // Installed and current: not re-installed; bare arguments pass through; the script's
+    // exit code is w3bs's.
+    let (code, _, err) = os_setup(&env, &["os", "setup", "--force", "--yes", "anthony", "--refresh"], "5");
+    assert_eq!(code, 5, "{err}");
+    assert_eq!(runs(&env), vec!["1.0.0"]);
+    assert_eq!(argv_log(&env), ran("anthony --refresh"));
+
+    // A newer catalog release is installed first. With --json the result is on stdout and the
+    // script's output on stderr.
+    set_raw_catalog(&ws, vec![root_os_entry(&env, "1.1.0")]);
+    let (code, out, err) = os_setup(&env, &["--json", "os", "setup", "--force", "--yes", "--", "mounts"], "9");
+    assert_eq!(code, 9, "{out} {err}");
+    let v: Value = serde_json::from_str(&out).unwrap_or_else(|e| panic!("{e}: {out}"));
+    assert_eq!((v["operation"].as_str(), v["data"]["exit_code"].as_i64(), v["error"]["code"].as_str()), (Some("os.setup"), Some(9), Some("SETUP_FAILED")), "{v}");
+    assert_eq!(outcome(&v, "profullstack.com/root-w3bs-os")["status"], "updated", "{v}");
+    assert!(err.contains("root-w3bs-os 1.1.0 ran"), "{err}");
+    assert_eq!(runs(&env), vec!["1.0.0", "1.1.0"]);
+    assert_eq!(argv_log(&env), ran("mounts"));
+
+    // --no-update leaves it alone; --print shows the exact command and runs nothing.
+    set_raw_catalog(&ws, vec![root_os_entry(&env, "1.2.0")]);
+    let (code, out, err) = os_setup(&env, &["--json", "os", "setup", "--force", "--no-update", "--print", "--", "anthony", "it's"], "0");
+    assert_eq!(code, 0, "{err}");
+    let v: Value = serde_json::from_str(&out).unwrap();
+    let want = format!("{}{} anthony 'it'\\''s'", if root { String::new() } else { format!("{} ", env.p("stubs/doas").display()) }, script.display());
+    assert_eq!((v["data"]["command_line"].as_str(), v["data"]["dry_run"].as_bool()), (Some(want.as_str()), Some(true)), "{v}");
+    assert_eq!(v["data"]["privilege"], if root { "root" } else { "doas" });
+    assert_eq!(runs(&env), vec!["1.0.0", "1.1.0"]);
+    assert!(argv_log(&env).is_empty());
+    // Without --no-update, the dry run plans the update and still runs nothing.
+    let (code, out, _) = os_setup(&env, &["--json", "os", "setup", "--force", "--dry-run", "--", "anthony"], "0");
+    let v: Value = serde_json::from_str(&out).unwrap();
+    assert_eq!((code, v["data"]["dry_run"].as_bool()), (0, Some(true)), "{v}");
+    assert_eq!(runs(&env), vec!["1.0.0", "1.1.0"]);
+    assert!(argv_log(&env).is_empty());
+
+    // No root, no doas, no sudo: exit 3 with a clear message (only testable as a user).
+    if !root {
+        for b in ["doas", "sudo"] {
+            std::fs::remove_file(env.p("stubs").join(b)).unwrap();
+        }
+        let o = Command::new(env!("CARGO_BIN_EXE_w3bs"))
+            .args(["os", "setup", "--force", "--no-update", "--", "anthony"])
+            .env("W3BS_HOME", env.home())
+            .env("W3BS_OS_SETUP_DIRS", env.p("sbin"))
+            .env("PATH", format!("{}:/nonexistent", env.p("stubs").display()))
+            .output()
+            .unwrap();
+        let err = String::from_utf8_lossy(&o.stderr);
+        assert_eq!(o.status.code(), Some(3), "{err}");
+        assert!(err.contains("NEEDS_ROOT") && err.contains("doas"), "{err}");
+        assert!(argv_log(&env).is_empty());
+    }
+}

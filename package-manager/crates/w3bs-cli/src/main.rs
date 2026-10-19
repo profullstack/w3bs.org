@@ -7,6 +7,7 @@ mod desktop;
 mod distupgrade;
 mod fleet;
 mod os;
+mod os_setup;
 mod handler;
 mod link;
 mod publish;
@@ -49,6 +50,7 @@ Apps:
   os         w3bs os status           W3BS OS edition, Alpine branch, pending updates, reboot
              w3bs os update           apk upgrade + w3bs self update + w3bs update
              w3bs os upgrade          dist-upgrade to the next Alpine branch (no ISO reinstall)
+             w3bs os setup -- <user>  set up accounts and services (runs root-w3bs-os as root)
   ab         w3bs ab ls               your A/B tests on w3bs.org/ab-testing (OpenABTest)
              w3bs ab new <id> --variant a --variant b   then start, show, pause, close
              w3bs ab --help           assign, resume, export, rm
@@ -804,6 +806,29 @@ enum OsCmd {
         #[command(flatten)]
         m: Mutate,
     },
+    /// Set up and maintain this box's accounts and services: install or update
+    /// profullstack.com/root-w3bs-os, then run `root-w3bs-os ARGS...` as root (doas or sudo)
+    #[command(after_help = "Script arguments: [user ...] [--groups g1,g2] [--refresh] [--with-sh1pt] [--without-moshcode]\n                  [mount|umount|mounts|share|groups|sandbox|confine ...]\nPut them after `--`; bare arguments work too when none is a w3bs flag.\n\n  w3bs os setup -- anthony preshy --groups wheel\n  w3bs os setup --print -- --refresh\n  w3bs os setup --no-update -- mounts")]
+    Setup {
+        /// Approve installing or updating root-w3bs-os
+        #[arg(short = 'y', long)]
+        yes: bool,
+        /// Plan the install or update and show the command; run nothing
+        #[arg(short = 'n', long)]
+        dry_run: bool,
+        /// Show the exact command that would run (same as --dry-run)
+        #[arg(long)]
+        print: bool,
+        /// Do not update root-w3bs-os first when it is already installed
+        #[arg(long)]
+        no_update: bool,
+        /// Run on a system that is not Alpine Linux (Ubuntu: use root-ubuntu.sh from cli-tools)
+        #[arg(long)]
+        force: bool,
+        /// Arguments for root-w3bs-os, passed through verbatim
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, value_name = "ARGS")]
+        args: Vec<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -988,7 +1013,16 @@ impl Interact for Tty {
 }
 
 fn main() {
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
+    if let Cmd::Os(OsCmd::Setup { .. }) = &cli.cmd {
+        // w3bs flags given among the script's arguments still count (see os_setup::split_args).
+        let (f, _) = os_setup::split_args(&os_setup::tail(&std::env::args().collect::<Vec<_>>()));
+        cli.out.json |= f.json;
+        cli.out.non_interactive |= f.non_interactive;
+        cli.out.quiet |= f.quiet && !cli.out.verbose && !f.verbose;
+        cli.out.verbose |= f.verbose && !cli.out.quiet;
+        os_setup::extend_path();
+    }
     let out = cli.out.clone();
     if let Cmd::External(args) = &cli.cmd {
         external(args, &out);
@@ -1001,7 +1035,11 @@ fn main() {
     } else {
         render::human(&res);
     }
-    let code = res.result.exit_code();
+    let mut code = res.result.exit_code();
+    // `os setup --json` reports the script's own exit code as its exit code.
+    if res.operation == "os.setup" && let Some(c) = res.data.get("exit_code").and_then(|c| c.as_i64()) {
+        code = c as i32;
+    }
     if res.result == Overall::Ok && res.data.get("handoff").and_then(|h| h.as_bool()) == Some(true) {
         handoff();
     }
@@ -1146,6 +1184,17 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
 
 async fn run_os(cmd: OsCmd, out: Output) -> (&'static str, w3bs_core::Result<OperationResult>) {
     let ni = out.non_interactive || out.json;
+    if let OsCmd::Setup { .. } = cmd {
+        // Re-split from argv: clap drops the `--` that separates w3bs flags from the script's.
+        let (flags, args) = os_setup::split_args(&os_setup::tail(&std::env::args().collect::<Vec<_>>()));
+        let (_, mk) = match engine_factory(&out) {
+            Ok(x) => x,
+            Err(e) => return ("os.setup", Err(e)),
+        };
+        let o = os_setup::SetupOpts { flags, args, json: out.json, non_interactive: out.non_interactive };
+        let ui = Tty { out };
+        return ("os.setup", os_setup::setup(&o, &ui, &|yes, dry_run| mk(&Mutate { yes, dry_run })).await);
+    }
     let ui = Tty { out };
     match cmd {
         OsCmd::Status => ("os.status", os::status().await),
@@ -1154,6 +1203,7 @@ async fn run_os(cmd: OsCmd, out: Output) -> (&'static str, w3bs_core::Result<Ope
             "os.upgrade",
             os::upgrade(&os::UpgradeOpts { to, allow_skip, ignore_policy, no_snapshot, resume, rollback, yes: m.yes, dry_run: m.dry_run, non_interactive: ni }, &ui).await,
         ),
+        OsCmd::Setup { .. } => unreachable!("handled above"),
     }
 }
 
