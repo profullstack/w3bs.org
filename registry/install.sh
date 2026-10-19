@@ -20,6 +20,8 @@
 # Options are passed straight to `w3bs install`, e.g.  ... | sh -s -- --version 1.2.3 --pin
 # Environment: W3BS_YES=1 approves without prompting (requires the fingerprints below);
 #              W3BS_HOME, W3BS_BIN_DIR relocate the install.
+#              W3BS_LIBC=gnu|musl overrides the C library detected on Linux (musl on Alpine
+#              and postmarketOS gets the static musl build).
 #
 # Nothing runs until the last line, so a truncated download does nothing.
 
@@ -38,8 +40,27 @@ w3bs_main() {
   say() { printf '%s\n' "$*" >&2; }
   die() { say "w3bs installer: $*"; exit "${2:-4}"; }
 
+  # musl (Alpine, postmarketOS) or glibc. ldd names its C library; without ldd, a glibc libc.so.6
+  # wins over a musl loader (Debian's `musl` package adds one; Alpine's gcompat fakes the glibc
+  # loader, not libc.so.6). W3BS_LIBC=gnu|musl overrides.
+  linux_libc() {
+    case "${W3BS_LIBC:-}" in gnu | musl) echo "$W3BS_LIBC"; return ;; esac
+    v="$(ldd --version 2>&1 || true)"
+    case "$v" in
+      *musl*) echo musl; return ;;
+      *GNU* | *GLIBC* | *glibc*) echo gnu; return ;;
+    esac
+    for f in /lib/*-linux-gnu/libc.so.6 /lib64/libc.so.6 /usr/lib64/libc.so.6 /usr/lib/libc.so.6; do
+      [ -e "$f" ] && { echo gnu; return; }
+    done
+    for f in /lib/ld-musl-*.so.1; do
+      [ -e "$f" ] && { echo musl; return; }
+    done
+    echo gnu
+  }
+
   case "$(uname -s)" in
-    Linux) os=unknown-linux-gnu ;;
+    Linux) os="unknown-linux-$(linux_libc)" ;;
     Darwin) os=apple-darwin ;;
     *) die "unsupported operating system $(uname -s); W3BS supports Linux and macOS" ;;
   esac
@@ -124,6 +145,10 @@ w3bs_main() {
       say "Until then, run it as:  $bin/w3bs update"
       ;;
   esac
+  # On a desktop, offer (never register silently) the handler for w3bs:// install links.
+  if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] || { [ "$(uname -s)" = Darwin ] && [ -z "${SSH_CONNECTION:-}" ]; }; then
+    say "Open w3bs:// install links from your browser (asks before every install):  w3bs handler install"
+  fi
 }
 
 w3bs_main "$@"
