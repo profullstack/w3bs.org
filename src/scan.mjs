@@ -155,7 +155,12 @@ export function verdict(report) {
     // Paths are relative to the scan root: installer/… or source/<repo-dir>/…
     file: String(finding.file || '').replace(/^source\/[^/]+\//, 'source/'),
     line: finding.line,
-    malware: MALWARE_RULES.has(finding.ruleId) || finding.cwe === 'CWE-506',
+    // ThreatCrush caps a bare match at medium and softens one in a test file, a test
+    // block or documentation to low. A softened match is a note, not malware: otherwise
+    // a scanner's own detection fixtures flag the scanner.
+    malware:
+      (MALWARE_RULES.has(finding.ruleId) || finding.cwe === 'CWE-506') &&
+      !['low', 'info'].includes(finding.severity),
   }));
   const malware = findings.filter((finding) => finding.malware).length;
   return {

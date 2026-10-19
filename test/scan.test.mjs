@@ -54,6 +54,19 @@ test('verdict: only malware rules flag a package; ordinary findings stay notes',
   }
 });
 
+test('verdict: a malware rule ThreatCrush softened to low (a test fixture) does not flag', () => {
+  // threatcrush 0.13.48 was flagged for its own false-positives.test.ts fixtures.
+  const fixture = finding('js-environment-exfiltration', {
+    severity: 'low',
+    file: 'source/repo-abc123/packages/scan/src/__tests__/false-positives.test.ts',
+  });
+  const passed = verdict(report([fixture]));
+  assert.equal(passed.status, 'passed');
+  assert.equal(passed.findings[0].malware, false);
+  const real = verdict(report([finding('js-environment-exfiltration', { severity: 'medium' })]));
+  assert.equal(real.status, 'flagged');
+});
+
 test('scanner scans once, re-scans only when the installer or version changes', async () => {
   const store = await openStore({ path: ':memory:', seed: false });
   const entry = await store.package(ID);
