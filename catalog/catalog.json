@@ -2338,15 +2338,15 @@
         "does": "Delete everything captured in the last ten minutes"
       }
     ],
-    "description": "Review, curate and version demonstrations of your desktop work, then let an authorized agent retrieve approved examples over MCP. Local first and encrypted at rest; push reviewed tasks to your own workspace at w3bs.org/training/app when you want them on another device or for a hosted agent.",
+    "description": "Review, curate and version demonstrations of your desktop work, then let an authorized agent retrieve approved examples over MCP. Local first and encrypted at rest; push reviewed tasks to your own workspace at w3bs.org/training/app, or publish them as OpenTasks on w3bs.org/tasks with a moshscript anyone can run.",
     "homepage": "https://w3bs.org/training",
     "repository": "https://github.com/profullstack/w3bs.org/tree/main/training",
     "license": "MIT",
     "agentic": true,
-    "latest_version": "0.2.6",
+    "latest_version": "0.2.7",
     "vendor": "Profullstack",
     "install": "curl -fsSL https://w3bs.org/training/install.sh | sh",
-    "evidence": "w3bs.org/training/install.sh 200 (text/x-shellscript); GitHub release training-v0.2.6 with 5 archives + SHA256SUMS; installed from w3bs.org in a clean ubuntu:24.04 container; hosted workspace answers an authenticated w3bs login session",
+    "evidence": "w3bs.org/training/install.sh 200 (text/x-shellscript); GitHub release training-v0.2.7 with 5 archives + SHA256SUMS; installed from w3bs.org in a clean ubuntu:24.04 container; hosted workspace answers an authenticated w3bs login session",
     "publisher": "profullstack"
   },
   {

@@ -21,7 +21,7 @@
 function Install-W3bsTraining {
     [CmdletBinding()]
     param(
-        [string]$Version = $(if ($env:W3BS_TRAINING_VERSION) { $env:W3BS_TRAINING_VERSION } else { '0.2.6' }),
+        [string]$Version = $(if ($env:W3BS_TRAINING_VERSION) { $env:W3BS_TRAINING_VERSION } else { '0.2.7' }),
         [switch]$Uninstall
     )
     $ErrorActionPreference = 'Stop'
