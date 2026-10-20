@@ -74,27 +74,32 @@ const specs = [
     'Implemented',
   ],
 ];
+// The main nav, mobile first. Phones get one Menu button holding every link; from 1000px the
+// PRIMARY links sit inline and the button becomes "More" with only the OVERFLOW links in it.
+const NAV_PRIMARY = [
+  ['/packages', 'Packages'],
+  ['/os', 'OS'],
+  ['/desktop', 'Desktop'],
+  ['/training', 'Training'],
+  ['/tasks', 'Tasks'],
+  ['/workflows', 'Workflows'],
+  ['/fleet', 'Fleet'],
+];
+const NAV_OVERFLOW = [
+  ['/specs', 'Standards'],
+  ['/browse', 'Browse'],
+  ['/prompts', 'Prompts'],
+  ['/social', 'Social'],
+  ['/bbs', 'Community'],
+  ['/governance', 'Participate'],
+];
 function header(active) {
-  return `<a class="skip" href="#main">Skip to content</a><header class="header"><a class="wordmark" href="/mission" aria-label="W3BS home"><img src="/assets/mark.svg" alt="" width="28" height="28">w3bs<span class="wordmark-dot">.</span></a><nav aria-label="Main navigation">${[
-    ['/packages', 'Packages'],
-    ['/os', 'OS'],
-    ['/specs', 'Standards'],
-    ['/browse', 'Browse'],
-    ['/prompts', 'Prompts'],
-    ['/desktop', 'Desktop'],
-    ['/training', 'Training'],
-    ['/fleet', 'Fleet'],
-    ['/social', 'Social'],
-    ['/bbs', 'Community'],
-    ['/governance', 'Participate'],
-  ]
-    .map(
-      ([href, label]) =>
-        `<a href="${href}" ${active === href ? 'aria-current="page"' : ''}>${label}</a>`,
-    )
-    .join(
-      '',
-    )}</nav><a class="header-account" href="/account" ${active === '/account' ? 'aria-current="page"' : ''}>Account</a><a class="header-action" href="/developers">Start building <span aria-hidden="true">↗</span></a></header>`;
+  const current = (href) =>
+    active === href || active?.startsWith(`${href}/`) ? 'aria-current="page"' : '';
+  const links = (list, cls = '') =>
+    list.map(([href, label]) => `<a${cls} href="${href}" ${current(href)}>${label}</a>`).join('');
+  const inOverflow = NAV_OVERFLOW.some(([href]) => current(href));
+  return `<a class="skip" href="#main">Skip to content</a><header class="header"><a class="wordmark" href="/mission" aria-label="W3BS home"><img src="/assets/mark.svg" alt="" width="28" height="28">w3bs<span class="wordmark-dot">.</span></a><nav aria-label="Main navigation"><div class="nav-inline">${links(NAV_PRIMARY)}</div><details class="nav-menu"><summary${inOverflow ? ' class="nav-menu-current"' : ''}><span class="nav-menu-label-mobile">Menu</span><span class="nav-menu-label-wide">More</span><span class="nav-menu-caret" aria-hidden="true">▾</span></summary><div class="nav-menu-panel">${links(NAV_PRIMARY, ' class="nav-menu-primary"')}${links(NAV_OVERFLOW)}</div></details></nav><a class="header-account" href="/account" ${active === '/account' ? 'aria-current="page"' : ''}>Account</a><a class="header-action" href="/developers">Start building <span aria-hidden="true">↗</span></a></header>`;
 }
 // W3BS's own community first, then Profullstack's accounts (the same list as
 // profullstack.com's footer).

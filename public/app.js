@@ -81,3 +81,16 @@ runForm?.addEventListener('submit', async (event) => {
   }
 });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+// The header's Menu/More dropdown is a <details>: close it on an outside click or Escape.
+const navMenu = document.querySelector('.nav-menu');
+if (navMenu) {
+  document.addEventListener('click', (event) => {
+    if (navMenu.open && !navMenu.contains(event.target)) navMenu.open = false;
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && navMenu.open) {
+      navMenu.open = false;
+      navMenu.querySelector('summary').focus();
+    }
+  });
+}

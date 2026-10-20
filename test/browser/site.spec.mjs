@@ -31,7 +31,10 @@ test('homepage navigation, code tabs and narrow layouts work', async ({ page }, 
   );
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.goto('/');
-  await page.getByRole('navigation').getByRole('link', { name: 'Standards' }).click();
+  // Standards lives in the overflow menu (Menu on phones, More on wide screens).
+  const nav = page.getByRole('navigation', { name: 'Main navigation' });
+  await nav.locator('summary').click();
+  await nav.getByRole('link', { name: 'Standards' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Common ground.');
   await page.getByRole('link', { name: /W3BS-URI-1/ }).click();
   await expect(page.getByRole('heading', { level: 1 })).toContainText('W3BS-URI-1');

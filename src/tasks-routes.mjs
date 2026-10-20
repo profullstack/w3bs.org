@@ -107,6 +107,7 @@ w3bs training unpublish TASK_ID`;
       : '<p class="muted">Nothing published yet. Tasks appear here when someone publishes a reviewed demonstration from W3BS Training.</p>';
     page(res, {
       title: 'Tasks',
+      active: '/tasks',
       description:
         'Desktop tasks people taught W3BS Training and published as OpenTasks: the goal and the steps as meaning, never coordinates or typed text, each with a moshscript to run it.',
       robots: '',
@@ -126,6 +127,7 @@ w3bs training unpublish TASK_ID`;
       : '';
     page(res, {
       title: task.title,
+      active: '/tasks',
       description: `${task.goal} An OpenTask with ${task.steps.length} step(s), published on W3BS.`,
       robots: '',
       track: true,
@@ -157,6 +159,7 @@ moshcode run ${t.id}.mosh             # opens claude with the task; or add: code
         : '<p class="muted">Publish a task first (<code>w3bs training publish</code>), then collect tasks here.</p>';
     page(res, {
       title: 'Workflows',
+      active: '/workflows',
       description:
         'Workflows are collections of published OpenTasks, served as OpenWorkflow documents: each task by URL and digest, run in sequence or any order.',
       robots: '',
@@ -175,6 +178,7 @@ moshcode run ${t.id}.mosh             # opens claude with the task; or add: code
       .join('\n');
     page(res, {
       title: w.title,
+      active: '/workflows',
       description: `${w.description || w.title}: an OpenWorkflow of ${w.tasks.length} task(s) on W3BS.`,
       robots: '',
       track: true,
