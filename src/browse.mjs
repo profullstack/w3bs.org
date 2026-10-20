@@ -34,8 +34,14 @@ export function normalizeInput(raw) {
   const input = String(raw ?? '').trim();
   if (!input) return null;
   if (input.length > 2048) throw invalid('Input is longer than 2048 characters.');
-  if (/^w3bs:\/\//i.test(input)) return { kind: 'w3bs', input, uri: input };
   let text = input;
+  // w3bs://type/namespace/name is a W3BS resource. A dotted authority is not a type but a name to
+  // browse: w3bs://chovy.hacker is chovy.hacker, w3bs://example.com/path is that https page.
+  const w3bs = /^w3bs:\/\/([^/?#]*)/i.exec(input);
+  if (w3bs) {
+    if (!w3bs[1].includes('.')) return { kind: 'w3bs', input, uri: input };
+    text = `https://${input.slice('w3bs://'.length)}`;
+  }
   const scheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(text);
   if (scheme) {
     const name = scheme[1].toLowerCase();
