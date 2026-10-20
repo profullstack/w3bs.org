@@ -23,6 +23,7 @@ COPY --chown=bun:bun catalog ./catalog
 COPY --chown=bun:bun registry ./registry
 # Agentic Desktop Layer installer served at /desktop/install.sh.
 COPY --chown=bun:bun desktop/packaging ./desktop/packaging
+COPY --chown=bun:bun de ./de
 # W3BS Training: the hosted workspace app (src/server.mjs mounts training/hosted-routes.mjs)
 # and the installers served at /training/install.sh and /training/install.ps1.
 COPY --chown=bun:bun training ./training

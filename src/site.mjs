@@ -80,6 +80,7 @@ const NAV_PRIMARY = [
   ['/packages', 'Packages'],
   ['/os', 'OS'],
   ['/desktop', 'Desktop'],
+  ['/de', 'DE'],
   ['/training', 'Training'],
   ['/tasks', 'Tasks'],
   ['/workflows', 'Workflows'],
@@ -391,13 +392,9 @@ const desktopPlatforms = [
   ['First', 'GNOME', 'Top-panel extension and settings app', 'Installable, testing'],
   ['Next', 'Windows', 'Taskbar notification-area icon', 'Installable, testing'],
   ['Next', 'macOS', 'Menu-bar item', 'Installable, testing'],
+  ['Next', 'Hyprland (and W3BS DE)', 'Tray in waybar; bar indicator in W3BS DE', 'Installable, testing'],
   ['Next', 'Cinnamon, Xfce, MATE, LXQt', 'Tray or panel integration', 'Planned'],
-  [
-    'Expansion',
-    'Vela, Sway, Hyprland and others',
-    'Capability-based compositor adapters',
-    'Planned',
-  ],
+  ['Expansion', 'Vela, Sway and others', 'Capability-based compositor adapters', 'Planned'],
 ];
 const desktopArchitecture = `Claude Code / OpenCode / Codex / compatible clients
                        |
@@ -477,6 +474,54 @@ curl -fsSL https://w3bs.org/desktop/install.sh | sh -s -- --uninstall
 
 # Windows (PowerShell)
 & ([scriptblock]::Create((irm https://w3bs.org/desktop/install.ps1))) -Uninstall`;
+const DE_INSTALL = 'curl -fsSL https://w3bs.org/de/install.sh | sh';
+const deDescription =
+  'W3BS DE: a minimal, agent-friendly Wayland desktop built on Hyprland, with the Agentic Desktop Layer built in and agent access off until you turn it on.';
+const deKeys = [
+  ['SUPER + SPACE', 'Launcher'],
+  ['SUPER + RETURN', 'Terminal'],
+  ['SUPER + W', 'Close the window'],
+  ['SUPER + 1 … 9', 'Workspaces (add SHIFT to move the window)'],
+  ['SUPER + arrows', 'Focus (add SHIFT to swap)'],
+  ['SUPER + T / F', 'Float or tile / full screen'],
+  ['SUPER + A', 'Agent control panel'],
+  ['SUPER + SHIFT + A', 'The agent workspace (a scratch space agents can use out of your way)'],
+  ['SUPER + ALT + ESCAPE', 'Turn agent access off, from anywhere'],
+  ['SUPER + N', 'Notifications'],
+  ['SUPER + ESCAPE', 'Lock'],
+  ['PRINT', 'Screenshot a region to the clipboard'],
+];
+const deDistros = [
+  ['Arch, EndeavourOS, CachyOS', 'pacman (extra)', 'Hyprland 0.56'],
+  ['Fedora', 'COPR lionheartp/Hyprland (the one the Hyprland wiki lists)', 'Hyprland 0.56'],
+  ['Debian', 'trixie-backports, forky, sid', '0.55 and later'],
+  ['Ubuntu', '26.10 and later (26.04 ships 0.53: hyprlang defaults)', '0.56'],
+  ['Alpine, postmarketOS', 'community (edge)', '0.54: hyprlang defaults'],
+  ['openSUSE Tumbleweed', 'zypper', 'current'],
+  ['NixOS', 'the installer prints the configuration.nix lines', 'current'],
+];
+function dePage() {
+  const shot = existsSync(resolve(ROOT, 'public', 'de-desktop.webp'))
+    ? `<figure class="control-shot control-shot-main"><img src="/assets/de-desktop.webp" width="1920" height="1080" loading="lazy" alt="W3BS DE: the w3bs bar at the top with workspaces, the window title, the agent indicator and the clock, two terminals tiled side by side on the dark w3bs wallpaper."><figcaption>W3BS DE on a test rig: the bar, two tiled terminals and the wallpaper. The agent indicator in the bar says whether agent access is off, on, or which agent is driving.</figcaption></figure>`
+    : '';
+  return `<section class="page-head desktop-head"><div class="eyebrow">W3BS DE · BUILT ON HYPRLAND · WAYLAND</div><h1>A quiet desktop.<br>Agents welcome.<br><em>Your switch.</em></h1><p>W3BS DE is a minimal Wayland desktop for people who work with agents. Hyprland underneath, one bar, one launcher, one notification center, and the <a class="inline-link" href="/desktop">Agentic Desktop Layer</a> built in: your agents can see and use this desktop when, and only when, you turn agent access on.</p><div class="desktop-install-box"><span class="eyebrow">LINUX (X86_64, ARM64)</span><div class="identity-line"><code>${e(DE_INSTALL)}</code><button class="small-button" type="button" data-copy="${e(DE_INSTALL)}">Copy</button></div><p class="muted">It installs Hyprland and a handful of small tools with your package manager (it asks first), the W3BS DE defaults in your home directory, a "W3BS DE" entry on your login screen, and the Agentic Desktop Layer. Read it first: <a class="inline-link" href="/de/install.sh">de/install.sh</a>.</p><div class="actions"><a class="button primary" href="#agents">What agents get <span aria-hidden="true">↓</span></a><a class="text-link" href="#keys">The keys <span aria-hidden="true">→</span></a></div></div></section><div class="draft-note desktop-status" id="status"><strong>Release status.</strong> 0.1, new. The agent backend for Hyprland (windows and layout over Hyprland's IPC, input through the Wayland virtual pointer and keyboard, captures through grim) ships in the Agentic Desktop Layer 0.8. Verified on Hyprland 0.56.2 with these defaults loaded: windows, captures, typing (every US key, accents, CJK) exactly, pointer, clicks and workspace shortcuts. Both config formats pass Hyprland's own <code>--verify-config</code>. W3BS DE is an independent project built on Hyprland; it is not made by or affiliated with the Hyprland project.</div>
+  ${shot ? `<section class="section desktop-demo"><div class="control-shots">${shot}</div></section>` : ''}
+  <section class="section"><div class="section-heading"><div><div class="eyebrow">WHAT IT IS</div><h2>Small on purpose.</h2></div><p>Every piece is something you could name and replace. Nothing runs that you did not ask for.</p></div><div class="principle-grid"><article><span class="card-index">01 / MINIMAL</span><h3>Hyprland and seven small tools.</h3><p>waybar for the bar, fuzzel to launch, swaync for notifications, hyprlock and hypridle, swaybg for the wallpaper, foot as the terminal. No blur, no shadows, short animations, the w3bs palette.</p></article><article><span class="card-index">02 / AGENT-FRIENDLY</span><h3>Built for the observe, act, observe loop.</h3><p>Predictable tiling, windows that open where they say, real window titles, and a desktop layer that types any Unicode character exactly. Agents see what you see.</p></article><article><span class="card-index">03 / YOURS</span><h3>Your settings survive updates.</h3><p>The defaults live in <code>~/.local/share/w3bs-de</code>; your changes go in <code>~/.config/w3bs-de/hypr/user.lua</code> and load last. W3BS DE uses its own config, so an existing Hyprland setup is left alone.</p></article></div></section>
+  <section class="section" id="agents"><div class="section-heading"><div><div class="eyebrow">AGENTS</div><h2>Agents get a desktop.<br><em>You keep the switch.</em></h2></div><p>The Agentic Desktop Layer starts with the session, Disabled. Everything it does on any desktop, it does here, with a backend made for Hyprland.</p></div><div class="principle-grid"><article><span class="card-index">THE BAR</span><h3>Always know who is driving.</h3><p>The agent indicator reads off, on, which agent is driving, or "agent needs you". Click it for the control app; right-click turns agent access off. SUPER + ALT + ESCAPE does the same from anywhere.</p></article><article><span class="card-index">ASKS FIRST</span><h3>Drive prompts and human steps.</h3><p>An agent asks before it drives, and hands you anything only a person should do: CAPTCHAs, sign-in codes, passwords, payments. They pop up in the notification center with their buttons.</p></article><article><span class="card-index">OUT OF YOUR WAY</span><h3>An agent workspace.</h3><p>SUPER + SHIFT + A shows a scratch workspace where agents can work while you use the others. Agent mode (<code>w3bs-de agent-mode on</code>) keeps the screen unlocked while agents work unattended; leave it off otherwise.</p></article></div><aside class="callout"><strong>Safety on this backend.</strong><p>Input is refused while the screen is locked or an authentication dialog (polkit, pinentry, a keyring prompt) is open, so synthetic keys never reach a password field. Moving the mouse while an agent drives counts as taking over and turns agent access off. Hyprland cannot tell a person's keyboard from the agent's, so use the mouse or SUPER + ALT + ESCAPE to take over.</p></aside></section>
+  <section class="section" id="keys"><div class="section-heading"><div><div class="eyebrow">THE KEYS</div><h2>Twelve to learn.</h2></div><p>SUPER is the Windows or Command key. Add your own in <code>user.lua</code> with <code>w3bs.bind("SUPER + E", "Files", "nautilus")</code>.</p></div><div class="table-wrap"><table class="platform-table"><caption class="sr-only">Key bindings</caption><thead><tr><th scope="col">Keys</th><th scope="col">Does</th></tr></thead><tbody>${deKeys.map(([k, d]) => `<tr><th scope="row"><code>${e(k)}</code></th><td>${e(d)}</td></tr>`).join('')}</tbody></table></div></section>
+  <section class="section"><div class="section-heading"><div><div class="eyebrow">WHERE IT RUNS</div><h2>Your distribution's Hyprland.</h2></div><p>W3BS DE installs Hyprland from your distribution; it does not build or bundle it. Hyprland 0.55 and later use the Lua defaults; older releases get the same desktop from hyprlang defaults.</p></div><div class="table-wrap"><table class="platform-table"><caption class="sr-only">Distributions</caption><thead><tr><th scope="col">Distribution</th><th scope="col">Hyprland from</th><th scope="col">Version</th></tr></thead><tbody>${deDistros.map(([d, f, v]) => `<tr><th scope="row">${e(d)}</th><td>${e(f)}</td><td>${e(v)}</td></tr>`).join('')}</tbody></table></div></section>
+  <section class="section"><div class="section-heading"><div><div class="eyebrow">EVERYTHING ELSE</div><h2>One command.</h2></div><p>The <code>w3bs-de</code> command runs the session and its helpers.</p></div><figure class="architecture"><pre>${e(`w3bs-de session            start the desktop (what the login screen runs)
+w3bs-de doctor             check what the desktop and its agent layer need
+w3bs-de agent-mode on|off  keep the screen unlocked while agents work unattended
+w3bs-de wallpaper [FILE]   set (or reset) the wallpaper
+w3bs-de screenshot region|screen
+w3bs-de update             fetch the latest defaults (your settings are kept)
+
+Install options: --yes, --no-packages, --no-agents, --no-session`)}</pre></figure><details class="inspector-panel"><summary>Uninstall</summary><pre class="instructions">${e(`rm -rf ~/.local/share/w3bs-de ~/.local/bin/w3bs-de
+rm -rf ~/.config/w3bs-de                      # your settings
+sudo rm -f /usr/share/wayland-sessions/w3bs-de.desktop /usr/local/bin/w3bs-de
+# Hyprland and the tools stay installed; remove them with your package manager.`)}</pre></details></section>`;
+}
 function desktopPage() {
   const prd = readFileSync(resolve(ROOT, 'docs', 'agentic-desktop-layer-prd.md'), 'utf8');
   const shots = `<div class="control-shots"><figure class="control-shot control-shot-main"><img src="/assets/desktop-control-app.webp" width="1280" height="1110" loading="lazy" alt="The control app with agent access Enabled: the active agent and its task, Disable agent access, Stop all agent activity and Quit and disable buttons, the emergency stop shortcut, a pending approval to type into the Kate editor, and three agents with their permission presets."><figcaption>The control app, opened from the tray. Status, the big switches, approvals and every agent's access on one page.</figcaption></figure><figure class="control-shot"><img src="/assets/desktop-control-app-access.webp" width="1280" height="900" loading="lazy" alt="Changing an agent's access in the control app: Observe, Restricted, Broad desktop or Nothing, and the list of apps a restricted agent may use."><figcaption>Change what an agent may do: observe only, restricted to named apps, the whole desktop, or nothing.</figcaption></figure><figure class="control-shot control-shot-phone"><img src="/assets/desktop-control-app-phone.webp" width="780" height="1420" loading="lazy" alt="The control app on a narrow screen: Enabled status and full-width Disable, Stop and Quit buttons."><figcaption>It stays usable in a narrow window.</figcaption></figure><p class="control-shots-note">Real screenshots of the control app running against the layer's built-in demo desktop, so the agents and tasks are sample data. The app only answers on 127.0.0.1 and signs in with a one-time link from the tray or <code>w3bs desktop control --open</code>.</p></div>`;
@@ -714,6 +759,10 @@ export async function renderPage({ path, host, query, store, origin, browser }) 
     description =
       'Teach agents by doing the task yourself: record it from the Agentic Desktop Layer, review it, and let only the agents you choose retrieve the approved examples over MCP.';
     content = trainingPage();
+  } else if (path === '/de') {
+    title = 'W3BS DE';
+    description = deDescription;
+    content = dePage();
   } else if (path === '/desktop') {
     title = 'Agentic Desktop Layer';
     description = desktopDescription;

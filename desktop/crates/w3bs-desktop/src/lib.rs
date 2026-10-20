@@ -61,8 +61,10 @@ struct Cli {
 
 #[derive(Clone, Copy, ValueEnum, PartialEq)]
 enum AdapterKind {
-    /// Vela if running, else the XDG portal backend (KDE Plasma, GNOME; windows from KWin or the W3BS GNOME Shell extension); never the mock
+    /// Vela if running, else Hyprland (W3BS DE), else the XDG portal backend (KDE Plasma, GNOME; windows from KWin or the W3BS GNOME Shell extension); never the mock
     Auto,
+    /// Hyprland (W3BS DE): IPC for windows, wlroots virtual pointer/keyboard for input, grim for captures
+    Hyprland,
     /// Vela compositor command socket (observation and interlocks; input needs VELA_DEBUG_INPUT)
     Vela,
     /// XDG RemoteDesktop/ScreenCast/Screenshot portals (KDE Plasma, GNOME); windows come from KWin or the GNOME Shell extension
@@ -120,7 +122,11 @@ enum Cmd {
         wait_for_broker: u64,
     },
     /// Show the layer state
-    Status,
+    Status {
+        /// One line of waybar custom-module JSON (text, class off|on|driving|waiting, tooltip), for the W3BS DE bar
+        #[arg(long)]
+        waybar: bool,
+    },
     /// Ask to enable agent access (confirm in the native control or with its code)
     Enable,
     /// Disable agent access and stop everything mediated by the layer
@@ -744,6 +750,26 @@ fn print(v: &Value, json_out: bool) {
     }
 }
 
+/// The W3BS DE bar's agent indicator: off, on, which agent is driving, or a person is needed.
+fn waybar_status(v: &Value, agents: &Value) -> Value {
+    let name = |id: &str| agents.as_array().and_then(|a| a.iter().find(|x| x["id"] == id)).and_then(|x| x["name"].as_str()).unwrap_or(id).to_string();
+    let n = |k: &str| v[k].as_u64().unwrap_or(0);
+    let waiting = n("pending_drive_requests") + n("pending_human_steps") + n("pending_approvals");
+    let state = v["state"].as_str().unwrap_or("disabled");
+    let (text, class) = if waiting > 0 {
+        ("agent needs you".to_string(), "waiting")
+    } else if let Some(agent) = v["lease"]["agent"].as_str() {
+        (format!("{} driving", name(agent)), "driving")
+    } else if state == "enabled" {
+        ("agents on".to_string(), "on")
+    } else {
+        ("agents off".to_string(), "off")
+    };
+    let mut tip = status_line(v);
+    tip += "\nClick: control app (SUPER+A). Right-click: turn agent access off (SUPER+ALT+Escape).";
+    json!({"text": text, "class": class, "tooltip": tip})
+}
+
 fn status_line(v: &Value) -> String {
     let mut s = format!("Agent access: {}", v["state"].as_str().unwrap_or("?").to_uppercase());
     if let Some(r) = v["blocked_reason"].as_str() {
@@ -844,8 +870,13 @@ fn run_with(cli: Cli) {
             control::run().map_err(|e| AdlError::new(ErrorCode::Blocked, e.to_string()))?;
             Ok(Value::Null)
         }
-        Cmd::Status => {
-            let v = control_client()?.call("status", json!({}))?;
+        Cmd::Status { waybar } => {
+            let mut c = control_client()?;
+            let v = c.call("status", json!({}))?;
+            if waybar {
+                let agents = c.call("agents.list", json!({})).unwrap_or(Value::Null);
+                return Ok(json!(waybar_status(&v, &agents).to_string()));
+            }
             Ok(if j { v } else { json!(status_line(&v)) })
         }
         Cmd::Enable => {

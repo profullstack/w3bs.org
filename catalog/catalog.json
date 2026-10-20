@@ -2311,6 +2311,41 @@
     "publisher": "profullstack"
   },
   {
+    "id": "w3bs.org/w3bs-de",
+    "name": "w3bs-de",
+    "commands": [
+      "w3bs-de"
+    ],
+    "examples": [
+      {
+        "run": "w3bs-de session",
+        "does": "Start W3BS DE (what the \"W3BS DE\" login-screen entry runs)"
+      },
+      {
+        "run": "w3bs-de doctor",
+        "does": "Check Hyprland, the desktop tools and the agent layer"
+      },
+      {
+        "run": "w3bs-de agent-mode on",
+        "does": "Keep the screen unlocked while agents work unattended (off restores idle locking)"
+      },
+      {
+        "run": "w3bs-de update",
+        "does": "Fetch the latest W3BS DE defaults; your settings in ~/.config/w3bs-de are kept"
+      }
+    ],
+    "description": "W3BS DE: a minimal, agent-friendly Wayland desktop built on Hyprland (waybar, fuzzel, swaync, hyprlock, foot), in the w3bs palette, with the Agentic Desktop Layer built in and agent access off until you turn it on. Installs Hyprland from your distribution.",
+    "homepage": "https://w3bs.org/de",
+    "repository": "https://github.com/profullstack/w3bs.org/tree/main/de",
+    "license": "MIT",
+    "agentic": true,
+    "latest_version": "0.1.0",
+    "vendor": "Profullstack",
+    "install": "curl -fsSL https://w3bs.org/de/install.sh | sh",
+    "evidence": "w3bs.org/de/install.sh and /de/manifest.txt (sha256 per file); installer verified into a clean home; Hyprland backend in the Agentic Desktop Layer 0.8",
+    "publisher": "profullstack"
+  },
+  {
     "id": "w3bs.org/w3bs-training",
     "name": "w3bs-training",
     "commands": [

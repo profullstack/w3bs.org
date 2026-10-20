@@ -1,0 +1,65 @@
+// W3BS DE bar (waybar). https://w3bs.org/de
+{
+  "layer": "top",
+  "position": "top",
+  "height": 30,
+  "spacing": 2,
+  "modules-left": ["custom/w3bs", "hyprland/workspaces"],
+  "modules-center": ["hyprland/window"],
+  "modules-right": ["custom/agents", "tray", "pulseaudio", "network", "battery", "clock", "custom/notifications"],
+
+  "custom/w3bs": {
+    "format": "w3bs<span color='#d95231'>.</span>",
+    "tooltip-format": "Launcher (SUPER + SPACE)",
+    "on-click": "w3bs-de launcher"
+  },
+  "hyprland/workspaces": {
+    "format": "{name}",
+    "show-special": true,
+    "special-visible-only": true,
+    "on-click": "activate"
+  },
+  "hyprland/window": {
+    "max-length": 80,
+    "separate-outputs": true
+  },
+  // Agent access at a glance: off, on, or which agent is driving. Click: the control app.
+  "custom/agents": {
+    "exec": "w3bs-de agents-status",
+    "return-type": "json",
+    "interval": 2,
+    "on-click": "w3bs-desktop control --open",
+    "on-click-right": "w3bs-desktop disable"
+  },
+  "tray": { "icon-size": 16, "spacing": 8 },
+  "pulseaudio": {
+    "format": "vol {volume}%",
+    "format-muted": "muted",
+    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+    "on-click-right": "pavucontrol"
+  },
+  "network": {
+    "format-wifi": "{essid}",
+    "format-ethernet": "wired",
+    "format-disconnected": "offline",
+    "tooltip-format": "{ifname} {ipaddr}"
+  },
+  "battery": {
+    "format": "bat {capacity}%",
+    "format-charging": "chg {capacity}%",
+    "states": { "warning": 20, "critical": 10 }
+  },
+  "clock": {
+    "format": "{:%a %d %b  %H:%M}",
+    "tooltip-format": "{:%Y-%m-%d}"
+  },
+  "custom/notifications": {
+    "exec": "swaync-client -swb",
+    "return-type": "json",
+    "format": "{icon}",
+    "format-icons": { "notification": "notes •", "none": "notes", "dnd-notification": "dnd •", "dnd-none": "dnd" },
+    "on-click": "swaync-client -t -sw",
+    "on-click-right": "swaync-client -d -sw",
+    "escape": true
+  }
+}

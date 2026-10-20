@@ -1,0 +1,206 @@
+#!/bin/sh
+# w3bs-de: the W3BS DE session and its small helpers. https://w3bs.org/de
+#
+#   w3bs-de session            start the desktop (what the login screen runs)
+#   w3bs-de doctor             check what the desktop and its agent layer need
+#   w3bs-de agent-mode on|off  keep the screen unlocked while agents work unattended
+#   w3bs-de wallpaper [FILE]   set (or reset) the wallpaper
+#   w3bs-de screenshot region|screen
+#   w3bs-de update             fetch the latest defaults (your settings are kept)
+#   w3bs-de version
+#
+# Inside the session: autostart, launcher, agents-status (for the bar), logout.
+set -u
+
+VERSION="@W3BS_DE_VERSION@"
+SHARE="${W3BS_DE_SHARE:-$HOME/.local/share/w3bs-de}"
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/w3bs-de"
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/w3bs-de"
+D="$SHARE/default"
+export W3BS_DE_SHARE="$SHARE"
+
+say() { printf '%s\n' "$*"; }
+die() { printf 'w3bs-de: %s\n' "$*" >&2; exit 1; }
+have() { command -v "$1" >/dev/null 2>&1; }
+running() { pgrep -u "$(id -u)" -x "$1" >/dev/null 2>&1; }
+# Start a session helper once, detached from this shell.
+spawn() { running "$1" || (setsid "$@" >/dev/null 2>&1 &); }
+
+# 0.55 moved Hyprland's config to Lua; older releases read hyprlang.
+hypr_version() { Hyprland --version 2>/dev/null | sed -n 's/^Hyprland \([0-9][0-9.]*\).*/\1/p' | head -n1; }
+hypr_lua() {
+  v="$(hypr_version)"
+  [ -n "$v" ] || return 0
+  major="${v%%.*}"; rest="${v#*.}"; minor="${rest%%.*}"
+  [ "$major" -gt 0 ] || [ "$minor" -ge 55 ]
+}
+
+# Your entry file: loads the defaults, then your own file. Written once, never overwritten.
+ensure_user_config() {
+  mkdir -p "$CONF/hypr" "$STATE"
+  [ -f "$CONF/hypr/hyprland.lua" ] || cat > "$CONF/hypr/hyprland.lua" <<EOF
+-- W3BS DE entry point. Defaults first, then your settings in user.lua (kept across updates).
+dofile((os.getenv("W3BS_DE_SHARE") or (os.getenv("HOME") .. "/.local/share/w3bs-de")) .. "/default/hypr/w3bs.lua")
+local user = (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/w3bs-de/hypr/user.lua"
+local f = io.open(user, "r")
+if f then
+  f:close()
+  dofile(user)
+end
+EOF
+  [ -f "$CONF/hypr/user.lua" ] || cat > "$CONF/hypr/user.lua" <<'EOF'
+-- Your W3BS DE settings. Loaded after the defaults; anything here wins.
+-- The Hyprland Lua reference: https://wiki.hypr.land/Configuring/Start/
+--
+-- hl.monitor({ output = "DP-1", mode = "2560x1440@144", position = "0x0", scale = 1 })
+-- hl.config({ input = { kb_layout = "us,de", kb_options = "grp:alts_toggle" } })
+-- w3bs.bind("SUPER + E", "Files", "nautilus")
+EOF
+  [ -f "$CONF/hypr/hyprland.conf" ] || cat > "$CONF/hypr/hyprland.conf" <<EOF
+# W3BS DE entry point for Hyprland before 0.55. Your settings go in user.conf.
+source = $D/hypr/w3bs.conf
+source = $CONF/hypr/user.conf
+EOF
+  [ -f "$CONF/hypr/user.conf" ] || printf '# Your W3BS DE settings (Hyprland before 0.55). Loaded after the defaults.\n' > "$CONF/hypr/user.conf"
+}
+
+cmd_session() {
+  have Hyprland || die "Hyprland is not installed; run: curl -fsSL https://w3bs.org/de/install.sh | sh"
+  ensure_user_config
+  export XDG_CURRENT_DESKTOP=Hyprland XDG_SESSION_TYPE=wayland XDG_SESSION_DESKTOP=w3bs-de W3BS_DE=1
+  if hypr_lua; then cfg="$CONF/hypr/hyprland.lua"; else cfg="$CONF/hypr/hyprland.conf"; fi
+  exec Hyprland --config "$cfg"
+}
+
+wallpaper_file() {
+  if [ -f "$CONF/wallpaper" ] && [ -f "$(cat "$CONF/wallpaper")" ]; then cat "$CONF/wallpaper"; else printf '%s' "$SHARE/wallpaper/w3bs-dark.png"; fi
+}
+
+polkit_agent() {
+  for p in hyprpolkitagent /usr/lib/hyprpolkitagent/hyprpolkitagent /usr/libexec/hyprpolkitagent lxqt-policykit-agent /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 /usr/libexec/polkit-gnome-authentication-agent-1; do
+    if have "$p" || [ -x "$p" ]; then spawn "$p"; return; fi
+  done
+}
+
+# Newer foot (1.28 here) names the section [colors-dark] and rejects [colors]; older foot only knows
+# [colors]. Keep whichever this foot accepts.
+fix_foot() {
+  f="$D/foot/foot.ini"
+  have foot && [ -f "$f" ] || return 0
+  foot --check-config --config="$f" >/dev/null 2>&1 && return 0
+  sed -i 's/^\[colors\]$/[colors-dark]/' "$f"
+  foot --check-config --config="$f" >/dev/null 2>&1 || sed -i 's/^\[colors-dark\]$/[colors]/' "$f"
+}
+
+cmd_autostart() {
+  ensure_user_config
+  fix_foot
+  have swaybg && spawn swaybg -m fill -i "$(wallpaper_file)"
+  have waybar && spawn waybar -c "$D/waybar/config.jsonc" -s "$D/waybar/style.css"
+  have swaync && spawn swaync -c "$D/swaync/config.json" -s "$D/swaync/style.css"
+  [ -f "$STATE/agent-mode" ] || { have hypridle && spawn hypridle -c "$D/hypr/hypridle.conf"; }
+  polkit_agent
+  # The agent broker (Disabled until you enable it) must see this session's environment to
+  # find Hyprland, so restart it now that the environment is imported.
+  if have w3bs-desktop; then
+    if have systemctl && systemctl --user cat w3bs-desktop.service >/dev/null 2>&1; then
+      systemctl --user restart w3bs-desktop.service
+    else
+      # Stop the old broker and wait for it: a new one refuses a socket that is still served.
+      pkill -u "$(id -u)" -f "w3bs-desktop daemon" 2>/dev/null
+      i=0
+      while pgrep -u "$(id -u)" -f "w3bs-desktop daemon" >/dev/null 2>&1 && [ $i -lt 25 ]; do sleep 0.2; i=$((i + 1)); done
+      (setsid w3bs-desktop daemon --adapter auto --mcp-http 127.0.0.1:7801 >"$STATE/broker.log" 2>&1 &)
+    fi
+    (setsid w3bs-desktop tray --wait-for-broker 60 >/dev/null 2>&1 &)
+  fi
+}
+
+cmd_agents_status() {
+  if have w3bs-desktop && out="$(w3bs-desktop status --waybar 2>/dev/null)"; then
+    printf '%s\n' "$out"
+  else
+    printf '{"text":"agents ?","class":"off","tooltip":"The Agentic Desktop Layer is not running (w3bs-de doctor)"}\n'
+  fi
+}
+
+cmd_agent_mode() {
+  mkdir -p "$STATE"
+  case "${1:-status}" in
+    on)
+      touch "$STATE/agent-mode"; pkill -u "$(id -u)" -x hypridle 2>/dev/null
+      say "Agent mode ON: the screen will not lock or blank on idle, so unattended agents are not paused."
+      say "Only use it on a machine you trust where you are; 'w3bs-de agent-mode off' restores locking." ;;
+    off)
+      rm -f "$STATE/agent-mode"; have hypridle && spawn hypridle -c "$D/hypr/hypridle.conf"
+      say "Agent mode off: idle dims, locks after 10 minutes and blanks after 15." ;;
+    status) if [ -f "$STATE/agent-mode" ]; then say on; else say off; fi ;;
+    *) die "usage: w3bs-de agent-mode on|off|status" ;;
+  esac
+}
+
+cmd_wallpaper() {
+  mkdir -p "$CONF"
+  if [ $# -eq 0 ]; then rm -f "$CONF/wallpaper"; else
+    f="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"; [ -f "$f" ] || die "no such file: $1"; printf '%s' "$f" > "$CONF/wallpaper"
+  fi
+  pkill -u "$(id -u)" -x swaybg 2>/dev/null
+  have swaybg && (setsid swaybg -m fill -i "$(wallpaper_file)" >/dev/null 2>&1 &)
+  say "wallpaper: $(wallpaper_file)"
+}
+
+cmd_screenshot() {
+  have grim || die "grim is not installed"
+  case "${1:-region}" in
+    region) have slurp || die "slurp is not installed"; g="$(slurp)" || exit 0; grim -g "$g" - | wl-copy --type image/png && notify-send -a w3bs-de "Screenshot copied" 2>/dev/null ;;
+    screen) dir="${XDG_PICTURES_DIR:-$HOME/Pictures}/Screenshots"; mkdir -p "$dir"; f="$dir/$(date +%Y-%m-%d_%H-%M-%S).png"; grim "$f" && notify-send -a w3bs-de "Screenshot saved" "$f" 2>/dev/null ;;
+    *) die "usage: w3bs-de screenshot region|screen" ;;
+  esac
+}
+
+cmd_logout() {
+  r="$(hyprctl dispatch 'hl.dsp.exit()' 2>&1)"
+  case "$r" in ok*) exit 0 ;; esac
+  r="$(hyprctl dispatch exit 2>&1)"
+  case "$r" in ok*) exit 0 ;; esac
+  pkill -u "$(id -u)" -x Hyprland
+}
+
+cmd_doctor() {
+  rc=0
+  ok() { printf '  ok    %s\n' "$*"; }
+  bad() { printf '  MISS  %s\n' "$*"; rc=1; }
+  say "W3BS DE $VERSION ($SHARE)"
+  v="$(hypr_version)"
+  if [ -n "$v" ]; then
+    if hypr_lua; then ok "Hyprland $v (Lua config)"; else ok "Hyprland $v (hyprlang config; 0.55+ recommended)"; fi
+  else bad "Hyprland (https://wiki.hypr.land/Getting-Started/Installation/)"; fi
+  fix_foot
+  for c in waybar fuzzel swaync swaybg hyprlock hypridle foot grim slurp wl-copy; do
+    if have "$c"; then ok "$c"; else bad "$c"; fi
+  done
+  if have w3bs-desktop; then
+    ok "w3bs-desktop $(w3bs-desktop --version 2>/dev/null | sed 's/^w3bs desktop //')"
+    if [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+      w3bs-desktop capabilities 2>/dev/null | grep -q linux-hyprland && ok "agent layer drives this session (linux-hyprland)" || bad "agent layer is not on the Hyprland backend; restart it: systemctl --user restart w3bs-desktop"
+    fi
+  else bad "w3bs-desktop (curl -fsSL https://w3bs.org/desktop/install.sh | sh)"; fi
+  [ -f "$STATE/agent-mode" ] && say "  note  agent mode is ON: idle locking is off"
+  return $rc
+}
+
+case "${1:-help}" in
+  session) cmd_session ;;
+  autostart) cmd_autostart ;;
+  launcher) exec fuzzel --config="$D/fuzzel/fuzzel.ini" ;;
+  agents-status) cmd_agents_status ;;
+  agent-mode) shift; cmd_agent_mode "$@" ;;
+  wallpaper) shift; cmd_wallpaper "$@" ;;
+  screenshot) shift; cmd_screenshot "$@" ;;
+  logout) cmd_logout ;;
+  doctor) cmd_doctor ;;
+  update) shift; curl -fsSL https://w3bs.org/de/install.sh | sh -s -- --no-packages "$@" ;;
+  version|--version|-V) say "w3bs-de $VERSION" ;;
+  help|--help|-h) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) die "unknown command: $1 (w3bs-de help)" ;;
+esac

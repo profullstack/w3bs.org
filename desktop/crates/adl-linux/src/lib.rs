@@ -2,6 +2,8 @@
 //!
 //! - [`vela`]: Vela compositor command socket (observation, focus, occlusion, lock and
 //!   authentication-prompt interlocks). Clean-room from interface facts.
+//! - [`hyprland`]: Hyprland (W3BS DE): IPC for layout and windows, wlroots virtual pointer and
+//!   keyboard for input, grim for captures.
 //! - [`portal`]: KDE Plasma / GNOME input and capture through the XDG desktop portals.
 //! - [`pipewire`]: the portal session's monitors as live PipeWire streams, for recording.
 //! - [`kwin`]: KDE Plasma window list, stacking, focus, activation and the polkit interlock via
@@ -13,6 +15,7 @@
 //! - [`xkb`]: which characters Mutter can type, from the compositor's live keymap.
 //! - [`screensaver`]: lock events from the desktop's ScreenSaver service (no logind needed).
 
+pub mod hyprland;
 pub mod keymap;
 #[cfg(feature = "dbus")]
 pub mod gnome;
@@ -25,6 +28,7 @@ pub mod pipewire;
 #[cfg(feature = "dbus")]
 pub mod portal;
 pub mod vela;
+pub mod wl;
 pub mod xkb;
 #[cfg(feature = "dbus")]
 pub mod screensaver;

@@ -1,0 +1,29 @@
+/* W3BS DE notifications. Agent prompts (drive, human steps) are critical and stay until answered. */
+* {
+  font-family: Arial, Helvetica, sans-serif;
+}
+.notification-row .notification-background .notification,
+.control-center {
+  background: #1c2b26;
+  color: #f6f4ed;
+  border: 1px solid #2c403a;
+  border-radius: 6px;
+}
+.notification.critical {
+  border: 2px solid #d95231;
+}
+.notification-action {
+  background: #2c403a;
+  color: #f6f4ed;
+  border-radius: 4px;
+  margin: 4px;
+}
+.notification-action:hover {
+  background: #d95231;
+}
+.summary {
+  font-weight: bold;
+}
+.body {
+  color: #dbded0;
+}

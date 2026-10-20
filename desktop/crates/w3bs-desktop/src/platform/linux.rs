@@ -1,4 +1,5 @@
-//! Linux: Vela command socket, or XDG portals with KWin / GNOME Shell window data.
+//! Linux: Vela command socket, Hyprland (IPC + wlroots virtual input), or XDG portals with KWin /
+//! GNOME Shell window data.
 
 use crate::paths;
 use crate::AdapterKind;
@@ -9,7 +10,7 @@ use std::sync::Arc;
 pub fn make_adapter(kind: AdapterKind) -> Result<Arc<dyn Adapter>> {
     use adl_linux::gnome::{self, ShellBus, ShellObserver, WithGnome};
     use adl_linux::kwin::{KWinObserver, KWinScripts, WithKWin};
-    use adl_linux::{portal::PortalAdapter, vela::VelaAdapter};
+    use adl_linux::{hyprland::HyprlandAdapter, portal::PortalAdapter, vela::VelaAdapter};
     let vela = || VelaAdapter::default_socket().map(VelaAdapter::new).ok_or_else(|| AdlError::new(ErrorCode::Blocked, "Vela command socket not found (needs XDG_RUNTIME_DIR and WAYLAND_DISPLAY)"));
     // The portal backend gets its window list, focus and stacking from KWin on Plasma and from
     // the W3BS Shell extension on GNOME.
@@ -42,7 +43,10 @@ pub fn make_adapter(kind: AdapterKind) -> Result<Arc<dyn Adapter>> {
         AdapterKind::Native => return Err(AdlError::unsupported("`native` is the Windows/macOS backend; on Linux use auto, portal or vela")),
         AdapterKind::Vela => Arc::new(vela()?),
         AdapterKind::Portal => portal(),
+        AdapterKind::Hyprland => Arc::new(HyprlandAdapter::from_env()?),
         AdapterKind::Auto if VelaAdapter::detect() => Arc::new(vela()?),
+        // Hyprland's portal has no RemoteDesktop: it gets its own backend, checked before portals.
+        AdapterKind::Auto if HyprlandAdapter::detect() => Arc::new(HyprlandAdapter::from_env()?),
         AdapterKind::Auto if PortalAdapter::detect() => portal(),
         AdapterKind::Auto => return Err(AdlError::new(ErrorCode::Blocked, "no supported desktop session found (need a Wayland/X11 session with D-Bus, or Vela); use --adapter mock for a demo")),
     })
