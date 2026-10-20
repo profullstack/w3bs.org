@@ -144,6 +144,8 @@ struct Inner {
     approvals: HashMap<String, ApprovalInfo>,
     drive: HashMap<String, DriveRequest>,
     human_steps: HashMap<String, HumanStep>,
+    /// Each agent's latest capture (id, PNG), so it can save a patch of it to screen memory.
+    shots: HashMap<String, (String, Arc<Vec<u8>>)>,
     captures: HashMap<String, CaptureMeta>,
     held: Vec<(Held, u64)>,
     challenge: Option<(String, u64)>,
@@ -157,6 +159,8 @@ pub struct Broker {
     pub(crate) adapter: Arc<dyn Adapter>,
     pub store: AgentStore,
     pub audit: Audit,
+    /// Targets agents saved for the locate fast path.
+    pub screen_memory: crate::screen_memory::ScreenMemory,
     pub(crate) cfg: Config,
     pub(crate) open: AtomicBool,
     pub(crate) generation: AtomicU64,
@@ -180,6 +184,7 @@ impl Broker {
             adapter,
             store,
             audit,
+            screen_memory: crate::screen_memory::ScreenMemory::memory(),
             cfg,
             open: AtomicBool::new(false),
             generation: AtomicU64::new(1),
@@ -191,6 +196,7 @@ impl Broker {
                 approvals: HashMap::new(),
                 drive: HashMap::new(),
                 human_steps: HashMap::new(),
+                shots: HashMap::new(),
                 captures: HashMap::new(),
                 held: vec![],
                 challenge: None,
@@ -203,6 +209,12 @@ impl Broker {
             rec: Mutex::new(crate::recorder::RecInner::default()),
             rec_blocks_leases: AtomicBool::new(false),
         }
+    }
+
+    /// Keep screen memory in a file (the daemon) instead of in memory (tests).
+    pub fn with_screen_memory(mut self, m: crate::screen_memory::ScreenMemory) -> Self {
+        self.screen_memory = m;
+        self
     }
 
     /// Push an event to every control subscriber (tray, panel, control app).
@@ -453,6 +465,7 @@ impl Broker {
                 Self::broadcast(&mut g, &json!({"v": SCHEMA_VERSION, "event": "human_step_resolved", "data": {"id": id, "status": HumanStepStatus::Expired}}));
             }
             g.captures.clear();
+            g.shots.clear();
         }
         report.streams_closed = self.adapter.close_streams();
 
@@ -662,6 +675,7 @@ impl Broker {
 
     pub fn remove_agent(&self, id: &str) -> Result<()> {
         self.revoke_agent(id).ok();
+        self.screen_memory.forget(id, None).ok();
         self.store.remove(id)
     }
 
@@ -782,13 +796,130 @@ impl Broker {
             capture: random_id("cap", 8), display: d.id.clone(), pixel_width: w, pixel_height: h, logical: d.logical,
             layout_generation: layout.generation, taken_at_ms: now, expires_at_ms: now + self.cfg.capture_ttl_ms,
         };
-        {
-            let mut g = self.lock();
-            g.captures.retain(|_, c| c.expires_at_ms > now);
-            g.captures.insert(meta.capture.clone(), meta.clone());
-        }
+        let png = Arc::new(png);
+        self.keep_capture(p, &meta, png.clone());
         self.audit.log("screenshot", Some(&p.agent), None, "allowed", "completed", json!({"display": display}));
-        Ok(Screenshot { meta, png_base64: base64::engine::general_purpose::STANDARD.encode(png) })
+        Ok(Screenshot { meta, png_base64: base64::engine::general_purpose::STANDARD.encode(png.as_slice()) })
+    }
+
+    /// Register a capture's coordinate space, and keep its pixels as this agent's latest shot.
+    fn keep_capture(&self, p: &Principal, meta: &CaptureMeta, png: Arc<Vec<u8>>) {
+        let now = now_ms();
+        let mut g = self.lock();
+        g.captures.retain(|_, c| c.expires_at_ms > now);
+        g.captures.insert(meta.capture.clone(), meta.clone());
+        g.shots.insert(p.agent.clone(), (meta.capture.clone(), png));
+    }
+
+    fn require_display_capture(&self, p: &Principal) -> Result<()> {
+        let pol = self.require_cap(p, Capability::ScreenCapture)?;
+        if pol.mode != ControlMode::BroadDesktop {
+            return Err(AdlError::denied("display capture shows every application; it needs broad_desktop control"));
+        }
+        Ok(())
+    }
+
+    // ---------------------------------------------------------------- screen memory
+
+    /// Save the patch around (x, y) of one of this agent's captures as `label`: the target it just
+    /// found the slow way. `locate` finds it again on later screens without a full screenshot pass.
+    pub fn memory_remember(&self, p: &Principal, label: &str, capture: &str, x: f64, y: f64, radius: Option<u32>) -> Result<ScreenMemoryEntry> {
+        use crate::screen_memory as sm;
+        self.require_enabled()?;
+        self.require_display_capture(p)?;
+        let label = sm::check_label(label)?;
+        if self.human_step_open() {
+            return Err(AdlError::new(ErrorCode::Busy, "a person is doing a step by hand; nothing on screen is saved meanwhile"));
+        }
+        let r = radius.unwrap_or(sm::DEFAULT_RADIUS).clamp(sm::MIN_RADIUS, sm::MAX_RADIUS);
+        let (meta, png) = {
+            let g = self.lock();
+            let meta = g.captures.get(capture).filter(|c| c.expires_at_ms > now_ms()).cloned();
+            match (meta, g.shots.get(&p.agent)) {
+                (Some(m), Some((id, png))) if id == capture => (m, png.clone()),
+                _ => return Err(AdlError::new(ErrorCode::TargetStale, "that capture is not your latest or has expired; take a screenshot (or locate) and use its capture id")),
+            }
+        };
+        let img = sm::Gray::from_png(&png)?;
+        let (cx, cy) = (x.round(), y.round());
+        if cx < 0.0 || cy < 0.0 {
+            return Err(AdlError::invalid("point is outside the capture"));
+        }
+        let patch = img.crop(cx as u32, cy as u32, r).ok_or_else(|| AdlError::invalid(format!("the {0}x{0} patch around that point does not fit inside the capture; use a smaller radius", 2 * r)))?;
+        if !sm::has_detail(&patch) {
+            return Err(AdlError::invalid("there is nothing distinctive around that point (a flat area); pick a point on the target's text or icon, or a larger radius"));
+        }
+        let scale = meta.pixel_width as f64 / meta.logical.width;
+        let e = self.screen_memory.remember(&p.agent, &label, &patch, scale, &meta.display)?;
+        self.audit.log("memory.remember", Some(&p.agent), None, "allowed", "completed", json!({"display": meta.display, "size": patch.w}));
+        Ok(e)
+    }
+
+    /// Where is `label` now? Takes a fresh capture of `display` and looks for the saved patch. A
+    /// confident, unique match returns a point in that capture; anything else returns
+    /// `found: false` and the agent takes the slow path (screenshot), then remembers again.
+    pub fn memory_locate(&self, p: &Principal, label: &str, display: &str, min_score: Option<f32>) -> Result<LocateResult> {
+        use crate::screen_memory as sm;
+        let t0 = Instant::now();
+        let gen0 = self.require_enabled()?;
+        self.require_display_capture(p)?;
+        let label = sm::check_label(label)?;
+        let min_score = min_score.unwrap_or(sm::DEFAULT_MIN_SCORE).clamp(0.7, 0.99);
+        let tpl = self.screen_memory.get(&p.agent, &label).ok_or_else(|| AdlError::not_found(format!("nothing remembered as \"{label}\"; find it with desktop_screenshot, then desktop_remember it")))?;
+        let layout = self.adapter.layout()?;
+        let d = layout.displays.iter().find(|d| d.id == display).ok_or_else(|| AdlError::not_found(format!("no display {display}")))?.clone();
+        let (png, w, h) = self.adapter.capture(display)?;
+        self.still_valid(gen0)?;
+        let now = now_ms();
+        let meta = CaptureMeta {
+            capture: random_id("cap", 8), display: d.id.clone(), pixel_width: w, pixel_height: h, logical: d.logical,
+            layout_generation: layout.generation, taken_at_ms: now, expires_at_ms: now + self.cfg.capture_ttl_ms,
+        };
+        let img = sm::Gray::from_png(&png)?;
+        self.keep_capture(p, &meta, Arc::new(png));
+        // A patch saved on a display with another scale is resized to this one.
+        let scale = w as f64 / d.logical.width;
+        let mut patch = tpl.gray();
+        if (scale / tpl.scale - 1.0).abs() > 0.01 {
+            let k = scale / tpl.scale;
+            patch = patch.resize((patch.w as f64 * k).round() as u32, (patch.h as f64 * k).round() as u32);
+        }
+        let m = sm::find(&img, &patch);
+        let (found, ambiguous) = m.map_or((false, false), |m| sm::accept(&m, min_score));
+        let score = m.map_or(0.0, |m| m.score);
+        self.screen_memory.record(&p.agent, &label, found);
+        let hint = if found {
+            "Act on `point` (space=capture) now; it is only valid for this capture and layout.".to_string()
+        } else if ambiguous {
+            "Several places look like this target. Take a screenshot to pick the right one, then remember it with a larger radius so it includes more context.".to_string()
+        } else {
+            format!("Not confidently on {display}. Take a screenshot to find it the usual way, then call desktop_remember again so the memory catches up with the new look.")
+        };
+        self.audit.log("memory.locate", Some(&p.agent), None, "allowed", if found { "completed" } else { "failed" }, json!({"display": display, "score": (score * 1000.0).round() / 1000.0, "ambiguous": ambiguous}));
+        Ok(LocateResult {
+            found,
+            label,
+            score,
+            min_score,
+            ambiguous,
+            point: if found { m.map(|m| Point::capture(meta.capture.clone(), m.x, m.y)) } else { None },
+            capture: meta,
+            elapsed_ms: t0.elapsed().as_millis() as u64,
+            hint,
+        })
+    }
+
+    pub fn memory_list(&self, p: &Principal) -> Vec<ScreenMemoryEntry> {
+        self.screen_memory.list(Some(&p.agent))
+    }
+
+    /// The person deletes an agent's saved targets (one label, or all of them).
+    pub fn memory_forget(&self, peer: &Peer, agent: &str, label: Option<&str>) -> Result<usize> {
+        self.require_human(peer, "memory.forget")?;
+        let id = self.store.get(agent).map(|a| a.id).or_else(|| self.store.list().into_iter().find(|a| a.name == agent).map(|a| a.id)).unwrap_or_else(|| agent.to_string());
+        let n = self.screen_memory.forget(&id, label)?;
+        self.audit.log("memory.forget", Some(&id), None, "allowed", "", json!({"removed": n}));
+        Ok(n)
     }
 
     pub fn pointer_position(&self, p: &Principal) -> Result<Observation<Option<(f64, f64)>>> {

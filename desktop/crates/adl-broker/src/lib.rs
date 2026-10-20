@@ -5,6 +5,7 @@ pub mod audit;
 pub mod broker;
 pub mod mock;
 pub mod recorder;
+pub mod screen_memory;
 pub mod store;
 pub mod training_bundle;
 pub mod util;

@@ -285,6 +285,40 @@ pub struct DriveRequest {
     pub until_ms: Option<u64>,
 }
 
+/// A target an agent saved for the screen-memory fast path (metadata only; pixels never leave
+/// the broker).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ScreenMemoryEntry {
+    pub agent: String,
+    pub label: String,
+    pub width: u32,
+    pub height: u32,
+    pub display: String,
+    pub saved_at_ms: u64,
+    pub last_used_ms: u64,
+    pub hits: u64,
+    pub misses: u64,
+}
+
+/// The answer to "where is <label> now?": a point in a capture taken just now when the match is
+/// confident and unique, otherwise `found: false` and the agent takes the slow path (screenshot).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LocateResult {
+    pub found: bool,
+    pub label: String,
+    /// Normalized cross-correlation of the best match, -1..1.
+    pub score: f32,
+    pub min_score: f32,
+    /// Another place matched almost as well; refused rather than guessed.
+    pub ambiguous: bool,
+    /// Where to act, in `space=capture` of the fresh `capture`. Absent unless `found`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub point: Option<crate::coords::Point>,
+    pub capture: crate::coords::CaptureMeta,
+    pub elapsed_ms: u64,
+    pub hint: String,
+}
+
 /// What an agent hands back to the person: a step only a human may do on this desktop.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

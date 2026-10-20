@@ -48,6 +48,7 @@ pub const AGENT_METHODS: &[&str] = &[
     "hello", "status", "capabilities", "layout", "windows", "inspect", "screenshot", "pointer.position",
     "task.begin", "task.end", "task.cancel", "task.list", "task.inspect", "lease.acquire", "lease.renew",
     "lease.release", "input", "approval.status", "human_step.request", "human_step.status",
+    "memory.remember", "memory.locate", "memory.list",
 ];
 
 /// Methods on the control socket.
@@ -55,7 +56,8 @@ pub const CONTROL_METHODS: &[&str] = &[
     "status", "capabilities", "doctor", "enable.request", "enable.confirm", "disable", "stop", "takeover",
     "agents.add", "agents.list", "agents.update", "agents.revoke", "agents.remove", "tasks.list",
     "tasks.inspect", "tasks.cancel", "approvals.list", "approvals.decide", "drive.list", "drive.decide",
-    "drive.always_allow", "human_steps.list", "human_steps.resolve", "audit.export", "audit.delete",
+    "drive.always_allow", "human_steps.list", "human_steps.resolve",
+    "memory.all", "memory.forget", "audit.export", "audit.delete",
     "audit.recent", "session.event", "subscribe", "control.login", "native.shortcut",
     "training.status", "training.apps", "training.start", "training.pause", "training.resume", "training.mark",
     "training.explain", "training.finish", "training.discard", "training.forget", "training.handoff",
