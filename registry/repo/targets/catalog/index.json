@@ -233,7 +233,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.45.5"
+      "latest_version": "0.46.1"
     },
     {
       "id": "threatcrush.com/threatcrush",
@@ -343,7 +343,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "3.19.3"
+      "latest_version": "3.19.4"
     },
     {
       "id": "logicsrc.com/opencontext",
@@ -1225,7 +1225,25 @@
       "vendor": "Profullstack",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "0.7.0"
+      "latest_version": "0.8.0"
+    },
+    {
+      "id": "w3bs.org/w3bs-de",
+      "name": "w3bs-de",
+      "description": "W3BS DE: a minimal, agent-friendly Wayland desktop built on Hyprland (waybar, fuzzel, swaync, hyprlock, foot), in the w3bs palette, with the Agentic Desktop Layer built in and agent access off until you turn it on. Installs Hyprland from your distribution.",
+      "commands": [
+        "w3bs-de"
+      ],
+      "install": {
+        "url": "https://w3bs.org/de/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://w3bs.org/de",
+      "repository": "https://github.com/profullstack/w3bs.org/tree/main/de",
+      "vendor": "Profullstack",
+      "license": "MIT",
+      "agentic": true,
+      "latest_version": "0.1.1"
     },
     {
       "id": "w3bs.org/w3bs-training",
