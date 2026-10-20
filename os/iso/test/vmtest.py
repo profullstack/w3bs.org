@@ -374,6 +374,8 @@ def cmd_installed(a):
             }.get(a.desktop, "pidof plasmashell || pgrep -a kwin_wayland || pgrep -a -f startplasma || echo NO_PLASMA")
             rc, out = vm.sh(session, 60)
             log(f"[installed] desktop session: {out.strip()[-300:]}")
+            if a.desktop == "hyprland" and "NO_HYPRLAND" in out:
+                failed.append("hyprland-session")
         if failed:
             raise SystemExit(f"installed system checks failed: {', '.join(failed)}")
         log("[installed] PASS")

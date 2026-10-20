@@ -570,7 +570,7 @@ HYPRLAND_PKGS="hyprland hyprcursor hyprpolkitagent xwayland xdg-desktop-portal-w
 	greetd greetd-openrc greetd-tuigreet waybar foot fuzzel mako swaybg swaylock swayidle grim slurp
 	wl-clipboard brightnessctl pipewire pipewire-pulse pipewire-alsa wireplumber wireplumber-logind
 	pavucontrol thunar gvfs udisks2 mesa-dri-gallium mesa-egl qt6-qtwayland adwaita-icon-theme
-	font-dejavu font-noto firefox"
+	font-dejavu font-noto font-awesome firefox"
 if [ "$DESKTOP" != none ]; then
 	case "$DESKTOP" in
 		hyprland) step "Installing the Hyprland desktop (setup-wayland-base; this downloads about 1 GB)" ;;

@@ -42,7 +42,7 @@ Hyprland. Login is greetd + tuigreet on tty7 (user name, then password); the ses
 `/usr/local/bin/w3bs-hyprland`, which copies the W3BS default
 `/usr/share/w3bs-os/hypr/hyprland.conf` to `~/.config/hypr/hyprland.conf` on the first login
 (edit that copy; the keyboard layout comes from `--keymap`). Included: Waybar, foot (SUPER+Return),
-fuzzel (SUPER+D), mako, swaylock/swayidle, grim/slurp (Print), PipeWire, Thunar, Firefox,
+fuzzel (SUPER+D), mako, Font Awesome (Waybar icons), swaylock/swayidle, grim/slurp (Print), PipeWire, Thunar, Firefox,
 hyprpolkitagent, and xdg-desktop-portal-wlr + gtk (`xdg-desktop-portal-hyprland` is not in
 Alpine 3.24, so screen sharing goes through the wlr portal). The Agentic Desktop Layer broker
 and tray start from the config with agent access off; Hyprland has no certified adapter yet
