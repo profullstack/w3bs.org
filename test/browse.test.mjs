@@ -440,6 +440,29 @@ test('/browse shows the Moshpit name first, the pit.world gateway as fallback, a
     const bad = await (await fetch(`${t.base}/browse?q=ftp%3A%2F%2Fexample.com`)).text();
     assert.match(bad, /Could not browse this\./);
 
+    // w3bs://<name> is an address: /browse opens the site instead of describing it.
+    const opened = await fetch(
+      `${t.base}/browse?q=${encodeURIComponent('w3bs://chovy.hacker/blog')}`,
+      {
+        redirect: 'manual',
+      },
+    );
+    assert.equal(opened.status, 302);
+    assert.equal(opened.headers.get('location'), 'https://chovy.hacker.pit.world/blog');
+    // A plain name, and a resource URI, still get the page.
+    assert.equal(
+      (await fetch(`${t.base}/browse?q=chovy.hacker`, { redirect: 'manual' })).status,
+      200,
+    );
+    assert.equal(
+      (
+        await fetch(`${t.base}/browse?q=${encodeURIComponent('w3bs://prompt/w3bs/research@1')}`, {
+          redirect: 'manual',
+        })
+      ).status,
+      200,
+    );
+
     const api = await fetch(`${t.base}/api/browse?q=chovy.hacker`);
     assert.equal(api.status, 200);
     const json = await api.json();

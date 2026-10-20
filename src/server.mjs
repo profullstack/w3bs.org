@@ -195,6 +195,25 @@ export function createApp({
   app.get('/api/browse', async (req, res) => res.json(await browse(String(req.query.q ?? ''))));
   // POST { q } is what the stdio MCP server (src/mcp-stdio.mjs) calls, as for the operations.
   app.post('/api/browse', async (req, res) => res.json(await browse(String(req.body?.q ?? ''))));
+  // w3bs://chovy.hacker or w3bs://example.com/path is an address, so /browse opens the site the way
+  // typing it would: a claimed Moshpit name at its pit.world gateway (which every browser reaches),
+  // anything else at https. Resource URIs (w3bs://prompt/...) and names that do not resolve fall
+  // through to the page. Browsers land here when they search a typed w3bs:// address.
+  app.get('/browse', async (req, res, next) => {
+    const q = String(req.query.q ?? '').trim();
+    if (!/^w3bs:\/\/[^/?#]*\./i.test(q)) return next();
+    let target = null;
+    try {
+      const r = await browse(q);
+      if (r.kind === 'moshpit') target = r.moshpit?.minted ? r.fallback : null;
+      else if (r.kind === 'web') target = r.primary;
+    } catch {
+      // The page explains what went wrong.
+    }
+    if (!target) return next();
+    res.set('cache-control', 'no-store');
+    res.redirect(302, target);
+  });
   app.get('/api/packages', async (req, res) => {
     const args = { query: String(req.query.q || '') };
     if (req.query.agentic === 'true' || req.query.agentic === 'false')
