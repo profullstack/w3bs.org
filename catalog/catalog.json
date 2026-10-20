@@ -2265,7 +2265,7 @@
     "repository": "https://github.com/danielmiessler/Fabric",
     "license": "MIT",
     "agentic": false,
-    "latest_version": "1.4.528",
+    "latest_version": "1.4.529",
     "vendor": "Daniel Miessler",
     "install": "curl -fsSL https://raw.githubusercontent.com/danielmiessler/fabric/main/scripts/installer/install.sh | bash",
     "evidence": "https://github.com/danielmiessler/Fabric README; gh release view; examples: https://github.com/danielmiessler/Fabric (README)",
