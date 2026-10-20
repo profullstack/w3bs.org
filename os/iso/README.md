@@ -21,7 +21,7 @@ installed system do not boot with Secure Boot on.
 | Keyboard, timezone, hostname | `us us`, `UTC`, `w3bs` | `--keymap`, `--timezone`, `--hostname` |
 | Network | DHCP on every wired interface | |
 | User | `w3bs` ("W3BS User"), zsh login shell, `wheel` + doas; root login locked | `--user`, `--fullname` |
-| Desktop | KDE Plasma with SDDM (`setup-desktop plasma`); the installer shows a numbered menu | `--desktop plasma\|gnome\|hyprland\|xfce\|none` |
+| Desktop | Hyprland with greetd + tuigreet (below); the installer shows a numbered menu | `--desktop hyprland\|plasma\|gnome\|xfce\|none` |
 | W3BS | `w3bs` and `w3bs-desktop` (musl builds) in `/usr/local/bin`; the W3BS repository (`https://w3bs.org/repo/`, pinned to `registry/FINGERPRINT`) is added for each user at first login | |
 | Agentic Desktop Layer | broker and tray autostart in the desktop session; agent access is **off** until the user turns it on (never `--enabled-by-default`) | |
 
@@ -36,7 +36,7 @@ install profile (`/etc/w3bs-os/install-profile`).
 
 ### Hyprland
 
-`--desktop hyprland` (menu choice 3) installs [Hyprland](https://hypr.land/) from Alpine
+The default desktop (`--desktop hyprland`, menu choice 1) installs [Hyprland](https://hypr.land/) from Alpine
 community on `setup-wayland-base` (elogind, polkit, udev, dbus), since `setup-desktop` has no
 Hyprland. Login is greetd + tuigreet on tty7 (user name, then password); the session is
 `/usr/local/bin/w3bs-hyprland`, which copies the W3BS default
@@ -56,8 +56,8 @@ installer; answer the prompts (Enter accepts the default). Or run it yourself:
 
 ```sh
 w3bs-os-install                         # interactive
-w3bs-os-install --desktop gnome         # interactive, GNOME instead of Plasma
-w3bs-os-install --desktop hyprland      # interactive, Hyprland instead of Plasma
+w3bs-os-install --desktop plasma        # interactive, KDE Plasma (SDDM) instead of Hyprland
+w3bs-os-install --desktop gnome         # interactive, GNOME instead of Hyprland
 w3bs-os-install --defaults --disk /dev/sda --yes
                                         # unattended apart from the two passwords
 w3bs-os-install --defaults --disk /dev/sda --yes --no-encrypt \

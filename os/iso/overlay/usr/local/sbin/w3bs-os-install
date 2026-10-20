@@ -4,7 +4,7 @@
 # Wraps Alpine's setup-alpine with an answer file and W3BS defaults: keyboard, timezone and
 # hostname prompts with defaults, DHCP networking, the largest internal disk erased after a
 # typed confirmation, LUKS2 encryption on by default, a "sys" install, a zsh user in wheel
-# with doas, KDE Plasma (or GNOME, Hyprland, Xfce), the w3bs CLI and the Agentic Desktop Layer (agent access OFF).
+# with doas, Hyprland (or KDE Plasma, GNOME, Xfce), the w3bs CLI and the Agentic Desktop Layer (agent access OFF).
 #
 #   w3bs-os-install                                interactive
 #   w3bs-os-install --defaults --disk /dev/sda --yes   unattended (still prompts for passwords
@@ -37,7 +37,7 @@ options:
   --yes                   do not ask for the typed erase confirmation (needed with --defaults
                           for a fully unattended run; the disk is still shown first)
   --no-encrypt            do not encrypt the disk (default: LUKS2 full-disk encryption)
-  --desktop NAME          plasma (default), gnome, hyprland, xfce or none
+  --desktop NAME          hyprland (default), plasma, gnome, xfce or none
   --hostname NAME         default: w3bs
   --timezone ZONE         default: UTC (for example America/Los_Angeles)
   --keymap "LAYOUT VAR"   default: "us us"
@@ -287,16 +287,16 @@ if [ -z "$DESKTOP" ]; then
 	if [ -z "$DEFAULTS" ]; then
 		say ""
 		say "Desktops:"
-		say "  1  plasma    KDE Plasma (SDDM)"
-		say "  2  gnome     GNOME (GDM)"
-		say "  3  hyprland  Hyprland tiling compositor (greetd + tuigreet, Waybar)"
+		say "  1  hyprland  Hyprland tiling compositor (greetd + tuigreet, Waybar)  [default]"
+		say "  2  plasma    KDE Plasma (SDDM)"
+		say "  3  gnome     GNOME (GDM)"
 		say "  4  xfce      Xfce (LightDM)"
 		say "  5  none      no desktop (server)"
 	fi
-	ask DESKTOP "Desktop (number or name)" "plasma"
+	ask DESKTOP "Desktop (number or name)" "hyprland"
 fi
-case "$DESKTOP" in 1) DESKTOP=plasma ;; 2) DESKTOP=gnome ;; 3) DESKTOP=hyprland ;; 4) DESKTOP=xfce ;; 5) DESKTOP=none ;; esac
-case "$DESKTOP" in plasma|gnome|hyprland|xfce|none) ;; *) fail "unknown desktop $DESKTOP (plasma, gnome, hyprland, xfce or none)" ;; esac
+case "$DESKTOP" in 1) DESKTOP=hyprland ;; 2) DESKTOP=plasma ;; 3) DESKTOP=gnome ;; 4) DESKTOP=xfce ;; 5) DESKTOP=none ;; esac
+case "$DESKTOP" in plasma|gnome|hyprland|xfce|none) ;; *) fail "unknown desktop $DESKTOP (hyprland, plasma, gnome, xfce or none)" ;; esac
 
 if [ -z "$DISK" ]; then
 	if [ -n "$DEFAULTS" ]; then
@@ -607,8 +607,12 @@ EOF
 		# Hyprland takes xkb layout names; the console keymap's layout has the same name.
 		sed "s|^\(\s*kb_layout = \).*|\1${KEYMAP%% *}|" /usr/share/w3bs-os/hypr/hyprland.conf \
 			>"$TARGET/usr/share/w3bs-os/hypr/hyprland.conf" || fail "cannot write the Hyprland default config"
+		install -m 0644 /usr/share/w3bs-os/hypr/waybar.css "$TARGET/usr/share/w3bs-os/hypr/waybar.css" \
+			|| fail "cannot install the Waybar style"
+		install -m 0755 /usr/share/w3bs-os/hypr/desktop-layer.sh "$TARGET/usr/share/w3bs-os/hypr/desktop-layer.sh" \
+			|| fail "cannot install the desktop layer launcher"
 		chmod 0755 "$TARGET/usr/share/w3bs-os/hypr" && chmod 0644 "$TARGET/usr/share/w3bs-os/hypr/hyprland.conf"
-		grep -q -- '--enabled-by-default' "$TARGET/usr/share/w3bs-os/hypr/hyprland.conf" \
+		grep -q -- '--enabled-by-default' "$TARGET/usr/share/w3bs-os/hypr/hyprland.conf" "$TARGET/usr/share/w3bs-os/hypr/desktop-layer.sh" \
 			&& fail "refusing: the Hyprland config would enable agent access by default"
 		mkdir -p "$TARGET/etc/xdg/xdg-desktop-portal"
 		install -m 0644 /usr/share/w3bs-os/hypr/hyprland-portals.conf "$TARGET/etc/xdg/xdg-desktop-portal/hyprland-portals.conf" \
