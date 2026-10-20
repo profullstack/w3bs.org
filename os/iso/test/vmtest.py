@@ -343,7 +343,7 @@ def cmd_installed(a):
             ("os-release", "cat /etc/w3bs-os-release", r"ID=w3bs-os[\s\S]*EDITION=iso[\s\S]*ALPINE=v3\.\d+"),
         ]
         if a.desktop != "none":
-            dm = {"plasma": "sddm", "gnome": "gdm", "xfce": "lightdm"}[a.desktop]
+            dm = {"plasma": "sddm", "gnome": "gdm", "xfce": "lightdm", "hyprland": "greetd"}[a.desktop]
             checks.append(("display-manager",
                            # busybox pgrep -x misses daemons started by full path; pidof matches the name.
                            f"for i in $(seq 1 60); do pidof {dm} >/dev/null && break; sleep 5; done; "
@@ -361,11 +361,18 @@ def cmd_installed(a):
         time.sleep(5)
         vm.screenshot(os.path.join(a.out, "installed-greeter.png"))
         if a.desktop != "none" and a.type_password:
+            if a.desktop == "hyprland":
+                # tuigreet asks for the user name first, then the password.
+                vm.sendkeys(user + "\n")
+                time.sleep(2)
             vm.sendkeys(pw + "\n")
             log(f"[installed] typed the password at the greeter; waiting {a.desktop_wait}s for the desktop")
             time.sleep(a.desktop_wait)
             vm.screenshot(os.path.join(a.out, "installed-desktop.png"))
-            rc, out = vm.sh("pidof plasmashell || pgrep -a kwin_wayland || pgrep -a -f startplasma || echo NO_PLASMA", 60)
+            session = {
+                "hyprland": "pidof Hyprland || pgrep -a -f start-hyprland || echo NO_HYPRLAND",
+            }.get(a.desktop, "pidof plasmashell || pgrep -a kwin_wayland || pgrep -a -f startplasma || echo NO_PLASMA")
+            rc, out = vm.sh(session, 60)
             log(f"[installed] desktop session: {out.strip()[-300:]}")
         if failed:
             raise SystemExit(f"installed system checks failed: {', '.join(failed)}")

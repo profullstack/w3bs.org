@@ -21,7 +21,7 @@ The product goal is broad device coverage. General replacement-OS installation o
 | Area | Requirement |
 | --- | --- |
 | Base | Alpine Linux stable userspace (musl, apk); Nura on mobile hardware; Docker images first (§20) |
-| Desktop | KDE Plasma selected initially; GNOME selectable; LXQt and Xfce offered when their profile passes qualification |
+| Desktop | KDE Plasma selected initially; GNOME and Hyprland selectable at install; LXQt and Xfce offered when their profile passes qualification |
 | Toolkits | Qt and GTK runtimes and integration installed for supported desktop applications |
 | Shell | zsh for newly created human users; bash and fish selectable |
 | Installer | Full setup wizard covering hardware, language, keyboard, network, desktop, shell, accounts, hostname, disks, encryption, software, and final review |

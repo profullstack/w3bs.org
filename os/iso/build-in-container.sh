@@ -58,7 +58,7 @@ install -D -m 0755 "$BIN_IN/w3bs-desktop" "$overlay/usr/local/bin/w3bs-desktop"
 install -D -m 0644 "$SRC/registry/FINGERPRINT" "$overlay/usr/share/w3bs-os/FINGERPRINT"
 echo "$VERSION" > "$overlay/usr/share/w3bs-os/VERSION"
 cp "$SRC/os/iso/VERSION" "$overlay/usr/share/w3bs-os/BASE_VERSION"
-chmod 0755 "$overlay/usr/local/sbin/"* "$overlay/usr/share/w3bs-os/first-login.sh"
+chmod 0755 "$overlay/usr/local/sbin/"* "$overlay/usr/share/w3bs-os/first-login.sh" "$overlay/usr/share/w3bs-os/w3bs-hyprland"
 "$overlay/usr/local/bin/w3bs" --version
 chown -R build:abuild /home/build/.mkimage "$overlay"
 

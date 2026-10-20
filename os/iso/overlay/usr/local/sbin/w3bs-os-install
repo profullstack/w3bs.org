@@ -4,7 +4,7 @@
 # Wraps Alpine's setup-alpine with an answer file and W3BS defaults: keyboard, timezone and
 # hostname prompts with defaults, DHCP networking, the largest internal disk erased after a
 # typed confirmation, LUKS2 encryption on by default, a "sys" install, a zsh user in wheel
-# with doas, KDE Plasma, the w3bs CLI and the Agentic Desktop Layer (agent access OFF).
+# with doas, KDE Plasma (or GNOME, Hyprland, Xfce), the w3bs CLI and the Agentic Desktop Layer (agent access OFF).
 #
 #   w3bs-os-install                                interactive
 #   w3bs-os-install --defaults --disk /dev/sda --yes   unattended (still prompts for passwords
@@ -37,7 +37,7 @@ options:
   --yes                   do not ask for the typed erase confirmation (needed with --defaults
                           for a fully unattended run; the disk is still shown first)
   --no-encrypt            do not encrypt the disk (default: LUKS2 full-disk encryption)
-  --desktop NAME          plasma (default), gnome, xfce or none
+  --desktop NAME          plasma (default), gnome, hyprland, xfce or none
   --hostname NAME         default: w3bs
   --timezone ZONE         default: UTC (for example America/Los_Angeles)
   --keymap "LAYOUT VAR"   default: "us us"
@@ -283,8 +283,20 @@ done
 if [ -z "$FULLNAME" ]; then ask FULLNAME "Full name" "W3BS User"; fi
 case "$FULLNAME" in *:*) fail "the full name cannot contain ':'" ;; esac
 
-if [ -z "$DESKTOP" ]; then ask DESKTOP "Desktop (plasma, gnome, xfce, none)" "plasma"; fi
-case "$DESKTOP" in plasma|gnome|xfce|none) ;; *) fail "unknown desktop $DESKTOP (plasma, gnome, xfce or none)" ;; esac
+if [ -z "$DESKTOP" ]; then
+	if [ -z "$DEFAULTS" ]; then
+		say ""
+		say "Desktops:"
+		say "  1  plasma    KDE Plasma (SDDM)"
+		say "  2  gnome     GNOME (GDM)"
+		say "  3  hyprland  Hyprland tiling compositor (greetd + tuigreet, Waybar)"
+		say "  4  xfce      Xfce (LightDM)"
+		say "  5  none      no desktop (server)"
+	fi
+	ask DESKTOP "Desktop (number or name)" "plasma"
+fi
+case "$DESKTOP" in 1) DESKTOP=plasma ;; 2) DESKTOP=gnome ;; 3) DESKTOP=hyprland ;; 4) DESKTOP=xfce ;; 5) DESKTOP=none ;; esac
+case "$DESKTOP" in plasma|gnome|hyprland|xfce|none) ;; *) fail "unknown desktop $DESKTOP (plasma, gnome, hyprland, xfce or none)" ;; esac
 
 if [ -z "$DISK" ]; then
 	if [ -n "$DEFAULTS" ]; then
@@ -352,7 +364,7 @@ $(lsblk -no NAME,SIZE,FSTYPE,LABEL "$DISK" 2>/dev/null | sed 's/^/              
   Users           $USERS (zsh, admin via doas/wheel)$(for u in $USERS; do [ -s "$WORK/keys/$u" ] && printf ', %s: %s SSH key(s)' "$u" "$(grep -Ec '(ssh-|ecdsa-|sk-)' "$WORK/keys/$u")"; [ -s "$WORK/pass/$u" ] || printf ', %s: no password' "$u"; done)
   Root            $( [ -n "$ROOT_PASS" ] && echo "password set" || echo "no password")$( [ -s "$WORK/keys/root" ] && echo ", $(grep -Ec '(ssh-|ecdsa-|sk-)' "$WORK/keys/root") SSH key(s)")
   SSH             $( [ -n "$SSH" ] && echo "sshd on: keys only, no password logins" || echo "off")
-  Desktop         $DESKTOP$( [ "$DESKTOP" = plasma ] && echo " (KDE Plasma, SDDM)")
+  Desktop         $DESKTOP$( case "$DESKTOP" in plasma) echo " (KDE Plasma, SDDM)" ;; hyprland) echo " (Hyprland, greetd + tuigreet)" ;; esac )
   W3BS            w3bs CLI and w3bs-desktop in /usr/local/bin; W3BS repo added at first login
   Agent access    Agentic Desktop Layer installed, agent access OFF until you turn it on
   Web server      Caddy, enabled, no sites (add them in /etc/caddy/sites/)
@@ -552,14 +564,63 @@ if [ -n "$SSH" ]; then
 fi
 
 # --- desktop ----------------------------------------------------------------------------
+# Alpine's setup-desktop has no Hyprland: use the base it builds GNOME and Plasma on
+# (setup-wayland-base: community repo, elogind, polkit, udev, dbus) plus these packages.
+HYPRLAND_PKGS="hyprland hyprcursor hyprpolkitagent xwayland xdg-desktop-portal-wlr xdg-desktop-portal-gtk
+	greetd greetd-openrc greetd-tuigreet waybar foot fuzzel mako swaybg swaylock swayidle grim slurp
+	wl-clipboard brightnessctl pipewire pipewire-pulse pipewire-alsa wireplumber wireplumber-logind
+	pavucontrol thunar gvfs udisks2 mesa-dri-gallium mesa-egl qt6-qtwayland adwaita-icon-theme
+	font-dejavu font-noto firefox"
 if [ "$DESKTOP" != none ]; then
-	step "Installing the $DESKTOP desktop (setup-desktop $DESKTOP; this downloads about 1-2 GB)"
+	case "$DESKTOP" in
+		hyprland) step "Installing the Hyprland desktop (setup-wayland-base; this downloads about 1 GB)" ;;
+		*) step "Installing the $DESKTOP desktop (setup-desktop $DESKTOP; this downloads about 1-2 GB)" ;;
+	esac
 	# setup-desktop runs `rc-update add SERVICE` without a runlevel, meaning "the current one":
 	# in this chroot OpenRC has no state and that is sysinit, so sddm, dbus and elogind would
 	# start before the system is up. Say the current runlevel is default while it runs.
 	mkdir -p "$TARGET/run/openrc" && echo default >"$TARGET/run/openrc/softlevel"
-	in_target setup-desktop "$DESKTOP" </dev/null 2>&1 | tee -a "$LOG"
+	if [ "$DESKTOP" = hyprland ]; then
+		# shellcheck disable=SC2086
+		in_target setup-wayland-base $HYPRLAND_PKGS </dev/null 2>&1 | tee -a "$LOG"
+	else
+		in_target setup-desktop "$DESKTOP" </dev/null 2>&1 | tee -a "$LOG"
+	fi
 	rm -f "$TARGET/run/openrc/softlevel"
+	if [ "$DESKTOP" = hyprland ]; then
+		# greetd on tty7 (tty1-6 keep their gettys) runs tuigreet as the greetd user; the
+		# session is w3bs-hyprland, which seeds ~/.config/hypr on first start.
+		mkdir -p "$TARGET/etc/greetd"
+		cat >"$TARGET/etc/greetd/config.toml" <<'EOF' || fail "cannot write /etc/greetd/config.toml"
+# W3BS OS: Hyprland login. tuigreet asks for the user name, then the password.
+[terminal]
+vt = 7
+
+[default_session]
+command = "tuigreet --time --remember --asterisks --greeting 'W3BS OS' --cmd /usr/local/bin/w3bs-hyprland"
+user = "greetd"
+EOF
+		chmod 0644 "$TARGET/etc/greetd/config.toml"
+		grep -q '^rc_need' "$TARGET/etc/conf.d/greetd" 2>/dev/null || echo 'rc_need="elogind dbus"' >>"$TARGET/etc/conf.d/greetd"
+		install -m 0755 /usr/share/w3bs-os/w3bs-hyprland "$TARGET/usr/local/bin/w3bs-hyprland" || fail "cannot install w3bs-hyprland"
+		mkdir -p "$TARGET/usr/share/w3bs-os/hypr"
+		# Hyprland takes xkb layout names; the console keymap's layout has the same name.
+		sed "s|^\(\s*kb_layout = \).*|\1${KEYMAP%% *}|" /usr/share/w3bs-os/hypr/hyprland.conf \
+			>"$TARGET/usr/share/w3bs-os/hypr/hyprland.conf" || fail "cannot write the Hyprland default config"
+		chmod 0755 "$TARGET/usr/share/w3bs-os/hypr" && chmod 0644 "$TARGET/usr/share/w3bs-os/hypr/hyprland.conf"
+		grep -q -- '--enabled-by-default' "$TARGET/usr/share/w3bs-os/hypr/hyprland.conf" \
+			&& fail "refusing: the Hyprland config would enable agent access by default"
+		mkdir -p "$TARGET/etc/xdg/xdg-desktop-portal"
+		install -m 0644 /usr/share/w3bs-os/hypr/hyprland-portals.conf "$TARGET/etc/xdg/xdg-desktop-portal/hyprland-portals.conf" \
+			|| fail "cannot install the Hyprland portal config"
+		for svc in elogind greetd; do
+			in_target rc-update add "$svc" default >>"$LOG" 2>&1 || fail "cannot enable $svc"
+		done
+		for u in $USERS; do
+			for g in video audio input; do in_target addgroup "$u" "$g" >>"$LOG" 2>&1; done
+		done
+		in_target addgroup greetd video >>"$LOG" 2>&1
+	fi
 	for svc in dbus elogind sddm gdm lightdm greetd; do
 		if [ -L "$TARGET/etc/runlevels/sysinit/$svc" ]; then
 			in_target rc-update del "$svc" sysinit >>"$LOG" 2>&1
@@ -571,6 +632,7 @@ if [ "$DESKTOP" != none ]; then
 		plasma) want="plasma-workspace sddm"; dm=sddm ;;
 		gnome) want="gnome-shell gdm"; dm=gdm ;;
 		xfce) want="xfce4-session lightdm"; dm=lightdm ;;
+		hyprland) want="hyprland greetd greetd-tuigreet waybar foot"; dm=greetd ;;
 	esac
 	for p in $want; do
 		in_target apk info -e "$p" >/dev/null 2>&1 || fail "setup-desktop $DESKTOP did not install $p"

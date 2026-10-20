@@ -791,7 +791,7 @@ async function osPage() {
       'First release',
       'Docker images: <code>w3bs-os:server</code> and <code>w3bs-os:desktop</code> with the Agentic Desktop Layer installed',
     ],
-    ['Desktop', 'KDE Plasma by default; GNOME selectable; LXQt and Xfce once qualified'],
+    ['Desktop', 'KDE Plasma by default; GNOME or Hyprland selectable at install; LXQt and Xfce once qualified'],
     ['Shell', 'zsh for new users; bash and fish selectable'],
     [
       'Web server',
