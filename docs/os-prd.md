@@ -21,7 +21,7 @@ The product goal is broad device coverage. General replacement-OS installation o
 | Area | Requirement |
 | --- | --- |
 | Base | Alpine Linux stable userspace (musl, apk); Nura on mobile hardware; Docker images first (§20) |
-| Desktop | KDE Plasma selected initially; GNOME selectable; LXQt and Xfce offered when their profile passes qualification |
+| Desktop | Hyprland selected by default in the installer; KDE Plasma and GNOME selectable at install; LXQt and Xfce offered when their profile passes qualification |
 | Toolkits | Qt and GTK runtimes and integration installed for supported desktop applications |
 | Shell | zsh for newly created human users; bash and fish selectable |
 | Installer | Full setup wizard covering hardware, language, keyboard, network, desktop, shell, accounts, hostname, disks, encryption, software, and final review |
@@ -106,7 +106,7 @@ Sane defaults, so a person can press Install after one review screen:
 | Encryption | LUKS2 full-disk encryption on, passphrase asked once |
 | Filesystem | btrfs with `@` and `@home` subvolumes, zstd compression |
 | Boot | UEFI with systemd-boot; legacy BIOS with GRUB only when UEFI is absent |
-| Desktop | KDE Plasma (Wayland) |
+| Desktop | Hyprland (Wayland, greetd + tuigreet); KDE Plasma, GNOME and Xfce in the same menu |
 | Shell | zsh |
 | Software | The full Profullstack suite (§5) |
 | Agents | Agentic Desktop Layer installed, agent access off |

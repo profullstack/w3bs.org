@@ -6,7 +6,8 @@
 #      after walking the interactive installer on VGA to its review screen and cancelling;
 #      BIOS: no --disk, the installer must pick /dev/vda as the largest disk)
 #   3. the installed disk boots; over serial: w3bs --version, zsh login shell, wheel,
-#      /etc/w3bs-os-release, sddm running; screendumps of the greeter and the Plasma desktop
+#      /etc/w3bs-os-release, greetd running, a Hyprland session after logging in at tuigreet;
+#      screendumps of the greeter and the Hyprland desktop (the installer default)
 # plus a LUKS job: an encrypted install creates a LUKS2 volume.
 # Also called by os-iso.yml (workflow_call) before it publishes a release.
 name: os-install-test
@@ -97,15 +98,15 @@ jobs:
           ls -l /dev/kvm
       - name: Live ISO boots to a login
         run: python3 os/iso/test/vmtest.py boot --iso "$ISO" --firmware ${{ matrix.firmware }} --out out --timeout 600
-      - name: Unattended install (Plasma, no encryption) onto a 20 GB virtio disk
+      - name: Unattended install (Hyprland, no encryption) onto a 20 GB virtio disk
         run: |
           qemu-img create -q -f qcow2 out/disk.qcow2 20G
           python3 os/iso/test/vmtest.py install --iso "$ISO" --disk out/disk.qcow2 --firmware ${{ matrix.firmware }} \
-            ${{ matrix.install_flags }} --desktop plasma --out out --timeout 600 --install-timeout 2400
-      - name: Installed disk boots; w3bs, zsh, os-release and sddm checked over serial
+            ${{ matrix.install_flags }} --desktop hyprland --out out --timeout 600 --install-timeout 2400
+      - name: Installed disk boots; w3bs, zsh, os-release, greetd and the Hyprland session checked
         run: |
           python3 os/iso/test/vmtest.py installed --disk out/disk.qcow2 --firmware ${{ matrix.firmware }} \
-            --desktop plasma --type-password --desktop-wait 120 --out out --timeout 900
+            --desktop hyprland --type-password --desktop-wait 120 --out out --timeout 900
       - uses: actions/upload-artifact@v4
         if: always()
         with:

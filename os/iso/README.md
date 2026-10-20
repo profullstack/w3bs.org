@@ -21,7 +21,7 @@ installed system do not boot with Secure Boot on.
 | Keyboard, timezone, hostname | `us us`, `UTC`, `w3bs` | `--keymap`, `--timezone`, `--hostname` |
 | Network | DHCP on every wired interface | |
 | User | `w3bs` ("W3BS User"), zsh login shell, `wheel` + doas; root login locked | `--user`, `--fullname` |
-| Desktop | KDE Plasma with SDDM (`setup-desktop plasma`) | `--desktop plasma\|gnome\|xfce\|none` |
+| Desktop | Hyprland with greetd + tuigreet (below); the installer shows a numbered menu | `--desktop hyprland\|plasma\|gnome\|xfce\|none` |
 | W3BS | `w3bs` and `w3bs-desktop` (musl builds) in `/usr/local/bin`; the W3BS repository (`https://w3bs.org/repo/`, pinned to `registry/FINGERPRINT`) is added for each user at first login | |
 | Agentic Desktop Layer | broker and tray autostart in the desktop session; agent access is **off** until the user turns it on (never `--enabled-by-default`) | |
 
@@ -34,6 +34,23 @@ without echo (or from files), never passed on a command line, and never written 
 (`/var/log/w3bs-os-install.log`, copied to the installed system) or to the nonsecret
 install profile (`/etc/w3bs-os/install-profile`).
 
+### Hyprland
+
+The default desktop (`--desktop hyprland`, menu choice 1) installs [Hyprland](https://hypr.land/) from Alpine
+community on `setup-wayland-base` (elogind, polkit, udev, dbus), since `setup-desktop` has no
+Hyprland. Login is greetd + tuigreet on tty7 (user name, then password); the session is
+`/usr/local/bin/w3bs-hyprland`, which copies the W3BS default
+`/usr/share/w3bs-os/hypr/hyprland.conf` to `~/.config/hypr/hyprland.conf` on the first login
+(edit that copy; the keyboard layout comes from `--keymap`). Included: Waybar, foot (SUPER+Return),
+fuzzel (SUPER+D), mako, Font Awesome (Waybar icons), swaylock/swayidle, grim/slurp (Print), PipeWire, Thunar, Firefox,
+hyprpolkitagent, and xdg-desktop-portal-wlr + gtk (`xdg-desktop-portal-hyprland` is not in
+Alpine 3.24, so screen sharing goes through the wlr portal). The Agentic Desktop Layer broker
+and tray start with the session (`/usr/share/w3bs-os/hypr/desktop-layer.sh`, which waits for
+Waybar's tray host; log in `~/.local/state/w3bs-os/desktop-layer.log`) with agent access off,
+and SUPER+ALT+Escape turns agent access off; Hyprland has no certified adapter yet
+(docs/agentic-desktop-layer-prd.md lists it as an expansion target), so `w3bs-desktop doctor`
+reports what works.
+
 ## Installer usage
 
 Boot the ISO. tty1 logs in as root on the live system and asks whether to start the
@@ -41,7 +58,8 @@ installer; answer the prompts (Enter accepts the default). Or run it yourself:
 
 ```sh
 w3bs-os-install                         # interactive
-w3bs-os-install --desktop gnome         # interactive, GNOME instead of Plasma
+w3bs-os-install --desktop plasma        # interactive, KDE Plasma (SDDM) instead of Hyprland
+w3bs-os-install --desktop gnome         # interactive, GNOME instead of Hyprland
 w3bs-os-install --defaults --disk /dev/sda --yes
                                         # unattended apart from the two passwords
 w3bs-os-install --defaults --disk /dev/sda --yes --no-encrypt \

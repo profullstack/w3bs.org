@@ -1,0 +1,12 @@
+#!/bin/sh
+# w3bs-hyprland: the W3BS OS Hyprland session, started by greetd (tuigreet --cmd).
+# Gives a user with no Hyprland config the W3BS default, then runs Hyprland under its
+# own session bus (OpenRC has no user bus).
+[ -r /etc/profile ] && . /etc/profile
+cfg=${XDG_CONFIG_HOME:-$HOME/.config}/hypr
+if [ ! -e "$cfg/hyprland.conf" ]; then
+	mkdir -p "$cfg" && cp /usr/share/w3bs-os/hypr/hyprland.conf "$cfg/hyprland.conf"
+fi
+export XDG_CURRENT_DESKTOP=Hyprland XDG_SESSION_DESKTOP=Hyprland XDG_SESSION_TYPE=wayland
+export MOZ_ENABLE_WAYLAND=1 QT_QPA_PLATFORM='wayland;xcb'
+exec dbus-run-session start-hyprland
