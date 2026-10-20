@@ -19,7 +19,7 @@ pub fn make_adapter(kind: AdapterKind) -> Result<Arc<dyn Adapter>> {
             }
             Ok(Arc::new(adl_windows::WindowsAdapter::new()))
         }
-        AdapterKind::Vela | AdapterKind::Portal => Err(AdlError::unsupported("vela and portal are Linux backends; on Windows use auto or native")),
+        AdapterKind::Vela | AdapterKind::Portal | AdapterKind::Hyprland => Err(AdlError::unsupported("vela, portal and hyprland are Linux backends; on Windows use auto or native")),
     }
 }
 
