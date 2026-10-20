@@ -343,7 +343,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "3.19.1"
+      "latest_version": "3.19.3"
     },
     {
       "id": "logicsrc.com/opencontext",
@@ -1225,7 +1225,7 @@
       "vendor": "Profullstack",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "0.6.0"
+      "latest_version": "0.7.0"
     },
     {
       "id": "w3bs.org/w3bs-training",
