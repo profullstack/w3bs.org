@@ -861,3 +861,114 @@ fn unanswered_human_step_lapses() {
     assert_eq!(h.b.human_step_status(&a, &step.id).unwrap().status, HumanStepStatus::Expired);
     h.b.lease_acquire(&a, &t, None).unwrap();
 }
+
+// ------------------------------------------------------------------ Screen memory (locate fast path)
+
+/// Draw a 100x30 "button" whose stripes depend on `seed`, so different buttons look different.
+fn widget(m: &MockDesktop, display: &str, x: u32, y: u32, seed: u32) {
+    use adl_broker::PixelRect;
+    m.paint(display, PixelRect { x, y, width: 100, height: 30 }, 60);
+    let mut cx = x + 4;
+    let mut i = 0;
+    while cx < x + 96 {
+        let wd = 3 + (seed * 7 + i * 5) % 9;
+        m.paint(display, PixelRect { x: cx, y: y + 6 + (i % 3) * 2, width: wd.min(x + 96 - cx), height: 14 }, (100 + (seed * 37 + i * 53) % 150) as u8);
+        cx += wd + 2;
+        i += 1;
+    }
+}
+
+fn erase(m: &MockDesktop, display: &str, x: u32, y: u32) {
+    m.paint(display, adl_broker::PixelRect { x, y, width: 100, height: 30 }, 0xe0);
+}
+
+#[test]
+fn remember_then_locate_finds_a_moved_target_and_clicks_it() {
+    let h = harness();
+    h.enable();
+    let (a, t) = h.driver("claude-code", broad());
+    widget(&h.m, "DP-1", 400, 300, 1);
+    widget(&h.m, "DP-1", 900, 500, 2);
+    let shot = h.b.screenshot(&a, "DP-1").unwrap();
+    let saved = h.b.memory_remember(&a, "Editor: Save button", &shot.meta.capture, 450.0, 315.0, None).unwrap();
+    assert_eq!((saved.width, saved.height), (48, 48));
+
+    // The window moved: the button is now at (1200, 800).
+    erase(&h.m, "DP-1", 400, 300);
+    widget(&h.m, "DP-1", 1200, 800, 1);
+    let r = h.b.memory_locate(&a, "Editor: Save button", "DP-1", None).unwrap();
+    assert!(r.found, "{r:?}");
+    assert!(r.score > 0.95 && !r.ambiguous);
+    let p = r.point.clone().unwrap();
+    h.input(&a, &t, None, vec![Action::Click { button: Button::Left, count: 1, at: Some(p), modifiers: vec![] }]).unwrap();
+    let InputEvent::MotionAbsolute { x, y } = h.m.events()[0] else { panic!("{:?}", h.m.events()) };
+    assert!((x - 1250.0).abs() <= 1.0 && (y - 815.0).abs() <= 1.0, "clicked ({x},{y})");
+    let e = &h.b.memory_list(&a)[0];
+    assert_eq!((e.hits, e.misses), (1, 0));
+}
+
+#[test]
+fn locate_routes_misses_and_look_alikes_to_the_slow_path() {
+    let h = harness();
+    h.enable();
+    let a = h.agent("claude-code", broad());
+    widget(&h.m, "DP-1", 400, 300, 1);
+    let shot = h.b.screenshot(&a, "DP-1").unwrap();
+    h.b.memory_remember(&a, "ok", &shot.meta.capture, 450.0, 315.0, None).unwrap();
+
+    // Gone (or redesigned): not found, no point, the agent is told to look and remember again.
+    erase(&h.m, "DP-1", 400, 300);
+    widget(&h.m, "DP-1", 400, 300, 9);
+    let r = h.b.memory_locate(&a, "ok", "DP-1", None).unwrap();
+    assert!(!r.found && r.point.is_none(), "{r:?}");
+    assert!(r.hint.contains("desktop_remember"));
+
+    // Two identical buttons: refused as ambiguous rather than guessed.
+    erase(&h.m, "DP-1", 400, 300);
+    widget(&h.m, "DP-1", 400, 300, 1);
+    widget(&h.m, "DP-1", 1300, 700, 1);
+    let r = h.b.memory_locate(&a, "ok", "DP-1", None).unwrap();
+    assert!(!r.found && r.ambiguous, "{r:?}");
+    assert_eq!(h.b.memory_list(&a)[0].misses, 2);
+}
+
+#[test]
+fn remember_refuses_flat_areas_stale_captures_and_human_steps() {
+    let h = harness();
+    h.enable();
+    let a = h.agent("claude-code", broad());
+    let other = h.agent("codex", broad());
+    widget(&h.m, "DP-1", 400, 300, 1);
+    let shot = h.b.screenshot(&a, "DP-1").unwrap();
+    assert_eq!(h.b.memory_remember(&a, "blank", &shot.meta.capture, 1500.0, 900.0, None).unwrap_err().code, ErrorCode::Invalid, "flat grey");
+    assert_eq!(h.b.memory_remember(&a, "edge", &shot.meta.capture, 5.0, 5.0, None).unwrap_err().code, ErrorCode::Invalid, "patch off the edge");
+    assert_eq!(h.b.memory_remember(&other, "x", &shot.meta.capture, 450.0, 315.0, None).unwrap_err().code, ErrorCode::TargetStale, "not codex's capture");
+    let newer = h.b.screenshot(&a, "DP-1").unwrap();
+    assert_eq!(h.b.memory_remember(&a, "x", &shot.meta.capture, 450.0, 315.0, None).unwrap_err().code, ErrorCode::TargetStale, "only the latest capture");
+    h.b.request_human_step(&other, None, HumanStepKind::Login, "Sign in").unwrap();
+    assert_eq!(h.b.memory_remember(&a, "x", &newer.meta.capture, 450.0, 315.0, None).unwrap_err().code, ErrorCode::Busy, "nothing saved while a person types a password");
+    // Locating something never saved says how to save it.
+    assert_eq!(h.b.memory_locate(&a, "nope", "DP-1", None).unwrap_err().code, ErrorCode::NotFound);
+}
+
+#[test]
+fn screen_memory_is_per_agent_needs_broad_capture_and_the_person_can_forget_it() {
+    let h = harness();
+    h.enable();
+    let a = h.agent("claude-code", broad());
+    let other = h.agent("codex", broad());
+    let narrow = h.agent("mailer", policy(ControlMode::Restricted, &Capability::ALL, &["org.mozilla.firefox"]));
+    widget(&h.m, "DP-1", 400, 300, 1);
+    let shot = h.b.screenshot(&a, "DP-1").unwrap();
+    h.b.memory_remember(&a, "ok", &shot.meta.capture, 450.0, 315.0, None).unwrap();
+    assert_eq!(h.b.memory_locate(&other, "ok", "DP-1", None).unwrap_err().code, ErrorCode::NotFound, "codex has its own memory");
+    assert_eq!(h.b.memory_locate(&narrow, "ok", "DP-1", None).unwrap_err().code, ErrorCode::Denied);
+    let agentish = Peer { agent_descendant: true, ..human() };
+    assert_eq!(h.b.memory_forget(&agentish, "claude-code", None).unwrap_err().code, ErrorCode::Denied);
+    assert_eq!(h.b.memory_forget(&human(), "claude-code", Some("ok")).unwrap(), 1, "by agent name");
+    assert!(h.b.memory_list(&a).is_empty());
+    let shot = h.b.screenshot(&a, "DP-1").unwrap();
+    h.b.memory_remember(&a, "ok", &shot.meta.capture, 450.0, 315.0, None).unwrap();
+    h.b.remove_agent(&a.agent).unwrap();
+    assert!(h.b.screen_memory.list(None).is_empty(), "removing an agent deletes its patches");
+}

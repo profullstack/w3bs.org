@@ -263,6 +263,13 @@ fn agent(b: &Arc<Broker>, c: &mut Conn, req: &Request) -> Result<Value> {
             to(b.request_human_step(&pr, p.get("task").and_then(Value::as_str), kind, p.get("message").and_then(Value::as_str).unwrap_or(""))?)
         }
         "human_step.status" => to(b.human_step_status(&pr, &str_param(p, "human_step")?)?),
+        "memory.remember" => {
+            let num = |k: &str| p.get(k).and_then(Value::as_f64).ok_or_else(|| AdlError::invalid(format!("missing number `{k}`")));
+            let radius = p.get("radius").and_then(Value::as_u64).map(|r| r.min(u32::MAX as u64) as u32);
+            to(b.memory_remember(&pr, &str_param(p, "label")?, &str_param(p, "capture")?, num("x")?, num("y")?, radius)?)
+        }
+        "memory.locate" => to(b.memory_locate(&pr, &str_param(p, "label")?, &str_param(p, "display")?, p.get("min_score").and_then(Value::as_f64).map(|v| v as f32))?),
+        "memory.list" => to(b.memory_list(&pr)),
         m => Err(AdlError::denied(format!("`{m}` is not available to agents"))),
     }
 }
@@ -338,6 +345,8 @@ fn control(b: &Arc<Broker>, c: &mut Conn, req: &Request) -> Result<Value> {
         }
         "drive.always_allow" => to(b.set_drive_always_allow(&peer, p.get("on").and_then(Value::as_bool).unwrap_or(false))?),
         "human_steps.list" => to(b.human_steps()),
+        "memory.all" => to(b.screen_memory.list(p.get("agent").and_then(Value::as_str))),
+        "memory.forget" => Ok(json!({"removed": b.memory_forget(&peer, &str_param(p, "agent")?, p.get("label").and_then(Value::as_str))?})),
         // The person finished a step an agent handed them (`done: true`) or will not do it.
         "human_steps.resolve" => to(b.resolve_human_step(&peer, &str_param(p, "human_step")?, p.get("done").and_then(Value::as_bool).unwrap_or(false))?),
         "audit.export" => to(b.audit.export()),

@@ -249,7 +249,15 @@ impl Adapter for MockDesktop {
             enc.set_depth(png::BitDepth::Eight);
             enc.set_compression(png::Compression::Fast);
             let mut wr = enc.write_header().map_err(|e| AdlError::internal(e.to_string()))?;
-            wr.write_image_data(&vec![0xe0u8; (w * h) as usize]).map_err(|e| AdlError::internal(e.to_string()))?;
+            // The painted rectangles show in captures as they do in stream frames.
+            let mut px = vec![0xe0u8; (w * h) as usize];
+            for (_, r, v) in self.lock().paint.iter().filter(|(id, _, _)| id == display) {
+                for y in r.y.min(h)..(r.y + r.height).min(h) {
+                    let row = (y * w) as usize;
+                    px[row + r.x.min(w) as usize..row + (r.x + r.width).min(w) as usize].fill(*v);
+                }
+            }
+            wr.write_image_data(&px).map_err(|e| AdlError::internal(e.to_string()))?;
         }
         Ok((out, w, h))
     }

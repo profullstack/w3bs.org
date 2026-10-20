@@ -223,6 +223,45 @@ MCP `human_step` and `w3bs desktop human ask` wait up to two minutes (`W3BS_DESK
 If the step is still `pending` after that, poll `human_step_status`. Only the human resolves a step:
 agents' process trees are refused.
 
+## Screen memory (locate fast path)
+
+An agent working from screenshots pays for a full vision-model pass every time it looks for the
+same button. Screen memory is the fast path, after the detector-plus-VLM split in the same paper
+(arXiv 2609.02393). It is used for finding your own UI again, never for bot checks; those are
+human steps.
+
+1. **Slow path:** the agent finds a target in `desktop_screenshot`, acts on it, and it works.
+2. **Label:** it calls `desktop_remember {label, capture, x, y}`. The broker saves a small grayscale
+   patch around that point (48x48 by default, `radius` 12-64) from the agent's latest capture.
+3. **Fast path:** next time it calls `desktop_locate {label, display}`. The broker takes a fresh
+   capture and searches it for the patch (zero-mean normalized cross-correlation, coarse-to-fine;
+   about 0.13 s on a 4K frame in a release build). It returns either:
+   - `found: true` with a `point` in that new capture (`space=capture`), when the match scores at
+     least `min_score` (0.9 by default) and nothing else comes close, or
+   - `found: false`. The agent goes back to the slow path and remembers the target again, so the
+     memory catches up when an app changes its look.
+
+Safety rules:
+- **No old coordinates:** every point belongs to a capture taken just now, and the usual layout
+  and capture checks apply when the agent clicks it.
+- **Ambiguous matches are refused:** when two places match within 0.03 of each other, it does not
+  guess (two identical "OK" buttons). A larger `radius` adds context.
+- **Flat patches are refused:** a blank field or plain background has nothing to match on.
+- **Same access as a screenshot:** it needs display capture and `broad_desktop`.
+- **Nothing is saved during a human step,** so a password being typed is never captured.
+- **Per agent, small, and yours to delete:** each agent keeps its own patches (at most 128,
+  least recently used go first) in `screen-memory.json` in the state directory, mode 0600.
+  Removing an agent deletes its patches. The audit log keeps the display and score, never the
+  label or the pixels.
+
+```bash
+w3bs desktop memory list [--of AGENT]        # labels, sizes, hits and misses (no pixels)
+w3bs desktop memory forget AGENT [LABEL]     # one label, or everything that agent saved
+# agent side (MCP: desktop_locate, desktop_remember, desktop_memory):
+w3bs desktop memory remember --agent A --capture cap_x --x 450 --y 315 "Editor: Save button"
+w3bs desktop memory locate --agent A --display DP-1 "Editor: Save button"
+```
+
 ## Control app
 
 A local, installable web app with everything the tray has and more: status (Disabled, Enabling,

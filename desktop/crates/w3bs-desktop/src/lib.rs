@@ -150,6 +150,9 @@ enum Cmd {
     /// Steps an agent hands to you (CAPTCHA, 2FA code, sign-in, payment): list, done, cancel; `ask` is the agent side
     #[command(subcommand)]
     Human(HumanCmd),
+    /// Screen memory: targets agents saved for the fast locate path (list, forget; remember and locate are the agent side)
+    #[command(subcommand)]
+    Memory(MemoryCmd),
     /// Inspect and cancel tasks
     #[command(subcommand)]
     Tasks(TasksCmd),
@@ -399,6 +402,41 @@ enum HumanCmd {
         kind: String,
         /// What the person should do, e.g. "Solve the CAPTCHA in Firefox, then press Done"
         message: String,
+        #[command(flatten)]
+        auth: AgentAuth,
+    },
+}
+
+#[derive(Subcommand)]
+enum MemoryCmd {
+    /// Saved targets (metadata only), for every agent or one
+    List {
+        #[arg(long)]
+        of: Option<String>,
+    },
+    /// Delete an agent's saved targets: one label, or all of them
+    Forget { agent: String, label: Option<String> },
+    /// (agent) Find a saved target on a fresh capture of a display
+    Locate {
+        #[arg(long)]
+        display: String,
+        #[arg(long)]
+        min_score: Option<f32>,
+        label: String,
+        #[command(flatten)]
+        auth: AgentAuth,
+    },
+    /// (agent) Save the patch around a point of your latest capture under a label
+    Remember {
+        #[arg(long)]
+        capture: String,
+        #[arg(long)]
+        x: f64,
+        #[arg(long)]
+        y: f64,
+        #[arg(long)]
+        radius: Option<u32>,
+        label: String,
         #[command(flatten)]
         auth: AgentAuth,
     },
@@ -764,7 +802,8 @@ fn run_with(cli: Cli) {
             let audit = Audit::open(paths::state_dir().join("audit"), retention_days);
             let mut cfg = Config { require_native_control: !no_native_control && !enabled_by_default, enabled_by_default, ..Config::default() };
             cfg.training.spill_dir = paths::memory_backed_spill_dir();
-            let broker = Arc::new(Broker::new(adapter, store, audit, cfg));
+            let memory = adl_broker::screen_memory::ScreenMemory::open(paths::state_dir().join("screen-memory.json"))?;
+            let broker = Arc::new(Broker::new(adapter, store, audit, cfg).with_screen_memory(memory));
             let restored = broker.training_restore_pending();
             if restored > 0 {
                 eprintln!("w3bs-desktop: {restored} recording(s) from before the restart are waiting for W3BS Training");
@@ -895,6 +934,10 @@ fn run_with(cli: Cli) {
                 DriveCmd::AlwaysAllow { state } => c.call("drive.always_allow", json!({"on": state == "on"})),
             }
         }
+        Cmd::Memory(MemoryCmd::Locate { display, min_score, label, auth }) => agent_client(&auth)?.call("memory.locate", json!({"label": label, "display": display, "min_score": min_score})),
+        Cmd::Memory(MemoryCmd::Remember { capture, x, y, radius, label, auth }) => agent_client(&auth)?.call("memory.remember", json!({"label": label, "capture": capture, "x": x, "y": y, "radius": radius})),
+        Cmd::Memory(MemoryCmd::List { of }) => control_client()?.call("memory.all", json!({"agent": of})),
+        Cmd::Memory(MemoryCmd::Forget { agent, label }) => control_client()?.call("memory.forget", json!({"agent": agent, "label": label})),
         Cmd::Human(HumanCmd::Ask { kind, message, auth }) => {
             let mut c = agent_client(&auth)?;
             let h = c.call("human_step.request", json!({"kind": kind, "message": message}))?;
