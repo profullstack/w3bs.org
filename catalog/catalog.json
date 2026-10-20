@@ -642,7 +642,7 @@
     "repository": "https://github.com/profullstack/tronbrowser.dev",
     "license": "MIT",
     "agentic": false,
-    "latest_version": "3.19.1",
+    "latest_version": "3.19.3",
     "vendor": "Profullstack",
     "install": "curl -fsSL https://tronbrowser.dev/install.sh | sh",
     "evidence": "tronbrowser.dev/install.sh 200; homebrew-tap Formula/tronbrowser.rb; examples: /home/anthony/src/profullstack/tronbrowser.dev/README.md (Install)",
