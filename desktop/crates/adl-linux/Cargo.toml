@@ -1,6 +1,6 @@
 [package]
 name = "adl-linux"
-description = "Agentic Desktop Layer: Linux adapters (Vela command socket, key mapping; portals and wlroots virtual input to follow)"
+description = "Agentic Desktop Layer: Linux adapters (XDG portals with KWin/GNOME Shell, Hyprland with wlroots virtual input, Vela)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

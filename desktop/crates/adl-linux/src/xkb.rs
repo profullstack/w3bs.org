@@ -17,12 +17,9 @@
 //! typeable in every group. If the keymap cannot be read, only printable ASCII is allowed.
 
 use crate::keymap;
-use std::collections::VecDeque;
+use crate::wl::{Args, Wire};
 use std::ffi::{c_char, c_int, c_void, CStr, CString};
-use std::io::Write;
-use std::os::fd::{FromRawFd, OwnedFd, RawFd};
 use std::os::unix::fs::FileExt;
-use std::os::unix::net::UnixStream;
 use std::sync::OnceLock;
 use std::time::Duration;
 
@@ -221,20 +218,47 @@ pub fn compile(text: &[u8], group: Option<u32>) -> Result<Vec<Group>, String> {
     }
 }
 
+/// XKB keycodes (9..=255) that produce no keysym in any layout or level of this keymap: keys a
+/// key binding can never match, which a virtual keyboard can use for symbols of its own.
+pub fn empty_keycodes(text: &[u8]) -> Result<Vec<u32>, String> {
+    let x = xkb()?;
+    let text = CString::new(text.split(|b| *b == 0).next().unwrap_or_default()).map_err(|e| e.to_string())?;
+    // SAFETY: plain libxkbcommon calls on objects created and released here (as in `compile`).
+    unsafe {
+        let ctx = (x.context_new)(3);
+        if ctx.is_null() {
+            return Err("xkb_context_new failed".into());
+        }
+        let km = (x.keymap_new_from_string)(ctx, text.as_ptr(), 1, 0);
+        if km.is_null() {
+            (x.context_unref)(ctx);
+            return Err("the compositor's keymap did not compile".into());
+        }
+        let (min, max, n) = ((x.min_keycode)(km), (x.max_keycode)(km), (x.num_layouts)(km).max(1));
+        let empty = (9..=255u32)
+            .filter(|&kc| {
+                kc < min
+                    || kc > max
+                    || (0..n).all(|g| {
+                        (0..(x.num_levels_for_key)(km, kc, g)).all(|level| {
+                            let mut syms: *const u32 = std::ptr::null();
+                            (x.key_get_syms_by_level)(km, kc, g, level, &mut syms) <= 0
+                        })
+                    })
+            })
+            .collect();
+        (x.keymap_unref)(km);
+        (x.context_unref)(ctx);
+        Ok(empty)
+    }
+}
+
 // ---------------------------------------------------------------- Wayland: wl_keyboard.keymap
 
 /// Read the keymap the compositor sends every Wayland client, over a minimal client connection
 /// (registry, wl_seat, wl_keyboard; nothing is drawn and no input is read).
 pub fn wayland_keymap() -> Result<Vec<u8>, String> {
-    let display = std::env::var("WAYLAND_DISPLAY").unwrap_or_else(|_| "wayland-0".into());
-    let path = if display.starts_with('/') {
-        display.into()
-    } else {
-        std::path::PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").ok_or("XDG_RUNTIME_DIR is not set")?).join(display)
-    };
-    let sock = UnixStream::connect(&path).map_err(|e| format!("Wayland {}: {e}", path.display()))?;
-    sock.set_read_timeout(Some(Duration::from_secs(2))).map_err(|e| e.to_string())?;
-    let mut w = Wire { sock, buf: vec![], fds: VecDeque::new() };
+    let mut w = Wire::connect(Duration::from_secs(2))?;
     const DISPLAY: u32 = 1;
     const REGISTRY: u32 = 2;
     const SEAT: u32 = 4;
@@ -285,132 +309,13 @@ pub fn wayland_keymap() -> Result<Vec<u8>, String> {
     keymap.unwrap_or_else(|| Err("the compositor sent no keymap".into()))
 }
 
-struct Args(Vec<u8>);
-
-impl Args {
-    fn new() -> Self {
-        Self(vec![])
-    }
-    fn u32(mut self, v: u32) -> Self {
-        self.0.extend_from_slice(&v.to_ne_bytes());
-        self
-    }
-    fn string(mut self, s: &str) -> Self {
-        self.0.extend_from_slice(&(s.len() as u32 + 1).to_ne_bytes());
-        self.0.extend_from_slice(s.as_bytes());
-        self.0.push(0);
-        while !self.0.len().is_multiple_of(4) {
-            self.0.push(0);
-        }
-        self
-    }
-}
-
-/// Reader over one event's arguments.
-struct ArgReader<'a>(&'a [u8]);
-
-impl ArgReader<'_> {
-    fn u32(&mut self) -> Result<u32, String> {
-        let (h, t) = self.0.split_at_checked(4).ok_or("short Wayland event")?;
-        self.0 = t;
-        Ok(u32::from_ne_bytes(h.try_into().unwrap()))
-    }
-    fn string(&mut self) -> Result<String, String> {
-        let n = self.u32()? as usize;
-        let padded = n.div_ceil(4) * 4;
-        let (h, t) = self.0.split_at_checked(padded).ok_or("short Wayland string")?;
-        self.0 = t;
-        Ok(String::from_utf8_lossy(&h[..n.saturating_sub(1)]).into_owned())
-    }
-}
-
-struct Wire {
-    sock: UnixStream,
-    buf: Vec<u8>,
-    fds: VecDeque<OwnedFd>,
-}
-
-impl Wire {
-    fn send(&mut self, obj: u32, opcode: u16, args: &Args) -> Result<(), String> {
-        let len = 8 + args.0.len();
-        let mut m = Vec::with_capacity(len);
-        m.extend_from_slice(&obj.to_ne_bytes());
-        m.extend_from_slice(&(((len as u32) << 16) | opcode as u32).to_ne_bytes());
-        m.extend_from_slice(&args.0);
-        self.sock.write_all(&m).map_err(|e| format!("Wayland write: {e}"))
-    }
-
-    /// Read more bytes, collecting any file descriptors passed alongside them.
-    fn fill(&mut self) -> Result<(), String> {
-        let mut data = [0u8; 4096];
-        let mut cbuf = [0u64; 64];
-        let mut iov = libc::iovec { iov_base: data.as_mut_ptr() as *mut c_void, iov_len: data.len() };
-        // SAFETY: recvmsg into stack buffers that outlive the call; control messages are walked
-        // with the libc CMSG helpers within msg_controllen.
-        unsafe {
-            let mut msg: libc::msghdr = std::mem::zeroed();
-            msg.msg_iov = &mut iov;
-            msg.msg_iovlen = 1;
-            msg.msg_control = cbuf.as_mut_ptr() as *mut c_void;
-            msg.msg_controllen = std::mem::size_of_val(&cbuf) as _;
-            let fd = std::os::fd::AsRawFd::as_raw_fd(&self.sock);
-            let n = libc::recvmsg(fd, &mut msg, libc::MSG_CMSG_CLOEXEC);
-            if n < 0 {
-                return Err(format!("Wayland read: {}", std::io::Error::last_os_error()));
-            }
-            if n == 0 {
-                return Err("the compositor closed the Wayland connection".into());
-            }
-            let mut c = libc::CMSG_FIRSTHDR(&msg);
-            while !c.is_null() {
-                if (*c).cmsg_level == libc::SOL_SOCKET && (*c).cmsg_type == libc::SCM_RIGHTS {
-                    let data = libc::CMSG_DATA(c) as *const RawFd;
-                    let count = ((*c).cmsg_len as usize - libc::CMSG_LEN(0) as usize) / std::mem::size_of::<RawFd>();
-                    for i in 0..count {
-                        self.fds.push_back(OwnedFd::from_raw_fd(std::ptr::read_unaligned(data.add(i))));
-                    }
-                }
-                c = libc::CMSG_NXTHDR(&msg, c);
-            }
-            self.buf.extend_from_slice(&data[..n as usize]);
-        }
-        Ok(())
-    }
-
-    /// Dispatch events to `f` until wl_callback `cb` is done.
-    fn until_done(&mut self, cb: u32, mut f: impl FnMut(u32, u16, &mut ArgReader, &mut VecDeque<OwnedFd>) -> Result<(), String>) -> Result<(), String> {
-        loop {
-            while self.buf.len() >= 8 {
-                let obj = u32::from_ne_bytes(self.buf[0..4].try_into().unwrap());
-                let word = u32::from_ne_bytes(self.buf[4..8].try_into().unwrap());
-                let (len, op) = ((word >> 16) as usize, (word & 0xffff) as u16);
-                if len < 8 {
-                    return Err("malformed Wayland message".into());
-                }
-                if self.buf.len() < len {
-                    break;
-                }
-                let body: Vec<u8> = self.buf[8..len].to_vec();
-                self.buf.drain(..len);
-                let mut a = ArgReader(&body);
-                if obj == 1 && op == 0 {
-                    let (_, code, msg) = (a.u32()?, a.u32()?, a.string()?);
-                    return Err(format!("Wayland protocol error {code}: {msg}"));
-                }
-                if obj == cb && op == 0 {
-                    return Ok(());
-                }
-                f(obj, op, &mut a, &mut self.fds)?;
-            }
-            self.fill()?;
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Read;
+    use crate::wl::ArgReader;
+    use std::io::{Read, Write};
+    use std::os::fd::RawFd;
+    use std::os::unix::net::UnixStream;
 
     /// A slice of a `us` keymap: keycodes ascending, levels per key.
     fn us() -> Group {

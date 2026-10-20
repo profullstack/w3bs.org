@@ -10,7 +10,7 @@ pub fn make_adapter(kind: AdapterKind) -> Result<Arc<dyn Adapter>> {
     match kind {
         AdapterKind::Mock => Ok(Arc::new(adl_broker::mock::MockDesktop::new())),
         AdapterKind::Auto | AdapterKind::Native => Ok(Arc::new(adl_macos::MacAdapter::new())),
-        AdapterKind::Vela | AdapterKind::Portal => Err(AdlError::unsupported("vela and portal are Linux backends; on macOS use auto or native")),
+        AdapterKind::Vela | AdapterKind::Portal | AdapterKind::Hyprland => Err(AdlError::unsupported("vela, portal and hyprland are Linux backends; on macOS use auto or native")),
     }
 }
 

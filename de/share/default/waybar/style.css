@@ -1,0 +1,62 @@
+/* W3BS DE bar. Palette from w3bs.org: ink, paper, orange, sage. */
+* {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+}
+window#waybar {
+  background: #1c2b26;
+  color: #f6f4ed;
+  border-bottom: 1px solid #2c403a;
+}
+#custom-w3bs {
+  font-weight: 800;
+  letter-spacing: -1px;
+  font-size: 15px;
+  padding: 0 12px 0 14px;
+}
+#workspaces button {
+  color: #a8ae9f;
+  padding: 0 8px;
+  background: transparent;
+}
+#workspaces button.active {
+  color: #f6f4ed;
+  box-shadow: inset 0 -2px #d95231;
+}
+#workspaces button.special {
+  color: #d95231;
+}
+#window {
+  color: #dbded0;
+}
+#custom-agents, #tray, #pulseaudio, #network, #battery, #clock, #custom-notifications {
+  padding: 0 10px;
+  color: #dbded0;
+}
+#custom-agents.off {
+  color: #6b7268;
+}
+#custom-agents.on {
+  color: #f6f4ed;
+}
+#custom-agents.driving {
+  color: #1c2b26;
+  background: #d95231;
+}
+#custom-agents.waiting {
+  color: #1c2b26;
+  background: #e6ebdc;
+}
+#battery.warning {
+  color: #d9a441;
+}
+#battery.critical {
+  color: #d95231;
+}
+tooltip {
+  background: #1c2b26;
+  border: 1px solid #d95231;
+}

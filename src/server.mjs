@@ -14,6 +14,7 @@ import { descriptor } from '@profullstack/footer';
 import { createScanner } from './scan.mjs';
 import { mountAccounts, OPEN_CORS, bearerOf } from './auth-routes.mjs';
 import { mountFleet } from './fleet-routes.mjs';
+import { mountDe } from './de-routes.mjs';
 import { mountSocial, socialConfig } from './social-routes.mjs';
 import { createMailer } from './mail.mjs';
 import { createHostedTraining } from '../training/hosted.mjs';
@@ -347,7 +348,7 @@ export function createApp({
     res
       .type('application/xml')
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/pricing', '/packages', '/packages/publish', '/specs', '/browse', '/prompts', '/desktop', '/training', '/tasks', '/workflows', '/os', '/ab-testing', '/social', '/governance', '/developers', '/signup', '/terms', '/privacy'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/pricing', '/packages', '/packages/publish', '/specs', '/browse', '/prompts', '/desktop', '/de', '/training', '/tasks', '/workflows', '/os', '/ab-testing', '/social', '/governance', '/developers', '/signup', '/terms', '/privacy'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
       ),
   );
   app.get('/docs/:file', (req, res) => {
@@ -369,6 +370,8 @@ export function createApp({
       res.type(type).set('Cache-Control', 'public, max-age=300').send(readFileSync(path));
     });
   }
+  // W3BS DE: installer, file manifest and files (w3bs.org/de).
+  mountDe(app);
   // W3BS Training installers (the recorder in the desktop layer hands recordings to it).
   for (const [route, file, type] of [
     ['/training/install.sh', 'install.sh', 'text/x-shellscript; charset=utf-8'],

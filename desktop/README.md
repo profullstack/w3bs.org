@@ -153,6 +153,44 @@ $B doctor                  # gnome_shell_extension: ok once it is loaded
 Without it the portal backend still types and clicks, but window listing is unsupported and
 targeted input is refused.
 
+## Hyprland (and W3BS DE)
+
+Hyprland's portal (xdg-desktop-portal-hyprland) has no RemoteDesktop interface, so the portal
+backend cannot type or click there. `--adapter auto` therefore picks a Hyprland backend
+(`linux-hyprland`) whenever `HYPRLAND_INSTANCE_SIGNATURE` points at a live Hyprland IPC socket:
+
+- **Layout and windows:** Hyprland's IPC (`j/monitors`, `j/clients`, `j/cursorpos`). Hyprland
+  serves one request per connection, synchronously, so each request opens, writes, reads and
+  closes. Windows are ordered topmost first (special workspace, fullscreen, floating and pinned,
+  then tiled) for occlusion checks. Monitor hotplug and config reloads on `.socket2.sock` mark
+  captures stale.
+- **Input:** the backend's own Wayland connection with `zwlr_virtual_pointer_v1` and
+  `zwp_virtual_keyboard_v1`, with a keymap it generates. Hyprland resolves its key bindings through
+  the seat's keymap, not the virtual keyboard's, so keycodes matter: every key a US keyboard has
+  sits at its real position with both levels (Shift goes through the modifier state, as with real
+  keys, and SUPER+1 still reaches the workspace binding); other characters (é, ✓, 日) go on keycodes
+  the seat's keymap leaves empty (read from the compositor; 14 on a US map), so no binding can
+  swallow them, and text needing more is typed in parts. (A wtype-style keymap that numbers keysyms
+  from keycode 9 loses `c`, `d` and `e`: on a US map those codes are Mute and Volume.) Closing the
+  connection (Stop, Disable) destroys both devices, which releases anything held.
+- **Captures:** `grim` (wlr-screencopy).
+- **Interlocks:** input is refused while hyprlock or swaylock runs, or while an authentication
+  dialog (polkit agent, pinentry, GCR prompter, ssh-askpass) is mapped.
+- **Takeover:** the pointer moving away from where the agent left it is physical input, which
+  disables access. Hyprland cannot tell a person's keys from virtual ones, so keyboard takeover is
+  not detected; use the mouse or the emergency stop.
+- **Native control:** the tray (StatusNotifierItem) shows in waybar. W3BS DE (w3bs.org/de) also
+  puts an agent indicator in its bar (`w3bs-desktop status --waybar`) and binds SUPER+ALT+Escape to
+  `w3bs-desktop disable`.
+
+Verified on the Hyprland 0.56.2 rig (`tests/rig/hyprland.sh`, then `tests/rig/hyprland-e2e.sh`),
+with W3BS DE's bindings loaded: backend auto-detected, windows and layout, a 1920x1080 capture,
+every US key on both levels plus accents and 20 CJK characters typed exactly, absolute pointer
+motion, a click, and SUPER+2 switching workspaces.
+
+If Hyprland's permission system is on (`ecosystem.enforce_permissions`), allow `grim` the
+`screencopy` permission.
+
 ## Drive prompt
 
 Before an agent takes the pointer and keyboard, the person at the desktop is asked:

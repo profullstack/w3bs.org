@@ -1,0 +1,41 @@
+#!/bin/sh
+# Container entrypoint: seatd + D-Bus session + Hyprland (DRM backend) + one headless output.
+set -eu
+export XDG_RUNTIME_DIR=/run/user/0
+export DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus
+export LIBSEAT_BACKEND=seatd SEATD_VTBOUND=0 HYPRLAND_NO_SD_NOTIFY=1
+export AQ_DRM_DEVICES=${AQ_DRM_DEVICES:-$(ls /dev/dri/card* 2>/dev/null | head -1)}
+export AQ_NO_KMS_REQUIREMENT=1 XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=Hyprland
+L=/var/log/rig; mkdir -p $L; mkdir -p -m 0700 $XDG_RUNTIME_DIR
+[ -n "$AQ_DRM_DEVICES" ] || { echo "rig: no /dev/dri/card* passed in" >&2; exit 2; }
+
+seatd -g root >$L/seatd.log 2>&1 &
+dbus-daemon --session --address=$DBUS_SESSION_BUS_ADDRESS --nofork --nopidfile >$L/dbus.log 2>&1 &
+for i in $(seq 1 50); do [ -S /run/seatd.sock ] && [ -S $XDG_RUNTIME_DIR/bus ] && break; sleep 0.1; done
+
+# start-hyprland is the watchdog launcher (plain Hyprland pops a red "started without
+# start-hyprland" banner into every screenshot). Root in a throwaway container: the flag skips
+# only the privileges check.
+start-hyprland -- --i-am-really-stupid >$L/hyprland.log 2>&1 &
+HPID=$!
+for i in $(seq 1 150); do
+  SIG=$(ls $XDG_RUNTIME_DIR/hypr 2>/dev/null | head -1)
+  [ -n "$SIG" ] && [ -S "$XDG_RUNTIME_DIR/hypr/$SIG/.socket.sock" ] && break
+  kill -0 $HPID 2>/dev/null || { echo "rig: Hyprland exited, see $L/hyprland.log" >&2; exit 1; }
+  sleep 0.1
+done
+WAYLAND_DISPLAY=$(cd $XDG_RUNTIME_DIR && ls wayland-* | grep -v lock | head -1)
+export HYPRLAND_INSTANCE_SIGNATURE=$SIG
+# Every DRM connector is disconnected on a headless box, so give Hyprland a virtual output.
+hyprctl -j monitors | jq -e 'length > 0' >/dev/null || hyprctl output create headless ${RIG_OUTPUT:-HEADLESS-1} >/dev/null
+for i in $(seq 1 50); do hyprctl -j monitors | jq -e 'length > 0' >/dev/null 2>&1 && break; sleep 0.1; done
+
+cat > $XDG_RUNTIME_DIR/rig.env <<EOT
+export XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR
+export WAYLAND_DISPLAY=$WAYLAND_DISPLAY
+export HYPRLAND_INSTANCE_SIGNATURE=$SIG
+export DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS
+export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=Hyprland
+EOT
+echo "rig: ready $SIG"
+wait $HPID
