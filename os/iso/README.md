@@ -45,7 +45,9 @@ Hyprland. Login is greetd + tuigreet on tty7 (user name, then password); the ses
 fuzzel (SUPER+D), mako, Font Awesome (Waybar icons), swaylock/swayidle, grim/slurp (Print), PipeWire, Thunar, Firefox,
 hyprpolkitagent, and xdg-desktop-portal-wlr + gtk (`xdg-desktop-portal-hyprland` is not in
 Alpine 3.24, so screen sharing goes through the wlr portal). The Agentic Desktop Layer broker
-and tray start from the config with agent access off; Hyprland has no certified adapter yet
+and tray start with the session (`/usr/share/w3bs-os/hypr/desktop-layer.sh`, which waits for
+Waybar's tray host; log in `~/.local/state/w3bs-os/desktop-layer.log`) with agent access off,
+and SUPER+ALT+Escape turns agent access off; Hyprland has no certified adapter yet
 (docs/agentic-desktop-layer-prd.md lists it as an expansion target), so `w3bs-desktop doctor`
 reports what works.
 
