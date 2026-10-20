@@ -2304,10 +2304,45 @@
     "repository": "https://github.com/profullstack/w3bs.org/tree/main/desktop",
     "license": "Apache-2.0",
     "agentic": true,
-    "latest_version": "0.7.0",
+    "latest_version": "0.8.0",
     "vendor": "Profullstack",
     "install": "curl -fsSL https://w3bs.org/desktop/install.sh | sh",
-    "evidence": "w3bs.org/desktop/install.sh 200 (text/x-shellscript); GitHub release desktop-v0.7.0 with 7 archives (incl. x86_64/aarch64 musl for Alpine and Nura) + SHA256SUMS; installer verified on ubuntu:24.04, macos-latest and windows-latest CI; Training Mode verified on the KDE Plasma rig (73/73)",
+    "evidence": "w3bs.org/desktop/install.sh 200 (text/x-shellscript); GitHub release desktop-v0.8.0 with 7 archives (incl. x86_64/aarch64 musl for Alpine and Nura) + SHA256SUMS; installer verified on ubuntu:24.04, macos-latest and windows-latest CI; Training Mode verified on the KDE Plasma rig (73/73)",
+    "publisher": "profullstack"
+  },
+  {
+    "id": "w3bs.org/w3bs-de",
+    "name": "w3bs-de",
+    "commands": [
+      "w3bs-de"
+    ],
+    "examples": [
+      {
+        "run": "w3bs-de session",
+        "does": "Start W3BS DE (what the \"W3BS DE\" login-screen entry runs)"
+      },
+      {
+        "run": "w3bs-de doctor",
+        "does": "Check Hyprland, the desktop tools and the agent layer"
+      },
+      {
+        "run": "w3bs-de agent-mode on",
+        "does": "Keep the screen unlocked while agents work unattended (off restores idle locking)"
+      },
+      {
+        "run": "w3bs-de update",
+        "does": "Fetch the latest W3BS DE defaults; your settings in ~/.config/w3bs-de are kept"
+      }
+    ],
+    "description": "W3BS DE: a minimal, agent-friendly Wayland desktop built on Hyprland (waybar, fuzzel, swaync, hyprlock, foot), in the w3bs palette, with the Agentic Desktop Layer built in and agent access off until you turn it on. Installs Hyprland from your distribution.",
+    "homepage": "https://w3bs.org/de",
+    "repository": "https://github.com/profullstack/w3bs.org/tree/main/de",
+    "license": "MIT",
+    "agentic": true,
+    "latest_version": "0.1.0",
+    "vendor": "Profullstack",
+    "install": "curl -fsSL https://w3bs.org/de/install.sh | sh",
+    "evidence": "w3bs.org/de/install.sh 200 (text/x-shellscript) and /de/manifest.txt (sha256 per file); installer verified into a clean home; Hyprland backend in desktop-v0.8.0, verified on a Hyprland 0.56.2 rig (typing, pointer, captures, workspace shortcuts) with these defaults loaded",
     "publisher": "profullstack"
   },
   {
