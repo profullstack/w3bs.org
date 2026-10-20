@@ -182,6 +182,47 @@ Only the human answers: agents' process trees are refused on every drive method.
 activity forgets every answer, so agents ask again. Non-desktop instances
 (`--enabled-by-default`) have nobody to ask and skip the prompt.
 
+## Human steps (CAPTCHA, 2FA, sign-in, payment)
+
+Agents that work from screenshots and OS input can be trained to beat CAPTCHAs: a fast detector
+for familiar puzzles, a vision model for new ones, and every model answer becomes a label for the
+detector ([Schneier, 2026-10-19](https://www.schneier.com/blog/archives/2026/10/training-ais-to-solve-captchas.html),
+arXiv 2609.02393). This layer goes the other way. **Agents do not solve "are you human" checks.
+They hand them to the person**, along with one-time codes, passwords and payment confirmations.
+
+| Kind | For |
+| --- | --- |
+| `captcha` | A CAPTCHA or any other bot check |
+| `two_factor` | A one-time code, security key, passkey or authenticator prompt |
+| `login` | A password or sign-in the agent should not hold |
+| `payment` | Confirming a purchase, payment or transfer |
+| `other` | Anything else only the person should do |
+
+When an agent asks:
+- The input lease is revoked (whoever held it), and no agent can take it until the step ends
+  (`busy` with `human_step_id`).
+- Your own clicks and typing while the step is open are **not** a takeover, so the layer stays on.
+- You get **"<agent> needs you for a human check (CAPTCHA)"** with the agent's message and two
+  buttons: **Done** and **Cancel**. It appears as a notification and in the menu on the KDE tray
+  and the GNOME panel, as a banner in the control app, and in `w3bs desktop control` (`done`,
+  `cancel`). The Windows and macOS menus do not show it yet; use the control app there.
+- **Done** drops every capture taken before the step. The agent must look at the screen again and
+  call `task_begin` to continue. **Cancel** tells the agent to stop and tell its user.
+- An unanswered step lapses after 15 minutes. Stop withdraws open steps.
+
+The audit log keeps only the kind, never the message. From a terminal:
+
+```bash
+w3bs desktop human list
+w3bs desktop human done <id>      # cancel <id> refuses it
+# the agent side (MCP tool `human_step`, or the CLI):
+w3bs desktop human ask --agent opencode --kind captcha "Solve the CAPTCHA on the sign-up page in Firefox"
+```
+
+MCP `human_step` and `w3bs desktop human ask` wait up to two minutes (`W3BS_DESKTOP_HUMAN_WAIT_S`).
+If the step is still `pending` after that, poll `human_step_status`. Only the human resolves a step:
+agents' process trees are refused.
+
 ## Control app
 
 A local, installable web app with everything the tray has and more: status (Disabled, Enabling,
@@ -317,6 +358,9 @@ enable` skips the code; disable and the interlocks still work. Never use it on a
   the layout generation; a covered target or a focus change stops the batch (`target_stale`).
 - **Agents ask before they drive** (the drive prompt above): Allow, Deny, Postpone or Always allow,
   answered only by the human; Stop forgets every answer.
+- **Agents hand human checks to the person** (human steps above): CAPTCHAs, one-time codes,
+  passwords and payments are never attempted by the agent; agent input pauses until the person
+  presses Done or Cancel.
 - **Approvals bind the exact request** (agent, task, target, argument digest, expiry); agent input
   is suspended while one is pending; the agent surface has no enable/grant/approve methods.
 - **Audit is metadata only** (7-day default retention): never screenshots, typed text or bodies.

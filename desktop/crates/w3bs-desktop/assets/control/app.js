@@ -172,6 +172,7 @@ function render() {
   connect();
   renderStatus();
   renderDrive();
+  renderHumanSteps();
   renderTraining();
   renderApprovals();
   renderAgents();
@@ -229,6 +230,19 @@ function renderDrive() {
   const box = $('[data-always-allow]');
   box.checked = Boolean(S.status.drive_always_allow);
   box.onchange = () => act('always_allow', { on: box.checked });
+}
+
+// Steps an agent handed the person (CAPTCHA, sign-in code, password, payment): agents never solve these.
+const HUMAN_KIND = { captcha: 'a human check (CAPTCHA)', two_factor: 'a sign-in code', login: 'a sign-in', payment: 'a payment confirmation', other: 'a step' };
+function renderHumanSteps() {
+  const pending = (S.human_steps || []).filter((s) => s.status === 'pending');
+  $('[data-human-steps]').replaceChildren(...pending.map((s) => h('div', { class: 'banner' },
+    h('p', {}, h('strong', { text: `${s.agent_name} needs you for ${HUMAN_KIND[s.kind] || 'a step'}.` }), ' ', h('span', { text: s.message })),
+    h('div', { class: 'banner-actions' },
+      h('button', { type: 'button', class: 'button primary small', onclick: () => act('human_step', { human_step: s.id, done: true }) }, 'Done'),
+      h('button', { type: 'button', class: 'button outline small', onclick: () => act('human_step', { human_step: s.id, done: false }) }, 'Cancel'),
+      h('span', { class: 'muted', text: `Agent input is paused until then; your own clicks and typing will not stop it. Lapses at ${time(s.expires_at_ms)}.` })),
+  )));
 }
 
 function renderApprovals() {

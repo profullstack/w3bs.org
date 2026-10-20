@@ -258,6 +258,11 @@ fn agent(b: &Arc<Broker>, c: &mut Conn, req: &Request) -> Result<Value> {
         "lease.release" => to(b.lease_release(&pr)?),
         "input" => to(b.input(&pr, &params::<InputBatch>(p)?)?),
         "approval.status" => to(b.approval_status(&pr, &str_param(p, "approval")?)?),
+        "human_step.request" => {
+            let kind: HumanStepKind = params(p.get("kind").unwrap_or(&json!("other")))?;
+            to(b.request_human_step(&pr, p.get("task").and_then(Value::as_str), kind, p.get("message").and_then(Value::as_str).unwrap_or(""))?)
+        }
+        "human_step.status" => to(b.human_step_status(&pr, &str_param(p, "human_step")?)?),
         m => Err(AdlError::denied(format!("`{m}` is not available to agents"))),
     }
 }
@@ -332,6 +337,9 @@ fn control(b: &Arc<Broker>, c: &mut Conn, req: &Request) -> Result<Value> {
             to(b.decide_drive(&peer, &str_param(p, "drive")?, decision, p.get("postpone_ms").and_then(Value::as_u64))?)
         }
         "drive.always_allow" => to(b.set_drive_always_allow(&peer, p.get("on").and_then(Value::as_bool).unwrap_or(false))?),
+        "human_steps.list" => to(b.human_steps()),
+        // The person finished a step an agent handed them (`done: true`) or will not do it.
+        "human_steps.resolve" => to(b.resolve_human_step(&peer, &str_param(p, "human_step")?, p.get("done").and_then(Value::as_bool).unwrap_or(false))?),
         "audit.export" => to(b.audit.export()),
         "audit.delete" => Ok(json!({"files_deleted": b.audit.delete_all()})),
         "audit.recent" => to(b.audit.recent(p.get("limit").and_then(Value::as_u64).unwrap_or(20).min(500) as usize)),

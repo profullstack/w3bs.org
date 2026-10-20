@@ -445,6 +445,7 @@ fn state(web: &Web, csrf: &str, addr: SocketAddr) -> Value {
         "pending_enable": pending.map(|(code, exp)| json!({"code": code, "expires_at_ms": exp})),
         "approvals": b.approvals(),
         "drive": b.drive_requests(),
+        "human_steps": b.human_steps(),
         "training": b.training_status(),
         "agents": b.store.list(),
         "tasks": tasks,
@@ -502,6 +503,8 @@ fn action(web: &Web, body: &Value, pid: Option<u32>, key: &str) -> Result<(Value
             let approve = str_of(body, "action")? == "approve";
             to(&b.decide_approval(&peer, str_of(body, "approval")?, approve)?)
         }
+        // A step an agent handed the person: done (true) or cancel (false).
+        "human_step" => to(&b.resolve_human_step(&peer, str_of(body, "human_step")?, body.get("done").and_then(Value::as_bool).unwrap_or(false))?),
         // An agent asking to drive: allow | deny | postpone (optional postpone_ms) | always_allow.
         "drive" => {
             let decision: DriveDecision = serde_json::from_value(body.get("decision").cloned().unwrap_or(Value::Null)).map_err(|_| AdlError::invalid("decision must be allow, deny, postpone or always_allow"))?;

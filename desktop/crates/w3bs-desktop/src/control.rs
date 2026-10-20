@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, IsTerminal, Write};
 use std::sync::mpsc;
 
-const HELP: &str = "commands: enable | disable | stop | confirm | approve <id> | deny <id> | approvals | allow | deny | postpone [minutes] | always (an agent asking to drive; add an id to pick one) | always off | tasks | status | open (the control app) | quit (quitting disables access)";
+const HELP: &str = "commands: enable | disable | stop | confirm | approve <id> | deny <id> | approvals | allow | deny | postpone [minutes] | always (an agent asking to drive; add an id to pick one) | always off | done | cancel (a step an agent handed you: CAPTCHA, 2FA, sign-in) | tasks | status | open (the control app) | quit (quitting disables access)";
 
 fn print_state(v: &Value) {
     let st = v["state"].as_str().unwrap_or("?");
@@ -50,6 +50,9 @@ pub fn run() -> std::io::Result<()> {
     // The drive request the person was last asked about: `allow`, `deny`, `postpone`, `always` answer it.
     let last_drive = std::sync::Arc::new(std::sync::Mutex::new(None::<String>));
     let drive_slot = last_drive.clone();
+    // The step an agent last handed the person: `done` and `cancel` answer it.
+    let last_human = std::sync::Arc::new(std::sync::Mutex::new(None::<String>));
+    let human_slot = last_human.clone();
     std::thread::spawn(move || {
         for line in reader.lines() {
             let Ok(line) = line else { break };
@@ -80,6 +83,20 @@ pub fn run() -> std::io::Result<()> {
                         *slot = None;
                     }
                     println!("  Drive request {} is {}", v["data"]["id"].as_str().unwrap_or(""), v["data"]["status"].as_str().unwrap_or(""));
+                }
+                Some("human_step_requested") => {
+                    let h = &v["data"];
+                    let id = h["id"].as_str().unwrap_or_default().to_string();
+                    println!("\n  AGENT NEEDS YOU [{id}] {} ({}): {}", h["agent_name"].as_str().unwrap_or(""), h["kind"].as_str().unwrap_or(""), h["message"].as_str().unwrap_or(""));
+                    println!("  Agent input is paused and your own input will not stop it. Do the step, then type `done` (or `cancel`).");
+                    *human_slot.lock().unwrap() = Some(id);
+                }
+                Some("human_step_resolved") => {
+                    let mut slot = human_slot.lock().unwrap();
+                    if slot.as_deref() == v["data"]["id"].as_str() {
+                        *slot = None;
+                    }
+                    println!("  Step {} is {}", v["data"]["id"].as_str().unwrap_or(""), v["data"]["status"].as_str().unwrap_or(""));
                 }
                 Some("drive_always_allow") => println!("  Always allow is {}", if v["data"]["on"].as_bool().unwrap_or(false) { "ON: agents drive without asking" } else { "off: you are asked first" }),
                 Some("lease") if !v["data"].is_null() => println!("  Agent {} took the input lease for task {}", v["data"]["agent"].as_str().unwrap_or(""), v["data"]["task"].as_str().unwrap_or("")),
@@ -156,6 +173,10 @@ pub fn run() -> std::io::Result<()> {
                     None => Err("no agent is waiting to drive (`always off` turns prompting back on)".into()),
                 }
             }
+            "done" | "cancel" => match arg.map(String::from).or_else(|| last_human.lock().unwrap().clone()) {
+                Some(id) => call("human_steps.resolve", json!({"human_step": id, "done": cmd == "done"})),
+                None => Err("no agent is waiting on you for a step".into()),
+            },
             "approvals" => call("approvals.list", json!({})),
             "tasks" => call("tasks.list", json!({})),
             "status" => call("status", json!({})),

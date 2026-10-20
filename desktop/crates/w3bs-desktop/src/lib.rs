@@ -147,6 +147,9 @@ enum Cmd {
     /// Agents asking to drive this desktop: allow, deny, postpone, or always allow (away from the desk)
     #[command(subcommand)]
     Drive(DriveCmd),
+    /// Steps an agent hands to you (CAPTCHA, 2FA code, sign-in, payment): list, done, cancel; `ask` is the agent side
+    #[command(subcommand)]
+    Human(HumanCmd),
     /// Inspect and cancel tasks
     #[command(subcommand)]
     Tasks(TasksCmd),
@@ -383,6 +386,25 @@ enum DriveCmd {
 }
 
 #[derive(Subcommand)]
+enum HumanCmd {
+    /// Steps agents handed you, and how they ended
+    List,
+    /// You did the step; the agent looks at the screen again and carries on
+    Done { id: String },
+    /// You will not do it; the agent stops and tells its user
+    Cancel { id: String },
+    /// (agent) Hand a step to the person and wait for them. Agents never solve CAPTCHAs themselves.
+    Ask {
+        #[arg(long, value_parser = ["captcha", "two_factor", "login", "payment", "other"], default_value = "other")]
+        kind: String,
+        /// What the person should do, e.g. "Solve the CAPTCHA in Firefox, then press Done"
+        message: String,
+        #[command(flatten)]
+        auth: AgentAuth,
+    },
+}
+
+#[derive(Subcommand)]
 enum TasksCmd {
     List,
     Inspect { id: String },
@@ -603,6 +625,21 @@ pub(crate) fn acquire_lease(c: &mut Client, task: &str, ttl_ms: Option<&Value>) 
     }
 }
 
+/// Wait (bounded) for the person to finish a step an agent handed them. Returns the step as it
+/// stands: `done`, `cancelled`, `expired`, or still `pending` when the wait ran out.
+/// `W3BS_DESKTOP_HUMAN_WAIT_S` sets the wait (default 120, 0 = do not wait).
+pub(crate) fn wait_human_step(c: &mut Client, id: &str) -> Result<Value> {
+    let wait = std::env::var("W3BS_DESKTOP_HUMAN_WAIT_S").ok().and_then(|v| v.parse::<u64>().ok()).unwrap_or(120);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(wait);
+    loop {
+        let h = c.call("human_step.status", json!({"human_step": id}))?;
+        if h["status"] != "pending" || std::time::Instant::now() >= deadline {
+            return Ok(h);
+        }
+        std::thread::sleep(std::time::Duration::from_secs(2));
+    }
+}
+
 /// One CLI input command = begin task, take lease, run one batch, end task.
 fn run_input(auth: &AgentAuth, what: &str, window: Option<String>, actions: Vec<Value>) -> Result<Value> {
     let mut c = agent_client(auth)?;
@@ -677,6 +714,9 @@ fn status_line(v: &Value) -> String {
     s += &format!("\nAdapter: {}  Agents: {}  Pending approvals: {}", v["adapter"].as_str().unwrap_or(""), v["agents"], v["pending_approvals"]);
     if v["pending_drive_requests"].as_u64().unwrap_or(0) > 0 {
         s += &format!("\nAgents asking to drive: {} (w3bs desktop drive list)", v["pending_drive_requests"]);
+    }
+    if v["pending_human_steps"].as_u64().unwrap_or(0) > 0 {
+        s += &format!("\nSteps waiting for you: {} (w3bs desktop human list)", v["pending_human_steps"]);
     }
     if v["drive_always_allow"].as_bool().unwrap_or(false) {
         s += "\nDrive prompt: off, always allow is on (w3bs desktop drive always-allow off)";
@@ -853,6 +893,20 @@ fn run_with(cli: Cli) {
                 }
                 DriveCmd::Always { id } => c.call("drive.decide", decide(&id, "always_allow")),
                 DriveCmd::AlwaysAllow { state } => c.call("drive.always_allow", json!({"on": state == "on"})),
+            }
+        }
+        Cmd::Human(HumanCmd::Ask { kind, message, auth }) => {
+            let mut c = agent_client(&auth)?;
+            let h = c.call("human_step.request", json!({"kind": kind, "message": message}))?;
+            eprintln!("w3bs desktop: waiting for the person at the desktop ({}); they press Done or Cancel", h["id"].as_str().unwrap_or(""));
+            wait_human_step(&mut c, h["id"].as_str().unwrap_or_default())
+        }
+        Cmd::Human(h) => {
+            let mut c = control_client()?;
+            match h {
+                HumanCmd::Done { id } => c.call("human_steps.resolve", json!({"human_step": id, "done": true})),
+                HumanCmd::Cancel { id } => c.call("human_steps.resolve", json!({"human_step": id, "done": false})),
+                _ => c.call("human_steps.list", json!({})),
             }
         }
         Cmd::Tasks(t) => {
