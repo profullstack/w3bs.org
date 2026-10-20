@@ -146,6 +146,14 @@ test('normalizeInput: W3BS URIs, Moshpit names, pit.world gateways and plain URL
   assert.equal(bare.kind, 'web');
   assert.equal(bare.candidate, true);
   assert.equal(bare.host, 'chovy.hacker');
+  // w3bs:// with a dotted authority names something to browse, not a resource type.
+  const named = normalizeInput('w3bs://chovy.hacker');
+  assert.equal(named.kind, 'web');
+  assert.equal(named.candidate, true);
+  assert.equal(named.host, 'chovy.hacker');
+  assert.equal(named.input, 'w3bs://chovy.hacker');
+  assert.equal(normalizeInput('W3BS://example.com/a?b=1').url, 'https://example.com/a?b=1');
+  assert.equal(normalizeInput('w3bs://chovy.hacker.pit.world/x').kind, 'moshpit');
   for (const input of [
     'https://chovy.hacker.pit.world/path?x=1',
     'chovy.hacker.pit.world/path?x=1',
