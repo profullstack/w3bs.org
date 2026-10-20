@@ -66,6 +66,8 @@ struct View {
     approvals: Vec<(String, String)>,
     /// Agents waiting to drive: (request id, "<agent> wants to drive: <task>").
     drives: Vec<(String, String)>,
+    /// Steps agents handed the person: (step id, "<agent> needs you: <message>").
+    human_steps: Vec<(String, String)>,
     /// The person chose "Always allow": no drive prompts.
     always_allow: bool,
     pending_code: Option<String>,
@@ -198,7 +200,7 @@ impl ksni::Tray for DesktopTray {
         ksni::Category::SystemServices
     }
     fn status(&self) -> ksni::Status {
-        if self.view.lease.is_some() || !self.view.approvals.is_empty() || !self.view.drives.is_empty() || self.view.pending_code.is_some() {
+        if self.view.lease.is_some() || !self.view.approvals.is_empty() || !self.view.drives.is_empty() || !self.view.human_steps.is_empty() || self.view.pending_code.is_some() {
             ksni::Status::NeedsAttention
         } else {
             ksni::Status::Active
@@ -220,6 +222,9 @@ impl ksni::Tray for DesktopTray {
         }
         if !self.view.drives.is_empty() {
             d += &format!("\n{} agent(s) asking to drive", self.view.drives.len());
+        }
+        if !self.view.human_steps.is_empty() {
+            d += &format!("\n{} step(s) waiting for you; agent input is paused", self.view.human_steps.len());
         }
         if self.view.always_allow {
             d += "\nAlways allow is on: agents drive without asking";
@@ -281,6 +286,14 @@ impl ksni::Tray for DesktopTray {
                 m.push(item("    Deny", "dialog-cancel", tx, Act::Drive(id.clone(), "deny")));
                 m.push(item("    Postpone 10 min", "chronometer", tx, Act::Drive(id.clone(), "postpone")));
                 m.push(item("    Always allow", "security-low", tx, Act::Drive(id.clone(), "always_allow")));
+            }
+        }
+        if !self.view.human_steps.is_empty() {
+            m.push(MenuItem::Separator);
+            for (id, text) in &self.view.human_steps {
+                m.push(label(lit(text)));
+                m.push(item("    Done", "dialog-ok", tx, Act::Drive(id.clone(), "done")));
+                m.push(item("    Cancel", "dialog-cancel", tx, Act::Drive(id.clone(), "cancel")));
             }
         }
         {
@@ -398,6 +411,7 @@ pub fn run() -> std::io::Result<()> {
                             t.view.lease = None;
                             t.view.approvals.clear();
                             t.view.drives.clear();
+                            t.view.human_steps.clear();
                         }
                     }
                     Some("enable_requested") => t.view.pending_code = data["code"].as_str().map(Into::into),
@@ -419,6 +433,23 @@ pub fn run() -> std::io::Result<()> {
                             n.close(id);
                         }
                         t.view.drives.retain(|(d, _)| d != id);
+                    }
+                    Some("human_step_requested") => {
+                        let id = data["id"].as_str().unwrap_or("").to_string();
+                        let (name, msg) = (data["agent_name"].as_str().unwrap_or(""), data["message"].as_str().unwrap_or(""));
+                        if let Some(n) = &notifier {
+                            n.close(&id);
+                            n.show_human_step(&id, name, data["kind"].as_str().unwrap_or(""), msg);
+                        }
+                        t.view.human_steps.retain(|(h, _)| *h != id);
+                        t.view.human_steps.push((id, format!("{name} needs you: {msg}")));
+                    }
+                    Some("human_step_resolved") => {
+                        let id = data["id"].as_str().unwrap_or("");
+                        if let Some(n) = &notifier {
+                            n.close(id);
+                        }
+                        t.view.human_steps.retain(|(h, _)| h != id);
                     }
                     Some("drive_always_allow") => t.view.always_allow = data["on"].as_bool().unwrap_or(false),
                     Some("training") => t.view.training = data.clone(),
@@ -454,6 +485,11 @@ pub fn run() -> std::io::Result<()> {
     if let Ok(v) = call("drive.list", json!({})) {
         for d in v.as_array().into_iter().flatten().filter(|d| d["status"] == "pending") {
             let _ = ev_tx_replay.send(json!({"event": "drive_requested", "data": d}));
+        }
+    }
+    if let Ok(v) = call("human_steps.list", json!({})) {
+        for h in v.as_array().into_iter().flatten().filter(|h| h["status"] == "pending") {
+            let _ = ev_tx_replay.send(json!({"event": "human_step_requested", "data": h}));
         }
     }
 
@@ -520,6 +556,8 @@ pub fn run() -> std::io::Result<()> {
             // The broker's own emergency-stop event: disables, and is audited as such.
             Act::Emergency => call("session.event", json!({"event": "emergency_stop"})),
             Act::Decide(id, ok) => call("approvals.decide", json!({"approval": id, "approve": ok})),
+            // Done/Cancel on a step an agent handed the person rides the same notification path.
+            Act::Drive(id, decision @ ("done" | "cancel")) => call("human_steps.resolve", json!({"human_step": id, "done": *decision == "done"})),
             Act::Drive(id, decision) => call("drive.decide", json!({"drive": id, "decision": decision})),
             Act::AlwaysAllow(on) => call("drive.always_allow", json!({"on": on})),
             // A one-time sign-in link minted on this (the native control's) connection.

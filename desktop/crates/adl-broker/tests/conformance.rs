@@ -770,3 +770,94 @@ fn headless_instances_skip_it_and_stop_forgets_every_answer() {
     let t2 = b.task_begin(&a, "again").unwrap().id;
     assert_eq!(b.lease_acquire(&a, &t2, None).unwrap_err().code, ErrorCode::ApprovalRequired);
 }
+
+// ------------------------------------------------------------------ Human steps (CAPTCHA, 2FA, sign-in)
+
+#[test]
+fn human_step_hands_the_desktop_to_the_person_and_back() {
+    let h = harness();
+    h.enable();
+    let (a, t) = h.driver("claude-code", broad());
+    let shot = h.b.screenshot(&a, "DP-1").unwrap();
+    let step = h.b.request_human_step(&a, Some(&t), HumanStepKind::Captcha, "Solve the CAPTCHA on the sign-up page").unwrap();
+    assert_eq!(step.status, HumanStepStatus::Pending);
+    assert!(h.b.status().lease.is_none(), "asking gives up the lease");
+    assert_eq!(h.b.status().pending_human_steps, 1);
+
+    // The person clicks and types to solve it: not a takeover.
+    h.m.push_event(SessionEvent::PhysicalInput);
+    h.b.pump_session_events();
+    assert_eq!(h.b.state(), GlobalState::Enabled);
+
+    // No agent drives meanwhile, the asker included.
+    let other = h.agent("codex", broad());
+    let to = h.b.task_begin(&other, "other").unwrap().id;
+    let e = h.b.lease_acquire(&other, &to, None).unwrap_err();
+    assert_eq!(e.code, ErrorCode::Busy);
+    assert_eq!(e.details["human_step_id"], step.id.as_str());
+    assert_eq!(h.b.lease_acquire(&a, &t, None).unwrap_err().code, ErrorCode::Busy);
+    assert_eq!(h.input(&a, &t, None, vec![Action::Wait { ms: 1 }]).unwrap_err().code, ErrorCode::Cancelled, "no lease, no dispatch");
+
+    let done = h.b.resolve_human_step(&human(), &step.id, true).unwrap();
+    assert_eq!(done.status, HumanStepStatus::Done);
+    assert_eq!(h.b.human_step_status(&a, &step.id).unwrap().status, HumanStepStatus::Done);
+    assert_eq!(h.b.status().pending_human_steps, 0);
+    h.b.lease_acquire(&a, &t, None).unwrap();
+    // The screen changed under the person's hands: old captures are gone.
+    let r = h.input(&a, &t, None, vec![click_at(Point::capture(&shot.meta.capture, 10.0, 10.0))]).unwrap();
+    assert_eq!(r.outcome, Outcome::Failed);
+    assert!(h.m.events().is_empty(), "no blind click after a human step");
+}
+
+#[test]
+fn human_step_is_resolved_only_by_the_person() {
+    let h = harness();
+    h.enable();
+    let (a, _) = h.driver("claude-code", broad());
+    let step = h.b.request_human_step(&a, None, HumanStepKind::TwoFactor, "Type the code from your phone").unwrap();
+    let agentish = Peer { agent_descendant: true, ..human() };
+    assert_eq!(h.b.resolve_human_step(&agentish, &step.id, true).unwrap_err().code, ErrorCode::Denied);
+    // Another agent cannot read it either.
+    let other = h.agent("codex", broad());
+    assert_eq!(h.b.human_step_status(&other, &step.id).unwrap_err().code, ErrorCode::NotFound);
+    let c = h.b.resolve_human_step(&human(), &step.id, false).unwrap();
+    assert_eq!(c.status, HumanStepStatus::Cancelled);
+    assert_eq!(h.b.resolve_human_step(&human(), &step.id, true).unwrap_err().code, ErrorCode::Invalid, "answered once");
+}
+
+#[test]
+fn human_step_needs_a_message_and_an_enabled_layer() {
+    let h = harness();
+    let a = h.agent("claude-code", broad());
+    assert_eq!(h.b.request_human_step(&a, None, HumanStepKind::Login, "Sign in").unwrap_err().code, ErrorCode::Disabled);
+    h.enable();
+    assert_eq!(h.b.request_human_step(&a, None, HumanStepKind::Login, "  ").unwrap_err().code, ErrorCode::Invalid);
+    // One open step per agent: asking again updates it.
+    let s1 = h.b.request_human_step(&a, None, HumanStepKind::Login, "Sign in").unwrap();
+    let s2 = h.b.request_human_step(&a, None, HumanStepKind::Login, "Sign in to GitHub").unwrap();
+    assert_eq!(s1.id, s2.id);
+    assert_eq!(h.b.human_steps().len(), 1);
+    assert_eq!(h.b.human_steps()[0].message, "Sign in to GitHub");
+}
+
+#[test]
+fn stop_withdraws_human_steps() {
+    let h = harness();
+    h.enable();
+    let (a, _) = h.driver("claude-code", broad());
+    let step = h.b.request_human_step(&a, None, HumanStepKind::Payment, "Confirm the payment").unwrap();
+    h.b.stop_all("test");
+    assert_eq!(h.b.human_step_status(&a, &step.id).unwrap().status, HumanStepStatus::Expired);
+    let t = h.b.task_begin(&a, "again").unwrap().id;
+    h.b.lease_acquire(&a, &t, None).unwrap();
+}
+
+#[test]
+fn unanswered_human_step_lapses() {
+    let h = harness_with(Config { human_step_ttl_ms: 0, ..cfg() });
+    h.enable();
+    let (a, t) = h.driver("claude-code", broad());
+    let step = h.b.request_human_step(&a, Some(&t), HumanStepKind::Other, "Look at this").unwrap();
+    assert_eq!(h.b.human_step_status(&a, &step.id).unwrap().status, HumanStepStatus::Expired);
+    h.b.lease_acquire(&a, &t, None).unwrap();
+}

@@ -51,6 +51,8 @@ pub struct Config {
     pub drive_postpone_ms: u64,
     /// "Allow" lasts while the agent keeps driving; this long without a lease and it asks again.
     pub drive_idle_ms: u64,
+    /// How long a step handed to the person (CAPTCHA, 2FA, sign-in) waits before it lapses.
+    pub human_step_ttl_ms: u64,
 }
 
 impl Default for Config {
@@ -70,6 +72,7 @@ impl Default for Config {
             drive_request_ttl_ms: 10 * 60_000,
             drive_postpone_ms: 10 * 60_000,
             drive_idle_ms: 10 * 60_000,
+            human_step_ttl_ms: 15 * 60_000,
         }
     }
 }
@@ -140,6 +143,7 @@ struct Inner {
     tasks: HashMap<String, Task>,
     approvals: HashMap<String, ApprovalInfo>,
     drive: HashMap<String, DriveRequest>,
+    human_steps: HashMap<String, HumanStep>,
     captures: HashMap<String, CaptureMeta>,
     held: Vec<(Held, u64)>,
     challenge: Option<(String, u64)>,
@@ -186,6 +190,7 @@ impl Broker {
                 tasks: HashMap::new(),
                 approvals: HashMap::new(),
                 drive: HashMap::new(),
+                human_steps: HashMap::new(),
                 captures: HashMap::new(),
                 held: vec![],
                 challenge: None,
@@ -439,6 +444,14 @@ impl Broker {
             for id in withdrawn {
                 Self::broadcast(&mut g, &json!({"v": SCHEMA_VERSION, "event": "drive_decided", "data": {"id": id, "status": DriveStatus::Expired}}));
             }
+            // The tasks that asked for a human step are gone too.
+            let steps: Vec<String> = g.human_steps.values().filter(|h| h.status == HumanStepStatus::Pending).map(|h| h.id.clone()).collect();
+            for id in steps {
+                let h = g.human_steps.get_mut(&id).unwrap();
+                h.status = HumanStepStatus::Expired;
+                h.resolved_at_ms = Some(now);
+                Self::broadcast(&mut g, &json!({"v": SCHEMA_VERSION, "event": "human_step_resolved", "data": {"id": id, "status": HumanStepStatus::Expired}}));
+            }
             g.captures.clear();
         }
         report.streams_closed = self.adapter.close_streams();
@@ -527,9 +540,10 @@ impl Broker {
             SessionEvent::PermissionLost(p) if active => drop(self.disable(&format!("permission lost: {p}"))),
             SessionEvent::AdapterFailed(why) if active => drop(self.disable(&format!("adapter failed: {why}"))),
             SessionEvent::PhysicalInput => {
-                // Only an active agent session counts as a takeover; ordinary use while idle is fine.
+                // Only an active agent session counts as a takeover; ordinary use while idle is fine,
+                // and so is the person doing a step an agent handed them (CAPTCHA, 2FA, sign-in).
                 let busy = self.lock().lease.is_some() || self.dispatch.try_lock().is_err();
-                if active && busy {
+                if active && busy && !self.human_step_open() {
                     drop(self.takeover());
                 }
             }
@@ -554,6 +568,7 @@ impl Broker {
             pending_approvals: g.approvals.values().filter(|a| a.status == ApprovalStatus::Pending).count(),
             pending_drive_requests: g.drive.values().filter(|d| d.status == DriveStatus::Pending && d.expires_at_ms > now_ms()).count(),
             drive_always_allow: self.store.drive_always_allow(),
+            pending_human_steps: g.human_steps.values().filter(|h| h.status == HumanStepStatus::Pending && h.expires_at_ms > now_ms()).count(),
             agents: self.store.list().iter().filter(|a| !a.revoked).count(),
             version: env!("CARGO_PKG_VERSION").into(),
         }
@@ -861,6 +876,10 @@ impl Broker {
         if self.recording_blocks_leases() {
             return Err(AdlError::new(ErrorCode::Busy, "a person is recording a demonstration; agent input is paused until they finish"));
         }
+        if let Some(h) = self.open_human_step() {
+            return Err(AdlError::new(ErrorCode::Busy, "a person is doing a step by hand; agent input is paused until they mark it done")
+                .with_details(json!({"human_step_id": h.id, "kind": h.kind})));
+        }
         let ttl = ttl_ms.unwrap_or(DEFAULT_LEASE_TTL_MS).clamp(1_000, MAX_LEASE_TTL_MS);
         let now = now_ms();
         let mut g = self.lock();
@@ -880,6 +899,114 @@ impl Broker {
         Self::broadcast(&mut g, &json!({"v": SCHEMA_VERSION, "event": "lease", "data": info}));
         drop(g);
         self.audit.log("lease.acquire", Some(&p.agent), Some(task), "allowed", "", json!({"ttl_ms": ttl, "drive": if auto { "always_allow" } else { "allowed" }}));
+        Ok(info)
+    }
+
+    // ---------------------------------------------------------------- human steps
+
+    /// The pending step an agent handed the person, if any (expired ones lapse here).
+    fn open_human_step(&self) -> Option<HumanStep> {
+        let now = now_ms();
+        let mut g = self.lock();
+        Self::expire_human_steps(&mut g, now);
+        g.human_steps.values().find(|h| h.status == HumanStepStatus::Pending).cloned()
+    }
+
+    fn human_step_open(&self) -> bool {
+        self.open_human_step().is_some()
+    }
+
+    fn expire_human_steps(g: &mut MutexGuard<'_, Inner>, now: u64) {
+        let lapsed: Vec<String> = g.human_steps.values().filter(|h| h.status == HumanStepStatus::Pending && h.expires_at_ms <= now).map(|h| h.id.clone()).collect();
+        for id in lapsed {
+            let h = g.human_steps.get_mut(&id).unwrap();
+            h.status = HumanStepStatus::Expired;
+            h.resolved_at_ms = Some(now);
+            Self::broadcast(g, &json!({"v": SCHEMA_VERSION, "event": "human_step_resolved", "data": {"id": id, "status": HumanStepStatus::Expired}}));
+        }
+    }
+
+    /// An agent hands one step to the person: a CAPTCHA, a 2FA code, a sign-in, a payment. Agents
+    /// do not solve "are you human" checks; they ask. Asking revokes the input lease, no
+    /// agent may take it until the step is resolved, and the person's own input meanwhile is not a
+    /// takeover. One open step per agent: asking again updates it.
+    pub fn request_human_step(&self, p: &Principal, task: Option<&str>, kind: HumanStepKind, message: &str) -> Result<HumanStep> {
+        self.require_enabled()?;
+        let message: String = message.trim().chars().take(500).collect();
+        if message.is_empty() {
+            return Err(AdlError::invalid("say what the person should do (message)"));
+        }
+        let now = now_ms();
+        let agent_name = self.store.get(&p.agent).map(|a| a.name).unwrap_or_else(|| p.agent.clone());
+        let mut g = self.lock();
+        Self::expire_human_steps(&mut g, now);
+        if let Some(t) = task {
+            match g.tasks.get(t) {
+                Some(ti) if ti.info.agent == p.agent => {}
+                _ => return Err(AdlError::not_found(format!("no task {t}"))),
+            }
+        }
+        // The person needs the whole desktop, so whoever holds the lease gives it up.
+        if g.lease.take().is_some() {
+            Self::broadcast(&mut g, &json!({"v": SCHEMA_VERSION, "event": "lease", "data": null}));
+        }
+        let existing = g.human_steps.values().find(|h| h.agent == p.agent && h.status == HumanStepStatus::Pending).map(|h| h.id.clone());
+        let h = HumanStep {
+            id: existing.unwrap_or_else(|| random_id("human", 8)),
+            agent: p.agent.clone(),
+            agent_name,
+            task: task.map(Into::into),
+            kind,
+            message,
+            status: HumanStepStatus::Pending,
+            created_at_ms: now,
+            expires_at_ms: now + self.cfg.human_step_ttl_ms,
+            resolved_at_ms: None,
+        };
+        g.human_steps.insert(h.id.clone(), h.clone());
+        Self::broadcast(&mut g, &json!({"v": SCHEMA_VERSION, "event": "human_step_requested", "data": h}));
+        drop(g);
+        // The message is agent text about the user's accounts; the audit keeps only the kind.
+        self.audit.log("human_step.request", Some(&p.agent), task, "approval_required", "", json!({"human_step": h.id, "kind": kind}));
+        Ok(h)
+    }
+
+    /// An agent checks on a step it handed the person.
+    pub fn human_step_status(&self, p: &Principal, id: &str) -> Result<HumanStep> {
+        let mut g = self.lock();
+        Self::expire_human_steps(&mut g, now_ms());
+        match g.human_steps.get(id) {
+            Some(h) if h.agent == p.agent => Ok(h.clone()),
+            _ => Err(AdlError::not_found(format!("no human step {id}"))),
+        }
+    }
+
+    pub fn human_steps(&self) -> Vec<HumanStep> {
+        let mut g = self.lock();
+        Self::expire_human_steps(&mut g, now_ms());
+        let mut v: Vec<_> = g.human_steps.values().cloned().collect();
+        v.sort_by_key(|h| h.created_at_ms);
+        v
+    }
+
+    /// The person finished the step (`done`) or will not do it. Either way the screen has changed,
+    /// so captures taken before it are dropped and the agent must observe again.
+    pub fn resolve_human_step(&self, peer: &Peer, id: &str, done: bool) -> Result<HumanStep> {
+        self.require_human(peer, "human_steps.resolve")?;
+        let now = now_ms();
+        let mut g = self.lock();
+        Self::expire_human_steps(&mut g, now);
+        let h = g.human_steps.get_mut(id).ok_or_else(|| AdlError::not_found(format!("no human step {id}")))?;
+        if h.status != HumanStepStatus::Pending {
+            return Err(AdlError::invalid(format!("human step is {:?}", h.status).to_lowercase()));
+        }
+        h.status = if done { HumanStepStatus::Done } else { HumanStepStatus::Cancelled };
+        h.resolved_at_ms = Some(now);
+        let info = h.clone();
+        g.captures.clear();
+        Self::broadcast(&mut g, &json!({"v": SCHEMA_VERSION, "event": "human_step_resolved", "data": {"id": id, "status": info.status}}));
+        drop(g);
+        self.audit.log("human_steps.resolve", Some(&info.agent), info.task.as_deref(), if done { "approved" } else { "denied" }, "", json!({"kind": info.kind}));
         Ok(info)
     }
 

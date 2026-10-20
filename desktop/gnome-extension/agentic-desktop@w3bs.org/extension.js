@@ -588,6 +588,14 @@ function modeLabel(p) {
     return caps.includes('pointer') || caps.includes('keyboard') ? 'broad desktop' : 'observe';
 }
 
+const HUMAN_KIND = {
+    captcha: 'a human check (CAPTCHA)',
+    two_factor: 'a sign-in code',
+    login: 'a sign-in',
+    payment: 'a payment confirmation',
+    other: 'a step',
+};
+
 const STATE_TEXT = {
     enabled: 'Enabled',
     disabled: 'Disabled',
@@ -601,7 +609,7 @@ class AdlIndicator extends PanelMenu.Button {
     _init(ext) {
         super._init(0.5, 'Agentic Desktop Layer', false);
         this._ext = ext;
-        this._view = {up: false, state: '', reason: null, lease: null, approvals: new Map(), drives: new Map(), alwaysAllow: false, code: null, note: null};
+        this._view = {up: false, state: '', reason: null, lease: null, approvals: new Map(), drives: new Map(), humans: new Map(), alwaysAllow: false, code: null, note: null};
         this._driveNotes = new Map();
         this._names = new Map();
 
@@ -630,6 +638,9 @@ class AdlIndicator extends PanelMenu.Button {
         // Agents asking to drive: Allow, Deny, Postpone, Always allow.
         this._driveSection = new PopupMenu.PopupMenuSection();
         this.menu.addMenuItem(this._driveSection);
+        // Steps an agent handed the person (CAPTCHA, sign-in code, password, payment): Done, Cancel.
+        this._humanSection = new PopupMenu.PopupMenuSection();
+        this.menu.addMenuItem(this._humanSection);
         this._alwaysItem = new PopupMenu.PopupSwitchMenuItem("Always allow agents to drive (I'm away)", false);
         this._alwaysItem.connect('toggled', (_it, on) => this._run('drive.always_allow', {on}));
         this.menu.addMenuItem(this._alwaysItem);
@@ -674,12 +685,20 @@ class AdlIndicator extends PanelMenu.Button {
                     this.event('drive_requested', d);
             }
         }).catch(() => {});
+        oneShot('human_steps.list', {}).then(list => {
+            for (const h of list ?? []) {
+                if (h.status === 'pending')
+                    this.event('human_step_requested', h);
+            }
+        }).catch(() => {});
     }
 
     down() {
         Object.assign(this._view, {up: false, state: '', reason: null, lease: null, code: null});
         this._view.approvals.clear();
         for (const id of [...this._view.drives.keys()])
+            this._dropDrive(id);
+        for (const id of [...this._view.humans.keys()])
             this._dropDrive(id);
         this._render();
     }
@@ -696,6 +715,8 @@ class AdlIndicator extends PanelMenu.Button {
                 v.lease = null;
                 v.approvals.clear();
                 for (const id of [...v.drives.keys()])
+                    this._dropDrive(id);
+                for (const id of [...v.humans.keys()])
                     this._dropDrive(id);
             }
             break;
@@ -723,6 +744,15 @@ class AdlIndicator extends PanelMenu.Button {
             }
             break;
         case 'drive_decided':
+            this._dropDrive(data?.id);
+            break;
+        case 'human_step_requested':
+            if (data?.id) {
+                v.humans.set(data.id, {name: data.agent_name ?? '', kind: data.kind ?? 'other', message: data.message ?? ''});
+                this._notifyHuman(data.id, data.agent_name ?? '', data.kind ?? 'other', data.message ?? '');
+            }
+            break;
+        case 'human_step_resolved':
             this._dropDrive(data?.id);
             break;
         case 'drive_always_allow':
@@ -851,8 +881,14 @@ class AdlIndicator extends PanelMenu.Button {
         this._run('drive.decide', {drive: id, decision});
     }
 
+    _human(id, done) {
+        this._run('human_steps.resolve', {human_step: id, done});
+    }
+
+    // Drive requests and human steps share the notification map (their ids differ).
     _dropDrive(id) {
         this._view.drives.delete(id);
+        this._view.humans.delete(id);
         const n = this._driveNotes.get(id);
         this._driveNotes.delete(id);
         try {
@@ -885,6 +921,28 @@ class AdlIndicator extends PanelMenu.Button {
         }
     }
 
+    _notifyHuman(id, name, kind, message) {
+        if (this._driveNotes.has(id))
+            return;
+        const what = HUMAN_KIND[kind] ?? HUMAN_KIND.other;
+        try {
+            const source = MessageTray.getSystemSource();
+            const n = new MessageTray.Notification({
+                source,
+                title: `${name} needs you for ${what}`,
+                body: `${message}\nAgent input is paused. Press Done when you have finished.`,
+                urgency: MessageTray.Urgency.CRITICAL,
+                resident: true,
+            });
+            n.addAction('Done', () => this._human(id, true));
+            n.addAction('Cancel', () => this._human(id, false));
+            source.addNotification(n);
+            this._driveNotes.set(id, n);
+        } catch (e) {
+            console.warn(`Agentic Desktop Layer: human step notification failed: ${e.message}`);
+        }
+    }
+
     _note(text) {
         this._view.note = text;
         this._render();
@@ -903,14 +961,14 @@ class AdlIndicator extends PanelMenu.Button {
     _render() {
         const v = this._view;
         const enabled = v.up && v.state === 'enabled';
-        const attention = v.approvals.size > 0 || v.drives.size > 0 || v.code !== null || v.state === 'blocked';
+        const attention = v.approvals.size > 0 || v.drives.size > 0 || v.humans.size > 0 || v.code !== null || v.state === 'blocked';
         let icon = 'changes-prevent-symbolic', short = 'Off';
         if (!v.up) {
             icon = 'action-unavailable-symbolic';
             short = 'No broker';
         } else if (attention) {
             icon = 'dialog-warning-symbolic';
-            short = v.drives.size > 0 ? 'Agent asking' : v.approvals.size > 0 ? `${enabled ? 'On' : 'Off'}, approval` : (v.state === 'blocked' ? 'Blocked' : 'Confirm');
+            short = v.humans.size > 0 ? 'Needs you' : v.drives.size > 0 ? 'Agent asking' : v.approvals.size > 0 ? `${enabled ? 'On' : 'Off'}, approval` : (v.state === 'blocked' ? 'Blocked' : 'Confirm');
         } else if (enabled) {
             icon = v.lease ? 'input-mouse-symbolic' : 'changes-allow-symbolic';
             short = v.lease ? 'On, active' : 'On';
@@ -931,6 +989,8 @@ class AdlIndicator extends PanelMenu.Button {
             a11y += `; ${v.approvals.size} approval(s) waiting`;
         if (v.drives.size)
             a11y += `; ${v.drives.size} agent(s) asking to drive`;
+        if (v.humans.size)
+            a11y += `; ${v.humans.size} step(s) waiting for you`;
         this.accessible_name = a11y;
 
         this._statusItem.label.text = `Status: ${this.stateText()}`;
@@ -964,6 +1024,17 @@ class AdlIndicator extends PanelMenu.Button {
                 this._action('    Deny', () => this._drive(id, 'deny'), this._driveSection);
                 this._action('    Postpone 10 min', () => this._drive(id, 'postpone'), this._driveSection);
                 this._action('    Always allow', () => this._drive(id, 'always_allow'), this._driveSection);
+            }
+        }
+
+        const humanIds = [...v.humans.keys()].join(',');
+        if (humanIds !== this._humanIds) {
+            this._humanIds = humanIds;
+            this._humanSection.removeAll();
+            for (const [id, hs] of v.humans) {
+                this._humanSection.addMenuItem(new PopupMenu.PopupMenuItem(`${hs.name} needs you: ${hs.message}`, {reactive: false, can_focus: false}));
+                this._action('    Done', () => this._human(id, true), this._humanSection);
+                this._action('    Cancel', () => this._human(id, false), this._humanSection);
             }
         }
 

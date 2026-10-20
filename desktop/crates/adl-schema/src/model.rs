@@ -285,6 +285,55 @@ pub struct DriveRequest {
     pub until_ms: Option<u64>,
 }
 
+/// What an agent hands back to the person: a step only a human may do on this desktop.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HumanStepKind {
+    /// A CAPTCHA or other "are you human" check. Agents never solve these.
+    Captcha,
+    /// A one-time code, security key, passkey or authenticator prompt.
+    TwoFactor,
+    /// Signing in or entering a password the agent should not hold.
+    Login,
+    /// Confirming a purchase, payment or transfer.
+    Payment,
+    Other,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HumanStepStatus {
+    /// Waiting for the person. No agent may take the input lease meanwhile.
+    Pending,
+    /// The person says the step is done; the agent observes again and continues.
+    Done,
+    /// The person will not do it; the agent stops and tells its user.
+    Cancelled,
+    /// Nobody answered in time.
+    Expired,
+}
+
+/// An agent asking the person to do one step by hand (a CAPTCHA, a 2FA code, a sign-in). Asking
+/// revokes the input lease, and the person's own typing and clicking while the step is
+/// open is not a takeover.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HumanStep {
+    pub id: String,
+    pub agent: String,
+    /// The agent's display name.
+    pub agent_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task: Option<String>,
+    pub kind: HumanStepKind,
+    /// What to do, in the agent's words (agent-supplied text; render as text only).
+    pub message: String,
+    pub status: HumanStepStatus,
+    pub created_at_ms: u64,
+    pub expires_at_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_at_ms: Option<u64>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Outcome {
@@ -354,6 +403,9 @@ pub struct Status {
     /// Drive requests are allowed without asking (the person is away).
     #[serde(default)]
     pub drive_always_allow: bool,
+    /// Steps agents handed to the person (CAPTCHA, 2FA, sign-in) that are not done yet.
+    #[serde(default)]
+    pub pending_human_steps: usize,
     pub agents: usize,
     pub version: String,
 }

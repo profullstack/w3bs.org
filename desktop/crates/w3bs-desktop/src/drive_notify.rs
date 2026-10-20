@@ -12,7 +12,8 @@ use zbus::zvariant::Value;
 const DEST: &str = "org.freedesktop.Notifications";
 const PATH: &str = "/org/freedesktop/Notifications";
 
-/// A button pressed on a drive prompt: the drive request id and `allow` | `deny` | `postpone` | `always_allow`.
+/// A button pressed on a drive prompt: the drive request id and `allow` | `deny` | `postpone` | `always_allow`;
+/// or on a human step: the step id and `done` | `cancel`.
 pub struct DriveAnswer(pub String, pub &'static str);
 
 pub struct Notifier {
@@ -27,6 +28,8 @@ fn decision(action: &str) -> Option<&'static str> {
         "deny" => "deny",
         "postpone" => "postpone",
         "always_allow" => "always_allow",
+        "done" => "done",
+        "cancel" => "cancel",
         _ => return None,
     })
 }
@@ -73,6 +76,29 @@ impl Notifier {
                 self.shown.lock().unwrap().insert(id, drive.to_string());
             }
             Err(e) => eprintln!("w3bs-desktop tray: drive prompt notification failed ({e}); answer from the tray menu"),
+        }
+    }
+
+    /// An agent handed the person a step (CAPTCHA, 2FA, sign-in): Done and Cancel buttons. The
+    /// answer comes back as a `DriveAnswer` carrying the step id (`human_...`).
+    pub fn show_human_step(&self, step: &str, agent_name: &str, kind: &str, message: &str) {
+        let actions = ["done", "Done", "cancel", "Cancel"];
+        let hints: HashMap<&str, Value> = HashMap::from([("urgency", Value::U8(2)), ("resident", Value::Bool(true)), ("desktop-entry", Value::from(crate::shortcut::APP_ID))]);
+        let what = match kind {
+            "captcha" => "a human check (CAPTCHA)",
+            "two_factor" => "a sign-in code",
+            "login" => "a sign-in",
+            "payment" => "a payment confirmation",
+            _ => "a step",
+        };
+        let summary = format!("{} needs you for {what}", plain(agent_name));
+        let body = format!("{}\nAgent input is paused. Press Done when you have finished.", plain(message));
+        let r: zbus::Result<u32> = self.proxy.call("Notify", &("Agentic Desktop Layer", 0u32, "dialog-information", summary, body, &actions[..], hints, 0i32));
+        match r {
+            Ok(id) => {
+                self.shown.lock().unwrap().insert(id, step.to_string());
+            }
+            Err(e) => eprintln!("w3bs-desktop tray: human step notification failed ({e}); answer from the tray menu"),
         }
     }
 
