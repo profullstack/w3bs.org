@@ -27,7 +27,8 @@ running() { pgrep -u "$(id -u)" -x "$1" >/dev/null 2>&1; }
 spawn() { running "$1" || (setsid "$@" >/dev/null 2>&1 &); }
 
 # 0.55 moved Hyprland's config to Lua; older releases read hyprlang.
-hypr_version() { Hyprland --version 2>/dev/null | sed -n 's/^Hyprland \([0-9][0-9.]*\).*/\1/p' | head -n1; }
+# Hyprland 0.56 aborts even on --version without XDG_RUNTIME_DIR (an ssh or su shell).
+hypr_version() { XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}" Hyprland --version 2>/dev/null | sed -n 's/^Hyprland \([0-9][0-9.]*\).*/\1/p' | head -n1; }
 hypr_lua() {
   v="$(hypr_version)"
   [ -n "$v" ] || return 0

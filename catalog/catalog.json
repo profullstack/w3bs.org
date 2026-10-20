@@ -2339,7 +2339,7 @@
     "repository": "https://github.com/profullstack/w3bs.org/tree/main/de",
     "license": "MIT",
     "agentic": true,
-    "latest_version": "0.1.0",
+    "latest_version": "0.1.1",
     "vendor": "Profullstack",
     "install": "curl -fsSL https://w3bs.org/de/install.sh | sh",
     "evidence": "w3bs.org/de/install.sh 200 (text/x-shellscript) and /de/manifest.txt (sha256 per file); installer verified into a clean home; Hyprland backend in desktop-v0.8.0, verified on a Hyprland 0.56.2 rig (typing, pointer, captures, workspace shortcuts) with these defaults loaded",
