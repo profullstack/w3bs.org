@@ -256,36 +256,7 @@ cat <<EOF
 EOF
 
 # --- questions --------------------------------------------------------------------------
-if [ -z "$KEYMAP" ]; then ask KEYMAP "Keyboard layout and variant (see /usr/share/bkeymaps)" "us us"; fi
-set -- $KEYMAP
-[ $# -eq 2 ] || fail "keymap must be \"LAYOUT VARIANT\", for example \"us us\" or \"de de-nodeadkeys\""
-[ -f "/usr/share/bkeymaps/$1/$2.bmap.gz" ] || fail "unknown keymap $KEYMAP (see /usr/share/bkeymaps)"
-
-if [ -z "$TIMEZONE" ]; then ask TIMEZONE "Timezone" "UTC"; fi
-[ -f "/usr/share/zoneinfo/$TIMEZONE" ] || fail "unknown timezone $TIMEZONE (see /usr/share/zoneinfo)"
-
-if [ -z "$HOSTNAME_" ]; then ask HOSTNAME_ "Hostname" "w3bs"; fi
-echo "$HOSTNAME_" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
-	|| fail "invalid hostname $HOSTNAME_ (lower-case letters, digits and -, up to 63 characters)"
-
-if [ -z "$(echo $USERS)" ]; then ask USERS "Your user name (more than one: separate with spaces)" "w3bs"; fi
-set -- $USERS
-USERS="$*" USERNAME=$1
-for u in $USERS; do
-echo "$u" | grep -Eq '^[a-z_][a-z0-9_-]{0,31}$' || fail "invalid user name $u"
-case "$u" in root|bin|daemon|adm|lp|sync|shutdown|halt|mail|news|uucp|operator|man|postmaster|cron|ftp|sshd|at|squid|xfs|games|cyrus|vpopmail|ntp|smmsp|guest|nobody|sddm|gdm|lightdm|messagebus|polkitd)
-	fail "$u is a system account name" ;;
-esac
-done
-for f in "$WORK"/keys/*; do
-	[ -f "$f" ] || continue
-	case " root $USERS " in *" ${f##*/} "*) ;; *) fail "SSH keys given for ${f##*/}, which is not root or a user being created" ;; esac
-	SSH=1
-done
-if [ -z "$FULLNAME" ]; then ask FULLNAME "Full name" "W3BS User"; fi
-case "$FULLNAME" in *:*) fail "the full name cannot contain ':'" ;; esac
-
-# Install type first: a desktop (graphical) install when the machine has a display adapter,
+# Install type, the first question: a desktop (graphical) install when the machine has a display adapter,
 # a server (command line only) install when it has none. Either can be chosen.
 GPU=$(for d in /sys/bus/pci/devices/*; do
 	case "$(cat "$d/class" 2>/dev/null)" in 0x03*) cat "$d/vendor" "$d/device" 2>/dev/null | tr '\n' ':' ; echo ;; esac
@@ -320,6 +291,36 @@ if [ -z "$DESKTOP" ]; then
 fi
 case "$DESKTOP" in 1) DESKTOP=hyprland ;; 2) DESKTOP=plasma ;; 3) DESKTOP=gnome ;; 4) DESKTOP=xfce ;; 5) DESKTOP=none ;; esac
 case "$DESKTOP" in plasma|gnome|hyprland|xfce|none) ;; *) fail "unknown desktop $DESKTOP (hyprland, plasma, gnome, xfce or none)" ;; esac
+
+if [ -z "$KEYMAP" ]; then ask KEYMAP "Keyboard layout and variant (see /usr/share/bkeymaps)" "us us"; fi
+set -- $KEYMAP
+[ $# -eq 2 ] || fail "keymap must be \"LAYOUT VARIANT\", for example \"us us\" or \"de de-nodeadkeys\""
+[ -f "/usr/share/bkeymaps/$1/$2.bmap.gz" ] || fail "unknown keymap $KEYMAP (see /usr/share/bkeymaps)"
+
+if [ -z "$TIMEZONE" ]; then ask TIMEZONE "Timezone" "UTC"; fi
+[ -f "/usr/share/zoneinfo/$TIMEZONE" ] || fail "unknown timezone $TIMEZONE (see /usr/share/zoneinfo)"
+
+if [ -z "$HOSTNAME_" ]; then ask HOSTNAME_ "Hostname" "w3bs"; fi
+echo "$HOSTNAME_" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
+	|| fail "invalid hostname $HOSTNAME_ (lower-case letters, digits and -, up to 63 characters)"
+
+if [ -z "$(echo $USERS)" ]; then ask USERS "Your user name (more than one: separate with spaces)" "w3bs"; fi
+set -- $USERS
+USERS="$*" USERNAME=$1
+for u in $USERS; do
+echo "$u" | grep -Eq '^[a-z_][a-z0-9_-]{0,31}$' || fail "invalid user name $u"
+case "$u" in root|bin|daemon|adm|lp|sync|shutdown|halt|mail|news|uucp|operator|man|postmaster|cron|ftp|sshd|at|squid|xfs|games|cyrus|vpopmail|ntp|smmsp|guest|nobody|sddm|gdm|lightdm|messagebus|polkitd)
+	fail "$u is a system account name" ;;
+esac
+done
+for f in "$WORK"/keys/*; do
+	[ -f "$f" ] || continue
+	case " root $USERS " in *" ${f##*/} "*) ;; *) fail "SSH keys given for ${f##*/}, which is not root or a user being created" ;; esac
+	SSH=1
+done
+if [ -z "$FULLNAME" ]; then ask FULLNAME "Full name" "W3BS User"; fi
+case "$FULLNAME" in *:*) fail "the full name cannot contain ':'" ;; esac
+
 
 if [ -z "$DISK" ]; then
 	if [ -n "$DEFAULTS" ]; then
@@ -389,6 +390,7 @@ $(lsblk -no NAME,SIZE,FSTYPE,LABEL "$DISK" 2>/dev/null | sed 's/^/              
   SSH             $( [ -n "$SSH" ] && echo "sshd on: keys only, no password logins" || echo "off")
   Desktop         $DESKTOP$( case "$DESKTOP" in plasma) echo " (KDE Plasma, SDDM)" ;; hyprland) echo " (Hyprland, greetd + tuigreet)" ;; none) echo " (server install: command line only)" ;; esac )
   W3BS            w3bs CLI and w3bs-desktop in /usr/local/bin; W3BS repo added at first login
+  Browsers        $( [ "$DESKTOP" = none ] && echo "none (server install)" || echo "Firefox and TronBrowser (tronbrowser.dev, Flathub Ungoogled Chromium engine)" )
   Agent access    Agentic Desktop Layer installed, agent access OFF until you turn it on
   Web server      Caddy, enabled, no sites (add them in /etc/caddy/sites/)
   Serial console  $( [ -n "$SERIAL" ] && echo "ttyS0 115200 (console and login)" || echo "off" )
@@ -649,6 +651,22 @@ EOF
 			for g in video audio input; do in_target addgroup "$u" "$g" >>"$LOG" 2>&1; done
 		done
 		in_target addgroup greetd video >>"$LOG" 2>&1
+	fi
+	# Every desktop install gets Firefox and TronBrowser (tronbrowser.dev). TronBrowser's own
+	# engine is a glibc build that cannot run on musl, so its launcher uses the Flathub
+	# Ungoogled Chromium instead (it falls back to that by itself). Not fatal: a desktop
+	# without a second browser still works.
+	step "Installing Firefox and TronBrowser (Flathub Ungoogled Chromium engine)"
+	in_target apk add --no-progress firefox flatpak python3 xdg-utils curl tar xz >>"$LOG" 2>&1 || fail "cannot install Firefox"
+	if in_target flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo >>"$LOG" 2>&1 \
+		&& in_target flatpak install --system -y --noninteractive flathub io.github.ungoogled_software.ungoogled_chromium >>"$LOG" 2>&1; then
+		for u in $USERS; do
+			in_target su - "$u" -s /bin/sh -c 'curl -fsSL https://tronbrowser.dev/install.sh | TB_NO_ENGINE_INSTALL=1 TB_NO_KILL=1 sh' >>"$LOG" 2>&1 \
+				|| say "warning: could not install TronBrowser for $u (see $LOG); run: curl -fsSL https://tronbrowser.dev/install.sh | sh"
+			[ -x "$TARGET/home/$u/.local/bin/tron" ] && log "TronBrowser installed for $u"
+		done
+	else
+		say "warning: could not install the Flathub Ungoogled Chromium TronBrowser needs (see $LOG); continuing"
 	fi
 	# VirtualBox: the guest additions (VBoxService, shared folders, display resize).
 	# Not fatal: the desktop works without them.
