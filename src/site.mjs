@@ -501,9 +501,37 @@ const deDistros = [
   ['NixOS', 'the installer prints the configuration.nix lines', 'current'],
 ];
 function dePage() {
-  const shot = existsSync(resolve(ROOT, 'public', 'de-desktop.webp'))
-    ? `<figure class="control-shot control-shot-main"><img src="/assets/de-desktop.webp" width="1920" height="1080" loading="lazy" alt="W3BS DE: the w3bs bar at the top with workspaces, the window title, the agent indicator and the clock, two terminals tiled side by side on the dark w3bs wallpaper."><figcaption>W3BS DE on a test rig: the bar, two tiled terminals and the wallpaper. The agent indicator in the bar says whether agent access is off, on, or which agent is driving.</figcaption></figure>`
-    : '';
+  // Real captures (grim) of W3BS DE installed with de/install.sh on Hyprland 0.56.2, 1920x1080.
+  const figure = (file, cls, alt, caption) =>
+    existsSync(resolve(ROOT, 'public', file))
+      ? `<figure class="control-shot${cls}"><img src="/assets/${file}" width="1920" height="1080" loading="lazy" alt="${alt}"><figcaption>${caption}</figcaption></figure>`
+      : '';
+  const shot = [
+    figure(
+      'de-desktop.webp',
+      ' control-shot-main',
+      'W3BS DE: the w3bs bar at the top with workspaces, the window title, the agent indicator and the clock, two terminals tiled side by side on the dark w3bs wallpaper.',
+      'W3BS DE on a test rig: the bar, two tiled terminals and the wallpaper. The agent indicator in the bar says whether agent access is off, on, or which agent is driving.',
+    ),
+    figure(
+      'de-launcher.webp',
+      '',
+      'The W3BS DE launcher (fuzzel) open in the middle of the screen with a w3bs prompt and a list of installed apps, over the w3bs wallpaper.',
+      'SUPER + SPACE: the launcher.',
+    ),
+    figure(
+      'de-notifications.webp',
+      '',
+      'The W3BS DE notification center open on the right with a Do not disturb switch and a Screenshot saved notification, next to a terminal that ran w3bs-de screenshot screen.',
+      'SUPER + N: the notification center, here with the notification from <code>w3bs-de screenshot screen</code>.',
+    ),
+  ].join('');
+  const cliShot = figure(
+    'de-cli.webp',
+    '',
+    'Two W3BS DE terminals. Left: w3bs-de doctor with every check ok, ending in agent layer drives this session (linux-hyprland). Right: w3bs-desktop status reports agent access DISABLED on the linux-hyprland adapter, and its doctor lists pointer, keyboard, screen capture and windows as available.',
+    'Fresh install: <code>w3bs-de doctor</code>, then the agent layer itself. Agent access is Disabled until you turn it on.',
+  );
   return `<section class="page-head desktop-head"><div class="eyebrow">W3BS DE · BUILT ON HYPRLAND · WAYLAND</div><h1>A quiet desktop.<br>Agents welcome.<br><em>Your switch.</em></h1><p>W3BS DE is a minimal Wayland desktop for people who work with agents. Hyprland underneath, one bar, one launcher, one notification center, and the <a class="inline-link" href="/desktop">Agentic Desktop Layer</a> built in: your agents can see and use this desktop when, and only when, you turn agent access on.</p><div class="desktop-install-box"><span class="eyebrow">LINUX (X86_64, ARM64)</span><div class="identity-line"><code>${e(DE_INSTALL)}</code><button class="small-button" type="button" data-copy="${e(DE_INSTALL)}">Copy</button></div><p class="muted">It installs Hyprland and a handful of small tools with your package manager (it asks first), the W3BS DE defaults in your home directory, a "W3BS DE" entry on your login screen, and the Agentic Desktop Layer. Read it first: <a class="inline-link" href="/de/install.sh">de/install.sh</a>.</p><div class="actions"><a class="button primary" href="#agents">What agents get <span aria-hidden="true">↓</span></a><a class="text-link" href="#keys">The keys <span aria-hidden="true">→</span></a></div></div></section><div class="draft-note desktop-status" id="status"><strong>Release status.</strong> 0.1, new. The agent backend for Hyprland (windows and layout over Hyprland's IPC, input through the Wayland virtual pointer and keyboard, captures through grim) ships in the Agentic Desktop Layer 0.8. Verified on Hyprland 0.56.2 with these defaults loaded: windows, captures, typing (every US key, accents, CJK) exactly, pointer, clicks and workspace shortcuts. Both config formats pass Hyprland's own <code>--verify-config</code>. W3BS DE is an independent project built on Hyprland; it is not made by or affiliated with the Hyprland project.</div>
   ${shot ? `<section class="section desktop-demo"><div class="control-shots">${shot}</div></section>` : ''}
   <section class="section"><div class="section-heading"><div><div class="eyebrow">WHAT IT IS</div><h2>Small on purpose.</h2></div><p>Every piece is something you could name and replace. Nothing runs that you did not ask for.</p></div><div class="principle-grid"><article><span class="card-index">01 / MINIMAL</span><h3>Hyprland and seven small tools.</h3><p>waybar for the bar, fuzzel to launch, swaync for notifications, hyprlock and hypridle, swaybg for the wallpaper, foot as the terminal. No blur, no shadows, short animations, the w3bs palette.</p></article><article><span class="card-index">02 / AGENT-FRIENDLY</span><h3>Built for the observe, act, observe loop.</h3><p>Predictable tiling, windows that open where they say, real window titles, and a desktop layer that types any Unicode character exactly. Agents see what you see.</p></article><article><span class="card-index">03 / YOURS</span><h3>Your settings survive updates.</h3><p>The defaults live in <code>~/.local/share/w3bs-de</code>; your changes go in <code>~/.config/w3bs-de/hypr/user.lua</code> and load last. W3BS DE uses its own config, so an existing Hyprland setup is left alone.</p></article></div></section>
@@ -517,7 +545,7 @@ w3bs-de wallpaper [FILE]   set (or reset) the wallpaper
 w3bs-de screenshot region|screen
 w3bs-de update             fetch the latest defaults (your settings are kept)
 
-Install options: --yes, --no-packages, --no-agents, --no-session`)}</pre></figure><details class="inspector-panel"><summary>Uninstall</summary><pre class="instructions">${e(`rm -rf ~/.local/share/w3bs-de ~/.local/bin/w3bs-de
+Install options: --yes, --no-packages, --no-agents, --no-session`)}</pre></figure>${cliShot}<details class="inspector-panel"><summary>Uninstall</summary><pre class="instructions">${e(`rm -rf ~/.local/share/w3bs-de ~/.local/bin/w3bs-de
 rm -rf ~/.config/w3bs-de                      # your settings
 sudo rm -f /usr/share/wayland-sessions/w3bs-de.desktop /usr/local/bin/w3bs-de
 # Hyprland and the tools stay installed; remove them with your package manager.`)}</pre></details></section>`;

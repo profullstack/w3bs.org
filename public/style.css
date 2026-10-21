@@ -1489,6 +1489,9 @@ textarea {
 .control-shot-main {
   grid-row: span 2;
 }
+.architecture + .control-shot {
+  margin: 24px 0;
+}
 .control-shot-phone img {
   max-width: 260px;
 }
