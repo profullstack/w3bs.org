@@ -233,7 +233,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.46.1"
+      "latest_version": "0.48.0"
     },
     {
       "id": "threatcrush.com/threatcrush",
@@ -324,7 +324,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.1.0"
+      "latest_version": "0.2.0"
     },
     {
       "id": "tronbrowser.dev/tronbrowser",
@@ -415,7 +415,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.1.0"
+      "latest_version": "0.2.0"
     },
     {
       "id": "profullstack.com/x402",
@@ -560,7 +560,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.17.0"
+      "latest_version": "0.19.0"
     },
     {
       "id": "hdtilt.com/hdtilt",
@@ -797,7 +797,7 @@
       "vendor": "Anthropic",
       "license": "proprietary",
       "agentic": true,
-      "latest_version": "2.1.304"
+      "latest_version": "2.1.306"
     },
     {
       "id": "openai.com/codex",
@@ -835,7 +835,7 @@
       "vendor": "GitHub",
       "license": "proprietary",
       "agentic": true,
-      "latest_version": "1.0.100"
+      "latest_version": "1.0.101"
     },
     {
       "id": "aider.chat/aider",
@@ -1056,7 +1056,7 @@
       "vendor": "Mistral AI",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "3.0.0"
+      "latest_version": "3.0.1"
     },
     {
       "id": "openhands.dev/openhands-cli",
@@ -1188,7 +1188,7 @@
       "vendor": "Ollama",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.40.6"
+      "latest_version": "0.40.7"
     },
     {
       "id": "github.com/fabric",
@@ -1207,7 +1207,7 @@
       "vendor": "Daniel Miessler",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "1.4.529"
+      "latest_version": "1.4.531"
     },
     {
       "id": "w3bs.org/agentic-desktop-layer",
@@ -2100,7 +2100,7 @@
       "vendor": "Hanzo AI",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "8.5.751"
+      "latest_version": "8.5.753"
     },
     {
       "id": "profullstack.com/root-w3bs-os",
