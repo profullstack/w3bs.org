@@ -65,6 +65,22 @@ VM settings to change, the tail of the log) instead of dropping back to the gree
 `~/.local/state/w3bs-os/hyprland-session.log`. Press **Host+F** (Right Ctrl+F) to leave
 VirtualBox full-screen mode.
 
+## Graphical installer
+
+The first thing the live system asks on the screen is how to install: **1 graphical
+installer** (the default when the machine has a display), **2 text installer**, or 3 a shell.
+`w3bs.installer=gui` or `w3bs.installer=text` on the kernel command line answers it in advance.
+
+The graphical installer (`w3bs-os-install-gui`) is a GTK 4 wizard, full screen under the
+`cage` kiosk compositor with software rendering (wlroots pixman + GTK cairo), so it runs on
+any display a kernel driver drives, VMs included. Its packages are on the ISO and load into
+RAM only when it is chosen. Pages: install type (desktop or server), desktop, keyboard / time
+zone / computer name, user and password, disk and encryption, review (a checkbox confirms the
+erase), live progress, and Reboot. It only collects answers: it runs `w3bs-os-install` with
+the matching flags, so both installers make the same install. "Use the text installer" is on
+every page, and any failure to start falls back to the text installer. Log:
+`/var/log/w3bs-os-install-gui.log`.
+
 ## Installer usage
 
 Boot the ISO. tty1 logs in as root on the live system and asks whether to start the

@@ -1,7 +1,8 @@
 
   W3BS OS network installer (live system, runs from RAM)
 
-  Install:   w3bs-os-install          (w3bs-os-install --help for options)
+  Install:   w3bs-os-install-gui      graphical installer (mouse and windows)
+             w3bs-os-install          text installer (w3bs-os-install --help for options)
   Shell:     you are root on the live system; nothing is on disk yet
   Docs:      https://w3bs.org/os
 

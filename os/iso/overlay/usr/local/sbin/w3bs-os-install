@@ -56,6 +56,8 @@ options:
   --no-reboot             do not offer to reboot at the end
   --serial-console        also use the first serial port (ttyS0, 115200) as a console and
                           login on the installed system (servers, VMs, automated tests)
+  --list-disks            print the disks the installer would offer (DEV BYTES MODEL) and exit
+                          (used by the graphical installer)
   -h, --help              show this help
 
 Secure Boot must be off: Alpine has no Microsoft-signed shim.
@@ -214,6 +216,9 @@ while [ $# -gt 0 ]; do
 		--passphrase-file) PASSPHRASE_FILE=${2:-}; shift ;;
 		--no-reboot) NO_REBOOT=1 ;;
 		--serial-console) SERIAL=1 ;;
+		--list-disks)
+			for d in $(internal_disks); do printf '/dev/%s\t%s\t%s\n' "$d" "$(disk_bytes "$d")" "$(disk_model "$d")"; done
+			exit 0 ;;
 		-h|--help) usage; exit 0 ;;
 		*) usage >&2; printf '\n%s: unknown option %s\n' "$PROG" "$1" >&2; exit 2 ;;
 	esac

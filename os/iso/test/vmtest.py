@@ -203,10 +203,15 @@ def cmd_boot(a):
             raise SystemExit(f"expected {want}")
         time.sleep(5)
         vm.screenshot(os.path.join(a.out, f"live-{a.firmware}-tty1.png"))
-        # The VGA console (a VPS VNC console): accept the tty1 offer, the installer starts.
+        # The VGA console: the first question is graphical or text installer; Enter takes
+        # the default, the graphical installer (QEMU's VGA is a display), which must come up.
         vm.sendkeys("\n")
+        rc, out = vm.sh("for i in $(seq 1 90); do pidof cage >/dev/null && break; sleep 2; done; "
+                        "echo GUI_UP=$(pidof cage); tail -n 5 /var/log/w3bs-os-install-gui.log", 240)
         time.sleep(8)
-        vm.screenshot(os.path.join(a.out, f"live-{a.firmware}-installer-vga.png"))
+        vm.screenshot(os.path.join(a.out, f"live-{a.firmware}-installer-gui.png"))
+        if not re.search(r"GUI_UP=\d", out):
+            raise SystemExit(f"the graphical installer did not start: {out[-600:]}")
         log(f"[{vm.name}] PASS")
     finally:
         vm.stop()
@@ -215,7 +220,7 @@ def cmd_boot(a):
 def vga_review(vm, a):
     """On tty1 (VGA), answer the interactive installer with its defaults up to the review
     screen, screenshot it, then cancel at the typed confirmation (nothing is written)."""
-    vm.sendkeys("\n")                       # start the installer from the tty1 offer
+    vm.sendkeys("2\n")                      # first question: 2 = the text installer
     time.sleep(8)
     for _ in range(8):                      # install type, keymap, timezone, hostname, user, full name, desktop, disk
         vm.sendkeys("\n")
