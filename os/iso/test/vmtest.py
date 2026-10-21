@@ -173,7 +173,7 @@ def push_file(vm, src, dest):
     import base64
     data = base64.encodebytes(open(src, "rb").read()).decode()
     # cat reads the tty in canonical mode, so the shell's line editor never sees the data.
-    vm.send(f"stty -echo; cat > {dest}.b64; stty echo\n")
+    vm.send(f"mkdir -p $(dirname {dest}); stty -echo; cat > {dest}.b64; stty echo\n")
     time.sleep(2)
     for line in data.splitlines():
         vm.send(line + "\n")

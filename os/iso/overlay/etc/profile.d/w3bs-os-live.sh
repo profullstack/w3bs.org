@@ -18,7 +18,7 @@ if [ "$(id -u)" = 0 ] && [ "$(tty 2>/dev/null)" = /dev/tty1 ] && [ -z "${W3BS_OS
 		printf '  How do you want to install?\n'
 		printf '    1  Graphical installer (mouse and windows)%s\n' "$( [ $_w3bs_def = 1 ] && echo '  [default]' || echo '  (no display found)')"
 		printf '    2  Text installer (command line)%s\n' "$( [ $_w3bs_def = 2 ] && echo '  [default]')"
-		printf '    3  Shell: do not install now\n\n'
+		printf '    3  Shell: do not install now (forgot a password? w3bs-os-install --reset-password USER)\n\n'
 		printf '  Choose 1, 2 or 3 [%s]: ' "$_w3bs_def"
 		read -r _w3bs_pick
 		[ -n "$_w3bs_pick" ] || _w3bs_pick=$_w3bs_def

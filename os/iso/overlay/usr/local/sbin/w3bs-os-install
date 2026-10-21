@@ -56,6 +56,10 @@ options:
   --no-reboot             do not offer to reboot at the end
   --serial-console        also use the first serial port (ttyS0, 115200) as a console and
                           login on the installed system (servers, VMs, automated tests)
+  --reset-password USER   rescue: set a new password for USER on the installed system
+                          (boot this ISO, choose the shell, run this; it unlocks the disk)
+  --eject-media           unmount and eject the installer DVD/USB (done before the reboot,
+                          so the machine starts the installed system, not the installer)
   --list-disks            print the disks the installer would offer (DEV BYTES MODEL) and exit
                           (used by the graphical installer)
   -h, --help              show this help
@@ -161,6 +165,54 @@ boot_media_disk() {
 	done
 }
 
+# Eject the installer media so the next boot is the installed system. A VM's virtual DVD
+# is removed by a guest eject (VirtualBox, QEMU); a USB stick only gets unmounted.
+eject_media() {
+	_d=$(boot_media_disk | head -n 1)
+	[ -n "$_d" ] || return 0
+	sync
+	cd / || return 0
+	# The live system's kernel modules are a squashfs loop-mounted from the media
+	# (/.modloop): unmount it and detach its loop device, or the drive stays open and locked.
+	umount /.modloop 2>/dev/null
+	for l in $(losetup -a 2>/dev/null | grep -F /media/ | cut -d: -f1); do losetup -d "$l" 2>/dev/null; done
+	for m in $(awk -v d="/dev/$_d" 'index($1, d) == 1 { print $2 }' /proc/mounts); do
+		umount "$m" 2>/dev/null || umount -l "$m" 2>/dev/null
+	done
+	case "$_d" in sr*) eject "/dev/$_d" 2>/dev/null || true ;; esac
+}
+
+# Rescue from the live system: set a new password for a user of the installed system.
+reset_password() {
+	_u=$1
+	[ -n "$_u" ] || { echo "usage: $PROG --reset-password USER" >&2; exit 2; }
+	modprobe dm-crypt 2>/dev/null; modprobe ext4 2>/dev/null
+	for p in $(blkid -t TYPE=crypto_LUKS -o device 2>/dev/null); do
+		[ -e /dev/mapper/w3bs-rescue ] && break
+		echo "Unlock the installed system ($p): enter the disk passphrase."
+		cryptsetup open "$p" w3bs-rescue || exit 1
+	done
+	command -v vgchange >/dev/null 2>&1 && vgchange -ay >/dev/null 2>&1
+	_mnt=/mnt/w3bs-rescue
+	mkdir -p "$_mnt"
+	for dev in /dev/vg0/lv_root $(blkid -t TYPE=ext4 -o device 2>/dev/null); do
+		[ -e "$dev" ] || continue
+		mount -t ext4 "$dev" "$_mnt" 2>/dev/null || continue
+		if [ -e "$_mnt/etc/w3bs-os-release" ]; then
+			grep -q "^$_u:" "$_mnt/etc/passwd" || { echo "$_u is not a user of the installed system; users: $(awk -F: '$3 >= 1000 && $3 < 60000 { printf "%s ", $1 }' "$_mnt/etc/passwd")" >&2; umount "$_mnt"; exit 1; }
+			echo "Set a new password for $_u on $dev:"
+			chroot "$_mnt" /usr/bin/passwd "$_u" || chroot "$_mnt" /bin/passwd "$_u"
+			_rc=$?
+			sync; umount "$_mnt"
+			[ $_rc = 0 ] && echo "Done. Remove the installer media and reboot." 
+			exit $_rc
+		fi
+		umount "$_mnt"
+	done
+	echo "No installed W3BS OS was found on this machine." >&2
+	exit 1
+}
+
 internal_disks() {
 	_boot=$(boot_media_disk)
 	for p in /sys/block/*; do
@@ -216,6 +268,8 @@ while [ $# -gt 0 ]; do
 		--passphrase-file) PASSPHRASE_FILE=${2:-}; shift ;;
 		--no-reboot) NO_REBOOT=1 ;;
 		--serial-console) SERIAL=1 ;;
+		--eject-media) eject_media; exit 0 ;;
+		--reset-password) reset_password "${2:-}" ;;
 		--list-disks)
 			for d in $(internal_disks); do printf '/dev/%s\t%s\t%s\n' "$d" "$(disk_bytes "$d")" "$(disk_model "$d")"; done
 			exit 0 ;;
@@ -597,7 +651,7 @@ fi
 # Alpine's setup-desktop has no Hyprland: use the base it builds GNOME and Plasma on
 # (setup-wayland-base: community repo, elogind, polkit, udev, dbus) plus these packages.
 HYPRLAND_PKGS="hyprland hyprcursor hyprpolkitagent xwayland xdg-desktop-portal-wlr xdg-desktop-portal-gtk
-	greetd greetd-openrc greetd-tuigreet waybar foot fuzzel mako swaybg swaylock swayidle grim slurp
+	greetd greetd-openrc greetd-tuigreet waybar foot fuzzel mako libnotify sway swaybg swaylock swayidle grim slurp
 	wl-clipboard brightnessctl pipewire pipewire-pulse pipewire-alsa wireplumber wireplumber-logind
 	pavucontrol thunar gvfs udisks2 mesa-dri-gallium mesa-egl qt6-qtwayland adwaita-icon-theme
 	font-dejavu font-noto font-awesome firefox"
@@ -632,6 +686,10 @@ vt = 1
 command = "tuigreet --time --remember --asterisks --greeting 'W3BS OS' --cmd /usr/local/bin/w3bs-hyprland"
 user = "greetd"
 EOF
+		# Name the account on the login screen: people type their full name or the password
+		# into "Username" otherwise.
+		_names=$(echo $USERS | sed 's/ /, /g')
+		sed -i "s|--greeting 'W3BS OS'|--greeting 'W3BS OS · log in as $_names (user name, then password)'|" "$TARGET/etc/greetd/config.toml"
 		chmod 0644 "$TARGET/etc/greetd/config.toml"
 		grep -q '^rc_need' "$TARGET/etc/conf.d/greetd" 2>/dev/null || echo 'rc_need="elogind dbus"' >>"$TARGET/etc/conf.d/greetd"
 		install -m 0755 /usr/share/w3bs-os/w3bs-hyprland "$TARGET/usr/local/bin/w3bs-hyprland" || fail "cannot install w3bs-hyprland"
@@ -639,6 +697,11 @@ EOF
 		# Hyprland takes xkb layout names; the console keymap's layout has the same name.
 		sed "s|^\(\s*kb_layout = \).*|\1${KEYMAP%% *}|" /usr/share/w3bs-os/hypr/hyprland.conf \
 			>"$TARGET/usr/share/w3bs-os/hypr/hyprland.conf" || fail "cannot write the Hyprland default config"
+		# The software fallback desktop (Sway + pixman), used when Hyprland cannot start.
+		mkdir -p "$TARGET/usr/share/w3bs-os/sway"
+		sed "s|^\(\s*xkb_layout \).*|\1${KEYMAP%% *}|" /usr/share/w3bs-os/sway/config \
+			>"$TARGET/usr/share/w3bs-os/sway/config" || fail "cannot write the fallback desktop config"
+		chmod 0755 "$TARGET/usr/share/w3bs-os/sway" && chmod 0644 "$TARGET/usr/share/w3bs-os/sway/config"
 		install -m 0644 /usr/share/w3bs-os/hypr/waybar.css "$TARGET/usr/share/w3bs-os/hypr/waybar.css" \
 			|| fail "cannot install the Waybar style"
 		install -m 0755 /usr/share/w3bs-os/hypr/desktop-layer.sh "$TARGET/usr/share/w3bs-os/hypr/desktop-layer.sh" \
@@ -829,7 +892,7 @@ trap - INT TERM
 cat <<EOF
 
   W3BS OS $OS_VERSION is installed on $DISK.
-  Remove the installer media and reboot.$( [ -n "$ENCRYPT" ] && printf '\n  You will be asked for the disk passphrase at boot.')
+  Remove the installer media (the installer ejects a DVD when it reboots) and reboot.$( [ -n "$ENCRYPT" ] && printf '\n  You will be asked for the disk passphrase at boot.')
   Log in as $USERNAME. Agent access stays OFF until you turn it on from the tray.
 
 EOF
@@ -837,6 +900,6 @@ log "SUCCESS"
 if [ -z "$NO_REBOOT" ] && [ -z "$DEFAULTS" ] && [ -t 0 ]; then
 	printf 'Reboot now? [Y/n] '
 	read -r _r || _r=n
-	case "$_r" in n*|N*) ;; *) reboot ;; esac
+	case "$_r" in n*|N*) ;; *) eject_media; reboot ;; esac
 fi
 exit 0

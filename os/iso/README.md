@@ -81,6 +81,14 @@ the matching flags, so both installers make the same install. "Use the text inst
 every page, and any failure to start falls back to the text installer. Log:
 `/var/log/w3bs-os-install-gui.log`.
 
+## After the install
+
+Both installers eject the installer DVD before they reboot, so the machine (or VM) starts
+the installed system: the login screen asks for your user name, then your password (and,
+with encryption, the disk passphrase comes first). A USB stick is only unmounted: take it
+out, or pick **Boot the installed system** in the ISO's boot menu. In VirtualBox the
+virtual DVD is removed on eject unless "Live CD/DVD" is ticked under Settings > Storage.
+
 ## Installer usage
 
 Boot the ISO. tty1 logs in as root on the live system and asks whether to start the

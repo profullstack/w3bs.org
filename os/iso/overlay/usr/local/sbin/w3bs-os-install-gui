@@ -59,7 +59,7 @@ echo "cage exited $rc" >>"$LOG"
 result=$(head -n 1 "$RUN/result" 2>/dev/null)
 case "$result" in
 	installed)
-		grep -qx reboot "$RUN/result" && { sync; reboot; }
+		grep -qx reboot "$RUN/result" && { /usr/local/sbin/w3bs-os-install --eject-media; reboot; }
 		exit 0 ;;
 	text) exit 10 ;;
 esac
