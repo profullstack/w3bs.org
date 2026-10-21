@@ -37,7 +37,8 @@ options:
   --yes                   do not ask for the typed erase confirmation (needed with --defaults
                           for a fully unattended run; the disk is still shown first)
   --no-encrypt            do not encrypt the disk (default: LUKS2 full-disk encryption)
-  --desktop NAME          hyprland (default), plasma, gnome, xfce or none
+  --desktop NAME          hyprland (default for a desktop install), plasma, gnome, xfce or none
+  --server                a server (command line only) install: the same as --desktop none
   --hostname NAME         default: w3bs
   --timezone ZONE         default: UTC (for example America/Los_Angeles)
   --keymap "LAYOUT VAR"   default: "us us"
@@ -200,6 +201,7 @@ while [ $# -gt 0 ]; do
 		--no-encrypt) ENCRYPT= ;;
 		--encrypt) ENCRYPT=1 ;;
 		--desktop) DESKTOP=${2:-}; shift ;;
+		--server) DESKTOP=none ;;
 		--hostname) HOSTNAME_=${2:-}; shift ;;
 		--timezone) TIMEZONE=${2:-}; shift ;;
 		--keymap) KEYMAP=${2:-}; shift ;;
@@ -283,6 +285,27 @@ done
 if [ -z "$FULLNAME" ]; then ask FULLNAME "Full name" "W3BS User"; fi
 case "$FULLNAME" in *:*) fail "the full name cannot contain ':'" ;; esac
 
+# Install type first: a desktop (graphical) install when the machine has a display adapter,
+# a server (command line only) install when it has none. Either can be chosen.
+GPU=$(for d in /sys/bus/pci/devices/*; do
+	case "$(cat "$d/class" 2>/dev/null)" in 0x03*) cat "$d/vendor" "$d/device" 2>/dev/null | tr '\n' ':' ; echo ;; esac
+done | head -n 1)
+[ -n "$GPU" ] || { ls /sys/class/drm/card[0-9]* >/dev/null 2>&1 && GPU=drm; }
+if [ -n "$GPU" ]; then TYPE_DEFAULT=desktop; else TYPE_DEFAULT=server; fi
+log "display adapter: ${GPU:-none}; default install type $TYPE_DEFAULT"
+if [ -z "$DESKTOP" ]; then
+	if [ -z "$DEFAULTS" ]; then
+		say ""
+		if [ -n "$GPU" ]; then say "A display adapter was found: a desktop install is the default."
+		else say "No display adapter was found: a server install is the default."; fi
+		say "Install type:"
+		say "  1  desktop   graphical desktop: you log in to Hyprland (or Plasma, GNOME, Xfce)$( [ "$TYPE_DEFAULT" = desktop ] && echo '  [default]')"
+		say "  2  server    command line only: zsh, w3bs, sshd, Caddy; no desktop$( [ "$TYPE_DEFAULT" = server ] && echo '  [default]')"
+	fi
+	ask ITYPE "Install type (number or name)" "$TYPE_DEFAULT"
+	case "$ITYPE" in 1|desktop|gui) ITYPE=desktop ;; 2|server|cli) ITYPE=server; DESKTOP=none ;;
+		*) fail "unknown install type $ITYPE (desktop or server)" ;; esac
+fi
 if [ -z "$DESKTOP" ]; then
 	if [ -z "$DEFAULTS" ]; then
 		say ""
@@ -364,7 +387,7 @@ $(lsblk -no NAME,SIZE,FSTYPE,LABEL "$DISK" 2>/dev/null | sed 's/^/              
   Users           $USERS (zsh, admin via doas/wheel)$(for u in $USERS; do [ -s "$WORK/keys/$u" ] && printf ', %s: %s SSH key(s)' "$u" "$(grep -Ec '(ssh-|ecdsa-|sk-)' "$WORK/keys/$u")"; [ -s "$WORK/pass/$u" ] || printf ', %s: no password' "$u"; done)
   Root            $( [ -n "$ROOT_PASS" ] && echo "password set" || echo "no password")$( [ -s "$WORK/keys/root" ] && echo ", $(grep -Ec '(ssh-|ecdsa-|sk-)' "$WORK/keys/root") SSH key(s)")
   SSH             $( [ -n "$SSH" ] && echo "sshd on: keys only, no password logins" || echo "off")
-  Desktop         $DESKTOP$( case "$DESKTOP" in plasma) echo " (KDE Plasma, SDDM)" ;; hyprland) echo " (Hyprland, greetd + tuigreet)" ;; esac )
+  Desktop         $DESKTOP$( case "$DESKTOP" in plasma) echo " (KDE Plasma, SDDM)" ;; hyprland) echo " (Hyprland, greetd + tuigreet)" ;; none) echo " (server install: command line only)" ;; esac )
   W3BS            w3bs CLI and w3bs-desktop in /usr/local/bin; W3BS repo added at first login
   Agent access    Agentic Desktop Layer installed, agent access OFF until you turn it on
   Web server      Caddy, enabled, no sites (add them in /etc/caddy/sites/)
@@ -588,13 +611,15 @@ if [ "$DESKTOP" != none ]; then
 	fi
 	rm -f "$TARGET/run/openrc/softlevel"
 	if [ "$DESKTOP" = hyprland ]; then
-		# greetd on tty7 (tty1-6 keep their gettys) runs tuigreet as the greetd user; the
-		# session is w3bs-hyprland, which seeds ~/.config/hypr on first start.
+		# greetd on tty1 (the screen the machine boots to; tty2-6 keep their gettys) runs
+		# tuigreet as the greetd user; the session is w3bs-hyprland, which seeds
+		# ~/.config/hypr on first start. With the greeter on tty7 and a getty on tty1, a VM
+		# console showed a text login and the install looked like a server with no desktop.
 		mkdir -p "$TARGET/etc/greetd"
 		cat >"$TARGET/etc/greetd/config.toml" <<'EOF' || fail "cannot write /etc/greetd/config.toml"
 # W3BS OS: Hyprland login. tuigreet asks for the user name, then the password.
 [terminal]
-vt = 7
+vt = 1
 
 [default_session]
 command = "tuigreet --time --remember --asterisks --greeting 'W3BS OS' --cmd /usr/local/bin/w3bs-hyprland"
@@ -625,6 +650,17 @@ EOF
 		done
 		in_target addgroup greetd video >>"$LOG" 2>&1
 	fi
+	# VirtualBox: the guest additions (VBoxService, shared folders, display resize).
+	# Not fatal: the desktop works without them.
+	case "$(cat /sys/class/dmi/id/product_name 2>/dev/null)" in
+		*VirtualBox*)
+			step "Installing the VirtualBox guest additions"
+			if in_target apk add --no-progress virtualbox-guest-additions virtualbox-guest-additions-openrc >>"$LOG" 2>&1; then
+				in_target rc-update add virtualbox-guest-additions default >>"$LOG" 2>&1
+			else
+				say "warning: could not install the VirtualBox guest additions (see $LOG); continuing"; log "WARN guest additions"
+			fi ;;
+	esac
 	for svc in dbus elogind sddm gdm lightdm greetd; do
 		if [ -L "$TARGET/etc/runlevels/sysinit/$svc" ]; then
 			in_target rc-update del "$svc" sysinit >>"$LOG" 2>&1
@@ -687,6 +723,11 @@ step "Finishing"
 rm -f "$TARGET/usr/local/sbin/cryptsetup" "$TARGET/etc/profile.d/w3bs-os-live.sh" "$TARGET/usr/local/sbin/w3bs-os-install" \
 	"$TARGET/usr/local/sbin/w3bs-os-serial-getty" "$TARGET/etc/w3bs-os/live" "$TARGET/etc/motd.w3bs-live"
 install -m 0644 /usr/share/w3bs-os/inittab.installed "$TARGET/etc/inittab" || fail "cannot write /etc/inittab"
+# The Hyprland greeter owns tty1 (greetd vt = 1): no getty there.
+if [ "$DESKTOP" = hyprland ]; then
+	sed -i 's|^tty1::|#tty1::|' "$TARGET/etc/inittab"
+	grep -q '^tty1::' "$TARGET/etc/inittab" && fail "cannot free tty1 for the greeter"
+fi
 if [ -n "$SERIAL" ]; then
 	sed -i 's|^#ttyS0::|ttyS0::|' "$TARGET/etc/inittab"
 	grep -qx ttyS0 "$TARGET/etc/securetty" 2>/dev/null || echo ttyS0 >>"$TARGET/etc/securetty"
