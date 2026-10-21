@@ -37,6 +37,10 @@ gpu() {
 }
 
 explain() {
+	# greetd gives the session no terminal on stdin/stdout: talk to the login VT itself, or
+	# this screen flashes by and the login looks like it was refused.
+	_vt=/dev/tty${XDG_VTNR:-1}
+	[ -w "$_vt" ] && exec <"$_vt" >"$_vt" 2>&1
 	clear 2>/dev/null
 	cat <<EOF
 
@@ -70,13 +74,13 @@ EOF
 EOF
 	tail -n 12 "$log" 2>/dev/null | sed 's/^/    /'
 	printf '\n  Press Enter to return to the login screen. '
-	read -r _
+	read -r _ || sleep 60
 }
 
 run() {
 	start=$(date +%s)
 	{ echo "=== $(date) $*"; echo "vm=${vm:-none} drivers=$(gpu)"; } >>"$log"
-	env "$@" dbus-run-session start-hyprland >>"$log" 2>&1
+	env "$@" dbus-run-session ${W3BS_SESSION_CMD:-start-hyprland} >>"$log" 2>&1
 	rc=$?
 	# Copy Hyprland's own log (it lives under the runtime dir, gone at logout).
 	for f in "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/hypr/*/hyprland.log; do
@@ -84,7 +88,9 @@ run() {
 	done
 	took=$(( $(date +%s) - start ))
 	echo "=== exit $rc after ${took}s" >>"$log"
-	[ "$rc" = 0 ] || [ "$took" -ge 20 ]
+	# start-hyprland exits 0 even when Hyprland never came up, so the exit code says nothing:
+	# only a session that lasted is a real one (the user logged out).
+	[ "$took" -ge 15 ]
 }
 
 drivers=$(gpu)
@@ -94,9 +100,18 @@ if [ -z "$drivers" ]; then
 	exit 1
 fi
 
-# A clean exit, or a session that lasted 20 s or more, was real: the user logged out.
+# A session that lasted 15 s or more was real: the user logged out.
 run W3BS_RENDER=hardware && exit 0
 echo "=== retrying with software rendering" >>"$log"
-run W3BS_RENDER=software LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe && exit 0
+# GBM too: on vmwgfx without 3D (VirtualBox VMSVGA) Mesa's GBM still loads the hardware driver.
+run W3BS_RENDER=software LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe GBM_ALWAYS_SOFTWARE=1 && exit 0
+# Hyprland has no pure software renderer; Sway with wlroots' pixman renderer draws on any
+# display a kernel driver drives (dumb buffers), so the user still gets a desktop.
+if command -v sway >/dev/null 2>&1 && [ -r /usr/share/w3bs-os/sway/config ]; then
+	echo "=== falling back to Sway (pixman software renderer)" >>"$log"
+	export XDG_CURRENT_DESKTOP=sway XDG_SESSION_DESKTOP=sway
+	W3BS_SESSION_CMD="sway -c /usr/share/w3bs-os/sway/config" \
+		run W3BS_RENDER=pixman WLR_RENDERER=pixman WLR_NO_HARDWARE_CURSORS=1 && exit 0
+fi
 explain "It exited at once, with hardware and with software rendering." "$drivers"
 exit 1

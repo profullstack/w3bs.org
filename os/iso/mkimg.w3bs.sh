@@ -45,7 +45,7 @@ gen_volid() {
 syslinux_gen_config() {
 	[ -z "$syslinux_serial" ] || echo "SERIAL $syslinux_serial"
 	echo "SAY W3BS OS ${RELEASE} network installer (Alpine Linux based)"
-	echo "SAY Enter or wait: install on this screen.  Type 'serial' + Enter: serial console ttyS0."
+	echo "SAY Enter or wait: install on this screen.  'disk' + Enter: boot the installed system.  'serial' + Enter: serial console ttyS0."
 	echo "TIMEOUT ${syslinux_timeout:-10}"
 	echo "PROMPT ${syslinux_prompt:-1}"
 	echo "DEFAULT w3bs"
@@ -62,6 +62,10 @@ syslinux_gen_config() {
 			KERNEL /boot/vmlinuz-$_f
 			INITRD $_initrd
 			APPEND $initfs_cmdline $kernel_cmdline
+
+		LABEL disk
+			MENU LABEL Boot the installed system (first hard disk)
+			LOCALBOOT 0x80
 
 		LABEL serial
 			MENU LABEL W3BS OS ${RELEASE} installer (serial console ttyS0)
@@ -96,6 +100,10 @@ grub_gen_config() {
 		menuentry "W3BS OS ${RELEASE} installer (serial console ttyS0)" {
 			linux	/boot/vmlinuz-$_f $initfs_cmdline console=tty0 console=ttyS0,115200
 			initrd	$_initrd
+		}
+
+		menuentry "Boot the installed system (next boot device)" {
+			exit
 		}
 
 		menuentry "W3BS OS ${RELEASE} installer (safe graphics: nomodeset)" {

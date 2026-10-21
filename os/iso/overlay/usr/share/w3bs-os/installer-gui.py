@@ -496,7 +496,7 @@ class Installer(Gtk.ApplicationWindow):
         if self.ok:
             self.done_title.set_text("W3BS OS is installed.")
             dev, _ = self.disk()
-            msg = f"It is on {dev}. Remove the installer media, then reboot."
+            msg = f"It is on {dev}. Reboot: the installer DVD is ejected first so the machine starts W3BS OS (take out a USB stick yourself)."
             if self.encrypt.get_active():
                 msg += " You will be asked for the disk passphrase at boot."
             msg += f" Log in as {self.username.get_text().strip()}."
