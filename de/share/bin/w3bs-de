@@ -70,6 +70,9 @@ cmd_session() {
   ensure_user_config
   export XDG_CURRENT_DESKTOP=Hyprland XDG_SESSION_TYPE=wayland XDG_SESSION_DESKTOP=w3bs-de W3BS_DE=1
   if hypr_lua; then cfg="$CONF/hypr/hyprland.lua"; else cfg="$CONF/hypr/hyprland.conf"; fi
+  # Hyprland 0.56 shows a red "started without start-hyprland" banner over the desktop when run
+  # directly; start-hyprland is its watchdog launcher. Older releases do not ship it.
+  if have start-hyprland; then exec start-hyprland -- --config "$cfg"; fi
   exec Hyprland --config "$cfg"
 }
 
