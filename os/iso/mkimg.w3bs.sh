@@ -30,7 +30,9 @@ profile_w3bs() {
 	initrd_ucode="/boot/amd-ucode.img /boot/intel-ucode.img"
 	apks="$apks libgcc zsh zsh-vcs tzdata kbd-bkeymaps alpine-conf lsblk blkid findmnt
 		cryptsetup lvm2 e2fsprogs dosfstools sfdisk mtools efibootmgr
-		grub grub-efi grub-bios syslinux mkinitfs doas"
+		grub grub-efi grub-bios syslinux mkinitfs doas
+		cage seatd-launch py3-gobject3 gtk4.0 font-dejavu adwaita-icon-theme eudev mesa-dri-gallium"
+	# ^ the graphical installer (w3bs-os-install-gui): loaded from the ISO only when chosen.
 	apkovl="genapkovl-w3bs.sh"
 	hostname="w3bs-os"
 }

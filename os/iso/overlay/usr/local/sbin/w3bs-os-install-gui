@@ -1,0 +1,67 @@
+#!/bin/sh
+# w3bs-os-install-gui: the W3BS OS graphical installer, full screen on this display.
+#
+# Installs the GUI packages from the ISO's own repository (no network), starts udev for
+# input devices, and runs installer-gui.py (GTK 4) under cage with software rendering
+# (pixman + cairo), so it works on any display a kernel driver drives, VMs included.
+# The GUI only collects answers; w3bs-os-install does the install.
+#
+# Exit: 0 installed, 10 the user asked for the text installer, 2 no usable display,
+# anything else the GUI could not start. Log: /var/log/w3bs-os-install-gui.log
+set -u
+umask 022
+LOG=/var/log/w3bs-os-install-gui.log
+RUN=/run/w3bs-gui
+PKGS="cage seatd-launch py3-gobject3 gtk4.0 font-dejavu adwaita-icon-theme eudev mesa-dri-gallium"
+
+say() { printf '  %s\n' "$*"; }
+: >"$LOG"
+
+# A usable display: a DRM card (simpledrm and efifb count once a driver binds).
+has_display() { ls /sys/class/drm/card[0-9]*/device >/dev/null 2>&1; }
+
+repo=
+for d in /media/*/apks; do
+	[ -e "$d/x86_64/APKINDEX.tar.gz" ] && repo=$d && break
+done
+if ! command -v cage >/dev/null 2>&1 || ! command -v seatd-launch >/dev/null 2>&1; then
+	say "Loading the graphical installer from the installer media..."
+	if [ -n "$repo" ]; then
+		# shellcheck disable=SC2086
+		apk add --no-network --repository "$repo" $PKGS >>"$LOG" 2>&1
+	else
+		# shellcheck disable=SC2086
+		apk add $PKGS >>"$LOG" 2>&1
+	fi || { say "The graphical installer could not be loaded (see $LOG)."; exit 3; }
+fi
+
+# libinput (cage) finds keyboards and mice through udev; the live system runs mdev.
+if ! pidof udevd >/dev/null 2>&1; then
+	echo >/proc/sys/kernel/hotplug 2>/dev/null
+	udevd --daemon >>"$LOG" 2>&1
+	udevadm trigger --action=add >>"$LOG" 2>&1
+	udevadm settle --timeout=20 >>"$LOG" 2>&1
+fi
+has_display || { sleep 2; has_display; } || { say "No display device was found."; exit 2; }
+
+mkdir -p "$RUN" && chmod 700 "$RUN"
+rm -f "$RUN/result"
+export XDG_RUNTIME_DIR=$RUN W3BS_GUI_RESULT=$RUN/result
+export WLR_RENDERER=pixman WLR_NO_HARDWARE_CURSORS=1 GSK_RENDERER=cairo GDK_BACKEND=wayland
+export XKB_DEFAULT_LAYOUT="${XKB_DEFAULT_LAYOUT:-us}"
+# Automated tests only (root-written, in RAM): W3BS_GUI_AUTOWALK and friends, see installer-gui.py.
+# shellcheck disable=SC1091
+[ -r /run/w3bs-gui.env ] && . /run/w3bs-gui.env
+say "Starting the graphical installer..."
+seatd-launch -- cage -s -- python3 /usr/share/w3bs-os/installer-gui.py >>"$LOG" 2>&1
+rc=$?
+echo "cage exited $rc" >>"$LOG"
+result=$(head -n 1 "$RUN/result" 2>/dev/null)
+case "$result" in
+	installed)
+		grep -qx reboot "$RUN/result" && { sync; reboot; }
+		exit 0 ;;
+	text) exit 10 ;;
+esac
+say "The graphical installer closed without installing (see $LOG)."
+exit 1
