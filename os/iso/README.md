@@ -24,6 +24,7 @@ installed system do not boot with Secure Boot on.
 | Install type | **desktop** (graphical) when a display adapter is found, **server** (command line only) when none is; asked first | `--server` (= `--desktop none`) |
 | Desktop | Hyprland with greetd + tuigreet (below); the installer shows a numbered menu | `--desktop hyprland\|plasma\|gnome\|xfce\|none` |
 | W3BS | `w3bs` and `w3bs-desktop` (musl builds) in `/usr/local/bin`; the W3BS repository (`https://w3bs.org/repo/`, pinned to `registry/FINGERPRINT`) is added for each user at first login | |
+| Browsers | desktop installs: Firefox (SUPER+B) and [TronBrowser](https://tronbrowser.dev) (SUPER+SHIFT+B) for every user; TronBrowser runs on the Flathub Ungoogled Chromium, since its own engine is a glibc build | |
 | Agentic Desktop Layer | broker and tray autostart in the desktop session; agent access is **off** until the user turns it on (never `--enabled-by-default`) | |
 
 The installer shows a review screen (exact disk, size, model, current partitions, every

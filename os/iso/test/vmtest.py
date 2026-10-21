@@ -217,7 +217,7 @@ def vga_review(vm, a):
     screen, screenshot it, then cancel at the typed confirmation (nothing is written)."""
     vm.sendkeys("\n")                       # start the installer from the tty1 offer
     time.sleep(8)
-    for _ in range(8):                      # keymap, timezone, hostname, user, full name, install type, desktop, disk
+    for _ in range(8):                      # install type, keymap, timezone, hostname, user, full name, desktop, disk
         vm.sendkeys("\n")
         time.sleep(2)
     vm.sendkeys("\n")                       # encryption: yes
