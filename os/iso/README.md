@@ -21,6 +21,7 @@ installed system do not boot with Secure Boot on.
 | Keyboard, timezone, hostname | `us us`, `UTC`, `w3bs` | `--keymap`, `--timezone`, `--hostname` |
 | Network | DHCP on every wired interface | |
 | User | `w3bs` ("W3BS User"), zsh login shell, `wheel` + doas; root login locked | `--user`, `--fullname` |
+| Install type | **desktop** (graphical) when a display adapter is found, **server** (command line only) when none is; asked first | `--server` (= `--desktop none`) |
 | Desktop | Hyprland with greetd + tuigreet (below); the installer shows a numbered menu | `--desktop hyprland\|plasma\|gnome\|xfce\|none` |
 | W3BS | `w3bs` and `w3bs-desktop` (musl builds) in `/usr/local/bin`; the W3BS repository (`https://w3bs.org/repo/`, pinned to `registry/FINGERPRINT`) is added for each user at first login | |
 | Agentic Desktop Layer | broker and tray autostart in the desktop session; agent access is **off** until the user turns it on (never `--enabled-by-default`) | |
@@ -38,7 +39,7 @@ install profile (`/etc/w3bs-os/install-profile`).
 
 The default desktop (`--desktop hyprland`, menu choice 1) installs [Hyprland](https://hypr.land/) from Alpine
 community on `setup-wayland-base` (elogind, polkit, udev, dbus), since `setup-desktop` has no
-Hyprland. Login is greetd + tuigreet on tty7 (user name, then password); the session is
+Hyprland. Login is greetd + tuigreet on tty1, the screen the machine boots to (user name, then password; tty2-6 keep text logins); the session is
 `/usr/local/bin/w3bs-hyprland`, which copies the W3BS default
 `/usr/share/w3bs-os/hypr/hyprland.conf` to `~/.config/hypr/hyprland.conf` on the first login
 (edit that copy; the keyboard layout comes from `--keymap`). Included: Waybar, foot (SUPER+Return),
@@ -50,6 +51,18 @@ Waybar's tray host; log in `~/.local/state/w3bs-os/desktop-layer.log`) with agen
 and SUPER+ALT+Escape turns agent access off; Hyprland has no certified adapter yet
 (docs/agentic-desktop-layer-prd.md lists it as an expansion target), so `w3bs-desktop doctor`
 reports what works.
+
+### In a virtual machine (VirtualBox, VMware, QEMU)
+
+Hyprland needs a display adapter with a kernel DRM driver. In VirtualBox use Settings >
+Display > Screen: Graphics Controller **VMSVGA**, Video Memory **128 MB**, and Enable 3D
+Acceleration (turn it off if the desktop still does not start). The installer adds the
+VirtualBox guest additions when it runs inside VirtualBox. In a VM the session uses software
+cursors, and if Hyprland exits within seconds `w3bs-hyprland` retries once with software
+rendering (Mesa llvmpipe); if that fails as well it explains why on the console (driver found,
+VM settings to change, the tail of the log) instead of dropping back to the greeter. Log:
+`~/.local/state/w3bs-os/hyprland-session.log`. Press **Host+F** (Right Ctrl+F) to leave
+VirtualBox full-screen mode.
 
 ## Installer usage
 

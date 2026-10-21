@@ -22,7 +22,7 @@ def log(*a):
 
 
 class VM:
-    def __init__(self, name, firmware="uefi", iso=None, disks=(), mem=4096, smp=4, outdir="."):
+    def __init__(self, name, firmware="uefi", iso=None, disks=(), mem=4096, smp=4, outdir=".", vga="std"):
         self.name, self.outdir = name, outdir
         self.serial_path = os.path.join(outdir, f"{name}.serial.sock")
         self.mon_path = os.path.join(outdir, f"{name}.mon.sock")
@@ -32,7 +32,7 @@ class VM:
                 os.unlink(p)
         kvm = os.path.exists("/dev/kvm") and os.access("/dev/kvm", os.W_OK)
         cmd = ["qemu-system-x86_64", "-machine", "q35", "-m", str(mem), "-smp", str(smp),
-               "-display", "none", "-vga", "std",
+               "-display", "none", "-vga", vga,
                "-serial", f"unix:{self.serial_path},server=on,wait=off",
                "-monitor", f"unix:{self.mon_path},server=on,wait=off",
                "-netdev", "user,id=n0", "-device", "virtio-net-pci,netdev=n0",
@@ -181,7 +181,7 @@ def push_file(vm, src, dest):
     time.sleep(1)
     vm.send("\x04")
     time.sleep(2)
-    rc, _ = vm.sh(f"base64 -d {dest}.b64 > {dest} && chmod 755 {dest} && rm {dest}.b64 && sh -n {dest}", 60)
+    rc, _ = vm.sh(f"base64 -d {dest}.b64 > {dest} && chmod 755 {dest} && rm {dest}.b64 && if head -n 1 {dest} | grep -q '^#!/bin/sh'; then sh -n {dest}; fi", 60)
     if rc != 0:
         raise SystemExit(f"could not push {src}")
     log(f"[{vm.name}] pushed {src} -> {dest}")
@@ -217,7 +217,7 @@ def vga_review(vm, a):
     screen, screenshot it, then cancel at the typed confirmation (nothing is written)."""
     vm.sendkeys("\n")                       # start the installer from the tty1 offer
     time.sleep(8)
-    for _ in range(7):                      # keymap, timezone, hostname, user, full name, desktop, disk
+    for _ in range(8):                      # keymap, timezone, hostname, user, full name, install type, desktop, disk
         vm.sendkeys("\n")
         time.sleep(2)
     vm.sendkeys("\n")                       # encryption: yes
@@ -243,6 +243,9 @@ def cmd_install(a):
         vm.sh("printf '%s\\n' 'w3bs-test-pass' > /tmp/pw; printf '%s\\n' 'w3bs-test-luks-pass' > /tmp/luks; chmod 600 /tmp/pw /tmp/luks", 30)
         if a.push_installer:
             push_file(vm, a.push_installer, "/usr/local/sbin/w3bs-os-install")
+        for spec in a.push:
+            src, dest = spec.split("=", 1)
+            push_file(vm, src, dest)
         if a.vga_review:
             vga_review(vm, a)
         disk = "" if a.auto_disk else "--disk /dev/vda "
@@ -322,7 +325,7 @@ def cmd_installed(a):
     """Boot the installed disk (UEFI), log in on ttyS0 as the user and assert the system,
     screenshot the greeter and, with --type-password, the desktop after logging in there."""
     user, pw = a.login.split(":", 1)
-    vm = VM(f"installed-{a.firmware}", a.firmware, disks=[a.disk], mem=a.mem, outdir=a.out)
+    vm = VM(f"installed-{a.firmware}", a.firmware, disks=[a.disk], mem=a.mem, outdir=a.out, vga=a.vga)
     try:
         t0 = time.time()
         vm.expect(r"login: ", a.timeout)
@@ -404,8 +407,12 @@ def main():
     p.add_argument("--login", default="w3bs:w3bs-test-pass")
     p.add_argument("--type-password", action="store_true")
     p.add_argument("--push-installer")
+    p.add_argument("--push", action="append", default=[], metavar="SRC=DEST",
+                   help="also copy SRC into the live system at DEST before installing (repeatable)")
     p.add_argument("--auto-disk", action="store_true", help="let the installer pick the largest disk")
     p.add_argument("--vga-review", action="store_true", help="first walk the interactive installer on tty1 to its review and cancel")
+    # vmware = the VMware SVGA II adapter with no 3D: what VirtualBox's default VMSVGA looks like to Linux.
+    p.add_argument("--vga", default="std", help="QEMU -vga for the installed boot (std, vmware, virtio)")
     p.add_argument("--out", default=".")
     a = p.parse_args()
     os.makedirs(a.out, exist_ok=True)

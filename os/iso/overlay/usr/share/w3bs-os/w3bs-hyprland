@@ -2,6 +2,11 @@
 # w3bs-hyprland: the W3BS OS Hyprland session, started by greetd (tuigreet --cmd).
 # Gives a user with no Hyprland config the W3BS default, then runs Hyprland under its
 # own session bus (OpenRC has no user bus).
+#
+# Virtual machines are the common first install, and Hyprland fails quietly in them (it
+# exits and tuigreet comes back, which looks like a server with no desktop). So: in a VM
+# use software cursors; if Hyprland exits within seconds, try once more with software
+# rendering (Mesa llvmpipe); if that fails too, say why on the console and wait for Enter.
 [ -r /etc/profile ] && . /etc/profile
 cfg=${XDG_CONFIG_HOME:-$HOME/.config}/hypr
 if [ ! -e "$cfg/hyprland.conf" ]; then
@@ -9,4 +14,89 @@ if [ ! -e "$cfg/hyprland.conf" ]; then
 fi
 export XDG_CURRENT_DESKTOP=Hyprland XDG_SESSION_DESKTOP=Hyprland XDG_SESSION_TYPE=wayland
 export MOZ_ENABLE_WAYLAND=1 QT_QPA_PLATFORM='wayland;xcb'
-exec dbus-run-session start-hyprland
+
+state=${XDG_STATE_HOME:-$HOME/.local/state}/w3bs-os
+mkdir -p "$state"
+log=$state/hyprland-session.log
+
+vm=$(cat /sys/class/dmi/id/product_name /sys/class/dmi/id/sys_vendor 2>/dev/null | tr '\n' ' ')
+case "$vm" in
+	*VirtualBox*|*innotek*) vm=VirtualBox ;;
+	*VMware*) vm=VMware ;;
+	*QEMU*|*KVM*|*Bochs*|*"Standard PC"*) vm=QEMU ;;
+	*) vm= ;;
+esac
+# hyprland.conf turns hardware cursors off when W3BS_VM is set (they are invisible in most VMs).
+[ -n "$vm" ] && export W3BS_VM="$vm"
+
+gpu() {
+	for c in /sys/class/drm/card[0-9]*; do
+		[ -e "$c/device" ] || continue
+		basename "$(readlink -f "$c/device/driver")" 2>/dev/null
+	done | sort -u | tr '\n' ' '
+}
+
+explain() {
+	clear 2>/dev/null
+	cat <<EOF
+
+  W3BS OS: the Hyprland desktop did not start.
+
+  $1
+
+  Display drivers: ${2:-none (no /dev/dri card)}
+  Session log:     $log
+EOF
+	if [ "$vm" = VirtualBox ]; then
+		cat <<'EOF'
+
+  In VirtualBox, power the VM off and open Settings > Display > Screen:
+    Graphics Controller  VMSVGA
+    Video Memory         128 MB
+    Enable 3D Acceleration  on (try off if it still fails)
+  then start the VM and log in again.
+EOF
+	elif [ -n "$vm" ]; then
+		cat <<EOF
+
+  This is a $vm virtual machine: give it a virtio-gpu or VGA display adapter with
+  at least 64 MB of video memory.
+EOF
+	fi
+	cat <<'EOF'
+
+  The console still works: Ctrl+Alt+F2 opens a text login.
+  Last lines of the Hyprland log:
+EOF
+	tail -n 12 "$log" 2>/dev/null | sed 's/^/    /'
+	printf '\n  Press Enter to return to the login screen. '
+	read -r _
+}
+
+run() {
+	start=$(date +%s)
+	{ echo "=== $(date) $*"; echo "vm=${vm:-none} drivers=$(gpu)"; } >>"$log"
+	env "$@" dbus-run-session start-hyprland >>"$log" 2>&1
+	rc=$?
+	# Copy Hyprland's own log (it lives under the runtime dir, gone at logout).
+	for f in "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/hypr/*/hyprland.log; do
+		[ -r "$f" ] && grep -i -E 'err|fail|crit|abort|egl|gbm|render|backend' "$f" | tail -n 40 >>"$log"
+	done
+	took=$(( $(date +%s) - start ))
+	echo "=== exit $rc after ${took}s" >>"$log"
+	[ "$rc" = 0 ] || [ "$took" -ge 20 ]
+}
+
+drivers=$(gpu)
+if [ -z "$drivers" ]; then
+	echo "=== $(date) no DRM card; vm=${vm:-none}" >>"$log"
+	explain "No graphics device the desktop can use was found." ""
+	exit 1
+fi
+
+# A clean exit, or a session that lasted 20 s or more, was real: the user logged out.
+run W3BS_RENDER=hardware && exit 0
+echo "=== retrying with software rendering" >>"$log"
+run W3BS_RENDER=software LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe && exit 0
+explain "It exited at once, with hardware and with software rendering." "$drivers"
+exit 1
