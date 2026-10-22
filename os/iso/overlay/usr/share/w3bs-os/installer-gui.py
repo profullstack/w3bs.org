@@ -507,6 +507,9 @@ class Installer(Gtk.ApplicationWindow):
             self.done_text.set_text("Nothing was reported as installed. Last lines of the log "
                                     "(full log: /var/log/w3bs-os-install.log):\n\n" + "\n".join(tail))
         self.show_page()
+        # After minutes of log updates the software renderer can leave this page blank in
+        # a VM (VirtualBox): force a full redraw once it is shown.
+        GLib.timeout_add(300, lambda: (self.queue_draw(), False)[1])
         if AUTOWALK and self.ok:
             print("W3BS_GUI_INSTALLED", flush=True)
         return False
