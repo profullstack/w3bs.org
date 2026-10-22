@@ -1,12 +1,7 @@
 #!/bin/sh
-# W3BS OS Hyprland session start (exec-once): VM tweaks, then a first-login welcome.
-if [ -n "${W3BS_VM:-}" ]; then
-	hyprctl keyword cursor:no_hardware_cursors true >/dev/null
-	# VMs report a 0x0 mm screen, and Hyprland's auto scale then picks 2x.
-	hyprctl keyword monitor ,preferred,auto,1 >/dev/null
-fi
-# Wallpaper (the keys to open things). Started from exec-once directly it died at once
-# (too early, or the monitor change above dropped its surface): start it now, keep it up.
+# W3BS OS Hyprland session start (exec-once): the wallpaper, then a first-login welcome.
+# Wallpaper (the keys to open things). Started from exec-once directly it died at once:
+# start it from here and restart it if it exits.
 (
 	n=0
 	while [ "$n" -lt 20 ]; do
