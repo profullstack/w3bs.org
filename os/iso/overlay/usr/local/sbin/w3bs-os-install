@@ -172,6 +172,14 @@ eject_media() {
 	[ -n "$_d" ] || return 0
 	sync
 	cd / || return 0
+	# The graphical installer starts udevd (and seatd), and udevd keeps kernel module index
+	# files open in /.modloop: stop them, and anything else using the media, or the unmount
+	# fails, the drive stays locked and the eject is silently ignored (seen in VirtualBox).
+	udevadm control --exit 2>/dev/null
+	killall udevd seatd 2>/dev/null
+	sleep 1
+	fuser -k -m /.modloop >/dev/null 2>&1
+	fuser -k -m /media/cdrom >/dev/null 2>&1
 	# The live system's kernel modules are a squashfs loop-mounted from the media
 	# (/.modloop): unmount it and detach its loop device, or the drive stays open and locked.
 	umount /.modloop 2>/dev/null
@@ -702,6 +710,10 @@ EOF
 		sed "s|^\(\s*xkb_layout \).*|\1${KEYMAP%% *}|" /usr/share/w3bs-os/sway/config \
 			>"$TARGET/usr/share/w3bs-os/sway/config" || fail "cannot write the fallback desktop config"
 		chmod 0755 "$TARGET/usr/share/w3bs-os/sway" && chmod 0644 "$TARGET/usr/share/w3bs-os/sway/config"
+		install -m 0755 /usr/share/w3bs-os/hypr/session-start.sh "$TARGET/usr/share/w3bs-os/hypr/session-start.sh" \
+			|| fail "cannot install the session start script"
+		install -m 0644 /usr/share/w3bs-os/wallpaper.png "$TARGET/usr/share/w3bs-os/wallpaper.png" \
+			|| fail "cannot install the wallpaper"
 		install -m 0644 /usr/share/w3bs-os/hypr/waybar.css "$TARGET/usr/share/w3bs-os/hypr/waybar.css" \
 			|| fail "cannot install the Waybar style"
 		install -m 0755 /usr/share/w3bs-os/hypr/desktop-layer.sh "$TARGET/usr/share/w3bs-os/hypr/desktop-layer.sh" \
