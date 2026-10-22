@@ -26,8 +26,20 @@ case "$vm" in
 	*QEMU*|*KVM*|*Bochs*|*"Standard PC"*) vm=QEMU ;;
 	*) vm= ;;
 esac
-# hyprland.conf turns hardware cursors off when W3BS_VM is set (they are invisible in most VMs).
 [ -n "$vm" ] && export W3BS_VM="$vm"
+# Machine-specific Hyprland settings, sourced by hyprland.conf (rewritten at every login).
+if [ -n "$vm" ]; then
+	cat >"$cfg/w3bs-session.conf" <<EOF
+# Written by w3bs-hyprland at login: this is a $vm virtual machine.
+# VMs report a 0x0 mm screen, so auto scale picks 2x; hardware cursors are often invisible.
+monitor = , preferred, auto, 1
+cursor {
+    no_hardware_cursors = true
+}
+EOF
+else
+	echo "# Written by w3bs-hyprland at login: nothing machine-specific here." >"$cfg/w3bs-session.conf"
+fi
 
 gpu() {
 	for c in /sys/class/drm/card[0-9]*; do
