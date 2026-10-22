@@ -172,14 +172,11 @@ eject_media() {
 	[ -n "$_d" ] || return 0
 	sync
 	cd / || return 0
-	# The graphical installer starts udevd (and seatd), and udevd keeps kernel module index
-	# files open in /.modloop: stop them, and anything else using the media, or the unmount
-	# fails, the drive stays locked and the eject is silently ignored (seen in VirtualBox).
+	# The graphical installer starts udevd (and seatd); udevd keeps module index files
+	# mapped from /.modloop, so stop it (and wait) or the unmounts below fail.
 	udevadm control --exit 2>/dev/null
 	killall udevd seatd 2>/dev/null
-	sleep 1
-	fuser -k -m /.modloop >/dev/null 2>&1
-	fuser -k -m /media/cdrom >/dev/null 2>&1
+	for _i in 1 2 3 4 5 6 7 8 9 10; do pidof udevd seatd >/dev/null 2>&1 || break; sleep 0.5; done
 	# The live system's kernel modules are a squashfs loop-mounted from the media
 	# (/.modloop): unmount it and detach its loop device, or the drive stays open and locked.
 	umount /.modloop 2>/dev/null
@@ -187,7 +184,17 @@ eject_media() {
 	for m in $(awk -v d="/dev/$_d" 'index($1, d) == 1 { print $2 }' /proc/mounts); do
 		umount "$m" 2>/dev/null || umount -l "$m" 2>/dev/null
 	done
-	case "$_d" in sr*) eject "/dev/$_d" 2>/dev/null || true ;; esac
+	# eudev's cdrom rule locks the tray (cdrom_id --lock-media) and busybox eject does not
+	# unlock it: the eject then "succeeds" and the DVD stays in (VirtualBox). cdrom_id
+	# --eject-media unlocks first.
+	case "$_d" in sr*)
+		if [ -x /usr/lib/udev/cdrom_id ]; then
+			/usr/lib/udev/cdrom_id --eject-media "/dev/$_d" >/dev/null 2>&1 || eject "/dev/$_d" 2>/dev/null
+		else
+			eject "/dev/$_d" 2>/dev/null
+		fi ;;
+	esac
+	return 0
 }
 
 # Rescue from the live system: set a new password for a user of the installed system.
