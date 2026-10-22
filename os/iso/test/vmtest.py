@@ -386,7 +386,7 @@ def cmd_installed(a):
             if a.desktop == "hyprland" and not re.search(r"HYPR_UP=\d", out):
                 failed.append("hyprland-session")
             # The Agentic Desktop Layer starts with the session: broker and tray, agent access off.
-            rc, out = vm.sh("sleep 20; echo ADL_PROCS=$(pidof w3bs-desktop | wc -w); ps -o args | grep '[w]3bs-desktop '; tail -n 5 ~/.local/state/w3bs-os/desktop-layer.log 2>/dev/null", 90)
+            rc, out = vm.sh("for i in $(seq 1 30); do [ $(pidof w3bs-desktop | wc -w) -ge 2 ] && break; sleep 2; done; echo ADL_PROCS=$(pidof w3bs-desktop | wc -w); ps -o args | grep '[w]3bs-desktop '; tail -n 5 ~/.local/state/w3bs-os/desktop-layer.log 2>/dev/null", 90)
             log(f"[installed] desktop layer: {out.strip()[-300:]}")
             if not re.search(r"ADL_PROCS=([2-9]|\d\d)", out):
                 failed.append("desktop-layer-running")
