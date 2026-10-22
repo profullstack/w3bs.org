@@ -8,7 +8,7 @@ input * {
     xkb_layout us
 }
 seat * hide_cursor 0
-output * bg #101418 solid_color
+output * bg /usr/share/w3bs-os/wallpaper.png fill #101418
 default_border pixel 2
 gaps inner 4
 gaps outer 4
