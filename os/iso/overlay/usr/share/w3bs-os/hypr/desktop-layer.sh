@@ -7,12 +7,27 @@ mkdir -p "${log%/*}"
 exec >>"$log" 2>&1
 echo "$(date '+%F %T') starting the Agentic Desktop Layer"
 /usr/local/bin/w3bs-desktop daemon --adapter auto --mcp-http 127.0.0.1:7801 &
+# Waybar owns the StatusNotifierWatcher name a moment before it registers itself as the
+# host, and the tray exits at once ("no StatusNotifierItem host") if it starts in between:
+# wait for the host, and restart the tray if it still exits early.
+host_ready() {
+	dbus-send --session --print-reply --dest=org.kde.StatusNotifierWatcher /StatusNotifierWatcher \
+		org.freedesktop.DBus.Properties.Get string:org.kde.StatusNotifierWatcher \
+		string:IsStatusNotifierHostRegistered 2>/dev/null | grep -q 'boolean true'
+}
 i=0
-until dbus-send --session --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus \
-	org.freedesktop.DBus.NameHasOwner string:org.kde.StatusNotifierWatcher 2>/dev/null | grep -q 'boolean true'; do
+until host_ready; do
 	i=$((i + 1))
-	[ "$i" -ge 60 ] && { echo "no StatusNotifier watcher after 30s; starting the tray anyway"; break; }
+	[ "$i" -ge 120 ] && { echo "no StatusNotifier host after 60s; starting the tray anyway"; break; }
 	sleep 0.5
 done
-/usr/local/bin/w3bs-desktop tray --wait-for-broker 60 &
+n=0
+while [ "$n" -lt 5 ]; do
+	n=$((n + 1))
+	t0=$(date +%s)
+	/usr/local/bin/w3bs-desktop tray --wait-for-broker 60
+	[ $(( $(date +%s) - t0 )) -ge 30 ] && break
+	echo "the tray exited early (try $n of 5); starting it again"
+	sleep 3
+done &
 wait
