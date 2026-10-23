@@ -25,6 +25,9 @@ installed system do not boot with Secure Boot on.
 | Desktop | Hyprland with greetd + tuigreet (below); the installer shows a numbered menu | `--desktop hyprland\|plasma\|gnome\|xfce\|none` |
 | W3BS | `w3bs` and `w3bs-desktop` (musl builds) in `/usr/local/bin`; the W3BS repository (`https://w3bs.org/repo/`, pinned to `registry/FINGERPRINT`) is added for each user at first login | |
 | Browsers | desktop installs: Firefox (SUPER+B) and [TronBrowser](https://tronbrowser.dev) (SUPER+SHIFT+B) for every user; TronBrowser runs on the Flathub Ungoogled Chromium, since its own engine is a glibc build | |
+| Dev tools | every install: curl, wget, Node (Alpine, musl), mise managing bun and pnpm per user (`mise use -g bun npm:pnpm`), and `pnpm i -g @profullstack/readm3`; on PATH via /etc/profile.d/w3bs-dev.sh | |
+| Box setup | every install runs [root-w3bs-os](https://github.com/profullstack/cli-tools/blob/master/root-w3bs-os.sh) (cli-tools, pinned + sha256-checked) for the users: oh-my-zsh, oh-my-tmux, threatcrush, moshcode, hqterm, ufw, swap/zram/earlyoom, per-user Caddy; services it cannot start in the install chroot are finished by a one-time run at first boot (/var/log/w3bs-first-boot.log) | |
+| Encryption choice | text: the yes/no question or `--no-encrypt`; graphical: "Encrypt the disk" or "Do not encrypt" on the disk page | |
 | Agentic Desktop Layer | broker and tray autostart in the desktop session; agent access is **off** until the user turns it on (never `--enabled-by-default`) | |
 
 The installer shows a review screen (exact disk, size, model, current partitions, every

@@ -464,6 +464,8 @@ $(lsblk -no NAME,SIZE,FSTYPE,LABEL "$DISK" 2>/dev/null | sed 's/^/              
   SSH             $( [ -n "$SSH" ] && echo "sshd on: keys only, no password logins" || echo "off")
   Desktop         $DESKTOP$( case "$DESKTOP" in plasma) echo " (KDE Plasma, SDDM)" ;; hyprland) echo " (Hyprland, greetd + tuigreet)" ;; none) echo " (server install: command line only)" ;; esac )
   W3BS            w3bs CLI and w3bs-desktop in /usr/local/bin; W3BS repo added at first login
+  Dev tools       curl, wget, mise (bun, pnpm), Node, readm3 (pnpm i -g @profullstack/readm3)
+  Box setup       root-w3bs-os (cli-tools): oh-my-zsh, tmux, moshcode, threatcrush, hqterm, ufw, zram
   Browsers        $( [ "$DESKTOP" = none ] && echo "none (server install)" || echo "Firefox and TronBrowser (tronbrowser.dev, Flathub Ungoogled Chromium engine)" )
   Agent access    Agentic Desktop Layer installed, agent access OFF until you turn it on
   Web server      Caddy, enabled, no sites (add them in /etc/caddy/sites/)
@@ -587,6 +589,13 @@ awk '$2 ~ /^\/boot/ { print $1, $2, $3 }' "$TARGET/etc/fstab" | sort -k2 | while
 	echo "mounted $dev on $mp" >>"$LOG"
 done || fail "cannot mount the boot partition"
 for m in dev proc sys; do mount --bind "/$m" "$TARGET/$m" || fail "cannot bind /$m"; done
+# setup-disk installs the live system's world on the target, which includes the graphical
+# installer's own packages (GTK, cage, eudev): drop them from the target's world, and the
+# next apk run there removes whatever nothing else needs.
+if [ -r /run/w3bs-os-gui-pkgs ]; then
+	for p in $(cat /run/w3bs-os-gui-pkgs); do sed -i "/^$p\$/d" "$TARGET/etc/apk/world"; done
+	log "dropped the graphical installer's packages from the target world"
+fi
 mountpoint -q "$TARGET/dev/pts" || mount --bind /dev/pts "$TARGET/dev/pts" 2>/dev/null
 cp /etc/resolv.conf "$TARGET/etc/resolv.conf" 2>/dev/null
 in_target() { chroot "$TARGET" /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root TERM="${TERM:-linux}" "$@"; }
@@ -787,6 +796,76 @@ EOF
 fi
 
 # --- W3BS -------------------------------------------------------------------------------
+# --- developer tools (every install: desktop and server) --------------------------------
+# curl and wget; mise manages bun and pnpm per user (pnpm through mise's npm backend, so no
+# GitHub API rate limit); Node is Alpine's own musl build (mise's Node downloads are glibc);
+# then pnpm i -g @profullstack/readm3. Per-user tool failures are warnings, not fatal.
+step "Installing developer tools (curl, wget, mise, Node, bun, pnpm, readm3)"
+in_target apk add --no-progress curl wget mise nodejs npm >>"$LOG" 2>&1 || fail "cannot install curl, wget, mise and Node"
+mkdir -p "$TARGET/etc/profile.d"
+cat >"$TARGET/etc/profile.d/w3bs-dev.sh" <<'EOF' || fail "cannot write /etc/profile.d/w3bs-dev.sh"
+# W3BS OS: mise-managed tools (bun, pnpm) and pnpm global commands (readm3) on PATH.
+export PNPM_HOME="$HOME/.local/share/pnpm"
+case ":$PATH:" in *":$HOME/.local/share/mise/shims:"*) ;; *) PATH="$HOME/.local/share/mise/shims:$PATH" ;; esac
+case ":$PATH:" in *":$PNPM_HOME:"*) ;; *) PATH="$PNPM_HOME:$PATH" ;; esac
+export PATH
+EOF
+chmod 0644 "$TARGET/etc/profile.d/w3bs-dev.sh"
+for u in $USERS; do
+	if in_target su - "$u" -s /bin/sh -c '
+		set -e
+		export MISE_YES=1 PNPM_HOME="$HOME/.local/share/pnpm"
+		export PATH="$PNPM_HOME:$HOME/.local/share/mise/shims:$PATH"
+		mise use -g bun@latest npm:pnpm@latest
+		pnpm config set global-bin-dir "$PNPM_HOME"
+		pnpm config set global-dir "$HOME/.local/share/pnpm/global"
+		pnpm i -g @profullstack/readm3
+		bun --version; pnpm --version; readm3 --version' >>"$LOG" 2>&1; then
+		log "bun, pnpm and readm3 installed for $u"
+	else
+		say "warning: could not install bun/pnpm/readm3 for $u (see $LOG); later run: mise use -g bun npm:pnpm && pnpm i -g @profullstack/readm3"
+	fi
+done
+
+# --- root-w3bs-os (cli-tools): the W3BS OS box setup, during the install ------------------
+# Accounts, base packages, dotfiles, oh-my-zsh/oh-my-tmux, mise, moshcode, threatcrush,
+# hqterm, ssh-agent, motd, per-user Caddy, ufw, swap/zram/earlyoom and confinement. Installed
+# through its pinned, sha256-checked installer, then run non-interactively in the target. In
+# the chroot no init is running, so it sets up everything but services; a one-shot at first
+# boot (/etc/local.d/w3bs-first-boot.start) re-runs it to enable and start those.
+step "Running root-w3bs-os (shell, tools, firewall, Caddy and account setup)"
+ROOT_W3BS_INSTALL=https://raw.githubusercontent.com/profullstack/cli-tools/master/install-root-w3bs-os.sh
+if in_target apk add --no-progress bash >>"$LOG" 2>&1 \
+	&& in_target sh -c "curl -fsSL $ROOT_W3BS_INSTALL | sh" >>"$LOG" 2>&1 \
+	&& [ -x "$TARGET/usr/local/sbin/root-w3bs-os" ]; then
+	# shellcheck disable=SC2086
+	if in_target /usr/local/sbin/root-w3bs-os $USERS --groups wheel --refresh </dev/null >>"$LOG" 2>&1; then
+		log "root-w3bs-os ran for $USERS"
+	else
+		say "warning: root-w3bs-os reported errors (see $LOG); it runs again at first boot"
+	fi
+	# A cut-short TUF write left a 0-byte root.json, and w3bs then failed every install ("Failed
+	# to parse trusted root metadata"); drop it so the pinned initial root is used. The motd
+	# cache it writes as root must be readable by the login shells that print it.
+	find "$TARGET/root" "$TARGET/home" -path '*/.local/share/w3bs/trust/*' -name root.json -size 0 -delete 2>/dev/null
+	[ -f "$TARGET/var/cache/profullstack-motd" ] && chmod 0644 "$TARGET/var/cache/profullstack-motd"
+	mkdir -p "$TARGET/etc/local.d"
+	cat >"$TARGET/etc/local.d/w3bs-first-boot.start" <<'EOF' || fail "cannot write the first-boot script"
+#!/bin/sh
+# W3BS OS first boot: finish root-w3bs-os now that OpenRC runs (enable and start ufw,
+# earlyoom, Caddy, ssh-agent ...), once, in the background. Log: /var/log/w3bs-first-boot.log
+[ -e /etc/w3bs-os/first-boot-done ] && exit 0
+(
+	for i in $(seq 1 60); do ping -c1 -W2 dl-cdn.alpinelinux.org >/dev/null 2>&1 && break; sleep 5; done
+	/usr/local/sbin/root-w3bs-os --refresh </dev/null && touch /etc/w3bs-os/first-boot-done
+) >>/var/log/w3bs-first-boot.log 2>&1 &
+EOF
+	chmod 0755 "$TARGET/etc/local.d/w3bs-first-boot.start"
+	in_target rc-update add local default >>"$LOG" 2>&1 || fail "cannot enable the first-boot script"
+else
+	say "warning: could not install root-w3bs-os (see $LOG); later: w3bs install profullstack.com/root-w3bs-os"
+fi
+
 step "Installing Caddy (the default web server; no sites yet)"
 in_target apk add --no-progress caddy >>"$LOG" 2>&1 || fail "cannot install caddy"
 mkdir -p "$TARGET/etc/caddy/sites"
@@ -894,6 +973,7 @@ if [ "$BOOTMODE" = UEFI ]; then
 	[ -n "$(find "$TARGET/boot" -maxdepth 4 -ipath '*/efi/*' -iname '*.efi' 2>/dev/null)" ] || fail "no EFI bootloader was installed"
 fi
 grep -qx ID=w3bs-os "$TARGET/etc/w3bs-os-release" || fail "/etc/w3bs-os-release is missing"
+for c in curl wget mise node npm; do in_target sh -c "command -v $c" >/dev/null 2>&1 || fail "$c is not installed"; done
 [ -L "$TARGET/etc/runlevels/default/caddy" ] || fail "caddy is not enabled"
 [ -z "$SSH" ] || [ -L "$TARGET/etc/runlevels/default/sshd" ] || fail "sshd is not enabled"
 ls "$TARGET"/boot/vmlinuz-* >/dev/null 2>&1 || fail "no kernel in /boot"

@@ -106,8 +106,14 @@ pub async fn load(layout: &Layout, alias: &str, base_url: &str, key: &str) -> Re
     let dir = layout.trust_dir(key);
     let initial = std::fs::read(dir.join("initial-root.json"))
         .map_err(|e| Error::preflight("TRUST_STATE", format!("trust root for repository `{alias}` is missing: {e}; run `w3bs repo remove {alias}` and add it again")))?;
-    // The datastore holds the newest root reached through verified rotation; prefer it.
-    let anchor = std::fs::read(dir.join("root.json")).unwrap_or_else(|_| initial.clone());
+    // The datastore holds the newest root reached through verified rotation; prefer it. An empty
+    // or unparseable one (a write cut short: seen as a 0-byte root.json after a W3BS OS install)
+    // would fail every load for good, so fall back to the pinned initial root and let TUF walk
+    // the rotations again.
+    let anchor = match std::fs::read(dir.join("root.json")) {
+        Ok(b) if serde_json::from_slice::<serde_json::Value>(&b).is_ok() => b,
+        _ => initial.clone(),
+    };
     let base = normalize_base(base_url, layout.dev_transport)?;
     let repo = RepositoryLoader::new(&anchor, sub(&base, "metadata/"), sub(&base, "targets/"))
         .transport(W3bsTransport::new(layout.dev_transport))
