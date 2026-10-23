@@ -1,0 +1,125 @@
+# W3BS OS 1.2 (Debian 13 "trixie") installer ISO, os/debian/. On every merge to main that
+# touches it (or by hand): build with live-build, run the QEMU install test (UEFI plain, BIOS
+# LUKS2), and only if both pass publish release os-v1.2.<n> (semver: os/debian/VERSION is
+# MAJOR.MINOR, the patch is one more than the last published os-v<MAJOR.MINOR>.*) and point
+# os-latest/latest.json, which w3bs.org/os reads, at it.
+name: os-debian
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "os/debian/**"
+      - "os/iso/test/vmtest.py"
+      - ".github/workflows/os-debian.yml"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish the release after the tests pass"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: os-debian
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version (semver)
+        id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mm=$(tr -d ' \n' < os/debian/VERSION)
+          echo "$mm" | grep -Eq '^[0-9]+\.[0-9]+$' || { echo "bad os/debian/VERSION: $mm"; exit 1; }
+          last=$(gh release list -R "$GITHUB_REPOSITORY" -L 200 --json tagName -q '.[].tagName' \
+            | sed -n "s/^os-v${mm//./\\.}\.\([0-9][0-9]*\)$/\1/p" | sort -n | tail -n 1)
+          v="$mm.$(( ${last:--1} + 1 ))"
+          echo "version=$v" >> "$GITHUB_OUTPUT"; echo "Version $v" >> "$GITHUB_STEP_SUMMARY"
+      - name: Build the ISO (live-build in debian:trixie)
+        run: |
+          os/debian/build.sh "${{ steps.v.outputs.version }}"
+          sudo chown -R "$(id -u):$(id -g)" os/debian/out
+          (cd os/debian/out && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: os-debian-iso
+          path: os/debian/out/
+          retention-days: 7
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { firmware: uefi, flags: "" }
+          - { firmware: bios, flags: "--encrypt" }
+    name: Install + boot (${{ matrix.firmware }} ${{ matrix.flags }})
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: os-debian-iso
+          path: iso
+      - name: QEMU, OVMF and KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends qemu-system-x86 qemu-utils ovmf python3-pil >/dev/null
+      - name: Live boot, install, installed system
+        run: |
+          mkdir -p out && qemu-img create -q -f qcow2 out/disk.qcow2 20G
+          python3 os/debian/test/dtest.py --iso iso/w3bs-os-${{ needs.build.outputs.version }}-amd64.iso \
+            --disk out/disk.qcow2 --firmware ${{ matrix.firmware }} ${{ matrix.flags }} --out out
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: os-debian-test-${{ matrix.firmware }}
+          path: |
+            out/*.png
+            out/*.log
+
+  publish:
+    needs: [build, test]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: os-debian-iso
+          path: iso
+      - name: Release os-v${{ needs.build.outputs.version }} and os-latest/latest.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          V: ${{ needs.build.outputs.version }}
+        run: |
+          set -eu
+          tag="os-v$V"; iso="w3bs-os-$V-amd64.iso"
+          (cd iso && sha256sum -c SHA256SUMS)
+          size=$(stat -c %s "iso/$iso"); sha=$(sha256sum "iso/$iso" | cut -d' ' -f1)
+          notes="W3BS OS $V installer for x86-64 PCs and servers (UEFI and BIOS; Secure Boot off).
+          Debian 13 \"trixie\" based, systemd. The live system brings up the network by itself (DHCP and IPv6 on every card) and SSH with a one-time root password shown on the screen.
+          Passed the QEMU install test (UEFI plain, BIOS + LUKS2) in run ${{ github.run_id }}. sha256 $sha"
+          gh release create "$tag" --target "$GITHUB_SHA" --latest=false --title "W3BS OS $V (Debian 13)" --notes "$notes" "iso/$iso" iso/SHA256SUMS
+          base="https://github.com/$GH_REPO/releases/download/$tag"
+          printf '{"version":"%s","name":"%s","url":"%s/%s","sumsUrl":"%s/SHA256SUMS","sha256":"%s","size":%s,"preview":false,"release":"%s"}\n' \
+            "$V" "$iso" "$base" "$iso" "$base" "$sha" "$size" "$tag" > latest.json
+          python3 -c 'import json; json.load(open("latest.json"))'
+          gh release view os-latest >/dev/null 2>&1 || gh release create os-latest --latest=false --prerelease \
+            --title "W3BS OS latest pointer" --notes "latest.json points at the newest tested W3BS OS ISO release."
+          gh release upload os-latest latest.json --clobber
+          echo "Published $tag ($size bytes, sha256 $sha)" >> "$GITHUB_STEP_SUMMARY"

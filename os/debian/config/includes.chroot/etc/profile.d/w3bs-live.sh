@@ -12,5 +12,9 @@ if [ "$(id -u)" = 0 ] && [ "$(tty 2>/dev/null)" = /dev/tty1 ] && [ -z "${W3BS_OS
 	else
 		printf '  No network address yet (DHCP and IPv6 keep trying).\n\n'
 	fi
-	unset _pw _addrs _a
+	printf '  Install W3BS OS on this machine now? (it erases a disk you choose, after a review)\n'
+	printf '    1  Yes, start the installer  [default]\n    2  No, give me a shell\n\n  Choose 1 or 2 [1]: '
+	read -r _pick
+	case "$_pick" in 2*) printf '\n  Run w3bs-os-install when you are ready.\n\n' ;; *) /usr/local/sbin/w3bs-os-install ;; esac
+	unset _pw _addrs _a _pick
 fi
