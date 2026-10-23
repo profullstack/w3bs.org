@@ -40,6 +40,14 @@ options:
   --desktop NAME          hyprland (default for a desktop install), plasma, gnome, xfce or none
   --server                a server (command line only) install: the same as --desktop none
   --hostname NAME         default: w3bs
+  --ip ADDR/PREFIX        static IPv4 instead of DHCP, e.g. 203.0.113.5/24 (servers whose
+                          provider assigns the address); with --gateway, optional --dns
+  --gateway ADDR          the IPv4 default gateway for --ip
+  --dns "ADDR ..."        nameservers for --ip (default: 1.1.1.1 9.9.9.9)
+  --iface NAME            the interface for --ip (default: the first wired one)
+  --ip6 ADDR/PREFIX       static IPv6 as well (e.g. 2001:db8::5/64), with --gateway6
+                          (often fe80::1); without it IPv6 autoconfigures (SLAAC) by default
+  --gateway6 ADDR         the IPv6 default gateway for --ip6
   --timezone ZONE         default: UTC (for example America/Los_Angeles)
   --keymap "LAYOUT VAR"   default: "us us"
   --user NAME             default: w3bs (or the preset users); repeat for more users, all in
@@ -261,6 +269,7 @@ wired_interfaces() {
 
 # --- arguments --------------------------------------------------------------------------
 DEFAULTS= DISK= YES= ENCRYPT=1 DESKTOP= HOSTNAME_= TIMEZONE= KEYMAP= USERS= FULLNAME=
+STATIC_IP= STATIC_GW= STATIC_DNS= NET_IFACE= STATIC_IP6= STATIC_GW6=
 PASSWORD_FILE= PASSPHRASE_FILE= NO_REBOOT= SERIAL= ROOT_PASSWORD_FILE= SSH= KEY_ARGS=
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -272,6 +281,12 @@ while [ $# -gt 0 ]; do
 		--desktop) DESKTOP=${2:-}; shift ;;
 		--server) DESKTOP=none ;;
 		--hostname) HOSTNAME_=${2:-}; shift ;;
+		--ip) STATIC_IP=${2:-}; shift ;;
+		--gateway) STATIC_GW=${2:-}; shift ;;
+		--dns) STATIC_DNS=${2:-}; shift ;;
+		--iface) NET_IFACE=${2:-}; shift ;;
+		--ip6) STATIC_IP6=${2:-}; shift ;;
+		--gateway6) STATIC_GW6=${2:-}; shift ;;
 		--timezone) TIMEZONE=${2:-}; shift ;;
 		--keymap) KEYMAP=${2:-}; shift ;;
 		--user) USERS="$USERS ${2:-}"; shift ;;
@@ -444,18 +459,76 @@ IFACES=$(wired_interfaces)
 [ -n "$IFACES" ] || fail "no wired network interface found; v0.1 installs need Ethernet (Wi-Fi setup is not in this installer yet)"
 
 # Packages download during the install: check the internet now, before anything is erased.
-# A card without an address gets one more DHCP try; then say so plainly instead of failing
-# later with apk "no such package" errors.
-net_ok() { wget -q -T 10 --spider http://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/APKINDEX.tar.gz 2>/dev/null; }
-if ! net_ok; then
+# DHCP first (one more try on every wired card); servers whose provider assigns a static
+# address get --ip/--gateway/--dns, or are asked for them here.
+# IPv6 first, then IPv4, each pinged by address (so a DNS problem does not hide them).
+# NET6/NET4 say what was found.
+NET6= NET4=
+net_probe() {
+	NET6= NET4=
+	ping -6 -c 1 -W 3 2606:4700:4700::1111 >/dev/null 2>&1 || ping -6 -c 1 -W 3 2620:fe::fe >/dev/null 2>&1 && NET6=yes
+	ping -4 -c 1 -W 3 1.1.1.1 >/dev/null 2>&1 || ping -4 -c 1 -W 3 9.9.9.9 >/dev/null 2>&1 && NET4=yes
+	log "probe: IPv6 ${NET6:-no}, IPv4 ${NET4:-no}"
+}
+# The download decides (ping is blocked on some networks); the probe only explains a failure.
+net_ok() {
+	net_probe
+	wget -q -T 10 --spider http://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/APKINDEX.tar.gz 2>/dev/null
+}
+# Router advertisements (IPv6 SLAAC) can take a few seconds after the link comes up.
+for _i in 1 2 3 4 5; do ip -6 addr show scope global 2>/dev/null | grep -q inet6 && break; sleep 1; done
+apply_static() {
+	ip link set "$NET_IFACE" up 2>/dev/null
+	ip -4 addr flush dev "$NET_IFACE" 2>/dev/null
+	ip addr add "$STATIC_IP" dev "$NET_IFACE" || fail "cannot set $STATIC_IP on $NET_IFACE"
+	ip route replace default via "$STATIC_GW" dev "$NET_IFACE" || fail "cannot use $STATIC_GW as the gateway on $NET_IFACE"
+	: >/etc/resolv.conf
+	for d in $STATIC_DNS; do echo "nameserver $d" >>/etc/resolv.conf; done
+	log "static network: $NET_IFACE $STATIC_IP via $STATIC_GW dns $STATIC_DNS"
+}
+apply_static6() {
+	ip link set "$NET_IFACE" up 2>/dev/null
+	ip -6 addr add "$STATIC_IP6" dev "$NET_IFACE" 2>/dev/null || ip -6 addr show dev "$NET_IFACE" | grep -q "${STATIC_IP6%/*}" \
+		|| fail "cannot set $STATIC_IP6 on $NET_IFACE"
+	ip -6 route replace default via "$STATIC_GW6" dev "$NET_IFACE" || fail "cannot use $STATIC_GW6 as the IPv6 gateway on $NET_IFACE"
+	[ -s /etc/resolv.conf ] || { [ -n "$STATIC_DNS" ] || STATIC_DNS="2606:4700:4700::1111 2620:fe::fe"; for d in $STATIC_DNS; do echo "nameserver $d" >>/etc/resolv.conf; done; }
+	log "static IPv6: $NET_IFACE $STATIC_IP6 via $STATIC_GW6"
+}
+net_summary() { for i in $IFACES; do printf '%s %s %s; ' "$i" "$(ip -4 addr show "$i" 2>/dev/null | awk '/inet /{print $2}' | head -n1)" "$(ip -6 addr show "$i" scope global 2>/dev/null | awk '/inet6 /{print $2}' | head -n1)"; done; }
+[ -n "$NET_IFACE" ] || NET_IFACE=$(echo $IFACES | cut -d' ' -f1)
+case " $IFACES " in *" $NET_IFACE "*) ;; *) fail "--iface $NET_IFACE is not a wired interface here ($(echo $IFACES))" ;; esac
+[ -z "$STATIC_IP6" ] || [ -n "$STATIC_GW6" ] || fail "--ip6 needs --gateway6 (often fe80::1)"
+if [ -n "$STATIC_IP" ]; then
+	[ -n "$STATIC_GW" ] || fail "--ip needs --gateway"
+	[ -n "$STATIC_DNS" ] || STATIC_DNS="1.1.1.1 9.9.9.9"
+	apply_static
+fi
+[ -n "$STATIC_IP6" ] && apply_static6
+if [ -z "$STATIC_IP$STATIC_IP6" ] && ! net_ok; then
 	for i in $IFACES; do
 		ip link set "$i" up 2>/dev/null
 		udhcpc -i "$i" -n -q -t 6 -T 3 >>"$LOG" 2>&1
 	done
 	sleep 2
-	net_ok || fail "no internet connection: the installer downloads packages from dl-cdn.alpinelinux.org, and it cannot reach it ($(for i in $IFACES; do printf '%s %s; ' "$i" "$(ip -4 addr show "$i" 2>/dev/null | awk '/inet /{print $2}' | head -n1)"; done)). Check the network cable, or in VirtualBox the VM's network adapter (NAT works), then run the installer again."
+	if ! net_ok && [ -z "$DEFAULTS" ] && [ -t 0 ]; then
+		say ""
+		say "No internet over DHCP ($(net_summary)). Servers often get a static address from"
+		say "their provider (the control panel shows the IPv4 address, prefix and gateway)."
+		ask STATIC_IP "Static IPv4 for $NET_IFACE with prefix, e.g. 203.0.113.5/24 (empty: stop)" ""
+		[ -n "$STATIC_IP" ] || fail "no internet connection; nothing was changed"
+		ask STATIC_GW "Gateway" ""
+		[ -n "$STATIC_GW" ] || fail "a static address needs a gateway"
+		ask STATIC_DNS "Nameservers" "1.1.1.1 9.9.9.9"
+		apply_static
+		ask STATIC_IP6 "Static IPv6 with prefix too, e.g. 2001:db8::5/64 (empty: none; SLAAC still works)" ""
+		if [ -n "$STATIC_IP6" ]; then
+			ask STATIC_GW6 "IPv6 gateway" "fe80::1"
+			apply_static6
+		fi
+	fi
 fi
-log "internet reachable"
+net_ok || fail "no internet connection (IPv6 ${NET6:-no}, IPv4 ${NET4:-no}$( [ -n "$NET6$NET4" ] && echo ': the network answers but dl-cdn.alpinelinux.org does not; check DNS (--dns)')): the installer downloads packages from dl-cdn.alpinelinux.org and cannot reach it ($(net_summary)). On a server, give the provider's static address: w3bs-os-install --ip ADDR/PREFIX --gateway GW (or answer the questions in the interactive installer). Otherwise check the network cable."
+log "internet reachable (IPv6 ${NET6:-no}, IPv4 ${NET4:-no})"
 
 if [ -d /sys/firmware/efi ]; then BOOTMODE=UEFI; else BOOTMODE=BIOS; fi
 
@@ -472,7 +545,8 @@ $(lsblk -no NAME,SIZE,FSTYPE,LABEL "$DISK" 2>/dev/null | sed 's/^/              
   Hostname        $HOSTNAME_
   Keyboard        $KEYMAP
   Timezone        $TIMEZONE
-  Network         DHCP on $(echo $IFACES)
+  Internet        IPv6 ${NET6:-no}, IPv4 ${NET4:-no}
+  Network         $( [ -n "$STATIC_IP" ] && echo "static $STATIC_IP via $STATIC_GW on $NET_IFACE, DNS $STATIC_DNS" || echo "DHCP on $(echo $IFACES)" ); IPv6 $( [ -n "$STATIC_IP6" ] && echo "static $STATIC_IP6 via $STATIC_GW6" || echo "autoconfigured (SLAAC)" )
   Users           $USERS (zsh, admin via doas/wheel)$(for u in $USERS; do [ -s "$WORK/keys/$u" ] && printf ', %s: %s SSH key(s)' "$u" "$(grep -Ec '(ssh-|ecdsa-|sk-)' "$WORK/keys/$u")"; [ -s "$WORK/pass/$u" ] || printf ', %s: no password' "$u"; done)
   Root            $( [ -n "$ROOT_PASS" ] && echo "password set" || echo "no password")$( [ -s "$WORK/keys/root" ] && echo ", $(grep -Ec '(ssh-|ecdsa-|sk-)' "$WORK/keys/root") SSH key(s)")
   SSH             $( [ -n "$SSH" ] && echo "sshd on: keys only, no password logins" || echo "off")
@@ -504,9 +578,28 @@ iface lo inet loopback
 "
 for i in $IFACES; do
 	INTERFACES="${INTERFACES}
-auto $i
-iface $i inet dhcp
+auto $i"
+	if [ -n "$STATIC_IP" ] && [ "$i" = "$NET_IFACE" ]; then
+		INTERFACES="${INTERFACES}
+iface $i inet static
+	address $STATIC_IP
+	gateway $STATIC_GW"
+	elif [ -z "$STATIC_IP6" ] || [ "$i" != "$NET_IFACE" ]; then
+		INTERFACES="${INTERFACES}
+iface $i inet dhcp"
+	fi
+	# IPv6 by default: SLAAC from router advertisements, or the static address given.
+	if [ -n "$STATIC_IP6" ] && [ "$i" = "$NET_IFACE" ]; then
+		INTERFACES="${INTERFACES}
+iface $i inet6 static
+	address $STATIC_IP6
+	gateway $STATIC_GW6
 "
+	else
+		INTERFACES="${INTERFACES}
+iface $i inet6 auto
+"
+	fi
 done
 DISKOPTS="-m sys"
 [ -n "$ENCRYPT" ] && DISKOPTS="$DISKOPTS -e -L"
@@ -526,6 +619,9 @@ DISKOPTS="$DISKOPTS"
 LBUOPTS=none
 APKCACHEOPTS=none
 EOF
+# Static address: setup-dns takes one nameserver here; all of them go into the target's
+# resolv.conf once it is mounted.
+[ -n "$STATIC_IP$STATIC_IP6" ] && [ -n "$STATIC_DNS" ] && echo "DNSOPTS=\"-n ${STATIC_DNS%% *}\"" >>"$WORK/answers"
 log "answer file:"; cat "$WORK/answers" >>"$LOG"
 
 # setup-disk runs cryptsetup interactively; this shim feeds it the passphrase from a keyfile
@@ -603,6 +699,11 @@ awk '$2 ~ /^\/boot/ { print $1, $2, $3 }' "$TARGET/etc/fstab" | sort -k2 | while
 	echo "mounted $dev on $mp" >>"$LOG"
 done || fail "cannot mount the boot partition"
 for m in dev proc sys; do mount --bind "/$m" "$TARGET/$m" || fail "cannot bind /$m"; done
+if [ -n "$STATIC_IP$STATIC_IP6" ] && [ -n "$STATIC_DNS" ]; then
+	: >"$TARGET/etc/resolv.conf"
+	for d in $STATIC_DNS; do echo "nameserver $d" >>"$TARGET/etc/resolv.conf"; done
+	chmod 0644 "$TARGET/etc/resolv.conf"
+fi
 # setup-disk installs the live system's world on the target, which includes the graphical
 # installer's own packages (GTK, cage, eudev): drop them from the target's world, and the
 # next apk run there removes whatever nothing else needs.

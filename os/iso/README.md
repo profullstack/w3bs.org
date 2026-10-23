@@ -19,7 +19,7 @@ installed system do not boot with Secure Boot on.
 | Encryption | LUKS2 full-disk encryption (LVM on LUKS: swap and ext4 root), passphrase at boot | `--no-encrypt` |
 | Mode | Alpine `sys` install (setup-disk `-m sys`), grub on UEFI, syslinux on BIOS | |
 | Keyboard, timezone, hostname | `us us`, `UTC`, `w3bs` | `--keymap`, `--timezone`, `--hostname` |
-| Network | DHCP on every wired interface | |
+| Network | DHCP on every wired interface, IPv6 autoconfigured (SLAAC) by default; the internet is checked (IPv6 first, then IPv4) before anything is erased, and with no DHCP the interactive installer asks for the provider's static address | `--ip ADDR/PREFIX --gateway GW [--dns "A B"]`, `--ip6 ADDR/PREFIX --gateway6 GW6`, `--iface NAME` |
 | User | `w3bs` ("W3BS User"), zsh login shell, `wheel` + doas; root login locked | `--user`, `--fullname` |
 | Install type | **desktop** (graphical) when a display adapter is found, **server** (command line only) when none is; asked first | `--server` (= `--desktop none`) |
 | Desktop | Hyprland with greetd + tuigreet (below); the installer shows a numbered menu | `--desktop hyprland\|plasma\|gnome\|xfce\|none` |
