@@ -34,7 +34,8 @@ try:
     flags = "--passphrase-file /tmp/lk" if a.encrypt else "--no-encrypt"
     rc, o = vm.sh(f"w3bs-os-install --defaults --disk /dev/vda --yes --no-reboot --serial-console --password-file /tmp/pw "
                   f"--domain ci.example.test {flags} > /tmp/o 2>&1; echo RC=$?; grep -E 'warning|FAILED|installed on' /tmp/o", a.timeout)
-    check("install", "RC=0" in o and "warning" not in o, o)
+    # The console echoes the command (which itself says 'warning'): count the installer's lines only.
+    check("install", re.search(r"^RC=0\s*$", o, re.M) is not None and re.search(r"^warning:", o, re.M) is None, o)
     if "RC=0" not in o:
         _, t = vm.sh("tail -40 /var/log/w3bs-os-install.log", 60); print(t)
 finally:
