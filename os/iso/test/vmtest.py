@@ -227,8 +227,8 @@ def vga_review(vm, a):
         time.sleep(2)
     vm.sendkeys("\n")                       # encryption: yes
     time.sleep(2)
-    # user password twice, root password (Enter: none, root stays locked), disk passphrase twice
-    for secret in ("vgatestpw", "vgatestpw", "", "vgatestluks", "vgatestluks"):
+    # root password (Enter: none, root stays locked), user password twice, disk passphrase twice
+    for secret in ("", "vgatestpw", "vgatestpw", "vgatestluks", "vgatestluks"):
         vm.sendkeys(secret + "\n")
         time.sleep(2)
     # The internet check (IPv6 then IPv4 probe, then the CDN) runs before the review.

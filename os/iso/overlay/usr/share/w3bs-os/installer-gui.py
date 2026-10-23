@@ -251,11 +251,11 @@ class Installer(Gtk.ApplicationWindow):
         self.pw2 = Gtk.PasswordEntry(show_peek_icon=True)
         self.rpw1 = Gtk.PasswordEntry(show_peek_icon=True)
         self.rpw2 = Gtk.PasswordEntry(show_peek_icon=True)
+        box.append(label("Root password (optional): for su and root logins on the console. Leave it empty "
+                         "to keep root locked; your account below is an administrator either way (sudo).", "muted"))
+        box.append(self.form([("Root password", self.rpw1), ("Root password again", self.rpw2)]))
         box.append(self.form([("Full name", self.fullname), ("User name", self.username),
                               ("Password", self.pw1), ("Password again", self.pw2)]))
-        box.append(label("Root password (optional): for su and root logins on the console. Leave it empty "
-                         "to keep root locked; your account is an administrator either way (doas).", "muted"))
-        box.append(self.form([("Root password", self.rpw1), ("Root password again", self.rpw2)]))
         self.user_err = label("", "error")
         box.append(self.user_err)
         return "user", sc
