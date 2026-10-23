@@ -43,9 +43,19 @@ fi
 if ! pidof udevd >/dev/null 2>&1; then
 	echo >/proc/sys/kernel/hotplug 2>/dev/null
 	udevd --daemon >>"$LOG" 2>&1
-	udevadm trigger --action=add >>"$LOG" 2>&1
+	# Not the network cards: re-adding them took the DHCP address away (seen on VirtualBox,
+	# "Network unreachable" and then apk "no such package" during the install).
+	udevadm trigger --action=add --subsystem-nomatch=net >>"$LOG" 2>&1
 	udevadm settle --timeout=20 >>"$LOG" 2>&1
 fi
+# And if a wired card has no address anyway, ask DHCP again.
+for p in /sys/class/net/*; do
+	i=${p##*/}
+	[ "$i" = lo ] || [ ! -e "$p/device" ] || [ -d "$p/wireless" ] && continue
+	ip -4 addr show "$i" 2>/dev/null | grep -q 'inet ' && continue
+	ip link set "$i" up 2>/dev/null
+	udhcpc -i "$i" -n -q -t 6 -T 3 >>"$LOG" 2>&1
+done
 has_display || { sleep 2; has_display; } || { say "No display device was found."; exit 2; }
 
 mkdir -p "$RUN" && chmod 700 "$RUN"
