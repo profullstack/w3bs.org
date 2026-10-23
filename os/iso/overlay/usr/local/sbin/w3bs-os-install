@@ -466,8 +466,8 @@ IFACES=$(wired_interfaces)
 NET6= NET4=
 net_probe() {
 	NET6= NET4=
-	ping -6 -c 1 -W 3 2606:4700:4700::1111 >/dev/null 2>&1 || ping -6 -c 1 -W 3 2620:fe::fe >/dev/null 2>&1 && NET6=yes
-	ping -4 -c 1 -W 3 1.1.1.1 >/dev/null 2>&1 || ping -4 -c 1 -W 3 9.9.9.9 >/dev/null 2>&1 && NET4=yes
+	ping -6 -c 1 -W 2 2606:4700:4700::1111 >/dev/null 2>&1 || ping -6 -c 1 -W 2 2620:fe::fe >/dev/null 2>&1 && NET6=yes
+	ping -4 -c 1 -W 2 1.1.1.1 >/dev/null 2>&1 || ping -4 -c 1 -W 2 9.9.9.9 >/dev/null 2>&1 && NET4=yes
 	log "probe: IPv6 ${NET6:-no}, IPv4 ${NET4:-no}"
 }
 # The download decides (ping is blocked on some networks); the probe only explains a failure.

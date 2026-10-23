@@ -230,7 +230,8 @@ def vga_review(vm, a):
     for secret in ("vgatestpw", "vgatestpw", "vgatestluks", "vgatestluks"):
         vm.sendkeys(secret + "\n")
         time.sleep(2)
-    time.sleep(6)
+    # The internet check (IPv6 then IPv4 probe, then the CDN) runs before the review.
+    time.sleep(30)
     vm.screenshot(os.path.join(a.out, f"install-{a.firmware}-review-vga.png"))
     vm.sendkeys("no\n")                     # anything but the disk name cancels
     time.sleep(5)
