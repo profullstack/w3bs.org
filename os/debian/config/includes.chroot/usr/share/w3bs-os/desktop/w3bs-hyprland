@@ -1,6 +1,6 @@
 #!/bin/sh
-# w3bs-hyprland: the W3BS OS Hyprland session, started by greetd (tuigreet --cmd).
-# Gives a user with no Hyprland config the W3BS default, then runs Hyprland under its
+# w3bs-hyprland: the W3BS OS desktop session, started by greetd (tuigreet --cmd): W3BS DE
+# (`w3bs-de session`, Hyprland with the W3BS defaults and the Agentic Desktop Layer) under the
 # systemd user session bus.
 #
 # Virtual machines are the common first install, and Hyprland fails quietly in them (it
@@ -8,11 +8,7 @@
 # use software cursors; if Hyprland exits within seconds, try once more with software
 # rendering (Mesa llvmpipe); if that fails too, say why on the console and wait for Enter.
 [ -r /etc/profile ] && . /etc/profile
-cfg=${XDG_CONFIG_HOME:-$HOME/.config}/hypr
-if [ ! -e "$cfg/hyprland.conf" ]; then
-	mkdir -p "$cfg" && cp /usr/share/w3bs-os/hypr/hyprland.conf "$cfg/hyprland.conf"
-fi
-export XDG_CURRENT_DESKTOP=Hyprland XDG_SESSION_DESKTOP=Hyprland XDG_SESSION_TYPE=wayland
+export XDG_CURRENT_DESKTOP=Hyprland XDG_SESSION_DESKTOP=w3bs-de XDG_SESSION_TYPE=wayland
 export MOZ_ENABLE_WAYLAND=1 QT_QPA_PLATFORM='wayland;xcb'
 
 state=${XDG_STATE_HOME:-$HOME/.local/state}/w3bs-os
@@ -27,18 +23,17 @@ case "$vm" in
 	*) vm= ;;
 esac
 [ -n "$vm" ] && export W3BS_VM="$vm"
-# Machine-specific Hyprland settings, sourced by hyprland.conf (rewritten at every login).
+# Machine-specific Hyprland settings, loaded by the user.lua W3BS OS gave each user (rewritten
+# at every login).
 if [ -n "$vm" ]; then
-	cat >"$cfg/w3bs-session.conf" <<EOF
-# Written by w3bs-hyprland at login: this is a $vm virtual machine.
-# VMs report a 0x0 mm screen, so auto scale picks 2x; hardware cursors are often invisible.
-monitor = , preferred, auto, 1
-cursor {
-    no_hardware_cursors = true
-}
+	cat >"$state/session.lua" <<EOF
+-- Written by w3bs-hyprland at login: this is a $vm virtual machine.
+-- VMs report a 0x0 mm screen, so auto scale picks 2x; hardware cursors are often invisible.
+hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })
+hl.config({ cursor = { no_hardware_cursors = 1 } })
 EOF
 else
-	echo "# Written by w3bs-hyprland at login: nothing machine-specific here." >"$cfg/w3bs-session.conf"
+	echo "-- Written by w3bs-hyprland at login: nothing machine-specific here." >"$state/session.lua"
 fi
 
 # systemd user session (logind + dbus-user-session): its bus; otherwise a bus of our own.
@@ -101,7 +96,7 @@ EOF
 run() {
 	start=$(date +%s)
 	{ echo "=== $(date) $*"; echo "vm=${vm:-none} drivers=$(gpu)"; } >>"$log"
-	env "$@" $bus ${W3BS_SESSION_CMD:-start-hyprland} >>"$log" 2>&1
+	env "$@" $bus ${W3BS_SESSION_CMD:-/usr/local/bin/w3bs-de session} >>"$log" 2>&1
 	rc=$?
 	# Copy Hyprland's own log (it lives under the runtime dir, gone at logout).
 	for f in "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/hypr/*/hyprland.log; do
@@ -109,7 +104,7 @@ run() {
 	done
 	took=$(( $(date +%s) - start ))
 	echo "=== exit $rc after ${took}s" >>"$log"
-	# start-hyprland exits 0 even when Hyprland never came up, so the exit code says nothing:
+	# start-hyprland (which w3bs-de session runs) exits 0 even when Hyprland never came up, so the exit code says nothing:
 	# only a session that lasted is a real one (the user logged out).
 	[ "$took" -ge 15 ]
 }

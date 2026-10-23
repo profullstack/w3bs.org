@@ -1,0 +1,9 @@
+#!/bin/sh
+# W3BS OS: /usr/local/bin/w3bs-de. W3BS DE (w3bs.org/de) lives in each user's home
+# (~/.local/share/w3bs-de, updated with `w3bs-de update`); this finds that copy. A user added
+# after the install gets it here on first use, from the copy W3BS OS keeps in /usr/share.
+share=${W3BS_DE_SHARE:-$HOME/.local/share/w3bs-de}
+if [ ! -x "$share/bin/w3bs-de" ] && [ -r /usr/share/w3bs-os/de/install.sh ]; then
+	W3BS_DE_SOURCE=/usr/share/w3bs-os/de/share sh /usr/share/w3bs-os/de/install.sh --no-packages --no-agents --no-session >&2
+fi
+exec "$share/bin/w3bs-de" "$@"

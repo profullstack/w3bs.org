@@ -9,7 +9,7 @@
 #   w3bs-de update             fetch the latest defaults (your settings are kept)
 #   w3bs-de version
 #
-# Inside the session: autostart, launcher, agents-status (for the bar), logout.
+# Inside the session: autostart, tray, launcher, agents-status (for the bar), logout.
 set -u
 
 VERSION="@W3BS_DE_VERSION@"
@@ -116,8 +116,37 @@ cmd_autostart() {
       while pgrep -u "$(id -u)" -f "w3bs-desktop daemon" >/dev/null 2>&1 && [ $i -lt 25 ]; do sleep 0.2; i=$((i + 1)); done
       (setsid w3bs-desktop daemon --adapter auto --mcp-http 127.0.0.1:7801 >"$STATE/broker.log" 2>&1 &)
     fi
-    (setsid w3bs-desktop tray --wait-for-broker 60 >/dev/null 2>&1 &)
+    (setsid "$0" tray >"$STATE/tray.log" 2>&1 &)
   fi
+}
+
+# The agent tray. It needs a StatusNotifier host (Waybar's tray), and Waybar starts at the same
+# moment: it owns the watcher name a moment before it registers as the host, and a tray started
+# in between exits at once ("no StatusNotifierItem host"). Wait for the host, and start the tray
+# again if it still exits early.
+sni_host() {
+  have dbus-send || return 0
+  dbus-send --session --print-reply --dest=org.kde.StatusNotifierWatcher /StatusNotifierWatcher \
+    org.freedesktop.DBus.Properties.Get string:org.kde.StatusNotifierWatcher \
+    string:IsStatusNotifierHostRegistered 2>/dev/null | grep -q 'boolean true'
+}
+
+cmd_tray() {
+  i=0
+  until sni_host; do
+    i=$((i + 1))
+    [ $i -ge 120 ] && { say "no StatusNotifier host after 60 s; starting the tray anyway"; break; }
+    sleep 0.5
+  done
+  n=0
+  while [ $n -lt 5 ]; do
+    n=$((n + 1))
+    t0=$(date +%s)
+    w3bs-desktop tray --wait-for-broker 60
+    [ $(( $(date +%s) - t0 )) -ge 30 ] && break
+    say "the tray exited early (try $n of 5); starting it again"
+    sleep 3
+  done
 }
 
 cmd_agents_status() {
@@ -196,6 +225,7 @@ cmd_doctor() {
 case "${1:-help}" in
   session) cmd_session ;;
   autostart) cmd_autostart ;;
+  tray) cmd_tray ;;
   launcher) exec fuzzel --config="$D/fuzzel/fuzzel.ini" ;;
   agents-status) cmd_agents_status ;;
   agent-mode) shift; cmd_agent_mode "$@" ;;

@@ -13,8 +13,11 @@ p = argparse.ArgumentParser()
 p.add_argument("--iso", required=True); p.add_argument("--disk", required=True)
 p.add_argument("--firmware", default="uefi"); p.add_argument("--encrypt", action="store_true")
 p.add_argument("--desktop", action="store_true", help="install the Hyprland desktop and log in at the greeter")
+p.add_argument("--gui", action="store_true", help="install through the graphical installer (implies --desktop)")
 p.add_argument("--out", default="out"); p.add_argument("--timeout", type=int, default=3000)
 a = p.parse_args()
+if a.gui:
+    a.desktop = True
 os.makedirs(a.out, exist_ok=True)
 fails = []
 
@@ -27,19 +30,39 @@ vm = VM(f"live-{a.firmware}", a.firmware, iso=a.iso, disks=[a.disk], mem=4096, o
 try:
     vm.expect(r"root@w3bs-os:~# |# ", 600); time.sleep(20)
     rc, o = vm.sh("cat /etc/w3bs-os-version; curl -s -o /dev/null -w 'MIRROR=%{http_code}\\n' http://deb.debian.org/debian/dists/trixie/Release; "
-                  "systemctl is-active systemd-networkd ssh; cat /run/w3bs-live-ssh-password", 120)
+                  "systemctl is-active systemd-networkd ssh; cat /run/w3bs-live-ssh-password; "
+                  "who | grep -c '^root *tty1' | sed 's/^/TTY1ROOT=/'", 120)
     check("live network + DNS", "MIRROR=200" in o, o)
+    check("live tty1: root, the installer menu", "TTY1ROOT=1" in o, o)
     check("live ssh one-time password", re.search(r"\b[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}\b", o) is not None, o)
     vm.screenshot(os.path.join(a.out, f"live-{a.firmware}.png"))
-    vm.sh("printf 'w3bs-test-pass\\n' > /tmp/pw; printf 'w3bs-luks-pass\\n' > /tmp/lk", 30)
-    flags = "--passphrase-file /tmp/lk" if a.encrypt else "--no-encrypt"
-    flags += " --desktop hyprland" if a.desktop else " --server"
-    rc, o = vm.sh(f"w3bs-os-install --defaults --disk /dev/vda --yes --no-reboot --serial-console --password-file /tmp/pw "
-                  f"--domain ci.example.test {flags} > /tmp/o 2>&1; echo RC=$?; grep -E 'warning|FAILED|installed on' /tmp/o", a.timeout)
-    # The console echoes the command (which itself says 'warning'): count the installer's lines only.
-    check("install", re.search(r"RC=0\b", o) is not None and re.search(r"warning: ", o) is None, o)
-    if "RC=0" not in o:
-        _, t = vm.sh("tail -40 /var/log/w3bs-os-install.log", 60); print(t)
+    if a.gui:
+        # The real first screen on tty1: 1 = the graphical installer; it clicks through by itself
+        # (W3BS_GUI_AUTOWALK, read by w3bs-os-install-gui) with the test password.
+        env = "W3BS_GUI_AUTOWALK=7 W3BS_GUI_TEST_PASSWORD=w3bs-test-pass" + (" W3BS_GUI_TEST_PASSPHRASE=w3bs-luks-pass" if a.encrypt else " W3BS_GUI_TEST_NOENCRYPT=1")
+        # The checks after the reboot read ttyS0: the test asks for that console like the text path does.
+        vm.sh(f"printf 'export {env} W3BS_GUI_TEST_ARGS=\\x27--serial-console --domain ci.example.test\\x27\\n' > /run/w3bs-gui.env", 30)
+        vm.sendkeys("1\n")
+        rc, o = vm.sh("for i in $(seq 1 90); do pidof cage >/dev/null && break; sleep 2; done; echo GUI=$(pidof cage)", 240)
+        check("graphical installer starts", re.search(r"GUI=\d", o) is not None, o)
+        for n in range(1, 6):
+            time.sleep(8); vm.screenshot(os.path.join(a.out, f"gui-{n}.png"))
+        rc, o = vm.sh("for i in $(seq 1 400); do grep -q -E 'W3BS_GUI_INSTALLED|cage exited' /var/log/w3bs-os-install-gui.log && break; sleep 5; done; "
+                      "grep -c W3BS_GUI_INSTALLED /var/log/w3bs-os-install-gui.log | sed 's/^/GUI_OK=/'; tail -3 /var/log/w3bs-os-install.log", a.timeout)
+        time.sleep(3); vm.screenshot(os.path.join(a.out, "gui-done.png"))
+        check("install", "GUI_OK=1" in o, o)
+        if "GUI_OK=1" not in o:
+            _, t = vm.sh("tail -40 /var/log/w3bs-os-install.log; tail -20 /var/log/w3bs-os-install-gui.log", 60); print(t)
+    else:
+        vm.sh("printf 'w3bs-test-pass\\n' > /tmp/pw; printf 'w3bs-luks-pass\\n' > /tmp/lk", 30)
+        flags = "--passphrase-file /tmp/lk" if a.encrypt else "--no-encrypt"
+        flags += " --desktop hyprland" if a.desktop else " --server"
+        rc, o = vm.sh(f"w3bs-os-install --defaults --disk /dev/vda --yes --no-reboot --serial-console --password-file /tmp/pw "
+                      f"--domain ci.example.test {flags} > /tmp/o 2>&1; echo RC=$?; grep -E 'warning|FAILED|installed on' /tmp/o", a.timeout)
+        # The console echoes the command (which itself says 'warning'): count the installer's lines only.
+        check("install", re.search(r"RC=0\b", o) is not None and re.search(r"warning: ", o) is None, o)
+        if "RC=0" not in o:
+            _, t = vm.sh("tail -40 /var/log/w3bs-os-install.log", 60); print(t)
 finally:
     vm.stop()
 
@@ -69,11 +92,20 @@ if "install" not in fails:
             check(f"tool {c}", f"HAVE_{c}" in o, "")
         check("user session units", "USER_UNITS_FAILED=0" in o, o)
         if a.desktop:
-            rc, o = vm.sh("echo HYPR=$(pidof Hyprland) WAYBAR=$(pidof waybar); "
-                          "cat /run/user/1000/hypr/*/hyprland.log 2>/dev/null | grep -c 'Config error' | sed 's/^/CFGERR=/'", 120)
+            rc, o = vm.sh("echo HYPR=$(pidof Hyprland) WAYBAR=$(pidof waybar) SWAYNC=$(pidof swaync); "
+                          "tr '\\0' ' ' </proc/$(pidof Hyprland | cut -d' ' -f1)/cmdline | grep -c 'w3bs-de/hypr/hyprland.lua' | sed 's/^/DECFG=/'; "
+                          "cat /run/user/1000/hypr/*/hyprland.log 2>/dev/null | grep -ciE 'config error|lua.*error|error.*lua' | sed 's/^/CFGERR=/'", 120)
             check("Hyprland session", re.search(r"HYPR=\d", o) is not None, o)
+            check("W3BS DE config (Lua)", "DECFG=1" in o, o)
             check("Waybar", re.search(r"WAYBAR=\d", o) is not None, o)
+            check("notification center (swaync)", re.search(r"SWAYNC=\d", o) is not None, o)
             check("Hyprland config has no errors", "CFGERR=0" in o, o)
+            rc, o = vm.sh("w3bs-de doctor; echo DOCTOR=$?", 120)
+            check("w3bs-de doctor", "DOCTOR=0" in o, o)
+            rc, o = vm.sh("for i in $(seq 1 30); do [ $(pidof w3bs-desktop | wc -w) -ge 2 ] && break; sleep 2; done; "
+                          "echo ADL=$(pidof w3bs-desktop | wc -w); /usr/local/bin/w3bs-desktop status 2>&1 | head -3", 120)
+            check("Agentic Desktop Layer (broker + tray)", re.search(r"ADL=([2-9]|\d\d)", o) is not None, o)
+            check("agent access off", "DISABLED" in o.upper(), o)
     finally:
         vm.stop()
 if fails:

@@ -64,9 +64,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { firmware: uefi, flags: "" }
-          - { firmware: bios, flags: "--encrypt" }
-          - { firmware: uefi, flags: "--desktop" }
+          - { id: uefi-server, firmware: uefi, flags: "" }
+          - { id: bios-encrypt, firmware: bios, flags: "--encrypt" }
+          - { id: uefi-desktop, firmware: uefi, flags: "--desktop" }
+          - { id: uefi-gui, firmware: uefi, flags: "--gui" }
     name: Install + boot (${{ matrix.firmware }} ${{ matrix.flags }})
     steps:
       - uses: actions/checkout@v4
@@ -88,7 +89,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: os-debian-test-${{ matrix.firmware }}
+          name: os-debian-test-${{ matrix.id }}
           path: |
             out/*.png
             out/*.log

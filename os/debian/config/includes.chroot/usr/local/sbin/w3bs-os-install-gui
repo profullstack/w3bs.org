@@ -1,0 +1,31 @@
+#!/bin/sh
+# w3bs-os-install-gui: the W3BS OS graphical installer (GTK 4), full screen under cage on this
+# display. cage takes the seat of the logind session tty1 runs (root autologin), and renders in
+# software (wlroots pixman, GSK cairo) so any display a kernel driver drives works, VMs too.
+# The wizard only collects answers; w3bs-os-install does the install.
+#
+# Exit: 0 installed, 10 the user asked for the text installer, 2 no usable display, other: the
+# GUI could not start. Log: /var/log/w3bs-os-install-gui.log
+set -u
+LOG=/var/log/w3bs-os-install-gui.log
+RUN=/run/w3bs-gui
+: >"$LOG"
+command -v cage >/dev/null 2>&1 || { echo "  The graphical installer is not on this ISO." >&2; exit 3; }
+ls /sys/class/drm/card[0-9]*/device >/dev/null 2>&1 || { echo "  No display device was found." >&2; exit 2; }
+mkdir -p "$RUN" && chmod 700 "$RUN" && rm -f "$RUN/result"
+[ -n "${XDG_RUNTIME_DIR:-}" ] && [ -d "$XDG_RUNTIME_DIR" ] || export XDG_RUNTIME_DIR=$RUN
+export W3BS_GUI_RESULT=$RUN/result WLR_RENDERER=pixman WLR_NO_HARDWARE_CURSORS=1 GSK_RENDERER=cairo GDK_BACKEND=wayland
+# Automated tests only (root-written, in RAM): W3BS_GUI_AUTOWALK and friends, see installer-gui.py.
+# shellcheck disable=SC1091
+[ -r /run/w3bs-gui.env ] && . /run/w3bs-gui.env
+echo "  Starting the graphical installer..."
+cage -s -- python3 /usr/share/w3bs-os/installer-gui.py >>"$LOG" 2>&1
+echo "cage exited $?" >>"$LOG"
+case "$(head -n 1 "$RUN/result" 2>/dev/null)" in
+	installed)
+		grep -qx reboot "$RUN/result" && { /usr/local/sbin/w3bs-os-install --eject-media; systemctl reboot; }
+		exit 0 ;;
+	text) exit 10 ;;
+esac
+echo "  The graphical installer closed without installing (see $LOG)." >&2
+exit 1
