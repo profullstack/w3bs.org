@@ -1090,6 +1090,18 @@ fi
 if [ "$BOOTMODE" = UEFI ]; then
 	find "$TARGET/boot" -maxdepth 4 -ipath '*/efi/*' -iname '*.efi' >>"$LOG" 2>&1
 	[ -n "$(find "$TARGET/boot" -maxdepth 4 -ipath '*/efi/*' -iname '*.efi' 2>/dev/null)" ] || fail "no EFI bootloader was installed"
+	# Boot the installed system first from now on, even with the ISO still attached (a
+	# server's virtual DVD often stays in): its entry to the front of BootOrder, and BootNext.
+	if command -v efibootmgr >/dev/null 2>&1; then
+		_id=$(efibootmgr 2>/dev/null | awk '/^Boot[0-9A-Fa-f]{4}/ && tolower($0) ~ /alpine|w3bs/ { print substr($1, 5, 4); exit }')
+		_order=$(efibootmgr 2>/dev/null | awk -F': ' '/^BootOrder/ { print $2 }')
+		if [ -n "$_id" ]; then
+			_new=$(printf '%s,%s' "$_id" "$_order" | tr ',' '\n' | awk 'NF && !seen[$0]++' | tr '\n' ',' | sed 's/,$//')
+			efibootmgr -o "$_new" >>"$LOG" 2>&1 && efibootmgr -n "$_id" >>"$LOG" 2>&1 \
+				&& log "UEFI boot order: $_new (installed system $_id first)" \
+				|| say "warning: could not put the installed system first in the UEFI boot order"
+		fi
+	fi
 fi
 grep -qx ID=w3bs-os "$TARGET/etc/w3bs-os-release" || fail "/etc/w3bs-os-release is missing"
 for c in curl wget mise node npm; do in_target sh -c "command -v $c" >/dev/null 2>&1 || fail "$c is not installed"; done
@@ -1115,6 +1127,10 @@ cat <<EOF
 
 EOF
 log "SUCCESS"
+# Eject the installer DVD now, so any reboot (this prompt, the provider's panel, a power
+# cycle) starts the installed system instead of the installer again. Not under the
+# graphical installer: stopping udevd/seatd would close it; it ejects at its Reboot button.
+[ -n "${W3BS_GUI_RESULT:-}" ] || eject_media
 if [ -z "$NO_REBOOT" ] && [ -z "$DEFAULTS" ] && [ -t 0 ]; then
 	printf 'Reboot now? [Y/n] '
 	read -r _r || _r=n

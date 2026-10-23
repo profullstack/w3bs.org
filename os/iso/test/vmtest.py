@@ -36,7 +36,7 @@ class VM:
                "-serial", f"unix:{self.serial_path},server=on,wait=off",
                "-monitor", f"unix:{self.mon_path},server=on,wait=off",
                "-netdev", "user,id=n0" + os.environ.get("VMTEST_NETDEV_EXTRA", ""), "-device", "virtio-net-pci,netdev=n0",
-               "-device", "virtio-rng-pci", "-no-reboot"]
+               "-device", "virtio-rng-pci"] + ([] if os.environ.get("VMTEST_ALLOW_REBOOT") else ["-no-reboot"])
         cmd += ["-accel", "kvm", "-cpu", "host"] if kvm else ["-accel", "tcg,thread=multi", "-cpu", "max"]
         log(f"[{name}] accel={'kvm' if kvm else 'tcg'} firmware={firmware}")
         if firmware == "uefi":

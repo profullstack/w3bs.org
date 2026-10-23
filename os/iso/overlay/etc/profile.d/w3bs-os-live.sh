@@ -27,13 +27,33 @@ if [ "$(id -u)" = 0 ] && [ "$(tty 2>/dev/null)" = /dev/tty1 ] && [ -z "${W3BS_OS
 		fi
 	}
 	_w3bs_ssh_info
+	# Already installed? (the ISO is still attached after the install, and a BIOS cannot be
+	# told to skip it): offer to start the installed system, the default after 15 s.
+	_w3bs_inst=
+	modprobe ext4 2>/dev/null; mkdir -p /run/w3bs-probe
+	for _d in $(blkid -o device -t TYPE=ext4 2>/dev/null); do
+		mount -o ro -t ext4 "$_d" /run/w3bs-probe 2>/dev/null || continue
+		{ [ -e /run/w3bs-probe/boot/vmlinuz-lts ] || [ -e /run/w3bs-probe/vmlinuz-lts ]; } && _w3bs_inst=$_d
+		umount /run/w3bs-probe 2>/dev/null
+		[ -n "$_w3bs_inst" ] && break
+	done
 	if [ -z "$_w3bs_pick" ]; then
+		if [ -n "$_w3bs_inst" ]; then
+			printf '  W3BS OS is already installed on this machine (%s). To start it instead:\n' "$_w3bs_inst"
+			printf '    reboot, then at the boot: prompt type  disk  and Enter (within 10 s),\n'
+			printf '    or remove the ISO (Proxmox: Hardware > CD/DVD Drive > Do not use any media).\n\n'
+		fi
 		printf '  How do you want to install?\n'
 		printf '    1  Graphical installer (mouse and windows)%s\n' "$( [ $_w3bs_def = 1 ] && echo '  [default]' || echo '  (no display found)')"
 		printf '    2  Text installer (command line)%s\n' "$( [ $_w3bs_def = 2 ] && echo '  [default]')"
 		printf '    3  Shell: do not install now (forgot a password? w3bs-os-install --reset-password USER)\n'
-		printf '    4  Set a static IP (servers without DHCP), then come back here\n\n'
-		printf '  Choose 1, 2, 3 or 4 [%s]: ' "$_w3bs_def"
+		printf '    4  Set a static IP (servers without DHCP), then come back here\n'
+		if [ -n "$_w3bs_inst" ]; then
+			printf '    5  Reboot (then type  disk  at the boot: prompt)\n\n'
+			printf '  Choose 1-5 [%s]: ' "$_w3bs_def"
+		else
+			printf '\n  Choose 1, 2, 3 or 4 [%s]: ' "$_w3bs_def"
+		fi
 		read -r _w3bs_pick
 		[ -n "$_w3bs_pick" ] || _w3bs_pick=$_w3bs_def
 	fi
@@ -46,6 +66,12 @@ if [ "$(id -u)" = 0 ] && [ "$(tty 2>/dev/null)" = /dev/tty1 ] && [ -z "${W3BS_OS
 				*) printf '\n  Starting the text installer instead.\n'; /usr/local/sbin/w3bs-os-install ;;
 			esac ;;
 		2*|t*|T*) /usr/local/sbin/w3bs-os-install ;;
+		5*)
+			# A real DVD drive (or VirtualBox) ejects and then boots the disk; a QEMU/Proxmox
+			# virtual DVD comes back at reset, so the boot: prompt's "disk" is the way there.
+			printf '\n  Rebooting. At the boot: prompt type  disk  and Enter.\n'
+			/usr/local/sbin/w3bs-os-install --eject-media
+			sleep 2; reboot ;;
 		4*)
 			_if=$(for p in /sys/class/net/*; do i=${p##*/}; [ "$i" != lo ] && [ -e "$p/device" ] && echo "$i"; done | head -n 1)
 			printf '\n  Interface [%s]: ' "$_if"; read -r _x; [ -n "$_x" ] && _if=$_x
@@ -59,5 +85,5 @@ if [ "$(id -u)" = 0 ] && [ "$(tty 2>/dev/null)" = /dev/tty1 ] && [ -z "${W3BS_OS
 			unset W3BS_OS_OFFERED; . /etc/profile.d/w3bs-os-live.sh ;;
 		*) printf '\n  Run w3bs-os-install-gui (graphical) or w3bs-os-install (text) when you are ready.\n\n' ;;
 	esac
-	unset _w3bs_pick _w3bs_def _w3bs_a
+	unset _w3bs_pick _w3bs_def _w3bs_a _w3bs_inst
 fi

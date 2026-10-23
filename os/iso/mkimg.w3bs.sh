@@ -24,7 +24,7 @@ profile_w3bs() {
 	# The serial entry (below) adds ttyS0 as the console; a serial login runs either way.
 	kernel_cmdline="console=tty0"
 	syslinux_serial="0 115200"
-	syslinux_timeout=50
+	syslinux_timeout=100
 	grub_mod="$grub_mod serial terminal"
 	boot_addons="amd-ucode intel-ucode"
 	initrd_ucode="/boot/amd-ucode.img /boot/intel-ucode.img"
@@ -37,6 +37,18 @@ profile_w3bs() {
 	hostname="w3bs-os"
 }
 
+# aports' build_syslinux plus chain.c32, so the "disk" entry can chain-load the first hard
+# disk (LOCALBOOT fails on many server BIOSes, SeaBIOS/Proxmox among them).
+build_syslinux() {
+	local _fn
+	mkdir -p "$DESTDIR"/boot/syslinux
+	apk fetch --root "$APKROOT" --stdout syslinux | tar -C "$DESTDIR" -xz usr/share/syslinux
+	for _fn in isohdpfx.bin isolinux.bin ldlinux.c32 libutil.c32 libcom32.c32 mboot.c32 chain.c32; do
+		mv "$DESTDIR"/usr/share/syslinux/$_fn "$DESTDIR"/boot/syslinux/$_fn
+	done
+	rm -rf "$DESTDIR"/usr
+}
+
 # Volume label (also used by the EFI grub to find the ISO).
 gen_volid() {
 	printf "%s" "W3BS_OS ${RELEASE%_rc*} $ARCH" | cut -c1-32
@@ -45,7 +57,8 @@ gen_volid() {
 syslinux_gen_config() {
 	[ -z "$syslinux_serial" ] || echo "SERIAL $syslinux_serial"
 	echo "SAY W3BS OS ${RELEASE} network installer (Alpine Linux based)"
-	echo "SAY Enter or wait: install on this screen.  'disk' + Enter: boot the installed system.  'serial' + Enter: serial console ttyS0."
+	echo "SAY Enter or wait 10 s: the installer.   disk + Enter: boot the installed system on the first disk."
+	echo "SAY serial + Enter: the installer on serial console ttyS0."
 	echo "TIMEOUT ${syslinux_timeout:-10}"
 	echo "PROMPT ${syslinux_prompt:-1}"
 	echo "DEFAULT w3bs"
@@ -65,7 +78,8 @@ syslinux_gen_config() {
 
 		LABEL disk
 			MENU LABEL Boot the installed system (first hard disk)
-			LOCALBOOT 0x80
+			COM32 chain.c32
+			APPEND hd0
 
 		LABEL serial
 			MENU LABEL W3BS OS ${RELEASE} installer (serial console ttyS0)
