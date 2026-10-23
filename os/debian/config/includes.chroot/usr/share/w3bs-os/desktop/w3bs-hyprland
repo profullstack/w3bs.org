@@ -1,0 +1,138 @@
+#!/bin/sh
+# w3bs-hyprland: the W3BS OS Hyprland session, started by greetd (tuigreet --cmd).
+# Gives a user with no Hyprland config the W3BS default, then runs Hyprland under its
+# systemd user session bus.
+#
+# Virtual machines are the common first install, and Hyprland fails quietly in them (it
+# exits and tuigreet comes back, which looks like a server with no desktop). So: in a VM
+# use software cursors; if Hyprland exits within seconds, try once more with software
+# rendering (Mesa llvmpipe); if that fails too, say why on the console and wait for Enter.
+[ -r /etc/profile ] && . /etc/profile
+cfg=${XDG_CONFIG_HOME:-$HOME/.config}/hypr
+if [ ! -e "$cfg/hyprland.conf" ]; then
+	mkdir -p "$cfg" && cp /usr/share/w3bs-os/hypr/hyprland.conf "$cfg/hyprland.conf"
+fi
+export XDG_CURRENT_DESKTOP=Hyprland XDG_SESSION_DESKTOP=Hyprland XDG_SESSION_TYPE=wayland
+export MOZ_ENABLE_WAYLAND=1 QT_QPA_PLATFORM='wayland;xcb'
+
+state=${XDG_STATE_HOME:-$HOME/.local/state}/w3bs-os
+mkdir -p "$state"
+log=$state/hyprland-session.log
+
+vm=$(cat /sys/class/dmi/id/product_name /sys/class/dmi/id/sys_vendor 2>/dev/null | tr '\n' ' ')
+case "$vm" in
+	*VirtualBox*|*innotek*) vm=VirtualBox ;;
+	*VMware*) vm=VMware ;;
+	*QEMU*|*KVM*|*Bochs*|*"Standard PC"*) vm=QEMU ;;
+	*) vm= ;;
+esac
+[ -n "$vm" ] && export W3BS_VM="$vm"
+# Machine-specific Hyprland settings, sourced by hyprland.conf (rewritten at every login).
+if [ -n "$vm" ]; then
+	cat >"$cfg/w3bs-session.conf" <<EOF
+# Written by w3bs-hyprland at login: this is a $vm virtual machine.
+# VMs report a 0x0 mm screen, so auto scale picks 2x; hardware cursors are often invisible.
+monitor = , preferred, auto, 1
+cursor {
+    no_hardware_cursors = true
+}
+EOF
+else
+	echo "# Written by w3bs-hyprland at login: nothing machine-specific here." >"$cfg/w3bs-session.conf"
+fi
+
+# systemd user session (logind + dbus-user-session): its bus; otherwise a bus of our own.
+bus=dbus-run-session
+if [ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus" ]; then
+	export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus"
+	bus=""
+	# The portals and PipeWire run as systemd user units: give them the Wayland session.
+	systemctl --user import-environment XDG_CURRENT_DESKTOP XDG_SESSION_TYPE 2>/dev/null
+fi
+
+gpu() {
+	for c in /sys/class/drm/card[0-9]*; do
+		[ -e "$c/device" ] || continue
+		basename "$(readlink -f "$c/device/driver")" 2>/dev/null
+	done | sort -u | tr '\n' ' '
+}
+
+explain() {
+	# greetd gives the session no terminal on stdin/stdout: talk to the login VT itself, or
+	# this screen flashes by and the login looks like it was refused.
+	_vt=/dev/tty${XDG_VTNR:-1}
+	[ -w "$_vt" ] && exec <"$_vt" >"$_vt" 2>&1
+	clear 2>/dev/null
+	cat <<EOF
+
+  W3BS OS: the Hyprland desktop did not start.
+
+  $1
+
+  Display drivers: ${2:-none (no /dev/dri card)}
+  Session log:     $log
+EOF
+	if [ "$vm" = VirtualBox ]; then
+		cat <<'EOF'
+
+  In VirtualBox, power the VM off and open Settings > Display > Screen:
+    Graphics Controller  VMSVGA
+    Video Memory         128 MB
+    Enable 3D Acceleration  on (try off if it still fails)
+  then start the VM and log in again.
+EOF
+	elif [ -n "$vm" ]; then
+		cat <<EOF
+
+  This is a $vm virtual machine: give it a virtio-gpu or VGA display adapter with
+  at least 64 MB of video memory.
+EOF
+	fi
+	cat <<'EOF'
+
+  The console still works: Ctrl+Alt+F2 opens a text login.
+  Last lines of the Hyprland log:
+EOF
+	tail -n 12 "$log" 2>/dev/null | sed 's/^/    /'
+	printf '\n  Press Enter to return to the login screen. '
+	read -r _ || sleep 60
+}
+
+run() {
+	start=$(date +%s)
+	{ echo "=== $(date) $*"; echo "vm=${vm:-none} drivers=$(gpu)"; } >>"$log"
+	env "$@" $bus ${W3BS_SESSION_CMD:-start-hyprland} >>"$log" 2>&1
+	rc=$?
+	# Copy Hyprland's own log (it lives under the runtime dir, gone at logout).
+	for f in "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/hypr/*/hyprland.log; do
+		[ -r "$f" ] && grep -i -E 'err|fail|crit|abort|egl|gbm|render|backend' "$f" | tail -n 40 >>"$log"
+	done
+	took=$(( $(date +%s) - start ))
+	echo "=== exit $rc after ${took}s" >>"$log"
+	# start-hyprland exits 0 even when Hyprland never came up, so the exit code says nothing:
+	# only a session that lasted is a real one (the user logged out).
+	[ "$took" -ge 15 ]
+}
+
+drivers=$(gpu)
+if [ -z "$drivers" ]; then
+	echo "=== $(date) no DRM card; vm=${vm:-none}" >>"$log"
+	explain "No graphics device the desktop can use was found." ""
+	exit 1
+fi
+
+# A session that lasted 15 s or more was real: the user logged out.
+run W3BS_RENDER=hardware && exit 0
+echo "=== retrying with software rendering" >>"$log"
+# GBM too: on vmwgfx without 3D (VirtualBox VMSVGA) Mesa's GBM still loads the hardware driver.
+run W3BS_RENDER=software LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe GBM_ALWAYS_SOFTWARE=1 && exit 0
+# Hyprland has no pure software renderer; Sway with wlroots' pixman renderer draws on any
+# display a kernel driver drives (dumb buffers), so the user still gets a desktop.
+if command -v sway >/dev/null 2>&1 && [ -r /usr/share/w3bs-os/sway/config ]; then
+	echo "=== falling back to Sway (pixman software renderer)" >>"$log"
+	export XDG_CURRENT_DESKTOP=sway XDG_SESSION_DESKTOP=sway
+	W3BS_SESSION_CMD="sway -c /usr/share/w3bs-os/sway/config" \
+		run W3BS_RENDER=pixman WLR_RENDERER=pixman WLR_NO_HARDWARE_CURSORS=1 && exit 0
+fi
+explain "It exited at once, with hardware and with software rendering." "$drivers"
+exit 1

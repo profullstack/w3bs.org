@@ -34,6 +34,9 @@ machine needs the internet (DHCP and IPv6 are automatic; --ip for a static addre
   --disk DEV              install to DEV (default: the largest internal disk)
   --yes                   no typed erase confirmation (the review is still shown)
   --no-encrypt            no LUKS2 encryption of the root (default: encrypted)
+  --desktop NAME          hyprland (the W3BS desktop) or none; default: hyprland when the
+                          machine has a display adapter, none (a server) when it has none
+  --server                the same as --desktop none
   --hostname NAME         default: w3bs (a dotted name is the domain too)
   --domain NAME           the web name of this machine (its page gets HTTPS)
   --timezone ZONE         default: UTC
@@ -140,7 +143,7 @@ wired_interfaces() {
 # --- arguments --------------------------------------------------------------------------
 DEFAULTS="" DISK="" YES="" ENCRYPT=1 HOSTNAME_="" DOMAIN="" TIMEZONE="" KEYMAP="" USERS="" FULLNAME=""
 PASSWORD_FILE="" ROOT_PASSWORD_FILE="" PASSPHRASE_FILE="" NO_REBOOT="" SERIAL=""
-STATIC_IP="" STATIC_GW="" STATIC_DNS="" STATIC_IP6="" STATIC_GW6="" NET_IFACE=""
+STATIC_IP="" STATIC_GW="" STATIC_DNS="" STATIC_IP6="" STATIC_GW6="" NET_IFACE="" DESKTOP=""
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--defaults) DEFAULTS=1 ;;
@@ -165,8 +168,8 @@ while [ $# -gt 0 ]; do
 		--iface) NET_IFACE=${2:-}; shift ;;
 		--serial-console) SERIAL=1 ;;
 		--no-reboot) NO_REBOOT=1 ;;
-		--desktop) [ "${2:-none}" = none ] || { echo "$PROG: desktop installs are not in W3BS OS $OS_VERSION on Debian yet; this installs a server" >&2; }; shift ;;
-		--server) ;;
+		--desktop) DESKTOP=${2:-}; shift ;;
+		--server) DESKTOP=none ;;
 		--list-disks) for d in $(internal_disks); do printf '/dev/%s\t%s\t%s\n' "$d" "$(disk_bytes "$d")" "$(disk_model "$d")"; done; exit 0 ;;
 		--eject-media) eject_media; exit 0 ;;
 		-h|--help) usage; exit 0 ;;
@@ -186,7 +189,7 @@ cat <<EOF
 
   W3BS OS $OS_VERSION installer (Debian 13 "trixie")
   ------------------------------------------------
-  Installs a W3BS OS server. Packages download during the install. Nothing is written to
+  Installs W3BS OS (a desktop or a server). Packages download during the install. Nothing is written to
   any disk until you confirm the review.
 
 EOF
@@ -230,6 +233,19 @@ net_ok || fail "no internet connection: $MIRROR does not answer ($(ip -br addr s
 log "internet reachable"
 
 # --- questions --------------------------------------------------------------------------
+# Install type first: a desktop when the machine has a display adapter, else a server.
+_gpu=""; grep -qs '^0x03' /sys/bus/pci/devices/*/class && _gpu=1
+if [ -z "$DESKTOP" ]; then
+	_def=$( [ -n "$_gpu" ] && echo desktop || echo server )
+	if [ -z "$DEFAULTS" ]; then
+		say "Install type:"
+		say "  1  desktop   Hyprland: greetd login, Waybar, Firefox, TronBrowser$( [ "$_def" = desktop ] && echo '  [default]')"
+		say "  2  server    command line only: zsh, sudo, ssh, nginx pages$( [ "$_def" = server ] && echo '  [default]')"
+	fi
+	ask _t "Install type (1/2 or desktop/server)" "$_def"
+	case "$_t" in 1|desktop) DESKTOP=hyprland ;; 2|server) DESKTOP=none ;; *) fail "unknown install type $_t" ;; esac
+fi
+case "$DESKTOP" in hyprland|none) ;; *) fail "unknown desktop $DESKTOP (hyprland or none)" ;; esac
 [ -n "$KEYMAP" ] || ask KEYMAP "Keyboard layout" "us"
 [ -n "$TIMEZONE" ] || ask TIMEZONE "Timezone" "UTC"
 [ -e "/usr/share/zoneinfo/$TIMEZONE" ] || fail "unknown timezone $TIMEZONE"
@@ -255,7 +271,8 @@ if [ -z "$DISK" ]; then
 fi
 [ -n "$DISK" ] && [ -b "$DISK" ] || fail "no disk to install to (${DISK:-none found})"
 DISK_BYTES=$(disk_bytes "$DISK")
-[ "$DISK_BYTES" -ge 8000000000 ] || fail "$DISK is $(human "$DISK_BYTES"); W3BS OS needs at least 8 GB"
+_need=8000000000; [ "$DESKTOP" = hyprland ] && _need=16000000000
+[ "$DISK_BYTES" -ge "$_need" ] || fail "$DISK is $(human "$DISK_BYTES"); this install needs at least $(human "$_need")"
 if [ -z "$DEFAULTS" ] && [ -n "$ENCRYPT" ]; then
 	ask _enc "Encrypt the disk with LUKS2 (recommended; the passphrase is asked at every boot)? yes/no" "yes"
 	case "$_enc" in n|no|N|NO|No) ENCRYPT="" ;; esac
@@ -294,6 +311,7 @@ $(lsblk -no NAME,SIZE,FSTYPE "$DISK" 2>/dev/null | sed 's/^/                    
   Network         $( [ -n "$STATIC_IP$STATIC_IP6" ] && echo "static ${STATIC_IP:-} ${STATIC_IP6:-} on $NET_IFACE" || echo "automatic: systemd-networkd on every card (DHCPv4, IPv6)" )
   Root            $( [ -n "$ROOT_PASS" ] && echo "password set (su, console login)" || echo "locked: no password (users use sudo)" )
   Users           $USERS (zsh, sudo)
+  Desktop         $( [ "$DESKTOP" = hyprland ] && echo "Hyprland 0.55 (Debian backports): greetd login, Waybar, Firefox, TronBrowser" || echo "none (server)" )
   SSH             on (password logins for users; root by key only)
   Dev tools       w3bs CLI, curl, wget, git, mise (node, bun, pnpm), readm3
   Box setup       cli-tools root-ubuntu.sh at first boot: nginx pages, firewall, oh-my-zsh, tmux
@@ -380,6 +398,16 @@ XKBVARIANT=""
 XKBOPTIONS=""
 BACKSPACE="guess"
 EOF
+# The console in UTF-8 (tuigreet's box lines, any non-ASCII text); without it a minimal
+# install shows mojibake on the text consoles.
+cat >"$TARGET/etc/default/console-setup" <<'EOF'
+ACTIVE_CONSOLES="/dev/tty[1-6]"
+CHARMAP="UTF-8"
+CODESET="guess"
+FONTFACE="Fixed"
+FONTSIZE="8x16"
+VIDEOMODE=
+EOF
 uuid() { blkid -s UUID -o value "$1"; }
 {
 	echo "# W3BS OS"
@@ -436,11 +464,61 @@ for u in $USERS; do
 done
 ROOT_PASS="" USER_PASS=""
 
+# --- desktop ----------------------------------------------------------------------------
+if [ "$DESKTOP" = hyprland ]; then
+	step "Installing the Hyprland desktop (Debian trixie-backports; about 700 MB)"
+	cat >>"$TARGET/etc/apt/sources.list.d/debian.sources" <<EOF
+
+Types: deb
+URIs: $MIRROR
+Suites: $SUITE-backports
+Components: main contrib non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+EOF
+	in_target apt-get update -qq >>"$LOG" 2>&1 || fail "apt-get update failed"
+	# One transaction, backports preferred: Hyprland from backports needs backports' PipeWire and
+	# libxkbcommon, and main's versions of those would pin the old ones.
+	in_target apt-get install -y --no-install-recommends -t "$SUITE-backports" \
+		hyprland hyprpaper hyprlock hypridle hyprpolkitagent hyprland-guiutils xdg-desktop-portal-hyprland \
+		greetd tuigreet waybar foot fuzzel mako-notifier swaybg swayidle swaylock grim slurp wl-clipboard xwayland \
+		fonts-dejavu fonts-font-awesome thunar libnotify-bin pipewire pipewire-pulse wireplumber firefox-esr \
+		qt6-wayland polkitd xdg-desktop-portal-gtk sway libgl1-mesa-dri dbus-user-session >>"$LOG" 2>&1 \
+		|| fail "cannot install the desktop packages (see $LOG)"
+	# The W3BS session and its defaults (same layout as W3BS DE): ~/.config/hypr is seeded at
+	# the first login; the Sway config is the software fallback.
+	src=/usr/share/w3bs-os/desktop
+	install -d "$TARGET/usr/share/w3bs-os/hypr" "$TARGET/usr/share/w3bs-os/sway" "$TARGET/etc/xdg/xdg-desktop-portal"
+	sed "s|^\(\s*kb_layout = \).*|\1$KEYMAP|" "$src/hyprland.conf" >"$TARGET/usr/share/w3bs-os/hypr/hyprland.conf"
+	install -m 0644 "$src/waybar.css" "$TARGET/usr/share/w3bs-os/hypr/waybar.css"
+	install -m 0755 "$src/session-start.sh" "$src/desktop-layer.sh" "$TARGET/usr/share/w3bs-os/hypr/"
+	sed "s|^\(\s*xkb_layout \).*|\1$KEYMAP|" "$src/sway.config" >"$TARGET/usr/share/w3bs-os/sway/config"
+	install -m 0644 "$src/wallpaper.png" "$TARGET/usr/share/w3bs-os/wallpaper.png"
+	install -m 0644 "$src/hyprland-portals.conf" "$TARGET/etc/xdg/xdg-desktop-portal/hyprland-portals.conf"
+	install -m 0755 "$src/w3bs-hyprland" "$TARGET/usr/local/bin/w3bs-hyprland"
+	_names=$(echo $USERS | sed 's/ /, /g')
+	cat >"$TARGET/etc/greetd/config.toml" <<EOF
+# W3BS OS: the Hyprland login on tty1. tuigreet asks for the user name, then the password.
+[terminal]
+vt = 1
+
+[default_session]
+command = "tuigreet --time --remember --asterisks --greeting 'W3BS OS · log in as $_names (user name, then password)' --cmd /usr/local/bin/w3bs-hyprland"
+user = "_greetd"
+EOF
+	in_target systemctl disable getty@tty1.service >>"$LOG" 2>&1
+	in_target systemctl enable greetd.service >>"$LOG" 2>&1 || fail "cannot enable greetd"
+	in_target systemctl set-default graphical.target >>"$LOG" 2>&1
+	for u in $USERS; do in_target usermod -aG video,input,render,audio "$u" >>"$LOG" 2>&1; done
+fi
+
 # --- bootloader -------------------------------------------------------------------------
 step "Installing the kernel and GRUB ($BOOTMODE)"
 GRUB_EXTRA=""
 [ -n "$SERIAL" ] && GRUB_EXTRA="console=tty0 console=ttyS0,115200"
-sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"quiet $GRUB_EXTRA\"|; s|^GRUB_DISTRIBUTOR=.*|GRUB_DISTRIBUTOR=\"W3BS OS\"|; s|^GRUB_TIMEOUT=.*|GRUB_TIMEOUT=3|" "$TARGET/etc/default/grub"
+# loglevel=3 and no systemd ssh generator probing (systemd 257 logs AF_VSOCK errors in VMs):
+# kernel messages must not print over the login screen on tty1.
+mkdir -p "$TARGET/etc/sysctl.d" && echo 'kernel.printk = 3 4 1 3' >"$TARGET/etc/sysctl.d/10-w3bs-console.conf"
+sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"quiet loglevel=3 systemd.ssh_auto=no $GRUB_EXTRA\"|; s|^GRUB_DISTRIBUTOR=.*|GRUB_DISTRIBUTOR=\"W3BS OS\"|; s|^GRUB_TIMEOUT=.*|GRUB_TIMEOUT=3|" "$TARGET/etc/default/grub"
 in_target update-initramfs -u -k all >>"$LOG" 2>&1 || fail "update-initramfs failed"
 if [ "$BOOTMODE" = UEFI ]; then
 	in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=w3bs --recheck >>"$LOG" 2>&1 || fail "grub-install (UEFI) failed"
@@ -519,6 +597,7 @@ for u in $USERS; do
 		mise use -g node@lts bun@latest npm:pnpm@latest
 		pnpm config set global-bin-dir "$PNPM_HOME"
 		pnpm i -g @profullstack/readm3
+		if [ -x /usr/bin/Hyprland ]; then curl -fsSL https://tronbrowser.dev/install.sh | TB_NO_KILL=1 sh; fi
 		node --version; bun --version; pnpm --version' >>"$LOG" 2>&1; then
 		log "dev tools installed for $u"
 	else
@@ -535,6 +614,10 @@ done
 ls "$TARGET"/boot/vmlinuz-* >/dev/null 2>&1 || fail "no kernel in /boot"
 ls "$TARGET"/boot/initrd.img-* >/dev/null 2>&1 || fail "no initramfs in /boot"
 [ -e "$TARGET/boot/grub/grub.cfg" ] || fail "no grub.cfg"
+if [ "$DESKTOP" = hyprland ]; then
+	[ -x "$TARGET/usr/bin/Hyprland" ] || fail "Hyprland is not installed"
+	in_target systemctl is-enabled greetd.service >/dev/null 2>&1 || fail "greetd is not enabled"
+fi
 [ -z "$ENCRYPT" ] || grep -q w3bs-root "$TARGET/etc/crypttab" || fail "crypttab is missing"
 cp "$LOG" "$TARGET/var/log/w3bs-os-install.log" && chmod 600 "$TARGET/var/log/w3bs-os-install.log"
 sync
