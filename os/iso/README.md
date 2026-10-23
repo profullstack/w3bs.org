@@ -84,6 +84,15 @@ the matching flags, so both installers make the same install. "Use the text inst
 every page, and any failure to start falls back to the text installer. Log:
 `/var/log/w3bs-os-install-gui.log`.
 
+## Install over SSH (servers)
+
+The live system starts SSH by default: tty1 shows `ssh root@<address>` for every address the
+machine has and a one-time root password made at boot (also in /run/w3bs-live-ssh-password).
+Log in from another computer, where copy and paste work, and run `w3bs-os-install`. A preset's
+root keys are accepted too. With no DHCP, choose 4 on the first screen to set a static IP
+first. The machine's own consoles still log root in without a password. None of this reaches
+the installed system: its root stays locked and its sshd keeps the installer's settings.
+
 ## After the install
 
 Both installers eject the installer DVD before they reboot, so the machine (or VM) starts

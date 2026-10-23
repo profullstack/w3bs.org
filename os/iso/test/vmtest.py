@@ -35,7 +35,7 @@ class VM:
                "-display", "none", "-vga", vga,
                "-serial", f"unix:{self.serial_path},server=on,wait=off",
                "-monitor", f"unix:{self.mon_path},server=on,wait=off",
-               "-netdev", "user,id=n0", "-device", "virtio-net-pci,netdev=n0",
+               "-netdev", "user,id=n0" + os.environ.get("VMTEST_NETDEV_EXTRA", ""), "-device", "virtio-net-pci,netdev=n0",
                "-device", "virtio-rng-pci", "-no-reboot"]
         cmd += ["-accel", "kvm", "-cpu", "host"] if kvm else ["-accel", "tcg,thread=multi", "-cpu", "max"]
         log(f"[{name}] accel={'kvm' if kvm else 'tcg'} firmware={firmware}")
@@ -299,6 +299,8 @@ echo ALPINE=$(cat /mnt/t/etc/alpine-release)
 cat /mnt/t/etc/w3bs-os/release /mnt/t/etc/w3bs-os/install-profile
 echo USERLINE=$(grep '^w3bs:' /mnt/t/etc/passwd)
 echo ROOTSHADOW=$(cut -d: -f1,2 /mnt/t/etc/shadow | grep '^root:' | cut -c1-6)
+grep -qs 'PermitRootLogin=yes' /mnt/t/etc/conf.d/sshd && echo LIVE_SSH_LEAK || echo NO_LIVE_SSH
+[ -e /mnt/t/etc/local.d/w3bs-live-ssh.start ] && echo LIVE_SSH_LEAK || echo NO_LIVE_SSH_SCRIPT
 echo GROUPS=$(chroot /mnt/t id -nG w3bs)
 echo VERSION=$(chroot /mnt/t /usr/local/bin/w3bs --version)
 echo DESKTOPV=$(chroot /mnt/t /usr/local/bin/w3bs-desktop --version)
@@ -319,9 +321,13 @@ for m in dev proc sys boot/efi boot ""; do umount /mnt/t/$m 2>/dev/null; done; t
         print(out)
         if rc != 0:
             raise SystemExit("inspection failed")
-        for want in ("/bin/zsh", "w3bs ", "NO_LIVE_LEFTOVER", "NO_AUTOLOGIN", "ROOTSHADOW=root:!", "wheel"):
+        for want in ("/bin/zsh", "w3bs ", "NO_LIVE_LEFTOVER", "NO_AUTOLOGIN", "NO_LIVE_SSH", "NO_LIVE_SSH_SCRIPT", "wheel"):
             if want not in out:
                 raise SystemExit(f"inspection: missing {want!r}")
+        # Root is locked ("!" or "*"): never a password hash, so the live one-time SSH password
+        # (or any other) cannot have leaked into the installed system.
+        if not re.search(r"ROOTSHADOW=root:[!*](\s|$)", out):
+            raise SystemExit("inspection: root is not locked on the installed system")
         log("[inspect] PASS")
     finally:
         vm.stop()

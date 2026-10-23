@@ -1020,6 +1020,9 @@ in_target /usr/local/bin/w3bs-desktop --version >>"$LOG" 2>&1 || fail "w3bs-desk
 
 # --- remove live-only configuration that setup-disk copied over -------------------------
 step "Finishing"
+# The live system's SSH (root password login, one-time password) must not reach the install.
+rm -f "$TARGET/etc/local.d/w3bs-live-ssh.start" "$TARGET/usr/local/sbin/w3bs-live-login"
+grep -q 'PermitRootLogin=yes' "$TARGET/etc/conf.d/sshd" 2>/dev/null && sed -i '/PermitRootLogin=yes/d' "$TARGET/etc/conf.d/sshd"
 rm -f "$TARGET/usr/local/sbin/cryptsetup" "$TARGET/etc/profile.d/w3bs-os-live.sh" "$TARGET/usr/local/sbin/w3bs-os-install" \
 	"$TARGET/usr/local/sbin/w3bs-os-serial-getty" "$TARGET/etc/w3bs-os/live" "$TARGET/etc/motd.w3bs-live"
 install -m 0644 /usr/share/w3bs-os/inittab.installed "$TARGET/etc/inittab" || fail "cannot write /etc/inittab"

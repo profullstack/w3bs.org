@@ -1,0 +1,8 @@
+#!/bin/sh
+# Live system console login: root logs in without a password on the machine's own consoles
+# (as tty1 already does); every other name goes through login. SSH needs the one-time
+# password from /etc/local.d/w3bs-live-ssh.start instead.
+printf '%s login: ' "$(hostname)"
+read -r name || exit 0
+[ "$name" = root ] && exec /bin/login -f root
+exec /bin/login "$name"
