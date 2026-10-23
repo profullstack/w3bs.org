@@ -443,6 +443,20 @@ fi
 IFACES=$(wired_interfaces)
 [ -n "$IFACES" ] || fail "no wired network interface found; v0.1 installs need Ethernet (Wi-Fi setup is not in this installer yet)"
 
+# Packages download during the install: check the internet now, before anything is erased.
+# A card without an address gets one more DHCP try; then say so plainly instead of failing
+# later with apk "no such package" errors.
+net_ok() { wget -q -T 10 --spider http://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/APKINDEX.tar.gz 2>/dev/null; }
+if ! net_ok; then
+	for i in $IFACES; do
+		ip link set "$i" up 2>/dev/null
+		udhcpc -i "$i" -n -q -t 6 -T 3 >>"$LOG" 2>&1
+	done
+	sleep 2
+	net_ok || fail "no internet connection: the installer downloads packages from dl-cdn.alpinelinux.org, and it cannot reach it ($(for i in $IFACES; do printf '%s %s; ' "$i" "$(ip -4 addr show "$i" 2>/dev/null | awk '/inet /{print $2}' | head -n1)"; done)). Check the network cable, or in VirtualBox the VM's network adapter (NAT works), then run the installer again."
+fi
+log "internet reachable"
+
 if [ -d /sys/firmware/efi ]; then BOOTMODE=UEFI; else BOOTMODE=BIOS; fi
 
 # --- review -----------------------------------------------------------------------------
