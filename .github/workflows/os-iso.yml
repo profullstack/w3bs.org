@@ -6,20 +6,9 @@
 # point os-latest/latest.json at it for w3bs.org/os.
 name: os-iso
 
+# Retired 2026-10-23: W3BS OS moved to Debian 13 (os/debian, os-debian.yml). Kept for manual
+# Alpine builds only; it no longer runs on push, so it cannot move os-latest back to Alpine.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "os/iso/**"
-      - "os/docker/zshrc"
-      - "os/docker/init.sh"
-      - "package-manager/crates/**"
-      - "package-manager/Cargo.lock"
-      - "desktop/crates/**"
-      - "desktop/Cargo.lock"
-      - "registry/FINGERPRINT"
-      - ".github/workflows/os-iso.yml"
-      - ".github/workflows/os-install-test.yml"
   workflow_dispatch:
     inputs:
       publish:
