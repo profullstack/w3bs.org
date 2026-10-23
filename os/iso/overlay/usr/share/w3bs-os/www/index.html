@@ -56,12 +56,12 @@ w3bs list</pre></div>
     <div class="card"><h3>Keep it up to date</h3>
       <p>Everything installed with w3bs, then the OS.</p>
       <pre>w3bs update --all
-doas w3bs os update</pre></div>
+sudo w3bs os update</pre></div>
     <div class="card"><h3>Administer</h3>
-      <p>Administrators use doas (sudo for Alpine).</p>
-      <pre>doas &lt;command&gt;
-doas -s            # a root shell
-doas rc-service caddy reload</pre></div>
+      <p>Administrators use sudo (or doas).</p>
+      <pre>sudo &lt;command&gt;
+sudo -i            # a root shell
+sudo rc-service caddy reload</pre></div>
     <div class="card"><h3>Developer tools</h3>
       <p>mise manages the runtimes; pnpm and bun are ready.</p>
       <pre>mise use -g node@lts python@3
@@ -73,11 +73,11 @@ bun --version</pre></div>
 ~/apps/&lt;name&gt;/public/       # &lt;name&gt;.you.this-domain</pre></div>
     <div class="card"><h3>A site of your own</h3>
       <p>One file per site; Caddy gets the HTTPS certificate.</p>
-      <pre>doas vi /etc/caddy/conf.d/example.com.caddy
+      <pre>sudo vi /etc/caddy/conf.d/example.com.caddy
 #   example.com {
 #     reverse_proxy 127.0.0.1:3000
 #   }
-doas rc-service caddy reload</pre></div>
+sudo rc-service caddy reload</pre></div>
   </div>
 
   <h2>Learn more</h2>

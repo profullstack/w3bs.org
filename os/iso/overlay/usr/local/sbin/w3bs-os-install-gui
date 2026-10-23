@@ -54,7 +54,7 @@ for p in /sys/class/net/*; do
 	[ "$i" = lo ] || [ ! -e "$p/device" ] || [ -d "$p/wireless" ] && continue
 	ip -4 addr show "$i" 2>/dev/null | grep -q 'inet ' && continue
 	ip link set "$i" up 2>/dev/null
-	udhcpc -i "$i" -n -q -t 6 -T 3 >>"$LOG" 2>&1
+	if command -v dhcpcd >/dev/null 2>&1; then dhcpcd -n "$i" >>"$LOG" 2>&1; else udhcpc -i "$i" -n -q -t 6 -T 3 >>"$LOG" 2>&1; fi
 done
 has_display || { sleep 2; has_display; } || { say "No display device was found."; exit 2; }
 

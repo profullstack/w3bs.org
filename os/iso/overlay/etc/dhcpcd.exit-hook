@@ -1,0 +1,5 @@
+# W3BS OS: when neither DHCP nor the IPv6 router announced a nameserver, use public ones
+# (IPv6 and IPv4), so names resolve on networks that only route.
+case "$reason" in BOUND|BOUND6|RENEW|RENEW6|REBIND|REBIND6|REBOOT|ROUTERADVERT|STATIC|INFORM6)
+	grep -qs '^nameserver' /etc/resolv.conf || printf 'nameserver %s\n' 2606:4700:4700::1111 1.1.1.1 2620:fe::fe 9.9.9.9 >>/etc/resolv.conf ;;
+esac

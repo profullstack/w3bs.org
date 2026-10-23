@@ -78,6 +78,7 @@ if [ "$(id -u)" = 0 ] && [ "$(tty 2>/dev/null)" = /dev/tty1 ] && [ -z "${W3BS_OS
 			printf '  IPv4 address with prefix (e.g. 203.0.113.5/32): '; read -r _ip
 			printf '  Gateway: '; read -r _gw
 			printf '  Nameservers [1.1.1.1 9.9.9.9]: '; read -r _dns; [ -n "$_dns" ] || _dns="1.1.1.1 9.9.9.9"
+			command -v dhcpcd >/dev/null 2>&1 && dhcpcd -x "$_if" >/dev/null 2>&1
 			ip link set "$_if" up; ip addr add "$_ip" dev "$_if" && ip route replace default via "$_gw" dev "$_if" onlink
 			: >/etc/resolv.conf; for _d in $_dns; do echo "nameserver $_d" >>/etc/resolv.conf; done
 			printf '\n  Pass the same to the installer: w3bs-os-install --ip %s --gateway %s --dns "%s"\n\n' "$_ip" "$_gw" "$_dns"
