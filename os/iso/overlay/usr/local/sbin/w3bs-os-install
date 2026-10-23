@@ -447,6 +447,15 @@ fi
 # Passwords: from files (unattended) or typed; never echoed, logged or saved in the profile.
 # A user with SSH keys and no password file under --defaults gets no password: SSH key login
 # only (the console then needs root's password or another user's).
+# Root first, then the users, as Debian's installer asks. Without a root password root stays
+# locked and the users are the administrators (sudo, doas).
+ROOT_PASS=
+if [ -n "$ROOT_PASSWORD_FILE" ]; then
+	read_secret_file ROOT_PASS "$ROOT_PASSWORD_FILE"
+elif [ -z "$DEFAULTS" ] && [ -t 0 ]; then
+	say "A root password lets you use su and log in as root on the console."
+	read_secret ROOT_PASS "Root password (Enter: none, root stays locked; your user uses sudo)" 6 optional
+fi
 mkdir -p "$WORK/pass"
 for u in $USERS; do
 	if [ -n "$PASSWORD_FILE" ]; then read_secret_file _p "$PASSWORD_FILE"
@@ -454,14 +463,6 @@ for u in $USERS; do
 	else read_secret _p "Password for $u" 1; fi
 	printf '%s' "$_p" >"$WORK/pass/$u"; _p=
 done
-ROOT_PASS=
-if [ -n "$ROOT_PASSWORD_FILE" ]; then
-	read_secret_file ROOT_PASS "$ROOT_PASSWORD_FILE"
-elif [ -z "$DEFAULTS" ] && [ -t 0 ]; then
-	# Without one, root stays locked and the users above are the administrators (doas).
-	say "A root password lets you use su and log in as root on the console."
-	read_secret ROOT_PASS "Root password (Enter: none, root stays locked; use doas)" 6 optional
-fi
 if [ -n "$ENCRYPT" ]; then
 	if [ -n "$PASSPHRASE_FILE" ]; then read_secret_file LUKS_PASS "$PASSPHRASE_FILE"
 	else
