@@ -20,13 +20,14 @@ cp -a "$W3BS_OVERLAY"/. "$tmp"/
 
 mkdir -p "$tmp"/etc/network "$tmp"/etc/apk
 echo "$HOSTNAME" > "$tmp"/etc/hostname
+# Like other distributions' live systems: dhcpcd brings up every wired card by itself,
+# DHCPv4 and IPv6 (router advertisements, DHCPv6, IPv6 DNS), and keeps trying in the
+# background. ifupdown only does the loopback.
 cat > "$tmp"/etc/network/interfaces <<EOF
 auto lo
 iface lo inet loopback
-
-auto eth0
-iface eth0 inet dhcp
 EOF
+printf 'af_packet\nipv6\n' > "$tmp"/etc/modules
 
 # Installed into the live system from the ISO's own repository at boot; setup-disk also
 # carries this list into the installed system.
@@ -45,6 +46,8 @@ lvm2
 e2fsprogs
 dosfstools
 sfdisk
+dhcpcd
+dhcpcd-openrc
 EOF
 
 rc_add devfs sysinit
@@ -60,6 +63,7 @@ rc_add hostname boot
 rc_add bootmisc boot
 rc_add syslog boot
 rc_add networking boot
+rc_add dhcpcd boot
 rc_add local default
 
 rc_add mount-ro shutdown

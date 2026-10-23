@@ -486,14 +486,22 @@ net_probe() {
 	ping -4 -c 1 -W 2 1.1.1.1 >/dev/null 2>&1 || ping -4 -c 1 -W 2 9.9.9.9 >/dev/null 2>&1 && NET4=yes
 	log "probe: IPv6 ${NET6:-no}, IPv4 ${NET4:-no}"
 }
+# No nameserver from DHCP or the IPv6 router: public ones, so names resolve anyway.
+net_dns_fallback() {
+	grep -qs '^nameserver' /etc/resolv.conf && return 0
+	printf 'nameserver %s\n' 1.1.1.1 2606:4700:4700::1111 9.9.9.9 >>/etc/resolv.conf
+	log "no nameserver from the network: using public resolvers"
+}
 # The download decides (ping is blocked on some networks); the probe only explains a failure.
 net_ok() {
 	net_probe
 	wget -q -T 10 --spider http://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/APKINDEX.tar.gz 2>/dev/null
 }
+net_dns_fallback
 # Router advertisements (IPv6 SLAAC) can take a few seconds after the link comes up.
 for _i in 1 2 3 4 5; do ip -6 addr show scope global 2>/dev/null | grep -q inet6 && break; sleep 1; done
 apply_static() {
+	command -v dhcpcd >/dev/null 2>&1 && dhcpcd -x "$NET_IFACE" >/dev/null 2>&1
 	ip link set "$NET_IFACE" up 2>/dev/null
 	ip -4 addr flush dev "$NET_IFACE" 2>/dev/null
 	ip addr add "$STATIC_IP" dev "$NET_IFACE" || fail "cannot set $STATIC_IP on $NET_IFACE"
@@ -522,11 +530,19 @@ if [ -n "$STATIC_IP" ]; then
 fi
 [ -n "$STATIC_IP6" ] && apply_static6
 if [ -z "$STATIC_IP$STATIC_IP6" ] && ! net_ok; then
-	for i in $IFACES; do
-		ip link set "$i" up 2>/dev/null
-		udhcpc -i "$i" -n -q -t 6 -T 3 >>"$LOG" 2>&1
+	# dhcpcd (DHCPv4, IPv6 RA/DHCPv6, every card) normally runs since boot; (re)start it
+	# and give it up to 30 s to get any address, as other distributions' installers do.
+	if command -v dhcpcd >/dev/null 2>&1; then
+		rc-service dhcpcd status >/dev/null 2>&1 || dhcpcd -b >>"$LOG" 2>&1
+		for i in $IFACES; do dhcpcd -n "$i" >>"$LOG" 2>&1; done
+	else
+		for i in $IFACES; do ip link set "$i" up 2>/dev/null; udhcpc -i "$i" -n -q -t 6 -T 3 >>"$LOG" 2>&1; done
+	fi
+	for _i in $(seq 1 15); do
+		ip addr show scope global 2>/dev/null | grep -q -E 'inet6? ' && break
+		sleep 2
 	done
-	sleep 2
+	net_dns_fallback
 	if ! net_ok && [ -z "$DEFAULTS" ] && [ -t 0 ]; then
 		say ""
 		say "No internet over DHCP ($(net_summary)). Servers often get a static address from"
@@ -563,8 +579,8 @@ $(lsblk -no NAME,SIZE,FSTYPE,LABEL "$DISK" 2>/dev/null | sed 's/^/              
   Keyboard        $KEYMAP
   Timezone        $TIMEZONE
   Internet        IPv6 ${NET6:-no}, IPv4 ${NET4:-no}
-  Network         $( [ -n "$STATIC_IP" ] && echo "static $STATIC_IP via $STATIC_GW on $NET_IFACE, DNS $STATIC_DNS" || echo "DHCP on $(echo $IFACES)" ); IPv6 $( [ -n "$STATIC_IP6" ] && echo "static $STATIC_IP6 via $STATIC_GW6" || echo "autoconfigured (SLAAC)" )
-  Users           $USERS (zsh, admin via doas/wheel)$(for u in $USERS; do [ -s "$WORK/keys/$u" ] && printf ', %s: %s SSH key(s)' "$u" "$(grep -Ec '(ssh-|ecdsa-|sk-)' "$WORK/keys/$u")"; [ -s "$WORK/pass/$u" ] || printf ', %s: no password' "$u"; done)
+  Network         $( if [ -n "$STATIC_IP$STATIC_IP6" ]; then echo "static ${STATIC_IP:+$STATIC_IP via $STATIC_GW }${STATIC_IP6:+$STATIC_IP6 via $STATIC_GW6 }on $NET_IFACE"; else echo "automatic: dhcpcd on every card (DHCPv4, IPv6 SLAAC/DHCPv6)"; fi )
+  Users           $USERS (zsh, admin via sudo or doas: wheel)$(for u in $USERS; do [ -s "$WORK/keys/$u" ] && printf ', %s: %s SSH key(s)' "$u" "$(grep -Ec '(ssh-|ecdsa-|sk-)' "$WORK/keys/$u")"; [ -s "$WORK/pass/$u" ] || printf ', %s: no password' "$u"; done)
   Root            $( [ -n "$ROOT_PASS" ] && echo "password set (su, console login)" || echo "locked: no password (administrators use doas)")$( [ -s "$WORK/keys/root" ] && echo ", $(grep -Ec '(ssh-|ecdsa-|sk-)' "$WORK/keys/root") SSH key(s)")
   SSH             $( [ -n "$SSH" ] && echo "sshd on: keys only, no password logins" || echo "off")
   Desktop         $DESKTOP$( case "$DESKTOP" in plasma) echo " (KDE Plasma, SDDM)" ;; hyprland) echo " (Hyprland, greetd + tuigreet)" ;; none) echo " (server install: command line only)" ;; esac )
@@ -593,7 +609,9 @@ step "Installing the base system (setup-alpine) to $DISK"
 INTERFACES="auto lo
 iface lo inet loopback
 "
-for i in $IFACES; do
+# Without a static address the installed system runs dhcpcd (every card, DHCPv4 + IPv6),
+# like the live system; ifupdown then only does the loopback.
+[ -n "$STATIC_IP$STATIC_IP6" ] && for i in $IFACES; do
 	INTERFACES="${INTERFACES}
 auto $i"
 	if [ -n "$STATIC_IP" ] && [ "$i" = "$NET_IFACE" ]; then
@@ -932,6 +950,18 @@ fi
 # curl and wget; mise manages bun and pnpm per user (pnpm through mise's npm backend, so no
 # GitHub API rate limit); Node is Alpine's own musl build (mise's Node downloads are glibc);
 # then pnpm i -g @profullstack/readm3. Per-user tool failures are warnings, not fatal.
+step "Network (dhcpcd) and sudo"
+# sudo as well as doas: wheel (the administrators) may use both.
+in_target apk add --no-progress sudo >>"$LOG" 2>&1 || fail "cannot install sudo"
+mkdir -p "$TARGET/etc/sudoers.d"
+printf '%%wheel ALL=(ALL:ALL) ALL\n' >"$TARGET/etc/sudoers.d/wheel" && chmod 0440 "$TARGET/etc/sudoers.d/wheel"
+in_target visudo -c >>"$LOG" 2>&1 || fail "the sudoers configuration does not load"
+if [ -z "$STATIC_IP$STATIC_IP6" ]; then
+	in_target apk add --no-progress dhcpcd dhcpcd-openrc >>"$LOG" 2>&1 || fail "cannot install dhcpcd"
+	in_target rc-update add dhcpcd default >>"$LOG" 2>&1 || fail "cannot enable dhcpcd"
+	install -m 0644 /etc/dhcpcd.exit-hook "$TARGET/etc/dhcpcd.exit-hook" || fail "cannot install the dhcpcd hook"
+fi
+
 step "Installing developer tools (curl, wget, mise, Node, bun, pnpm, readm3)"
 in_target apk add --no-progress curl wget mise nodejs npm >>"$LOG" 2>&1 || fail "cannot install curl, wget, mise and Node"
 mkdir -p "$TARGET/etc/profile.d"
@@ -1142,7 +1172,8 @@ if [ "$BOOTMODE" = UEFI ]; then
 	fi
 fi
 grep -qx ID=w3bs-os "$TARGET/etc/w3bs-os-release" || fail "/etc/w3bs-os-release is missing"
-for c in curl wget mise node npm; do in_target sh -c "command -v $c" >/dev/null 2>&1 || fail "$c is not installed"; done
+for c in curl wget mise node npm sudo; do in_target sh -c "command -v $c" >/dev/null 2>&1 || fail "$c is not installed"; done
+[ -n "$STATIC_IP$STATIC_IP6" ] || [ -L "$TARGET/etc/runlevels/default/dhcpcd" ] || fail "dhcpcd is not enabled"
 [ -L "$TARGET/etc/runlevels/default/caddy" ] || fail "caddy is not enabled"
 [ -z "$SSH" ] || [ -L "$TARGET/etc/runlevels/default/sshd" ] || fail "sshd is not enabled"
 ls "$TARGET"/boot/vmlinuz-* >/dev/null 2>&1 || fail "no kernel in /boot"
