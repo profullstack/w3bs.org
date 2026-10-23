@@ -29,3 +29,10 @@ less
 vim-tiny
 eject
 gdisk
+# The graphical installer (w3bs-os-install-gui): GTK 4 under cage, software rendering
+cage
+python3-gi
+gir1.2-gtk-4.0
+fonts-dejavu-core
+xkb-data
+libgl1-mesa-dri

@@ -40,7 +40,7 @@ machine needs the internet (DHCP and IPv6 are automatic; --ip for a static addre
   --hostname NAME         default: w3bs (a dotted name is the domain too)
   --domain NAME           the web name of this machine (its page gets HTTPS)
   --timezone ZONE         default: UTC
-  --keymap LAYOUT         keyboard layout, default: us
+  --keymap "LAYOUT [VARIANT]"  keyboard layout (XKB), default: us
   --user NAME             default: w3bs (repeat for more; all are administrators via sudo)
   --fullname "NAME"       the first user's full name
   --password-file FILE    the users' password, first line of FILE
@@ -239,7 +239,7 @@ if [ -z "$DESKTOP" ]; then
 	_def=$( [ -n "$_gpu" ] && echo desktop || echo server )
 	if [ -z "$DEFAULTS" ]; then
 		say "Install type:"
-		say "  1  desktop   Hyprland: greetd login, Waybar, Firefox, TronBrowser$( [ "$_def" = desktop ] && echo '  [default]')"
+		say "  1  desktop   W3BS DE (Hyprland): greetd login, agent layer, Firefox, TronBrowser$( [ "$_def" = desktop ] && echo '  [default]')"
 		say "  2  server    command line only: zsh, sudo, ssh, nginx pages$( [ "$_def" = server ] && echo '  [default]')"
 	fi
 	ask _t "Install type (1/2 or desktop/server)" "$_def"
@@ -311,7 +311,8 @@ $(lsblk -no NAME,SIZE,FSTYPE "$DISK" 2>/dev/null | sed 's/^/                    
   Network         $( [ -n "$STATIC_IP$STATIC_IP6" ] && echo "static ${STATIC_IP:-} ${STATIC_IP6:-} on $NET_IFACE" || echo "automatic: systemd-networkd on every card (DHCPv4, IPv6)" )
   Root            $( [ -n "$ROOT_PASS" ] && echo "password set (su, console login)" || echo "locked: no password (users use sudo)" )
   Users           $USERS (zsh, sudo)
-  Desktop         $( [ "$DESKTOP" = hyprland ] && echo "Hyprland 0.55 (Debian backports): greetd login, Waybar, Firefox, TronBrowser" || echo "none (server)" )
+  Desktop         $( [ "$DESKTOP" = hyprland ] && echo "W3BS DE $(cat /usr/share/w3bs-os/de/share/VERSION 2>/dev/null) on Hyprland 0.55 (Debian backports): greetd login, Firefox, TronBrowser" || echo "none (server)" )
+  Agent access    $( [ "$DESKTOP" = hyprland ] && echo "Agentic Desktop Layer installed, agent access OFF until you turn it on in the tray" || echo "-" )
   SSH             on (password logins for users; root by key only)
   Dev tools       w3bs CLI, curl, wget, git, mise (node, bun, pnpm), readm3
   Box setup       cli-tools root-ubuntu.sh at first boot: nginx pages, firewall, oh-my-zsh, tmux
@@ -393,8 +394,8 @@ in_target locale-gen >>"$LOG" 2>&1 || fail "locale-gen failed"
 echo 'LANG=en_US.UTF-8' >"$TARGET/etc/default/locale"
 cat >"$TARGET/etc/default/keyboard" <<EOF
 XKBMODEL="pc105"
-XKBLAYOUT="$KEYMAP"
-XKBVARIANT=""
+XKBLAYOUT="${KEYMAP%% *}"
+XKBVARIANT="$( case "$KEYMAP" in *" "*) echo "${KEYMAP#* }" ;; esac )"
 XKBOPTIONS=""
 BACKSPACE="guess"
 EOF
@@ -466,7 +467,7 @@ ROOT_PASS="" USER_PASS=""
 
 # --- desktop ----------------------------------------------------------------------------
 if [ "$DESKTOP" = hyprland ]; then
-	step "Installing the Hyprland desktop (Debian trixie-backports; about 700 MB)"
+	step "Installing the desktop: W3BS DE on Hyprland (Debian trixie-backports; about 700 MB)"
 	cat >>"$TARGET/etc/apt/sources.list.d/debian.sources" <<EOF
 
 Types: deb
@@ -479,36 +480,82 @@ EOF
 	# One transaction, backports preferred: Hyprland from backports needs backports' PipeWire and
 	# libxkbcommon, and main's versions of those would pin the old ones.
 	in_target apt-get install -y --no-install-recommends -t "$SUITE-backports" \
-		hyprland hyprpaper hyprlock hypridle hyprpolkitagent hyprland-guiutils xdg-desktop-portal-hyprland \
-		greetd tuigreet waybar foot fuzzel mako-notifier swaybg swayidle swaylock grim slurp wl-clipboard xwayland \
-		fonts-dejavu fonts-font-awesome thunar libnotify-bin pipewire pipewire-pulse wireplumber firefox-esr \
-		qt6-wayland polkitd xdg-desktop-portal-gtk sway libgl1-mesa-dri dbus-user-session >>"$LOG" 2>&1 \
+		hyprland hyprlock hypridle hyprpolkitagent hyprland-guiutils xdg-desktop-portal-hyprland \
+		greetd tuigreet waybar foot fuzzel sway-notification-center swaybg swayidle swaylock grim slurp wl-clipboard \
+		xwayland brightnessctl pavucontrol fonts-dejavu fonts-noto-core fonts-font-awesome thunar libnotify-bin \
+		pipewire pipewire-pulse wireplumber firefox-esr qt6-wayland polkitd xdg-desktop-portal-gtk sway \
+		libgl1-mesa-dri dbus-user-session dbus-bin >>"$LOG" 2>&1 \
 		|| fail "cannot install the desktop packages (see $LOG)"
-	# The W3BS session and its defaults (same layout as W3BS DE): ~/.config/hypr is seeded at
-	# the first login; the Sway config is the software fallback.
+	# The desktop is W3BS DE (w3bs.org/de): its files live in each user's home and update with
+	# `w3bs-de update`; the copy on this ISO (same release) is kept in /usr/share/w3bs-os/de for
+	# users added later. w3bs-hyprland (greetd's session) runs `w3bs-de session` with the VM and
+	# software-rendering fallbacks; the Sway config is the last fallback.
 	src=/usr/share/w3bs-os/desktop
-	install -d "$TARGET/usr/share/w3bs-os/hypr" "$TARGET/usr/share/w3bs-os/sway" "$TARGET/etc/xdg/xdg-desktop-portal"
-	sed "s|^\(\s*kb_layout = \).*|\1$KEYMAP|" "$src/hyprland.conf" >"$TARGET/usr/share/w3bs-os/hypr/hyprland.conf"
-	install -m 0644 "$src/waybar.css" "$TARGET/usr/share/w3bs-os/hypr/waybar.css"
-	install -m 0755 "$src/session-start.sh" "$src/desktop-layer.sh" "$TARGET/usr/share/w3bs-os/hypr/"
-	sed "s|^\(\s*xkb_layout \).*|\1$KEYMAP|" "$src/sway.config" >"$TARGET/usr/share/w3bs-os/sway/config"
+	[ -r /usr/share/w3bs-os/de/install.sh ] || fail "W3BS DE is missing from this ISO"
+	install -d "$TARGET/usr/share/w3bs-os/sway" "$TARGET/etc/xdg/xdg-desktop-portal" "$TARGET/usr/share/wayland-sessions"
+	cp -a /usr/share/w3bs-os/de "$TARGET/usr/share/w3bs-os/de"
+	KB_LAYOUT=${KEYMAP%% *}
+	KB_VARIANT=$(case "$KEYMAP" in *" "*) echo "${KEYMAP#* }" ;; esac)
+	sed -e "s|^\(\s*xkb_layout \).*|\1$KB_LAYOUT|" -e "s|^\(\s*xkb_variant \).*|\1\"$KB_VARIANT\"|" \
+		"$src/sway.config" >"$TARGET/usr/share/w3bs-os/sway/config"
+	install -m 0644 "$src/waybar.css" "$TARGET/usr/share/w3bs-os/sway/waybar.css"
+	install -m 0755 "$src/desktop-layer.sh" "$TARGET/usr/share/w3bs-os/sway/desktop-layer.sh"
 	install -m 0644 "$src/wallpaper.png" "$TARGET/usr/share/w3bs-os/wallpaper.png"
 	install -m 0644 "$src/hyprland-portals.conf" "$TARGET/etc/xdg/xdg-desktop-portal/hyprland-portals.conf"
 	install -m 0755 "$src/w3bs-hyprland" "$TARGET/usr/local/bin/w3bs-hyprland"
+	install -m 0755 "$src/w3bs-de" "$TARGET/usr/local/bin/w3bs-de"
+	printf '[Desktop Entry]\nName=W3BS DE\nComment=Minimal, agent-friendly Wayland desktop built on Hyprland (w3bs.org/de)\nExec=/usr/local/bin/w3bs-hyprland\nType=Application\nDesktopNames=Hyprland\n' \
+		>"$TARGET/usr/share/wayland-sessions/w3bs-de.desktop"
+	for u in $USERS; do
+		in_target su - "$u" -s /bin/sh -c 'W3BS_DE_SOURCE=/usr/share/w3bs-os/de/share sh /usr/share/w3bs-os/de/install.sh --no-packages --no-agents --no-session' \
+			>>"$LOG" 2>&1 || fail "cannot install W3BS DE for $u"
+		# Each user's own W3BS DE settings (never overwritten by updates): the keyboard chosen
+		# here, and the machine settings w3bs-hyprland writes at each login.
+		h=$(in_target getent passwd "$u" | cut -d: -f6)
+		install -d -o "$(in_target id -u "$u")" -g "$(in_target id -g "$u")" "$TARGET$h/.config" "$TARGET$h/.config/w3bs-de" "$TARGET$h/.config/w3bs-de/hypr"
+		{
+			echo '-- Your W3BS DE settings. Loaded after the defaults; anything here wins.'
+			echo '-- The Hyprland Lua reference: https://wiki.hypr.land/Configuring/Start/'
+			echo '--'
+			echo '-- hl.monitor({ output = "DP-1", mode = "2560x1440@144", position = "0x0", scale = 1 })'
+			echo '-- w3bs.bind("SUPER + E", "Files", "thunar")'
+			echo
+			echo '-- The keyboard chosen when W3BS OS was installed.'
+			if [ -n "$KB_VARIANT" ]; then
+				echo "hl.config({ input = { kb_layout = \"$KB_LAYOUT\", kb_variant = \"$KB_VARIANT\" } })"
+			else
+				echo "hl.config({ input = { kb_layout = \"$KB_LAYOUT\" } })"
+			fi
+			echo
+			echo '-- W3BS OS: machine settings written at each login (a VM gets scale 1 and software cursors).'
+			echo 'local w3bs_os = (os.getenv("XDG_STATE_HOME") or (os.getenv("HOME") .. "/.local/state")) .. "/w3bs-os/session.lua"'
+			echo 'local w3bs_os_file = io.open(w3bs_os, "r")'
+			echo 'if w3bs_os_file then'
+			echo '  w3bs_os_file:close()'
+			echo '  dofile(w3bs_os)'
+			echo 'end'
+		} >"$TARGET$h/.config/w3bs-de/hypr/user.lua"
+		in_target chown "$u:" "$h/.config/w3bs-de/hypr/user.lua"
+	done
 	_names=$(echo $USERS | sed 's/ /, /g')
 	cat >"$TARGET/etc/greetd/config.toml" <<EOF
-# W3BS OS: the Hyprland login on tty1. tuigreet asks for the user name, then the password.
+# W3BS OS: the desktop login on tty1 (W3BS DE). tuigreet asks for the user name, then the password.
 [terminal]
 vt = 1
 
 [default_session]
-command = "tuigreet --time --remember --asterisks --greeting 'W3BS OS · log in as $_names (user name, then password)' --cmd /usr/local/bin/w3bs-hyprland"
+command = "tuigreet --time --remember --asterisks --greeting 'W3BS OS · W3BS DE · log in as $_names (user name, then password)' --cmd /usr/local/bin/w3bs-hyprland"
 user = "_greetd"
 EOF
 	in_target systemctl disable getty@tty1.service >>"$LOG" 2>&1
 	in_target systemctl enable greetd.service >>"$LOG" 2>&1 || fail "cannot enable greetd"
 	in_target systemctl set-default graphical.target >>"$LOG" 2>&1
 	for u in $USERS; do in_target usermod -aG video,input,render,audio "$u" >>"$LOG" 2>&1; done
+	# The Agentic Desktop Layer (glibc build): W3BS DE starts the broker and the tray with the
+	# session (w3bs-de autostart); agent access stays OFF until the user turns it on.
+	in_target sh -c 'curl -fsSL https://w3bs.org/desktop/install.sh | W3BS_BIN_DIR=/usr/local/bin W3BS_DESKTOP_NO_SERVICE=1 sh' >>"$LOG" 2>&1 \
+		&& in_target /usr/local/bin/w3bs-desktop --version >>"$LOG" 2>&1 \
+		|| fail "cannot install the Agentic Desktop Layer (w3bs-desktop)"
 fi
 
 # --- bootloader -------------------------------------------------------------------------
@@ -617,6 +664,10 @@ ls "$TARGET"/boot/initrd.img-* >/dev/null 2>&1 || fail "no initramfs in /boot"
 if [ "$DESKTOP" = hyprland ]; then
 	[ -x "$TARGET/usr/bin/Hyprland" ] || fail "Hyprland is not installed"
 	in_target systemctl is-enabled greetd.service >/dev/null 2>&1 || fail "greetd is not enabled"
+	[ -x "$TARGET/usr/local/bin/w3bs-desktop" ] || fail "w3bs-desktop is not installed"
+	for u in $USERS; do
+		in_target su - "$u" -s /bin/sh -c '"$HOME/.local/share/w3bs-de/bin/w3bs-de" version' >/dev/null 2>&1 || fail "W3BS DE is not installed for $u"
+	done
 fi
 [ -z "$ENCRYPT" ] || grep -q w3bs-root "$TARGET/etc/crypttab" || fail "crypttab is missing"
 cp "$LOG" "$TARGET/var/log/w3bs-os-install.log" && chmod 600 "$TARGET/var/log/w3bs-os-install.log"

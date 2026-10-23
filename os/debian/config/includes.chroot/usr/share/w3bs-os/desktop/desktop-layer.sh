@@ -1,7 +1,8 @@
 #!/bin/sh
-# Not installed (W3BS OS 1.2 on Debian ships it later): nothing to start.
+# The Sway fallback session's Agentic Desktop Layer (W3BS DE starts its own: w3bs-de autostart).
+# Not installed: nothing to start.
 [ -x /usr/local/bin/w3bs-desktop ] || exit 0
-# Starts the Agentic Desktop Layer in the Hyprland session: the broker (agent access starts
+# Starts the Agentic Desktop Layer in the session: the broker (agent access starts
 # Disabled) and the tray. The tray needs a StatusNotifier host, which is Waybar here; Waybar
 # starts at the same moment, so wait for its watcher on the session bus before the tray.
 log=${XDG_STATE_HOME:-$HOME/.local/state}/w3bs-os/desktop-layer.log

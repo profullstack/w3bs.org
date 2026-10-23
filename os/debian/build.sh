@@ -5,16 +5,18 @@ set -eu
 VERSION=${1:?usage: build.sh VERSION}
 here=$(cd "$(dirname "$0")" && pwd)
 mkdir -p "$here/out"
-docker run --rm --privileged -v "$here:/src:ro" -v "$here/out:/out" debian:trixie sh -euc '
+# W3BS DE (../../de) goes onto the ISO too: the installer sets it up for each user from this copy.
+docker run --rm --privileged -v "$here:/src:ro" -v "$here/../../de:/de:ro" -v "$here/out:/out" debian:trixie sh -euc '
 	apt-get update -qq >/dev/null
 	apt-get install -y -qq live-build debootstrap >/dev/null
 	mkdir /build && cd /build && cp -a /src/config .
+	mkdir -p config/includes.chroot/usr/share/w3bs-os/de && cp -a /de/install.sh /de/share config/includes.chroot/usr/share/w3bs-os/de/
 	echo "'"$VERSION"'" > config/includes.chroot/etc/w3bs-os-version
 	lb config --distribution trixie --architectures amd64 --binary-images iso-hybrid \
 		--archive-areas "main non-free-firmware" --debian-installer none --apt-recommends false \
 		--bootloaders "syslinux,grub-efi" --iso-application "W3BS OS" --iso-volume "W3BS_OS '"$VERSION"'" \
 		--iso-publisher "w3bs.org" --memtest none --firmware-binary false --firmware-chroot false \
-		--bootappend-live "boot=live components quiet hostname=w3bs-os console=tty0 console=ttyS0,115200" >/dev/null
+		--bootappend-live "boot=live components live-config.noautologin quiet hostname=w3bs-os console=tty0 console=ttyS0,115200" >/dev/null
 	# live-build stock menus wait forever on "Press ENTER": boot the live system after 5 s,
 	# under a W3BS OS title, in the BIOS (isolinux) and UEFI (grub) menus alike.
 	cp -a /usr/share/live/build/bootloaders config/
