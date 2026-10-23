@@ -1,0 +1,555 @@
+#!/bin/bash
+# w3bs-os-install: the W3BS OS 1.2 installer (Debian 13 "trixie", systemd).
+#
+# Erases one disk after a review and a typed confirmation, then: GPT (BIOS boot + EFI + /boot +
+# root), LUKS2 on the root by default, debootstrap trixie, the kernel, GRUB for BIOS and UEFI,
+# systemd-networkd (DHCP and IPv6 on every card, or a static address), root password first
+# then the users (sudo), the developer tools, and the W3BS landing page. cli-tools
+# root-ubuntu.sh (accounts, shell, nginx pages, firewall) runs once at first boot.
+#
+#   w3bs-os-install                                     interactive
+#   w3bs-os-install --defaults --disk /dev/sda --yes    unattended (passwords still asked on a
+#                                                       terminal unless the files are given)
+# Passwords are never logged. Any failure exits non-zero and says so.
+set -uo pipefail
+umask 022
+
+PROG=w3bs-os-install
+OS_VERSION=$(cat /etc/w3bs-os-version 2>/dev/null || echo 1.2.0)
+SUITE=trixie
+MIRROR=${W3BS_MIRROR:-http://deb.debian.org/debian}
+WORK=/run/w3bs-os-install
+LOG=/var/log/w3bs-os-install.log
+TARGET=/mnt/w3bs-target
+ROOT_UBUNTU_URL=https://raw.githubusercontent.com/profullstack/cli-tools/master/root-ubuntu.sh
+
+usage() {
+	cat <<EOF
+usage: $PROG [options]
+
+W3BS OS $OS_VERSION installer (Debian 13). Packages download during the install, so the
+machine needs the internet (DHCP and IPv6 are automatic; --ip for a static address).
+
+  --defaults              accept the default for every question that has one
+  --disk DEV              install to DEV (default: the largest internal disk)
+  --yes                   no typed erase confirmation (the review is still shown)
+  --no-encrypt            no LUKS2 encryption of the root (default: encrypted)
+  --hostname NAME         default: w3bs (a dotted name is the domain too)
+  --domain NAME           the web name of this machine (its page gets HTTPS)
+  --timezone ZONE         default: UTC
+  --keymap LAYOUT         keyboard layout, default: us
+  --user NAME             default: w3bs (repeat for more; all are administrators via sudo)
+  --fullname "NAME"       the first user's full name
+  --password-file FILE    the users' password, first line of FILE
+  --root-password-file FILE   root's password (default: none, root stays locked)
+  --passphrase-file FILE  the disk passphrase
+  --ip ADDR/PREFIX --gateway GW [--dns "A B"]     static IPv4 instead of DHCP
+  --ip6 ADDR/PREFIX --gateway6 GW6                static IPv6 as well (often fe80::1)
+  --iface NAME            the interface for --ip/--ip6 (default: the first wired one)
+  --serial-console        also a login on ttyS0 and kernel messages there
+  --no-reboot             do not offer to reboot at the end
+  --list-disks            print the disks the installer would offer and exit
+  --eject-media           eject the installer DVD and exit
+EOF
+}
+
+say() { printf '%s\n' "$*"; }
+log() { printf '%s %s\n' "$(date '+%F %T')" "$*" >>"$LOG" 2>/dev/null; }
+step() { printf '\n==> %s\n' "$*"; log "STEP $*"; }
+fail() {
+	printf '\n%s: INSTALL FAILED: %s\n' "$PROG" "$*" >&2
+	printf 'W3BS OS was NOT installed completely. Details: %s\n' "$LOG" >&2
+	log "FAILED: $*"
+	cleanup
+	exit 1
+}
+cleanup() {
+	for m in boot/efi boot dev/pts dev proc sys/firmware/efi/efivars sys run ""; do
+		mountpoint -q "$TARGET/$m" 2>/dev/null && umount -l "$TARGET/$m" 2>/dev/null
+	done
+	[ -e /dev/mapper/w3bs-root ] && cryptsetup close w3bs-root 2>/dev/null
+	return 0
+}
+ask() { # ask VAR "Question" default
+	local _q=$2 _def=$3 _ans
+	if [ -n "$DEFAULTS" ]; then printf -v "$1" '%s' "$_def"; return; fi
+	printf '%s [%s]: ' "$_q" "$_def"
+	read -r _ans || fail "no input"
+	[ -n "$_ans" ] || _ans=$_def
+	printf -v "$1" '%s' "$_ans"
+}
+read_secret() { # read_secret VAR "Prompt" MINLEN [optional]
+	local _s1 _s2
+	[ -t 0 ] || fail "a password is needed but there is no terminal; use --password-file / --passphrase-file"
+	while :; do
+		read -r -s -p "$2: " _s1 || fail "no input"; echo
+		[ -z "$_s1" ] && [ "${4:-}" = optional ] && break
+		read -r -s -p "$2 (again): " _s2; echo
+		[ -n "$_s1" ] || { say "It cannot be empty."; continue; }
+		[ "$_s1" = "$_s2" ] || { say "They do not match; try again."; continue; }
+		[ ${#_s1} -ge "${3:-1}" ] || { say "Use at least ${3:-1} characters."; continue; }
+		break
+	done
+	printf -v "$1" '%s' "$_s1"
+}
+read_secret_file() { [ -r "$2" ] || fail "cannot read $2"; local l; l=$(head -n 1 "$2"); [ -n "$l" ] || fail "$2 is empty"; printf -v "$1" '%s' "$l"; }
+
+# --- disks ------------------------------------------------------------------------------
+disk_bytes() { echo $(( $(cat "/sys/block/${1#/dev/}/size" 2>/dev/null || echo 0) * 512 )); }
+human() { awk -v b="$1" 'BEGIN { if (b >= 1e12) printf "%.1f TB", b/1e12; else printf "%.1f GB", b/1e9 }'; }
+disk_model() { tr -s ' ' <"/sys/block/${1#/dev/}/device/model" 2>/dev/null | sed 's/ *$//'; }
+boot_media_disk() {
+	local dev
+	dev=$(findmnt -n -o SOURCE /run/live/medium 2>/dev/null) || return 0
+	[ -n "$dev" ] || return 0
+	lsblk -no PKNAME "$dev" 2>/dev/null | head -n 1 | grep . || basename "$dev"
+}
+internal_disks() {
+	local boot p d
+	boot=$(boot_media_disk)
+	for p in /sys/block/*; do
+		d=${p##*/}
+		case "$d" in loop*|ram*|sr*|zram*|dm-*|md*|fd*|nbd*) continue ;; esac
+		[ "$(cat "$p/removable" 2>/dev/null)" = 1 ] && continue
+		[ "$(cat "$p/size" 2>/dev/null || echo 0)" -gt 0 ] || continue
+		[ "$d" = "$boot" ] && continue
+		echo "$d"
+	done
+}
+largest_disk() {
+	local best="" bestsz=0 d sz
+	for d in $(internal_disks); do sz=$(disk_bytes "$d"); [ "$sz" -gt "$bestsz" ] && { best=$d; bestsz=$sz; }; done
+	[ -n "$best" ] && echo "/dev/$best"
+}
+part() { case "$1" in *[0-9]) echo "${1}p$2" ;; *) echo "$1$2" ;; esac; }
+eject_media() {
+	local m dev
+	dev=$(findmnt -n -o SOURCE /run/live/medium 2>/dev/null) || return 0
+	case "$dev" in /dev/sr*) eject "$dev" 2>/dev/null || true ;; esac
+	return 0
+}
+wired_interfaces() {
+	local p i
+	for p in /sys/class/net/*; do
+		i=${p##*/}; [ "$i" = lo ] && continue
+		[ -e "$p/device" ] || continue; [ -d "$p/wireless" ] && continue
+		echo "$i"
+	done
+}
+
+# --- arguments --------------------------------------------------------------------------
+DEFAULTS="" DISK="" YES="" ENCRYPT=1 HOSTNAME_="" DOMAIN="" TIMEZONE="" KEYMAP="" USERS="" FULLNAME=""
+PASSWORD_FILE="" ROOT_PASSWORD_FILE="" PASSPHRASE_FILE="" NO_REBOOT="" SERIAL=""
+STATIC_IP="" STATIC_GW="" STATIC_DNS="" STATIC_IP6="" STATIC_GW6="" NET_IFACE=""
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--defaults) DEFAULTS=1 ;;
+		--disk) DISK=${2:-}; shift ;;
+		--yes) YES=1 ;;
+		--no-encrypt) ENCRYPT="" ;;
+		--encrypt) ENCRYPT=1 ;;
+		--hostname) HOSTNAME_=${2:-}; shift ;;
+		--domain) DOMAIN=${2:-}; shift ;;
+		--timezone) TIMEZONE=${2:-}; shift ;;
+		--keymap) KEYMAP=${2:-}; shift ;;
+		--user) USERS="$USERS ${2:-}"; shift ;;
+		--fullname) FULLNAME=${2:-}; shift ;;
+		--password-file) PASSWORD_FILE=${2:-}; shift ;;
+		--root-password-file) ROOT_PASSWORD_FILE=${2:-}; shift ;;
+		--passphrase-file) PASSPHRASE_FILE=${2:-}; shift ;;
+		--ip) STATIC_IP=${2:-}; shift ;;
+		--gateway) STATIC_GW=${2:-}; shift ;;
+		--dns) STATIC_DNS=${2:-}; shift ;;
+		--ip6) STATIC_IP6=${2:-}; shift ;;
+		--gateway6) STATIC_GW6=${2:-}; shift ;;
+		--iface) NET_IFACE=${2:-}; shift ;;
+		--serial-console) SERIAL=1 ;;
+		--no-reboot) NO_REBOOT=1 ;;
+		--desktop) [ "${2:-none}" = none ] || { echo "$PROG: desktop installs are not in W3BS OS $OS_VERSION on Debian yet; this installs a server" >&2; }; shift ;;
+		--server) ;;
+		--list-disks) for d in $(internal_disks); do printf '/dev/%s\t%s\t%s\n' "$d" "$(disk_bytes "$d")" "$(disk_model "$d")"; done; exit 0 ;;
+		--eject-media) eject_media; exit 0 ;;
+		-h|--help) usage; exit 0 ;;
+		*) usage >&2; echo "$PROG: unknown option $1" >&2; exit 2 ;;
+	esac
+	shift
+done
+[ "$(id -u)" = 0 ] || { echo "$PROG: run as root" >&2; exit 1; }
+mkdir -p "$WORK" && chmod 700 "$WORK"
+: >"$LOG" && chmod 600 "$LOG"
+log "$PROG $OS_VERSION started"
+for c in debootstrap sfdisk mkfs.ext4 mkfs.vfat cryptsetup wipefs blkid curl; do
+	command -v "$c" >/dev/null 2>&1 || fail "$c is missing from the live system"
+done
+
+cat <<EOF
+
+  W3BS OS $OS_VERSION installer (Debian 13 "trixie")
+  ------------------------------------------------
+  Installs a W3BS OS server. Packages download during the install. Nothing is written to
+  any disk until you confirm the review.
+
+EOF
+
+# --- network: check now, before anything is erased -------------------------------------
+IFACES=$(wired_interfaces | tr '\n' ' ')
+[ -n "$IFACES" ] || fail "no wired network interface found"
+[ -n "$NET_IFACE" ] || NET_IFACE=$(echo $IFACES | cut -d' ' -f1)
+net_ok() { curl -fsS -m 15 -o /dev/null "$MIRROR/dists/$SUITE/Release"; }
+apply_static() {
+	networkctl down "$NET_IFACE" >/dev/null 2>&1; ip link set "$NET_IFACE" up
+	if [ -n "$STATIC_IP" ]; then
+		ip -4 addr flush dev "$NET_IFACE"; ip addr add "$STATIC_IP" dev "$NET_IFACE" || fail "cannot set $STATIC_IP"
+		ip route replace default via "$STATIC_GW" dev "$NET_IFACE" onlink || fail "cannot use the gateway $STATIC_GW"
+	fi
+	if [ -n "$STATIC_IP6" ]; then
+		ip -6 addr add "$STATIC_IP6" dev "$NET_IFACE" 2>/dev/null
+		ip -6 route replace default via "$STATIC_GW6" dev "$NET_IFACE" onlink || fail "cannot use the IPv6 gateway $STATIC_GW6"
+	fi
+	[ -n "$STATIC_DNS" ] || STATIC_DNS="1.1.1.1 2606:4700:4700::1111 9.9.9.9"
+	resolvectl dns "$NET_IFACE" $STATIC_DNS 2>/dev/null
+	log "static network on $NET_IFACE: ${STATIC_IP:-} ${STATIC_IP6:-} dns $STATIC_DNS"
+}
+[ -z "$STATIC_IP" ] || [ -n "$STATIC_GW" ] || fail "--ip needs --gateway"
+[ -z "$STATIC_IP6" ] || [ -n "$STATIC_GW6" ] || fail "--ip6 needs --gateway6 (often fe80::1)"
+if [ -n "$STATIC_IP$STATIC_IP6" ]; then
+	apply_static
+elif ! net_ok; then
+	say "Waiting for the network (DHCP and IPv6 on $IFACES) ..."
+	for _i in $(seq 1 15); do net_ok && break; sleep 2; done
+	if ! net_ok && [ -z "$DEFAULTS" ] && [ -t 0 ]; then
+		say "No internet over DHCP/IPv6. Servers often get a static address from their provider."
+		ask STATIC_IP "Static IPv4 for $NET_IFACE with prefix, e.g. 203.0.113.5/24 (Enter: stop)" ""
+		[ -n "$STATIC_IP" ] || fail "no internet connection; nothing was changed"
+		ask STATIC_GW "Gateway" ""
+		ask STATIC_DNS "Nameservers" "1.1.1.1 9.9.9.9"
+		apply_static
+	fi
+fi
+net_ok || fail "no internet connection: $MIRROR does not answer ($(ip -br addr show | grep -v '^lo' | tr -s ' ' | tr '\n' ';')). On a server, give the provider's static address: --ip ADDR/PREFIX --gateway GW"
+log "internet reachable"
+
+# --- questions --------------------------------------------------------------------------
+[ -n "$KEYMAP" ] || ask KEYMAP "Keyboard layout" "us"
+[ -n "$TIMEZONE" ] || ask TIMEZONE "Timezone" "UTC"
+[ -e "/usr/share/zoneinfo/$TIMEZONE" ] || fail "unknown timezone $TIMEZONE"
+[ -n "$HOSTNAME_" ] || ask HOSTNAME_ "Hostname" "w3bs"
+case "$HOSTNAME_" in *.*) [ -n "$DOMAIN" ] || DOMAIN=$HOSTNAME_; HOSTNAME_=${HOSTNAME_%%.*} ;; esac
+if [ -z "$DOMAIN" ] && [ -z "$DEFAULTS" ]; then
+	ask DOMAIN "Domain name this machine is reached by, for its web page and HTTPS (e.g. dev1.example.com; Enter: none)" ""
+fi
+case "$DOMAIN" in ''|*.*) ;; *) fail "the domain must be a full name like dev1.example.com" ;; esac
+[ -n "${USERS// /}" ] || { ask _u "Your user name (more than one: separate with spaces)" "w3bs"; USERS=$_u; }
+USERS=$(echo $USERS)
+for u in $USERS; do [[ "$u" =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] && [ "$u" != root ] || fail "invalid user name $u"; done
+[ -n "$FULLNAME" ] || ask FULLNAME "Full name" "W3BS User"
+case "$FULLNAME" in *:*) fail "the full name cannot contain ':'" ;; esac
+
+if [ -z "$DISK" ]; then
+	if [ -n "$DEFAULTS" ]; then DISK=$(largest_disk) || true
+	else
+		say ""; say "Internal disks:"
+		for d in $(internal_disks); do say "  /dev/$d  $(human "$(disk_bytes "$d")")  $(disk_model "$d")"; done
+		ask DISK "Disk to ERASE and install to" "$(largest_disk)"
+	fi
+fi
+[ -n "$DISK" ] && [ -b "$DISK" ] || fail "no disk to install to (${DISK:-none found})"
+DISK_BYTES=$(disk_bytes "$DISK")
+[ "$DISK_BYTES" -ge 8000000000 ] || fail "$DISK is $(human "$DISK_BYTES"); W3BS OS needs at least 8 GB"
+if [ -z "$DEFAULTS" ] && [ -n "$ENCRYPT" ]; then
+	ask _enc "Encrypt the disk with LUKS2 (recommended; the passphrase is asked at every boot)? yes/no" "yes"
+	case "$_enc" in n|no|N|NO|No) ENCRYPT="" ;; esac
+fi
+
+# Root first, then the users. Without a root password root stays locked (users use sudo).
+ROOT_PASS=""
+if [ -n "$ROOT_PASSWORD_FILE" ]; then read_secret_file ROOT_PASS "$ROOT_PASSWORD_FILE"
+elif [ -z "$DEFAULTS" ] && [ -t 0 ]; then
+	say "A root password lets you use su and log in as root on the console."
+	read_secret ROOT_PASS "Root password (Enter: none, root stays locked; your user uses sudo)" 6 optional
+fi
+USER_PASS=""
+if [ -n "$PASSWORD_FILE" ]; then read_secret_file USER_PASS "$PASSWORD_FILE"
+else read_secret USER_PASS "Password for $(echo $USERS | tr ' ' ',')" 1; fi
+LUKS_PASS=""
+if [ -n "$ENCRYPT" ]; then
+	if [ -n "$PASSPHRASE_FILE" ]; then read_secret_file LUKS_PASS "$PASSPHRASE_FILE"
+	else read_secret LUKS_PASS "Disk encryption passphrase" 8; fi
+	[ ${#LUKS_PASS} -ge 8 ] || fail "the disk passphrase must be at least 8 characters"
+fi
+if [ -d /sys/firmware/efi ]; then BOOTMODE=UEFI; else BOOTMODE=BIOS; fi
+
+# --- review -----------------------------------------------------------------------------
+cat <<EOF
+
+  Review: nothing has been written yet
+  ------------------------------------
+  Target disk     $DISK  $(human "$DISK_BYTES")  $(disk_model "$DISK")
+                  ALL DATA ON THIS DISK WILL BE ERASED. Partitions now on it:
+$(lsblk -no NAME,SIZE,FSTYPE "$DISK" 2>/dev/null | sed 's/^/                    /')
+  Layout          $BOOTMODE: GPT, EFI + /boot, root $( [ -n "$ENCRYPT" ] && echo "on LUKS2" || echo "ext4" ), swap file
+  System          Debian 13 "trixie" (systemd), W3BS OS $OS_VERSION
+  Hostname        $HOSTNAME_$( [ -n "$DOMAIN" ] && echo "  (web: https://$DOMAIN)" )
+  Keyboard        $KEYMAP      Timezone  $TIMEZONE
+  Network         $( [ -n "$STATIC_IP$STATIC_IP6" ] && echo "static ${STATIC_IP:-} ${STATIC_IP6:-} on $NET_IFACE" || echo "automatic: systemd-networkd on every card (DHCPv4, IPv6)" )
+  Root            $( [ -n "$ROOT_PASS" ] && echo "password set (su, console login)" || echo "locked: no password (users use sudo)" )
+  Users           $USERS (zsh, sudo)
+  SSH             on (password logins for users; root by key only)
+  Dev tools       w3bs CLI, curl, wget, git, mise (node, bun, pnpm), readm3
+  Box setup       cli-tools root-ubuntu.sh at first boot: nginx pages, firewall, oh-my-zsh, tmux
+  Web page        the W3BS landing page at $( [ -n "$DOMAIN" ] && echo "https://$DOMAIN" || echo "http://$HOSTNAME_" )
+EOF
+if [ -z "$YES" ]; then
+	printf '\nType the disk name %s to erase it and install, or anything else to cancel: ' "$DISK"
+	read -r _confirm || fail "no input"
+	[ "$_confirm" = "$DISK" ] || { say "Cancelled. Nothing was written."; log "cancelled at review"; exit 1; }
+else
+	say ""; say "--yes given: erasing $DISK without a typed confirmation."
+fi
+log "erase confirmed: $DISK"
+trap 'fail "interrupted"' INT TERM
+
+# --- partition, format ------------------------------------------------------------------
+step "Partitioning $DISK (GPT: BIOS boot, EFI, /boot, root)"
+cleanup
+wipefs -a "$DISK" >>"$LOG" 2>&1
+sfdisk --quiet --wipe always "$DISK" >>"$LOG" 2>&1 <<EOF || fail "cannot partition $DISK"
+label: gpt
+size=1MiB, type=21686148-6449-6E6F-744E-656564454649, name=bios
+size=512MiB, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, name=efi
+size=1GiB, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name=boot
+type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name=root
+EOF
+partprobe "$DISK" 2>/dev/null; udevadm settle 2>/dev/null; sleep 1
+P_EFI=$(part "$DISK" 2) P_BOOT=$(part "$DISK" 3) P_ROOT=$(part "$DISK" 4)
+mkfs.vfat -F 32 -n EFI "$P_EFI" >>"$LOG" 2>&1 || fail "cannot format $P_EFI"
+mkfs.ext4 -q -F -L boot "$P_BOOT" >>"$LOG" 2>&1 || fail "cannot format $P_BOOT"
+ROOTDEV=$P_ROOT
+if [ -n "$ENCRYPT" ]; then
+	step "Encrypting the root (LUKS2)"
+	printf '%s' "$LUKS_PASS" | cryptsetup luksFormat --type luks2 --batch-mode --key-file=- "$P_ROOT" >>"$LOG" 2>&1 || fail "cannot encrypt $P_ROOT"
+	printf '%s' "$LUKS_PASS" | cryptsetup open --key-file=- "$P_ROOT" w3bs-root >>"$LOG" 2>&1 || fail "cannot open $P_ROOT"
+	ROOTDEV=/dev/mapper/w3bs-root
+fi
+mkfs.ext4 -q -F -L root "$ROOTDEV" >>"$LOG" 2>&1 || fail "cannot format the root"
+mkdir -p "$TARGET"
+mount "$ROOTDEV" "$TARGET" || fail "cannot mount the root"
+mkdir -p "$TARGET/boot" && mount "$P_BOOT" "$TARGET/boot" || fail "cannot mount /boot"
+mkdir -p "$TARGET/boot/efi" && mount "$P_EFI" "$TARGET/boot/efi" || fail "cannot mount /boot/efi"
+
+# --- base system ------------------------------------------------------------------------
+step "Installing Debian 13 (debootstrap; this downloads a few hundred MB)"
+PKGS="linux-image-amd64,initramfs-tools,systemd-sysv,systemd-resolved,libnss-resolve,libpam-systemd,dbus,dbus-user-session,openssh-server,sudo,locales,console-setup,keyboard-configuration,tzdata,zsh,curl,wget,ca-certificates,git,less,vim-tiny,iproute2,iputils-ping,efibootmgr"
+[ -n "$ENCRYPT" ] && PKGS="$PKGS,cryptsetup,cryptsetup-initramfs"
+if [ "$BOOTMODE" = UEFI ]; then PKGS="$PKGS,grub-efi-amd64"; else PKGS="$PKGS,grub-pc"; fi
+debootstrap --arch=amd64 --components=main,contrib,non-free-firmware --include="$PKGS" "$SUITE" "$TARGET" "$MIRROR" >>"$LOG" 2>&1 \
+	|| fail "debootstrap failed (see $LOG)"
+for m in dev dev/pts proc sys run; do mount --bind "/$m" "$TARGET/$m" || fail "cannot bind /$m"; done
+[ -d /sys/firmware/efi/efivars ] && mount --bind /sys/firmware/efi/efivars "$TARGET/sys/firmware/efi/efivars" 2>/dev/null
+in_target() { chroot "$TARGET" env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root LANG=C.UTF-8 DEBIAN_FRONTEND=noninteractive "$@"; }
+
+step "Configuring the system"
+cat >"$TARGET/etc/apt/sources.list.d/debian.sources" <<EOF
+Types: deb
+URIs: $MIRROR
+Suites: $SUITE $SUITE-updates
+Components: main contrib non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: http://security.debian.org/debian-security
+Suites: $SUITE-security
+Components: main contrib non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+EOF
+rm -f "$TARGET/etc/apt/sources.list"
+echo "$HOSTNAME_" >"$TARGET/etc/hostname"
+cat >"$TARGET/etc/hosts" <<EOF
+127.0.0.1	localhost
+127.0.1.1	${DOMAIN:+$DOMAIN }$HOSTNAME_
+::1		localhost ip6-localhost ip6-loopback
+EOF
+ln -sf "/usr/share/zoneinfo/$TIMEZONE" "$TARGET/etc/localtime"; echo "$TIMEZONE" >"$TARGET/etc/timezone"
+sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' "$TARGET/etc/locale.gen"
+in_target locale-gen >>"$LOG" 2>&1 || fail "locale-gen failed"
+echo 'LANG=en_US.UTF-8' >"$TARGET/etc/default/locale"
+cat >"$TARGET/etc/default/keyboard" <<EOF
+XKBMODEL="pc105"
+XKBLAYOUT="$KEYMAP"
+XKBVARIANT=""
+XKBOPTIONS=""
+BACKSPACE="guess"
+EOF
+uuid() { blkid -s UUID -o value "$1"; }
+{
+	echo "# W3BS OS"
+	echo "UUID=$(uuid "$ROOTDEV")  /          ext4  errors=remount-ro  0 1"
+	echo "UUID=$(uuid "$P_BOOT")  /boot      ext4  defaults           0 2"
+	echo "UUID=$(uuid "$P_EFI")  /boot/efi  vfat  umask=0077         0 1"
+	echo "/swapfile  none  swap  sw  0 0"
+} >"$TARGET/etc/fstab"
+if [ -n "$ENCRYPT" ]; then
+	echo "w3bs-root UUID=$(uuid "$P_ROOT") none luks,discard" >"$TARGET/etc/crypttab"
+fi
+fallocate -l 2G "$TARGET/swapfile" 2>/dev/null || dd if=/dev/zero of="$TARGET/swapfile" bs=1M count=2048 status=none
+chmod 600 "$TARGET/swapfile" && mkswap "$TARGET/swapfile" >>"$LOG" 2>&1
+
+# Network: systemd-networkd + resolved, like the live system (or the static address).
+mkdir -p "$TARGET/etc/systemd/network"
+if [ -n "$STATIC_IP$STATIC_IP6" ]; then
+	{
+		echo "[Match]"; echo "Name=$NET_IFACE"; echo; echo "[Network]"
+		[ -n "$STATIC_IP" ] || echo "DHCP=ipv4"
+		echo "IPv6AcceptRA=yes"
+		for d in $STATIC_DNS; do echo "DNS=$d"; done
+		[ -n "$STATIC_IP" ] && { echo; echo "[Address]"; echo "Address=$STATIC_IP"; echo; echo "[Route]"; echo "Gateway=$STATIC_GW"; echo "GatewayOnLink=yes"; }
+		[ -n "$STATIC_IP6" ] && { echo; echo "[Address]"; echo "Address=$STATIC_IP6"; echo; echo "[Route]"; echo "Gateway=$STATIC_GW6"; echo "GatewayOnLink=yes"; }
+	} >"$TARGET/etc/systemd/network/20-$NET_IFACE.network"
+fi
+cat >"$TARGET/etc/systemd/network/90-wired.network" <<'EOF'
+# W3BS OS: every other wired card, DHCPv4 and IPv6 (router advertisements, DHCPv6).
+[Match]
+Type=ether
+
+[Network]
+DHCP=yes
+IPv6AcceptRA=yes
+EOF
+in_target systemctl enable systemd-networkd systemd-resolved ssh >>"$LOG" 2>&1 || fail "cannot enable networkd/resolved/ssh"
+ln -sf /run/systemd/resolve/stub-resolv.conf "$TARGET/etc/resolv.conf"
+grep -q 'resolve' "$TARGET/etc/nsswitch.conf" || sed -i 's/^hosts:.*/hosts:          files resolve [!UNAVAIL=return] dns/' "$TARGET/etc/nsswitch.conf"
+# Name resolution inside the chroot for the rest of the install.
+cp -L /etc/resolv.conf "$TARGET/run/w3bs-resolv.conf" 2>/dev/null
+mount --bind /etc/resolv.conf "$TARGET/etc/resolv.conf" 2>/dev/null || cp -L /etc/resolv.conf "$TARGET/etc/resolv.conf"
+
+# --- accounts ---------------------------------------------------------------------------
+step "Creating users $USERS (zsh, sudo)"
+if [ -n "$ROOT_PASS" ]; then printf 'root:%s\n' "$ROOT_PASS" | in_target chpasswd || fail "cannot set root's password"
+else in_target passwd -l root >>"$LOG" 2>&1; fi
+first=1
+for u in $USERS; do
+	_c=(); [ -n "$first" ] && _c=(-c "$FULLNAME")
+	in_target useradd -m -s /usr/bin/zsh -G sudo,adm,systemd-journal "${_c[@]}" "$u" >>"$LOG" 2>&1 || fail "cannot create $u"
+	printf '%s:%s\n' "$u" "$USER_PASS" | in_target chpasswd || fail "cannot set the password for $u"
+	in_target sh -c "touch /home/$u/.zshrc && chown $u:$u /home/$u/.zshrc"
+	first=""
+done
+ROOT_PASS="" USER_PASS=""
+
+# --- bootloader -------------------------------------------------------------------------
+step "Installing the kernel and GRUB ($BOOTMODE)"
+GRUB_EXTRA=""
+[ -n "$SERIAL" ] && GRUB_EXTRA="console=tty0 console=ttyS0,115200"
+sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"quiet $GRUB_EXTRA\"|; s|^GRUB_DISTRIBUTOR=.*|GRUB_DISTRIBUTOR=\"W3BS OS\"|; s|^GRUB_TIMEOUT=.*|GRUB_TIMEOUT=3|" "$TARGET/etc/default/grub"
+in_target update-initramfs -u -k all >>"$LOG" 2>&1 || fail "update-initramfs failed"
+if [ "$BOOTMODE" = UEFI ]; then
+	in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=w3bs --recheck >>"$LOG" 2>&1 || fail "grub-install (UEFI) failed"
+	# The fallback path too: firmware without boot entries (many VPS) starts EFI/BOOT/BOOTX64.EFI.
+	in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --removable >>"$LOG" 2>&1
+	_id=$(efibootmgr 2>/dev/null | awk '/^Boot[0-9A-Fa-f]{4}/ && tolower($0) ~ /w3bs/ { print substr($1, 5, 4); exit }')
+	if [ -n "$_id" ]; then
+		_order=$(efibootmgr | awk -F': ' '/^BootOrder/ { print $2 }')
+		efibootmgr -o "$(printf '%s,%s' "$_id" "$_order" | tr ',' '\n' | awk 'NF && !s[$0]++' | paste -sd,)" >>"$LOG" 2>&1
+	fi
+else
+	in_target grub-install --target=i386-pc "$DISK" >>"$LOG" 2>&1 || fail "grub-install (BIOS) failed"
+fi
+in_target update-grub >>"$LOG" 2>&1 || fail "update-grub failed"
+
+# --- W3BS -------------------------------------------------------------------------------
+step "W3BS: branding, landing page, first-boot setup"
+cat >"$TARGET/etc/w3bs-os-release" <<EOF
+ID=w3bs-os
+NAME="W3BS OS"
+VERSION=$OS_VERSION
+BASE=debian
+BASE_VERSION=$(cat "$TARGET/etc/debian_version")
+EOF
+cat >"$TARGET/etc/motd" <<'EOF'
+
+  Welcome to W3BS OS (Debian 13 based).   https://w3bs.org/os
+
+    sudo <command>          run as administrator
+    mise use -g node@lts    language runtimes (bun, pnpm are set up)
+
+EOF
+mkdir -p "$TARGET/var/www/userdirs" "$TARGET/etc/cli-tools"
+install -m 0644 /usr/share/w3bs-os/www/index.html "$TARGET/var/www/userdirs/index.html" || fail "cannot install the landing page"
+{
+	echo "# W3BS OS install: settings root-ubuntu.sh reads on every run (KEY=value)."
+	if [ -n "$DOMAIN" ]; then echo "WEB_DOMAIN=$DOMAIN"; else echo "WEB_DOMAIN=$HOSTNAME_"; echo "WEB_TLS=off"; fi
+} >"$TARGET/etc/cli-tools/server.conf"
+curl -fsSL "$ROOT_UBUNTU_URL" -o "$TARGET/usr/local/sbin/root-ubuntu" && chmod 0755 "$TARGET/usr/local/sbin/root-ubuntu" \
+	|| say "warning: could not download root-ubuntu.sh; first-boot setup will be skipped"
+cat >"$TARGET/etc/systemd/system/w3bs-first-boot.service" <<EOF
+[Unit]
+Description=W3BS OS first boot: cli-tools root-ubuntu.sh (accounts, shell, nginx pages, firewall)
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=!/etc/w3bs-os/first-boot-done
+ConditionPathExists=/usr/local/sbin/root-ubuntu
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c '/usr/local/sbin/root-ubuntu $USERS --groups sudo --refresh </dev/null >>/var/log/w3bs-first-boot.log 2>&1; mkdir -p /etc/w3bs-os; touch /etc/w3bs-os/first-boot-done'
+TimeoutStartSec=3600
+
+[Install]
+WantedBy=multi-user.target
+EOF
+in_target systemctl enable w3bs-first-boot.service >>"$LOG" 2>&1
+
+step "Installing developer tools (mise: node, bun, pnpm; readm3)"
+cat >"$TARGET/etc/profile.d/w3bs-dev.sh" <<'EOF'
+# W3BS OS: mise-managed tools and pnpm global commands on PATH.
+export PNPM_HOME="$HOME/.local/share/pnpm"
+case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) PATH="$HOME/.local/bin:$PATH" ;; esac
+case ":$PATH:" in *":$HOME/.local/share/mise/shims:"*) ;; *) PATH="$HOME/.local/share/mise/shims:$PATH" ;; esac
+case ":$PATH:" in *":$PNPM_HOME:"*) ;; *) PATH="$PNPM_HOME:$PATH" ;; esac
+export PATH
+EOF
+mkdir -p "$TARGET/etc/zsh"; grep -qs w3bs-dev "$TARGET/etc/zsh/zprofile" || echo '[ -r /etc/profile.d/w3bs-dev.sh ] && . /etc/profile.d/w3bs-dev.sh' >>"$TARGET/etc/zsh/zprofile"
+for u in $USERS; do
+	if in_target su - "$u" -s /bin/sh -c '
+		set -e
+		curl -fsSL https://w3bs.org/install.sh | W3BS_YES=1 sh
+		curl -fsSL https://mise.run | sh
+		export MISE_YES=1 PNPM_HOME="$HOME/.local/share/pnpm"
+		export PATH="$PNPM_HOME:$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH"
+		mise use -g node@lts bun@latest npm:pnpm@latest
+		pnpm config set global-bin-dir "$PNPM_HOME"
+		pnpm i -g @profullstack/readm3
+		node --version; bun --version; pnpm --version' >>"$LOG" 2>&1; then
+		log "dev tools installed for $u"
+	else
+		say "warning: could not install the dev tools for $u (see $LOG)"
+	fi
+done
+
+# --- finish -----------------------------------------------------------------------------
+step "Verifying the installed system"
+umount "$TARGET/etc/resolv.conf" 2>/dev/null; ln -sf /run/systemd/resolve/stub-resolv.conf "$TARGET/etc/resolv.conf"
+for u in $USERS; do
+	in_target id -nG "$u" | tr ' ' '\n' | grep -qx sudo || fail "$u is not in sudo"
+done
+ls "$TARGET"/boot/vmlinuz-* >/dev/null 2>&1 || fail "no kernel in /boot"
+ls "$TARGET"/boot/initrd.img-* >/dev/null 2>&1 || fail "no initramfs in /boot"
+[ -e "$TARGET/boot/grub/grub.cfg" ] || fail "no grub.cfg"
+[ -z "$ENCRYPT" ] || grep -q w3bs-root "$TARGET/etc/crypttab" || fail "crypttab is missing"
+cp "$LOG" "$TARGET/var/log/w3bs-os-install.log" && chmod 600 "$TARGET/var/log/w3bs-os-install.log"
+sync
+cleanup
+trap - INT TERM
+cat <<EOF
+
+  W3BS OS $OS_VERSION is installed on $DISK.$( [ -n "$ENCRYPT" ] && printf '\n  You will be asked for the disk passphrase at boot.')
+  Log in as $(echo $USERS | cut -d' ' -f1). First boot finishes the setup (root-ubuntu.sh) in the background.
+
+EOF
+log "SUCCESS"
+eject_media
+if [ -z "$NO_REBOOT" ] && [ -z "$DEFAULTS" ] && [ -t 0 ]; then
+	read -r -p 'Reboot now? [Y/n] ' _r || _r=n
+	case "$_r" in n*|N*) ;; *) reboot ;; esac
+fi
+exit 0
