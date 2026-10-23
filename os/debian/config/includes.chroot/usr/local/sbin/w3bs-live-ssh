@@ -1,0 +1,12 @@
+#!/bin/sh
+# W3BS OS live system: SSH on by default with a random one-time root password, shown on tty1,
+# so a server can be installed from another computer (web consoles cannot paste).
+set -eu
+pw=$(tr -dc 'abcdefghjkmnpqrstuvwxyz23456789' </dev/urandom | head -c 12)
+pw="$(echo "$pw" | cut -c1-4)-$(echo "$pw" | cut -c5-8)-$(echo "$pw" | cut -c9-12)"
+echo "root:$pw" | chpasswd
+umask 077
+echo "$pw" >/run/w3bs-live-ssh-password
+umask 022
+mkdir -p /etc/ssh/sshd_config.d
+printf 'PermitRootLogin yes\nPasswordAuthentication yes\n' >/etc/ssh/sshd_config.d/10-w3bs-live.conf
