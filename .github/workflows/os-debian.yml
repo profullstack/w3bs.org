@@ -66,6 +66,7 @@ jobs:
         include:
           - { firmware: uefi, flags: "" }
           - { firmware: bios, flags: "--encrypt" }
+          - { firmware: uefi, flags: "--desktop" }
     name: Install + boot (${{ matrix.firmware }} ${{ matrix.flags }})
     steps:
       - uses: actions/checkout@v4

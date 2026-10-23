@@ -12,6 +12,7 @@ from vmtest import VM, log  # noqa: E402
 p = argparse.ArgumentParser()
 p.add_argument("--iso", required=True); p.add_argument("--disk", required=True)
 p.add_argument("--firmware", default="uefi"); p.add_argument("--encrypt", action="store_true")
+p.add_argument("--desktop", action="store_true", help="install the Hyprland desktop and log in at the greeter")
 p.add_argument("--out", default="out"); p.add_argument("--timeout", type=int, default=3000)
 a = p.parse_args()
 os.makedirs(a.out, exist_ok=True)
@@ -32,6 +33,7 @@ try:
     vm.screenshot(os.path.join(a.out, f"live-{a.firmware}.png"))
     vm.sh("printf 'w3bs-test-pass\\n' > /tmp/pw; printf 'w3bs-luks-pass\\n' > /tmp/lk", 30)
     flags = "--passphrase-file /tmp/lk" if a.encrypt else "--no-encrypt"
+    flags += " --desktop hyprland" if a.desktop else " --server"
     rc, o = vm.sh(f"w3bs-os-install --defaults --disk /dev/vda --yes --no-reboot --serial-console --password-file /tmp/pw "
                   f"--domain ci.example.test {flags} > /tmp/o 2>&1; echo RC=$?; grep -E 'warning|FAILED|installed on' /tmp/o", a.timeout)
     # The console echoes the command (which itself says 'warning'): count the installer's lines only.
@@ -47,6 +49,11 @@ if "install" not in fails:
         if a.encrypt:
             vm.expect(r"[Pp]assphrase|unlock disk", 300); time.sleep(2); vm.send("w3bs-luks-pass\n")
         vm.expect(r"\S+ login: ", 600); time.sleep(3)
+        if a.desktop:
+            # The greeter (tuigreet) on the screen: user name, then password.
+            time.sleep(8); vm.screenshot(os.path.join(a.out, f"greeter-{a.firmware}.png"))
+            vm.sendkeys("w3bs\n"); time.sleep(2); vm.sendkeys("w3bs-test-pass\n"); time.sleep(70)
+            vm.screenshot(os.path.join(a.out, f"desktop-{a.firmware}.png"))
         vm.send("w3bs\n"); vm.expect(r"[Pp]assword: ", 60); vm.send("w3bs-test-pass\n")
         time.sleep(15); vm.send("PS1='> '; PROMPT='> '\n"); time.sleep(2)
         rc, o = vm.sh("grep -E '^(ID|VERSION)=' /etc/w3bs-os-release; echo SHELL=$SHELL; "
@@ -61,6 +68,12 @@ if "install" not in fails:
         for c in ("w3bs", "mise", "node", "bun", "pnpm", "readm3"):
             check(f"tool {c}", f"HAVE_{c}" in o, "")
         check("user session units", "USER_UNITS_FAILED=0" in o, o)
+        if a.desktop:
+            rc, o = vm.sh("echo HYPR=$(pidof Hyprland) WAYBAR=$(pidof waybar); "
+                          "cat /run/user/1000/hypr/*/hyprland.log 2>/dev/null | grep -c 'Config error' | sed 's/^/CFGERR=/'", 120)
+            check("Hyprland session", re.search(r"HYPR=\d", o) is not None, o)
+            check("Waybar", re.search(r"WAYBAR=\d", o) is not None, o)
+            check("Hyprland config has no errors", "CFGERR=0" in o, o)
     finally:
         vm.stop()
 if fails:

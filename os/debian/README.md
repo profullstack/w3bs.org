@@ -26,7 +26,10 @@ ssh root@ with the shown password.
 2. Box setup: cli-tools root-ubuntu.sh (Debian + systemd) instead of root-w3bs-os; WEB_DOMAIN from
    the domain question; the W3BS landing page; curl wget mise bun pnpm readm3; w3bs + w3bs-desktop
    (glibc builds).
-3. Graphical installer (GTK 4 under cage) and the desktop: Hyprland, greetd + tuigreet, Waybar,
-   Firefox, TronBrowser (its glibc engine runs natively on Debian).
+3. Graphical installer (GTK 4 under cage). The desktop is done (1.2.1): `--desktop hyprland` (the
+   default with a display adapter) installs Hyprland 0.55 from trixie-backports in one transaction
+   with the rest (backports preferred: Hyprland needs backports' PipeWire and libxkbcommon), greetd +
+   tuigreet on tty1 (UTF-8 console), Waybar, Firefox ESR, TronBrowser, the W3BS wallpaper, and the
+   Sway (pixman) fallback session. The Agentic Desktop Layer for Debian comes next.
 4. CI: build + the QEMU install tests (os/iso/test/vmtest.py) on the Debian ISO; release 1.2.x and
    point w3bs.org/os at it. Alpine (os/iso) is then retired.

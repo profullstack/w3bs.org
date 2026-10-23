@@ -1,0 +1,8 @@
+/* W3BS OS: Waybar's packaged style with text in DejaVu Sans. The packaged style lists
+   FontAwesome first, which draws digits in the icon font and drops ".", "/" and ":";
+   icons still come from Font Awesome through fontconfig fallback. */
+@import url("file:///etc/xdg/waybar/style.css");
+
+* {
+    font-family: "DejaVu Sans", sans-serif;
+}
