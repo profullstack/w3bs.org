@@ -481,7 +481,8 @@ apply_static() {
 	ip link set "$NET_IFACE" up 2>/dev/null
 	ip -4 addr flush dev "$NET_IFACE" 2>/dev/null
 	ip addr add "$STATIC_IP" dev "$NET_IFACE" || fail "cannot set $STATIC_IP on $NET_IFACE"
-	ip route replace default via "$STATIC_GW" dev "$NET_IFACE" || fail "cannot use $STATIC_GW as the gateway on $NET_IFACE"
+	# onlink: KVM servers often give a /32 or a gateway outside the subnet (routed setups).
+	ip route replace default via "$STATIC_GW" dev "$NET_IFACE" onlink || fail "cannot use $STATIC_GW as the gateway on $NET_IFACE"
 	: >/etc/resolv.conf
 	for d in $STATIC_DNS; do echo "nameserver $d" >>/etc/resolv.conf; done
 	log "static network: $NET_IFACE $STATIC_IP via $STATIC_GW dns $STATIC_DNS"
@@ -490,7 +491,7 @@ apply_static6() {
 	ip link set "$NET_IFACE" up 2>/dev/null
 	ip -6 addr add "$STATIC_IP6" dev "$NET_IFACE" 2>/dev/null || ip -6 addr show dev "$NET_IFACE" | grep -q "${STATIC_IP6%/*}" \
 		|| fail "cannot set $STATIC_IP6 on $NET_IFACE"
-	ip -6 route replace default via "$STATIC_GW6" dev "$NET_IFACE" || fail "cannot use $STATIC_GW6 as the IPv6 gateway on $NET_IFACE"
+	ip -6 route replace default via "$STATIC_GW6" dev "$NET_IFACE" onlink || fail "cannot use $STATIC_GW6 as the IPv6 gateway on $NET_IFACE"
 	[ -s /etc/resolv.conf ] || { [ -n "$STATIC_DNS" ] || STATIC_DNS="2606:4700:4700::1111 2620:fe::fe"; for d in $STATIC_DNS; do echo "nameserver $d" >>/etc/resolv.conf; done; }
 	log "static IPv6: $NET_IFACE $STATIC_IP6 via $STATIC_GW6"
 }
@@ -583,7 +584,7 @@ auto $i"
 		INTERFACES="${INTERFACES}
 iface $i inet static
 	address $STATIC_IP
-	gateway $STATIC_GW"
+	up ip route replace default via $STATIC_GW dev $i onlink"
 	elif [ -z "$STATIC_IP6" ] || [ "$i" != "$NET_IFACE" ]; then
 		INTERFACES="${INTERFACES}
 iface $i inet dhcp"
@@ -593,7 +594,7 @@ iface $i inet dhcp"
 		INTERFACES="${INTERFACES}
 iface $i inet6 static
 	address $STATIC_IP6
-	gateway $STATIC_GW6
+	up ip -6 route replace default via $STATIC_GW6 dev $i onlink
 "
 	else
 		INTERFACES="${INTERFACES}
