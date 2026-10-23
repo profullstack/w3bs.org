@@ -267,13 +267,21 @@ class Installer(Gtk.ApplicationWindow):
             first = first or b
             self.disk_btns.append((dev, size, b))
             box.append(b)
-        self.encrypt = Gtk.Switch(active=True, halign=Gtk.Align.START)
+        box.append(label("Disk encryption", "card-title"))
+        # self.encrypt is the "Encrypt" card: get_active() is the choice.
+        self.encrypt = self.card(None, "Encrypt the disk  (recommended)",
+                                 "LUKS2. A passphrase is asked at every boot; if you lose it, the data cannot be recovered.", True)
+        self.no_encrypt = self.card(self.encrypt, "Do not encrypt",
+                                    "Boots straight to the login screen. For VMs, test machines and servers with a web console.")
+        row = Gtk.Box(spacing=16, homogeneous=True)
+        row.append(self.encrypt)
+        row.append(self.no_encrypt)
+        box.append(row)
         self.pp1 = Gtk.PasswordEntry(show_peek_icon=True)
         self.pp2 = Gtk.PasswordEntry(show_peek_icon=True)
-        self.encrypt.connect("notify::active", lambda *_: [w.set_sensitive(self.encrypt.get_active()) for w in (self.pp1, self.pp2)])
-        box.append(self.form([("Encrypt the disk (LUKS2)", self.encrypt), ("Disk passphrase", self.pp1),
-                              ("Passphrase again", self.pp2)]))
-        box.append(label("The passphrase is asked at every boot. If you lose it, the data cannot be recovered.", "muted"))
+        self.pp_form = self.form([("Disk passphrase", self.pp1), ("Passphrase again", self.pp2)])
+        self.encrypt.connect("toggled", lambda *_: self.pp_form.set_visible(self.encrypt.get_active()))
+        box.append(self.pp_form)
         self.disk_err = label("", "error")
         box.append(self.disk_err)
         return "disk", sc
@@ -411,6 +419,7 @@ class Installer(Gtk.ApplicationWindow):
             f"Computer name:  {self.hostname.get_text().strip()}",
             f"User:  {self.username.get_text().strip()} ({self.fullname.get_text().strip()}), administrator via doas",
             "W3BS:  w3bs CLI and the Agentic Desktop Layer (agent access OFF until you turn it on)",
+            "Dev tools:  curl, wget, mise (bun, pnpm), Node and readm3",
         ]
         while (child := self.review.get_first_child()) is not None:
             self.review.remove(child)
@@ -531,7 +540,7 @@ class Installer(Gtk.ApplicationWindow):
                 w.set_text(TEST_PW)
         if name == "disk":
             if os.environ.get("W3BS_GUI_TEST_NOENCRYPT"):
-                self.encrypt.set_active(False)
+                self.no_encrypt.set_active(True)
             elif TEST_PW:
                 for w in (self.pp1, self.pp2):
                     w.set_text(TEST_PW + "-luks")
