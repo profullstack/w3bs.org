@@ -230,9 +230,10 @@ class Installer(Gtk.ApplicationWindow):
         self.kb_layout.connect("notify::selected", self.on_layout)
         self.tz = dropdown(self.zones, "UTC", search=True)
         self.hostname = Gtk.Entry(text="w3bs")
+        self.domain = Gtk.Entry(placeholder_text="optional, e.g. dev1.example.com: its web page gets HTTPS")
         self.test_entry = Gtk.Entry(placeholder_text="Type here to test the keyboard (after install the layout above is used)")
         box.append(self.form([("Keyboard layout", self.kb_layout), ("Variant", self.kb_variant),
-                              ("Time zone", self.tz), ("Computer name", self.hostname), ("", self.test_entry)]))
+                              ("Time zone", self.tz), ("Computer name", self.hostname), ("Web domain", self.domain), ("", self.test_entry)]))
         return "locale", sc
 
     def on_layout(self, *_):
@@ -248,8 +249,13 @@ class Installer(Gtk.ApplicationWindow):
         self.username = Gtk.Entry(text="w3bs")
         self.pw1 = Gtk.PasswordEntry(show_peek_icon=True)
         self.pw2 = Gtk.PasswordEntry(show_peek_icon=True)
+        self.rpw1 = Gtk.PasswordEntry(show_peek_icon=True)
+        self.rpw2 = Gtk.PasswordEntry(show_peek_icon=True)
         box.append(self.form([("Full name", self.fullname), ("User name", self.username),
                               ("Password", self.pw1), ("Password again", self.pw2)]))
+        box.append(label("Root password (optional): for su and root logins on the console. Leave it empty "
+                         "to keep root locked; your account is an administrator either way (doas).", "muted"))
+        box.append(self.form([("Root password", self.rpw1), ("Root password again", self.rpw2)]))
         self.user_err = label("", "error")
         box.append(self.user_err)
         return "user", sc
@@ -364,6 +370,10 @@ class Installer(Gtk.ApplicationWindow):
                 err = "Use a password of at least 6 characters."
             elif self.pw1.get_text() != self.pw2.get_text():
                 err = "The two passwords are different."
+            elif self.rpw1.get_text() and len(self.rpw1.get_text()) < 6:
+                err = "Use a root password of at least 6 characters, or leave it empty."
+            elif self.rpw1.get_text() != self.rpw2.get_text():
+                err = "The two root passwords are different."
             self.user_err.set_text(err)
             return not err
         if name == "disk":
@@ -381,7 +391,9 @@ class Installer(Gtk.ApplicationWindow):
             self.disk_err.set_text(err)
             return not err
         if name == "locale":
-            return bool(re.fullmatch(r"[A-Za-z0-9-]{1,63}", self.hostname.get_text().strip()))
+            d = self.domain.get_text().strip()
+            return bool(re.fullmatch(r"[A-Za-z0-9-]{1,63}", self.hostname.get_text().strip())) and \
+                (not d or bool(re.fullmatch(r"[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+", d)))
         return True
 
     def go(self, delta):
@@ -417,7 +429,9 @@ class Installer(Gtk.ApplicationWindow):
             f"Keyboard:  {dd_value(self.kb_layout)} {dd_value(self.kb_variant)}",
             f"Time zone:  {dd_value(self.tz)}",
             f"Computer name:  {self.hostname.get_text().strip()}",
+            f"Web page:  {'https://' + self.domain.get_text().strip() if self.domain.get_text().strip() else 'http://' + self.hostname.get_text().strip() + ' (no domain: no HTTPS)'}",
             f"User:  {self.username.get_text().strip()} ({self.fullname.get_text().strip()}), administrator via doas",
+            f"Root:  {'password set (su, console login)' if self.rpw1.get_text() else 'locked (administrators use doas)'}",
             "W3BS:  w3bs CLI and the Agentic Desktop Layer (agent access OFF until you turn it on)",
             "Dev tools:  curl, wget, mise (bun, pnpm), Node and readm3",
         ]
@@ -443,9 +457,15 @@ class Installer(Gtk.ApplicationWindow):
             f.write(self.pw1.get_text() + "\n")
         args = [INSTALLER, "--defaults", "--yes", "--no-reboot", "--disk", dev, "--desktop", self.desktop(),
                 "--hostname", self.hostname.get_text().strip(), "--timezone", dd_value(self.tz),
+                *(["--domain", self.domain.get_text().strip()] if self.domain.get_text().strip() else []),
                 "--keymap", f"{dd_value(self.kb_layout)} {dd_value(self.kb_variant)}",
                 "--user", self.username.get_text().strip(), "--fullname", self.fullname.get_text().strip(),
                 "--password-file", pw]
+        if self.rpw1.get_text():
+            rp = os.path.join(work, "root")
+            with open(os.open(rp, os.O_WRONLY | os.O_CREAT, 0o600), "w") as f:
+                f.write(self.rpw1.get_text() + "\n")
+            args += ["--root-password-file", rp]
         if self.encrypt.get_active():
             pp = os.path.join(work, "luks")
             with open(os.open(pp, os.O_WRONLY | os.O_CREAT, 0o600), "w") as f:
@@ -495,7 +515,7 @@ class Installer(Gtk.ApplicationWindow):
         return self.proc is not None and self.proc.poll() is None
 
     def on_exit(self, rc):
-        for f in ("pw", "luks"):
+        for f in ("pw", "luks", "root"):
             try:
                 os.unlink(os.path.join(self.work, f))
             except OSError:

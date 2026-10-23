@@ -40,6 +40,8 @@ options:
   --desktop NAME          hyprland (default for a desktop install), plasma, gnome, xfce or none
   --server                a server (command line only) install: the same as --desktop none
   --hostname NAME         default: w3bs
+  --domain NAME           the name this machine is reached by on the web (e.g. dev1.example.com):
+                          Caddy serves the W3BS landing page there with automatic HTTPS
   --ip ADDR/PREFIX        static IPv4 instead of DHCP, e.g. 203.0.113.5/24 (servers whose
                           provider assigns the address); with --gateway, optional --dns
   --gateway ADDR          the IPv4 default gateway for --ip
@@ -123,13 +125,14 @@ ask() { # ask VAR "Question" default
 	eval "$_var=\$_ans"
 }
 
-read_secret() { # read_secret VAR "Prompt"
+read_secret() { # read_secret VAR "Prompt" [MINLEN] [optional]
 	_var=$1
 	[ -t 0 ] || fail "a password is needed but there is no terminal; use --password-file / --passphrase-file"
 	while :; do
 		printf '%s: ' "$2"
 		stty -echo; read -r _s1; _rc=$?; stty echo; printf '\n'
 		[ $_rc -eq 0 ] || fail "no input"
+		[ -z "$_s1" ] && [ "${4:-}" = optional ] && break
 		printf '%s (again): ' "$2"
 		stty -echo; read -r _s2; stty echo; printf '\n'
 		if [ -z "$_s1" ]; then say "It cannot be empty."; continue; fi
@@ -269,7 +272,7 @@ wired_interfaces() {
 
 # --- arguments --------------------------------------------------------------------------
 DEFAULTS= DISK= YES= ENCRYPT=1 DESKTOP= HOSTNAME_= TIMEZONE= KEYMAP= USERS= FULLNAME=
-STATIC_IP= STATIC_GW= STATIC_DNS= NET_IFACE= STATIC_IP6= STATIC_GW6=
+STATIC_IP= STATIC_GW= STATIC_DNS= NET_IFACE= STATIC_IP6= STATIC_GW6= DOMAIN=
 PASSWORD_FILE= PASSPHRASE_FILE= NO_REBOOT= SERIAL= ROOT_PASSWORD_FILE= SSH= KEY_ARGS=
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -281,6 +284,7 @@ while [ $# -gt 0 ]; do
 		--desktop) DESKTOP=${2:-}; shift ;;
 		--server) DESKTOP=none ;;
 		--hostname) HOSTNAME_=${2:-}; shift ;;
+		--domain) DOMAIN=${2:-}; shift ;;
 		--ip) STATIC_IP=${2:-}; shift ;;
 		--gateway) STATIC_GW=${2:-}; shift ;;
 		--dns) STATIC_DNS=${2:-}; shift ;;
@@ -390,6 +394,12 @@ if [ -z "$TIMEZONE" ]; then ask TIMEZONE "Timezone" "UTC"; fi
 [ -f "/usr/share/zoneinfo/$TIMEZONE" ] || fail "unknown timezone $TIMEZONE (see /usr/share/zoneinfo)"
 
 if [ -z "$HOSTNAME_" ]; then ask HOSTNAME_ "Hostname" "w3bs"; fi
+# A hostname with dots is the web name too; the machine's own name is its first label.
+case "$HOSTNAME_" in *.*) [ -n "$DOMAIN" ] || DOMAIN=$HOSTNAME_; HOSTNAME_=${HOSTNAME_%%.*} ;; esac
+if [ -z "$DOMAIN" ] && [ -z "$DEFAULTS" ]; then
+	ask DOMAIN "Domain name this machine is reached by, for its web page and HTTPS (e.g. dev1.example.com; Enter: none)" ""
+fi
+case "$DOMAIN" in ''|*.*) ;; *) fail "the domain must be a full name like dev1.example.com" ;; esac
 echo "$HOSTNAME_" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
 	|| fail "invalid hostname $HOSTNAME_ (lower-case letters, digits and -, up to 63 characters)"
 
@@ -445,7 +455,13 @@ for u in $USERS; do
 	printf '%s' "$_p" >"$WORK/pass/$u"; _p=
 done
 ROOT_PASS=
-[ -n "$ROOT_PASSWORD_FILE" ] && read_secret_file ROOT_PASS "$ROOT_PASSWORD_FILE"
+if [ -n "$ROOT_PASSWORD_FILE" ]; then
+	read_secret_file ROOT_PASS "$ROOT_PASSWORD_FILE"
+elif [ -z "$DEFAULTS" ] && [ -t 0 ]; then
+	# Without one, root stays locked and the users above are the administrators (doas).
+	say "A root password lets you use su and log in as root on the console."
+	read_secret ROOT_PASS "Root password (Enter: none, root stays locked; use doas)" 6 optional
+fi
 if [ -n "$ENCRYPT" ]; then
 	if [ -n "$PASSPHRASE_FILE" ]; then read_secret_file LUKS_PASS "$PASSPHRASE_FILE"
 	else
@@ -549,7 +565,7 @@ $(lsblk -no NAME,SIZE,FSTYPE,LABEL "$DISK" 2>/dev/null | sed 's/^/              
   Internet        IPv6 ${NET6:-no}, IPv4 ${NET4:-no}
   Network         $( [ -n "$STATIC_IP" ] && echo "static $STATIC_IP via $STATIC_GW on $NET_IFACE, DNS $STATIC_DNS" || echo "DHCP on $(echo $IFACES)" ); IPv6 $( [ -n "$STATIC_IP6" ] && echo "static $STATIC_IP6 via $STATIC_GW6" || echo "autoconfigured (SLAAC)" )
   Users           $USERS (zsh, admin via doas/wheel)$(for u in $USERS; do [ -s "$WORK/keys/$u" ] && printf ', %s: %s SSH key(s)' "$u" "$(grep -Ec '(ssh-|ecdsa-|sk-)' "$WORK/keys/$u")"; [ -s "$WORK/pass/$u" ] || printf ', %s: no password' "$u"; done)
-  Root            $( [ -n "$ROOT_PASS" ] && echo "password set" || echo "no password")$( [ -s "$WORK/keys/root" ] && echo ", $(grep -Ec '(ssh-|ecdsa-|sk-)' "$WORK/keys/root") SSH key(s)")
+  Root            $( [ -n "$ROOT_PASS" ] && echo "password set (su, console login)" || echo "locked: no password (administrators use doas)")$( [ -s "$WORK/keys/root" ] && echo ", $(grep -Ec '(ssh-|ecdsa-|sk-)' "$WORK/keys/root") SSH key(s)")
   SSH             $( [ -n "$SSH" ] && echo "sshd on: keys only, no password logins" || echo "off")
   Desktop         $DESKTOP$( case "$DESKTOP" in plasma) echo " (KDE Plasma, SDDM)" ;; hyprland) echo " (Hyprland, greetd + tuigreet)" ;; none) echo " (server install: command line only)" ;; esac )
   W3BS            w3bs CLI and w3bs-desktop in /usr/local/bin; W3BS repo added at first login
@@ -557,7 +573,7 @@ $(lsblk -no NAME,SIZE,FSTYPE,LABEL "$DISK" 2>/dev/null | sed 's/^/              
   Box setup       root-w3bs-os (cli-tools): oh-my-zsh, tmux, moshcode, threatcrush, hqterm, ufw, zram
   Browsers        $( [ "$DESKTOP" = none ] && echo "none (server install)" || echo "Firefox and TronBrowser (tronbrowser.dev, Flathub Ungoogled Chromium engine)" )
   Agent access    Agentic Desktop Layer installed, agent access OFF until you turn it on
-  Web server      Caddy, enabled, no sites (add them in /etc/caddy/sites/)
+  Web server      Caddy: the W3BS landing page on $( [ -n "$DOMAIN" ] && echo "https://$DOMAIN" || echo "http://$HOSTNAME_ (no domain: no HTTPS)" ); your sites in /etc/caddy/conf.d/
   Serial console  $( [ -n "$SERIAL" ] && echo "ttyS0 115200 (console and login)" || echo "off" )
   Packages        downloaded from the Alpine CDN mirror (network installer)
 
@@ -950,6 +966,14 @@ done
 # the chroot no init is running, so it sets up everything but services; a one-shot at first
 # boot (/etc/local.d/w3bs-first-boot.start) re-runs it to enable and start those.
 step "Running root-w3bs-os (shell, tools, firewall, Caddy and account setup)"
+# Its settings for this box, read on every run (the environment still wins): the web name
+# (HTTPS) or, without one, plain http on the hostname.
+mkdir -p "$TARGET/etc/cli-tools"
+{
+	echo "# W3BS OS install: settings root-w3bs-os reads on every run (KEY=value)."
+	if [ -n "$DOMAIN" ]; then echo "WEB_DOMAIN=$DOMAIN"; else echo "WEB_DOMAIN=$HOSTNAME_"; echo "WEB_TLS=off"; fi
+} >"$TARGET/etc/cli-tools/server.conf"
+chmod 0644 "$TARGET/etc/cli-tools/server.conf"
 ROOT_W3BS_INSTALL=https://raw.githubusercontent.com/profullstack/cli-tools/master/install-root-w3bs-os.sh
 if in_target apk add --no-progress bash >>"$LOG" 2>&1 \
 	&& in_target sh -c "curl -fsSL $ROOT_W3BS_INSTALL | sh" >>"$LOG" 2>&1 \
@@ -982,18 +1006,32 @@ else
 	say "warning: could not install root-w3bs-os (see $LOG); later: w3bs install profullstack.com/root-w3bs-os"
 fi
 
-step "Installing Caddy (the default web server; no sites yet)"
+step "Setting up Caddy and the W3BS landing page"
 in_target apk add --no-progress caddy >>"$LOG" 2>&1 || fail "cannot install caddy"
-mkdir -p "$TARGET/etc/caddy/sites"
-cat >"$TARGET/etc/caddy/Caddyfile" <<'EOF' || fail "cannot write /etc/caddy/Caddyfile"
-# W3BS OS: Caddy runs with no sites. Add one file per site in /etc/caddy/sites/, for example
+# The landing page (what W3BS OS is, common commands, links to w3bs.org). root-w3bs-os's own
+# staff page is replaced; a page without its marker is left alone by its later runs.
+mkdir -p "$TARGET/var/www/userdirs"
+install -m 0644 /usr/share/w3bs-os/www/index.html "$TARGET/var/www/userdirs/index.html" || fail "cannot install the landing page"
+chmod 0755 "$TARGET/var/www" "$TARGET/var/www/userdirs"
+mkdir -p "$TARGET/etc/caddy/conf.d"
+if grep -qs 'managed by cli-tools/root-w3bs-os' "$TARGET/etc/caddy/Caddyfile"; then
+	log "Caddy: root-w3bs-os's Caddyfile (WEB_DOMAIN ${DOMAIN:-$HOSTNAME_})"
+else
+	# root-w3bs-os did not run: serve the landing page ourselves, sites in conf.d.
+	cat >"$TARGET/etc/caddy/Caddyfile" <<EOF || fail "cannot write /etc/caddy/Caddyfile"
+# W3BS OS: the landing page, then one file per site in /etc/caddy/conf.d/, for example
 #   example.com {
 #   	reverse_proxy 127.0.0.1:3000
 #   }
 # then: doas rc-service caddy reload
-import /etc/caddy/sites/*
+${DOMAIN:-:80} {
+	root * /var/www/userdirs
+	file_server
+}
+import /etc/caddy/conf.d/*.caddy
 EOF
-chmod 0755 "$TARGET/etc/caddy" "$TARGET/etc/caddy/sites" && chmod 0644 "$TARGET/etc/caddy/Caddyfile"
+fi
+chmod 0755 "$TARGET/etc/caddy" "$TARGET/etc/caddy/conf.d" && chmod 0644 "$TARGET/etc/caddy/Caddyfile"
 in_target caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >>"$LOG" 2>&1 || fail "the Caddy configuration does not load"
 in_target rc-update add caddy default >>"$LOG" 2>&1 || fail "cannot enable caddy"
 

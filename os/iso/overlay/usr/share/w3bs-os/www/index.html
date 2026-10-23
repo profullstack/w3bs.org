@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<!-- W3BS OS default landing page (w3bs-os-install). Replace it freely: root-w3bs-os leaves a
+     page without its marker alone. File: /var/www/userdirs/index.html -->
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W3BS OS server</title>
+<meta name="description" content="This server runs W3BS OS, the Alpine Linux based OS from w3bs.org.">
+<style>
+  :root { color-scheme: light dark; --bg:#f6f4ed; --fg:#1f2a2a; --dim:#5d6868; --line:#ddd8cb;
+          --card:#ffffff; --accent:#d9532c; --code:#efece2 }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#101418; --fg:#e9e6dc; --dim:#9aa4a4; --line:#2a3133; --card:#161b1f; --code:#1b2226 }
+  }
+  * { box-sizing: border-box }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif }
+  .wrap { max-width: 56rem; margin: 0 auto; padding: 3.5rem 1rem 3rem }
+  .mark { font-weight: 800; font-size: 2.6rem; letter-spacing: -.03em; margin: 0 }
+  .mark span { color: var(--accent) }
+  .eyebrow { color: var(--accent); font-size: .75rem; letter-spacing: .14em; font-weight: 700;
+             text-transform: uppercase; margin: 0 0 .5rem }
+  h1 { font-size: 1.6rem; line-height: 1.25; margin: 1.25rem 0 .5rem }
+  .lead { color: var(--dim); max-width: 40rem; margin: 0 0 2rem }
+  h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .1em; color: var(--dim);
+       margin: 2.5rem 0 .75rem; font-weight: 700 }
+  .grid { display: grid; gap: .9rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)) }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: .6rem; padding: 1rem }
+  .card h3 { margin: 0 0 .35rem; font-size: 1rem }
+  .card p { margin: 0 0 .6rem; color: var(--dim); font-size: .92rem }
+  pre { margin: 0; background: var(--code); border-radius: .4rem; padding: .6rem .7rem; overflow-x: auto;
+        font: .82rem/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em }
+  a { color: var(--accent) }
+  .links { display: flex; flex-wrap: wrap; gap: .6rem 1.4rem; margin: 0; padding: 0; list-style: none }
+  footer { margin-top: 3rem; color: var(--dim); font-size: .85rem; border-top: 1px solid var(--line); padding-top: 1rem }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <p class="eyebrow">W3BS OS server</p>
+  <p class="mark">w3bs<span>.</span></p>
+  <h1 id="host">This server runs W3BS OS.</h1>
+  <p class="lead">W3BS OS is a lightweight Alpine Linux based operating system for servers, desktops and
+    agents, with the <code>w3bs</code> package manager, zsh, Caddy, mise and the Profullstack tools
+    installed. This is its default page: the owner has not published a site here yet.</p>
+
+  <h2>Common commands</h2>
+  <div class="grid">
+    <div class="card"><h3>Find and install software</h3>
+      <p>Signed packages from the W3BS repository.</p>
+      <pre>w3bs search &lt;name&gt;
+w3bs install &lt;name&gt;
+w3bs list</pre></div>
+    <div class="card"><h3>Keep it up to date</h3>
+      <p>Everything installed with w3bs, then the OS.</p>
+      <pre>w3bs update --all
+doas w3bs os update</pre></div>
+    <div class="card"><h3>Administer</h3>
+      <p>Administrators use doas (sudo for Alpine).</p>
+      <pre>doas &lt;command&gt;
+doas -s            # a root shell
+doas rc-service caddy reload</pre></div>
+    <div class="card"><h3>Developer tools</h3>
+      <p>mise manages the runtimes; pnpm and bun are ready.</p>
+      <pre>mise use -g node@lts python@3
+pnpm i -g &lt;package&gt;
+bun --version</pre></div>
+    <div class="card"><h3>Your own page</h3>
+      <p>Every account gets a page and dev app hosting.</p>
+      <pre>~/public_html/index.html   # /~you
+~/apps/&lt;name&gt;/public/       # &lt;name&gt;.you.this-domain</pre></div>
+    <div class="card"><h3>A site of your own</h3>
+      <p>One file per site; Caddy gets the HTTPS certificate.</p>
+      <pre>doas vi /etc/caddy/conf.d/example.com.caddy
+#   example.com {
+#     reverse_proxy 127.0.0.1:3000
+#   }
+doas rc-service caddy reload</pre></div>
+  </div>
+
+  <h2>Learn more</h2>
+  <ul class="links">
+    <li><a href="https://w3bs.org/">w3bs.org</a></li>
+    <li><a href="https://w3bs.org/os">W3BS OS</a></li>
+    <li><a href="https://w3bs.org/packages">Packages</a></li>
+    <li><a href="https://w3bs.org/docs/os-prd.md">Specification</a></li>
+    <li><a href="https://w3bs.org/fleet">Fleet: watch your servers</a></li>
+  </ul>
+
+  <footer>Replace this page: <code>/var/www/userdirs/index.html</code>.
+    Powered by <a href="https://w3bs.org/os">W3BS OS</a>.</footer>
+</main>
+<script>
+  // Name the host in the heading (the page is static; this is the only script).
+  document.getElementById("host").textContent = location.hostname + " runs W3BS OS.";
+</script>
+</body>
+</html>

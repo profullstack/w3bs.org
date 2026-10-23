@@ -93,6 +93,16 @@ root keys are accepted too. With no DHCP, choose 4 on the first screen to set a 
 first. The machine's own consoles still log root in without a password. None of this reaches
 the installed system: its root stays locked and its sshd keeps the installer's settings.
 
+## Root password, web domain and landing page
+
+The installer asks for a root password after the user's (Enter keeps root locked: the users
+are administrators through doas; `--root-password-file` for unattended installs), and for the
+domain the machine is reached by (`--domain dev1.example.com`; a dotted hostname counts).
+root-w3bs-os gets it as WEB_DOMAIN in /etc/cli-tools/server.conf, so Caddy serves the W3BS
+landing page (/var/www/userdirs/index.html: what W3BS OS is, common commands, links to
+w3bs.org) at https://<domain> with an automatic certificate, or at http://<hostname> without
+a domain. Your own sites go in /etc/caddy/conf.d/*.caddy.
+
 ## After the install
 
 Both installers eject the installer DVD before they reboot, so the machine (or VM) starts
