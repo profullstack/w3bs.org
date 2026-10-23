@@ -1,0 +1,13 @@
+#!/bin/sh
+# W3BS OS live system: networkd + resolved, SSH with the one-time password, branding.
+set -e
+systemctl enable systemd-networkd systemd-resolved ssh w3bs-live-ssh
+ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+# Names through systemd-resolved even when /etc/resolv.conf is rewritten (live-boot does).
+grep -q 'resolve' /etc/nsswitch.conf || sed -i 's/^hosts:.*/hosts:          files resolve [!UNAVAIL=return] dns/' /etc/nsswitch.conf
+echo w3bs-os >/etc/hostname
+cat >/etc/motd <<'MOTD'
+
+  W3BS OS installer (live system, runs from RAM) - https://w3bs.org/os
+
+MOTD

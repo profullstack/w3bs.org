@@ -1,0 +1,11 @@
+[Unit]
+Description=W3BS OS live: one-time root password for SSH
+Before=ssh.service
+ConditionPathExists=/run/live/medium
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/w3bs-live-ssh
+
+[Install]
+WantedBy=multi-user.target

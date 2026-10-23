@@ -1,0 +1,8 @@
+# W3BS OS live system: every wired card, DHCPv4 and IPv6 (router advertisements, DHCPv6),
+# DNS from either, retried by systemd-networkd until the network answers.
+[Match]
+Type=ether
+
+[Network]
+DHCP=yes
+IPv6AcceptRA=yes
