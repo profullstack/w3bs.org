@@ -60,6 +60,7 @@ rc_add hostname boot
 rc_add bootmisc boot
 rc_add syslog boot
 rc_add networking boot
+rc_add local default
 
 rc_add mount-ro shutdown
 rc_add killprocs shutdown
@@ -70,6 +71,6 @@ chown -R 0:0 "$tmp"
 # on the build host's umask (git keeps only the x bit); 007 once left /etc 0770 on installs.
 find "$tmp" -type d -exec chmod 0755 {} +
 find "$tmp" -type f -exec chmod 0644 {} +
-chmod 0755 "$tmp"/usr/local/sbin/* "$tmp"/usr/local/bin/* "$tmp"/usr/share/w3bs-os/first-login.sh "$tmp"/usr/share/w3bs-os/w3bs-hyprland "$tmp"/usr/share/w3bs-os/hypr/*.sh 2>/dev/null || true
+chmod 0755 "$tmp"/usr/local/sbin/* "$tmp"/usr/local/bin/* "$tmp"/usr/share/w3bs-os/first-login.sh "$tmp"/usr/share/w3bs-os/w3bs-hyprland "$tmp"/usr/share/w3bs-os/hypr/*.sh "$tmp"/etc/local.d/*.start 2>/dev/null || true
 chmod 0700 "$tmp"/usr/local/sbin/w3bs-os-install 2>/dev/null || true
 tar -c -C "$tmp" etc usr | gzip -9n > "$HOSTNAME".apkovl.tar.gz

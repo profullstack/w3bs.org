@@ -2,6 +2,6 @@
 # Live system: a login prompt on the first serial port, only if the machine has
 # one (otherwise init would respawn a failing getty forever).
 if stty -F /dev/ttyS0 >/dev/null 2>&1; then
-	exec /sbin/getty -L 115200 ttyS0 vt100
+	exec /sbin/getty -n -l /usr/local/sbin/w3bs-live-login -L 115200 ttyS0 vt100
 fi
 exec sleep 2147483647
