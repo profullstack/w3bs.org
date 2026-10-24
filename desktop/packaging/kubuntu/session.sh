@@ -79,8 +79,11 @@ konsole >"$LOGS/konsole.log" 2>&1 &
 # unless `w3bs fleet desktop password` set one; then the w3bs.org page asks for it.
 PASSWD=$HOME/.config/tigervnc/passwd
 if [ -s "$PASSWD" ]; then SECURITY="-SecurityTypes VncAuth -PasswordFile $PASSWD"; else SECURITY="-SecurityTypes None"; fi
+# No blacklist: on a Unix socket every client has the same "address", so five connections that
+# never logged in (a probe, a tab closed at the password prompt) locked every viewer out, for a
+# timeout that doubles each try. The socket is owner-only; there is nobody else to keep out.
 # shellcheck disable=SC2086
-w0vncserver -rfbport -1 -rfbunixpath /vnc/vnc.sock $SECURITY -AlwaysShared \
+w0vncserver -rfbport -1 -rfbunixpath /vnc/vnc.sock $SECURITY -AlwaysShared -UseBlacklist=0 \
   -desktop "w3bs desktop" >"$LOGS/w0vncserver.log" 2>&1 &
 W0=$!
 
