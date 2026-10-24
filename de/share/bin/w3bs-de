@@ -9,7 +9,8 @@
 #   w3bs-de update             fetch the latest defaults (your settings are kept)
 #   w3bs-de version
 #
-# Inside the session: autostart, tray, launcher, agents-status (for the bar), logout.
+# Inside the session: autostart, tray, launcher, terminal (hqterm, else foot), agents-status
+# (for the bar), logout.
 set -u
 
 VERSION="@W3BS_DE_VERSION@"
@@ -227,6 +228,10 @@ case "${1:-help}" in
   autostart) cmd_autostart ;;
   tray) cmd_tray ;;
   launcher) exec fuzzel --config="$D/fuzzel/fuzzel.ini" ;;
+  # The terminal (SUPER+RETURN): hqterm's desktop app when hqterm is installed (persistent
+  # sessions and tabs, https://hqterm.sh), else foot.
+  terminal) if have hqterm && [ -e "$HOME/.local/opt/hqterm-desktop" ]; then exec hqterm desktop; fi
+            exec foot --config="$D/foot/foot.ini" ;;
   agents-status) cmd_agents_status ;;
   agent-mode) shift; cmd_agent_mode "$@" ;;
   wallpaper) shift; cmd_wallpaper "$@" ;;

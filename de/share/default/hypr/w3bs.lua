@@ -14,7 +14,7 @@ local d = share .. "/default"
 
 w3bs = w3bs or {}
 w3bs.share = share
-w3bs.terminal = os.getenv("W3BS_DE_TERMINAL") or ("foot --config=" .. d .. "/foot/foot.ini")
+w3bs.terminal = os.getenv("W3BS_DE_TERMINAL") or "w3bs-de terminal"
 w3bs.launcher = "fuzzel --config=" .. d .. "/fuzzel/fuzzel.ini"
 w3bs.browser = os.getenv("W3BS_DE_BROWSER") or "xdg-open https://w3bs.org"
 

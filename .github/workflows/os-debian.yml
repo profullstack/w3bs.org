@@ -10,6 +10,7 @@ on:
     branches: [main]
     paths:
       - "os/debian/**"
+      - "de/**"
       - "os/iso/test/vmtest.py"
       - ".github/workflows/os-debian.yml"
   workflow_dispatch:
