@@ -104,13 +104,13 @@ if "install" not in fails:
         rc, o = vm.sh("grep -E '^(ID|VERSION)=' /etc/w3bs-os-release; echo SHELL=$SHELL; "
                       "curl -s -o /dev/null -w 'NET=%{http_code}\\n' http://deb.debian.org/debian/dists/trixie/Release; "
                       "echo w3bs-test-pass | sudo -S -p '' id -u; "
-                      "for c in w3bs mise node bun pnpm readm3 hqterm hqsh; do command -v $c >/dev/null && echo HAVE_$c; done; "
+                      "for c in w3bs mise node bun pnpm readm3 hqterm hqsh threatcrush; do command -v $c >/dev/null && echo HAVE_$c; done; "
                       "systemctl --failed --no-legend --no-pager | grep -c 'user@' | sed 's/^/USER_UNITS_FAILED=/'", 300)
         check("os-release", "ID=w3bs-os" in o, o)
         check("zsh", "SHELL=/usr/bin/zsh" in o, o)
         check("network", "NET=200" in o, o)
         check("sudo", re.search(r"^0\s*$", o, re.M) is not None, o)
-        for c in ("w3bs", "mise", "node", "bun", "pnpm", "readm3", "hqterm", "hqsh"):
+        for c in ("w3bs", "mise", "node", "bun", "pnpm", "readm3", "hqterm", "hqsh", "threatcrush"):
             check(f"tool {c}", f"HAVE_{c}" in o, "")
         check("user session units", "USER_UNITS_FAILED=0" in o, o)
         if a.cidata:
