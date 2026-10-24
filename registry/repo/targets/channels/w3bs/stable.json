@@ -70,6 +70,10 @@
     {
       "version": "0.1.16",
       "manifest": "manifests/w3bs/0.1.16.json"
+    },
+    {
+      "version": "0.1.17",
+      "manifest": "manifests/w3bs/0.1.17.json"
     }
   ],
   "revoked": []
