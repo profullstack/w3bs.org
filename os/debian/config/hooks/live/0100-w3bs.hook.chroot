@@ -2,6 +2,10 @@
 # W3BS OS live system: networkd + resolved, SSH with the one-time password, branding.
 set -e
 systemctl enable systemd-networkd systemd-resolved ssh w3bs-live-ssh w3bs-live-net
+# live-boot writes /etc/network/interfaces (DHCP on the card) for ifupdown. On a VPS without DHCP
+# its client falls back to a 169.254.x address and replaces the default route, cutting off the
+# static address systemd-networkd set: networkd alone runs the network here.
+systemctl mask ifup@.service networking.service
 ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
 # Names through systemd-resolved even when /etc/resolv.conf is rewritten (live-boot does).
 grep -q 'resolve' /etc/nsswitch.conf || sed -i 's/^hosts:.*/hosts:          files resolve [!UNAVAIL=return] dns/' /etc/nsswitch.conf
