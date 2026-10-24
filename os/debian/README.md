@@ -47,6 +47,15 @@ come with it, and the **Agentic Desktop Layer** (`w3bs-desktop`, glibc build in 
 `w3bs-de autostart` starts its broker and tray, and agent access stays OFF until the user turns it
 on.
 
+**Login and fleet screen (1.2.7).** At boot greetd's `initial_session` logs the first user in on
+its own with `W3BS_LOCK_AT_START=1`: `w3bs-hyprland` runs hyprlock as soon as Hyprland is up, so
+the console shows a lock screen, never an open desktop (`--no-autologin` keeps the tuigreet
+greeter). Every Hyprland session also runs wayvnc on `$XDG_RUNTIME_DIR/w3bs-vnc.sock` (0700, no TCP
+port; restarted when it exits, which it does when the lock screen goes away). `w3bs fleet screen on
+--control --vnc unix:/run/user/<uid>/w3bs-vnc.sock` relays it to w3bs.org/fleet, where the owner
+sees the lock screen and can type the password. `--fleet-token fj_...` does that join at first boot
+(`w3bs-fleet-join.service`, lingering user service of the first user).
+
 ## Tests
 
 `test/dtest.py` boots the ISO in QEMU (KVM when available) and checks the live system, an
