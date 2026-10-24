@@ -105,6 +105,18 @@ def online():
         return False
 
 
+def live_net():
+    """The static network w3bs-live-net took from the provider (cloud-init seed or ip=), or {}."""
+    out = {}
+    try:
+        for line in open("/run/w3bs-net.env", encoding="utf-8"):
+            k, _, v = line.strip().partition("=")
+            out[k] = (shlex.split(v) or [""])[0]
+    except OSError:
+        pass
+    return out if out.get("STATIC_IP") or out.get("STATIC_IP6") else {}
+
+
 def disks():
     try:
         out = subprocess.run([INSTALLER, "--list-disks"], capture_output=True, text=True, timeout=30).stdout
@@ -300,6 +312,18 @@ class Installer(Gtk.ApplicationWindow):
                                    ("IPv6 address/prefix", self.ip6), ("IPv6 gateway", self.gw6), ("DNS servers", self.dns)])
         self.net_form.set_visible(False)
         self.net_static.connect("toggled", lambda *_: self.net_form.set_visible(self.net_static.get_active()))
+        # No DHCP on many VPSes: the provider's static address (read by the live system) is filled in.
+        given = live_net()
+        if given:
+            if given.get("NET_IFACE") in names:
+                self.iface.set_selected(names.index(given["NET_IFACE"]))
+            for w, k in ((self.ip4, "STATIC_IP"), (self.gw4, "STATIC_GW"), (self.ip6, "STATIC_IP6"), (self.gw6, "STATIC_GW6")):
+                w.set_text(given.get(k, ""))
+            if given.get("STATIC_DNS"):
+                self.dns.set_text(given["STATIC_DNS"])
+            self.net_static.set_active(True)
+            self.net_form.set_visible(True)
+            box.append(label(f"Filled in from your provider ({given.get('NET_SOURCE', 'the live system')}); this machine runs without DHCP.", "muted"))
         box.append(self.net_form)
         self.net_err = label("", "error")
         box.append(self.net_err)

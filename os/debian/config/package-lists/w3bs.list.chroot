@@ -36,3 +36,4 @@ gir1.2-gtk-4.0
 fonts-dejavu-core
 xkb-data
 libgl1-mesa-dri
+python3-yaml

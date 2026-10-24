@@ -1,0 +1,191 @@
+#!/usr/bin/python3 -I
+"""W3BS OS live system: a static network from the provider, before systemd-networkd starts.
+
+Many VPS hosts (Proxmox, OpenStack, Luxvps...) run no DHCP and hand the address to the VM on a
+cloud-init NoCloud disk (label "cidata"): network-config, version 1 or 2. A kernel `ip=` option
+(ip=ADDR::GW:NETMASK:HOST:IFACE:off, plus nameserver=) works too. Found settings become
+/run/systemd/network/10-w3bs-live.network (it wins over the DHCP default, 20-wired.network) and
+/run/w3bs-net.env, which w3bs-os-install reads so the installed system keeps the same address.
+SSH keys from the cidata user-data (ssh_authorized_keys) go to /run/w3bs-live-ssh-keys.
+Without either source this does nothing and DHCP/IPv6 stay automatic.
+"""
+import glob, ipaddress, os, shlex, subprocess, sys, tempfile
+
+try:
+    import yaml
+except ImportError:  # pragma: no cover
+    yaml = None
+
+
+def log(msg):
+    print(f"w3bs-live-net: {msg}", file=sys.stderr)
+
+
+def macs():
+    out = {}
+    for p in glob.glob("/sys/class/net/*/address"):
+        name = p.split("/")[4]
+        if name != "lo" and os.path.exists(f"/sys/class/net/{name}/device"):
+            out[open(p).read().strip().lower()] = name
+    return out
+
+
+def read_cidata():
+    """{'network-config': text, 'user-data': text} from a NoCloud seed disk, or {}."""
+    try:
+        devs = subprocess.run(["blkid", "-o", "device", "-t", "LABEL=cidata"], capture_output=True, text=True).stdout.split()
+        devs += subprocess.run(["blkid", "-o", "device", "-t", "LABEL=CIDATA"], capture_output=True, text=True).stdout.split()
+    except OSError:
+        return {}
+    for dev in devs:
+        mnt = tempfile.mkdtemp(prefix="cidata-")
+        if subprocess.run(["mount", "-o", "ro", dev, mnt], capture_output=True).returncode != 0:
+            continue
+        try:
+            got = {}
+            for name in ("network-config", "user-data", "meta-data"):
+                p = os.path.join(mnt, name)
+                if os.path.isfile(p):
+                    got[name] = open(p, encoding="utf-8", errors="replace").read()
+            log(f"cloud-init seed on {dev}: {', '.join(sorted(got)) or 'empty'}")
+            return got
+        finally:
+            subprocess.run(["umount", mnt], capture_output=True)
+            os.rmdir(mnt)
+    return {}
+
+
+def prefixed(addr, netmask=None):
+    if "/" in addr:
+        return str(ipaddress.ip_interface(addr))
+    if netmask:
+        return str(ipaddress.ip_interface(f"{addr}/{netmask}"))
+    return str(ipaddress.ip_interface(addr + ("/64" if ":" in addr else "/24")))
+
+
+def from_v1(cfg, bymac):
+    """cloud-init network config v1 -> (iface, [addrs], gw4, gw6, [dns])."""
+    iface, addrs, gw4, gw6, dns = None, [], None, None, []
+    for item in cfg.get("config") or []:
+        t = item.get("type")
+        if t == "physical" and iface is None:
+            mac = str(item.get("mac_address") or "").lower()
+            name = bymac.get(mac) or (item.get("name") if os.path.exists(f"/sys/class/net/{item.get('name')}") else None)
+            subs = [s for s in item.get("subnets") or [] if str(s.get("type", "")).startswith("static")]
+            if not name or not subs:
+                continue
+            iface = name
+            for s in subs:
+                a = prefixed(str(s["address"]), s.get("netmask"))
+                addrs.append(a)
+                if s.get("gateway"):
+                    if ":" in a:
+                        gw6 = str(s["gateway"])
+                    else:
+                        gw4 = str(s["gateway"])
+                dns += [str(d) for d in s.get("dns_nameservers") or []]
+        elif t == "nameserver":
+            dns += [str(d) for d in item.get("address") or []]
+    return iface, addrs, gw4, gw6, dns
+
+
+def from_v2(cfg, bymac):
+    """netplan-style v2 -> same tuple (the first ethernet with addresses)."""
+    for key, eth in (cfg.get("ethernets") or {}).items():
+        mac = str((eth.get("match") or {}).get("macaddress") or "").lower()
+        name = bymac.get(mac) or (eth.get("set-name") if eth.get("set-name") and os.path.exists(f"/sys/class/net/{eth.get('set-name')}") else None) \
+            or (key if os.path.exists(f"/sys/class/net/{key}") else None)
+        addrs = [prefixed(str(a)) for a in eth.get("addresses") or []]
+        if not name or not addrs:
+            continue
+        gw4, gw6 = eth.get("gateway4"), eth.get("gateway6")
+        for r in eth.get("routes") or []:
+            if str(r.get("to")) in ("default", "0.0.0.0/0"):
+                gw4 = r.get("via")
+            elif str(r.get("to")) in ("::/0",):
+                gw6 = r.get("via")
+        dns = [str(d) for d in (eth.get("nameservers") or {}).get("addresses") or []]
+        return name, addrs, gw4 and str(gw4), gw6 and str(gw6), dns
+    return None, [], None, None, []
+
+
+def from_cmdline(bymac):
+    """ip=ADDR:PEER:GW:NETMASK:HOST:IFACE:off[:DNS0[:DNS1]] and nameserver=X."""
+    args = open("/proc/cmdline").read().split()
+    ipv, dns = None, []
+    for a in args:
+        if a.startswith("ip=") and a.count(":") >= 3:
+            ipv = a[3:]
+        elif a.startswith("nameserver="):
+            dns.append(a.split("=", 1)[1])
+    if not ipv:
+        return None, [], None, None, []
+    f = ipv.split(":") + [""] * 9
+    addr, gw, mask, iface = f[0], f[2], f[3], f[5]
+    dns += [d for d in f[7:9] if d]
+    if not addr:
+        return None, [], None, None, []
+    if not iface or not os.path.exists(f"/sys/class/net/{iface}"):
+        iface = sorted(bymac.values())[0] if bymac else None
+    return iface, [prefixed(addr, mask or None)], gw or None, None, dns
+
+
+def main():
+    # The seed disk and the network cards appear through udev: let it finish first.
+    subprocess.run(["udevadm", "settle", "-t", "15"], capture_output=True)
+    bymac = macs()
+    seed = read_cidata()
+    iface, addrs, gw4, gw6, dns, source = None, [], None, None, [], ""
+    if seed.get("network-config") and yaml:
+        try:
+            cfg = yaml.safe_load(seed["network-config"]) or {}
+            cfg = cfg.get("network", cfg)
+            iface, addrs, gw4, gw6, dns = (from_v2 if cfg.get("version") == 2 else from_v1)(cfg, bymac)
+            source = "cloud-init network-config"
+        except Exception as e:  # a broken seed must not stop the live system
+            log(f"cannot read network-config: {e}")
+    if not addrs:
+        iface, addrs, gw4, gw6, dns = from_cmdline(bymac)
+        source = "kernel ip="
+    if seed.get("user-data") and yaml:
+        try:
+            ud = yaml.safe_load(seed["user-data"]) or {}
+            keys = list(ud.get("ssh_authorized_keys") or [])
+            for u in ud.get("users") or []:
+                if isinstance(u, dict):
+                    keys += u.get("ssh_authorized_keys") or []
+            keys = [k.strip() for k in keys if isinstance(k, str) and k.strip().startswith(("ssh-", "ecdsa-", "sk-"))]
+            if keys:
+                with open("/run/w3bs-live-ssh-keys", "w") as f:
+                    f.write("\n".join(keys) + "\n")
+                log(f"{len(keys)} SSH key(s) from the cloud-init user-data")
+        except Exception as e:
+            log(f"cannot read user-data: {e}")
+    if not iface or not addrs:
+        log("no static network given: DHCP and IPv6 stay automatic")
+        return 0
+    ip4 = next((a for a in addrs if ":" not in a), "")
+    ip6 = next((a for a in addrs if ":" in a), "")
+    os.makedirs("/run/systemd/network", exist_ok=True)
+    lines = ["# Written by w3bs-live-net from the " + source, "[Match]", f"Name={iface}", "", "[Network]"]
+    lines.append("DHCP=no" if ip4 else "DHCP=ipv4")
+    lines.append("IPv6AcceptRA=yes")
+    lines += [f"DNS={d}" for d in dns]
+    for a in addrs:
+        lines += ["", "[Address]", f"Address={a}"]
+    for g in (gw4 if ip4 else None, gw6 if ip6 else None):
+        if g:
+            lines += ["", "[Route]", f"Gateway={g}", "GatewayOnLink=yes"]
+    with open(f"/run/systemd/network/10-w3bs-live.network", "w") as f:
+        f.write("\n".join(lines) + "\n")
+    env = {"NET_IFACE": iface, "STATIC_IP": ip4, "STATIC_GW": gw4 if ip4 else "", "STATIC_IP6": ip6,
+           "STATIC_GW6": gw6 if ip6 else "", "STATIC_DNS": " ".join(dns), "NET_SOURCE": source}
+    with open("/run/w3bs-net.env", "w") as f:
+        for k, v in env.items():
+            f.write(f"{k}={shlex.quote(v or '')}\n")
+    log(f"static network on {iface} from the {source}: {' '.join(addrs)} gw {gw4 or '-'} {gw6 or ''} dns {' '.join(dns)}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

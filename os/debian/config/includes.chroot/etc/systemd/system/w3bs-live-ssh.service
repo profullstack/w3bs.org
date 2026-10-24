@@ -1,6 +1,7 @@
 [Unit]
 Description=W3BS OS live: one-time root password for SSH
 Before=ssh.service
+After=w3bs-live-net.service
 ConditionPathExists=/run/live/medium
 
 [Service]
