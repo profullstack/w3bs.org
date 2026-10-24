@@ -54,6 +54,8 @@ try:
     if a.cidata:
         _, n = vm.sh("ip -4 -br addr | grep -c ' 10.0.2.77/24' | sed 's/^/CIDATA_LIVE=/'; cat /run/w3bs-net.env", 60)
         check("live static network from the cloud-init seed", "CIDATA_LIVE=1" in n, n)
+    _, n = vm.sh("systemctl is-enabled ifup@.service networking.service 2>&1 | grep -c masked | sed 's/^/IFUPDOWN_MASKED=/'; pgrep -c 'dhclient|dhcpcd' | sed 's/^/DHCPCLIENTS=/'", 60)
+    check("live network is systemd-networkd only (no ifupdown DHCP client)", "IFUPDOWN_MASKED=2" in n and "DHCPCLIENTS=0" in n, n)
     check("live ssh one-time password", re.search(r"\b[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}\b", o) is not None, o)
     vm.screenshot(os.path.join(a.out, f"live-{a.firmware}.png"))
     if a.gui:
