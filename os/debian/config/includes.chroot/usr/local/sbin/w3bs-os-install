@@ -49,6 +49,11 @@ machine needs the internet (DHCP and IPv6 are automatic; --ip for a static addre
   --ip ADDR/PREFIX --gateway GW [--dns "A B"]     static IPv4 instead of DHCP
   --ip6 ADDR/PREFIX --gateway6 GW6                static IPv6 as well (often fe80::1)
   --iface NAME            the interface for --ip/--ip6 (default: the first wired one)
+  --no-autologin          a desktop shows the greeter at boot (default: the first user is logged
+                          in on its own, straight to the lock screen, so the screen can be
+                          watched and unlocked from w3bs.org/fleet)
+  --fleet-token TOKEN     join your fleet on w3bs.org/fleet at first boot (the fj_... token from
+                          that page), sharing the desktop's screen there (view and control)
   --serial-console        also a login on ttyS0 and kernel messages there
   --no-reboot             do not offer to reboot at the end
   --list-disks            print the disks the installer would offer and exit
@@ -144,6 +149,7 @@ wired_interfaces() {
 DEFAULTS="" DISK="" YES="" ENCRYPT=1 HOSTNAME_="" DOMAIN="" TIMEZONE="" KEYMAP="" USERS="" FULLNAME=""
 PASSWORD_FILE="" ROOT_PASSWORD_FILE="" PASSPHRASE_FILE="" NO_REBOOT="" SERIAL=""
 STATIC_IP="" STATIC_GW="" STATIC_DNS="" STATIC_IP6="" STATIC_GW6="" NET_IFACE="" DESKTOP=""
+AUTOLOGIN=1 FLEET_TOKEN=""
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--defaults) DEFAULTS=1 ;;
@@ -167,6 +173,8 @@ while [ $# -gt 0 ]; do
 		--gateway6) STATIC_GW6=${2:-}; shift ;;
 		--iface) NET_IFACE=${2:-}; shift ;;
 		--serial-console) SERIAL=1 ;;
+		--no-autologin) AUTOLOGIN="" ;;
+		--fleet-token) FLEET_TOKEN=${2:-}; shift ;;
 		--no-reboot) NO_REBOOT=1 ;;
 		--desktop) DESKTOP=${2:-}; shift ;;
 		--server) DESKTOP=none ;;
@@ -270,6 +278,8 @@ USERS=$(echo $USERS)
 for u in $USERS; do [[ "$u" =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] && [ "$u" != root ] || fail "invalid user name $u"; done
 [ -n "$FULLNAME" ] || ask FULLNAME "Full name" "W3BS User"
 case "$FULLNAME" in *:*) fail "the full name cannot contain ':'" ;; esac
+case "$FLEET_TOKEN" in ''|fj_*) ;; *) fail "--fleet-token takes the fj_... token from w3bs.org/fleet" ;; esac
+FIRST_USER=${USERS%% *}
 
 if [ -z "$DISK" ]; then
 	if [ -n "$DEFAULTS" ]; then DISK=$(largest_disk) || true
@@ -323,6 +333,8 @@ $(lsblk -no NAME,SIZE,FSTYPE "$DISK" 2>/dev/null | sed 's/^/                    
   Users           $USERS (zsh, sudo)
   Desktop         $( [ "$DESKTOP" = hyprland ] && echo "W3BS DE $(cat /usr/share/w3bs-os/de/share/VERSION 2>/dev/null) on Hyprland 0.55 (Debian backports): greetd login, Firefox, TronBrowser" || echo "none (server)" )
   Agent access    $( [ "$DESKTOP" = hyprland ] && echo "Agentic Desktop Layer installed, agent access OFF until you turn it on in the tray" || echo "-" )
+  Login           $( [ "$DESKTOP" != hyprland ] && echo "-" || { [ -n "$AUTOLOGIN" ] && echo "$FIRST_USER logged in at boot, desktop locked (--no-autologin: greeter)" || echo "greeter"; } )
+  Fleet           $( [ -n "$FLEET_TOKEN" ] && echo "joins w3bs.org/fleet at first boot as $FIRST_USER$( [ "$DESKTOP" = hyprland ] && echo ", screen shared (view and control)" )" || echo "not joined (w3bs fleet join later)" )
   SSH             on (password logins for users; root by key only)
   Dev tools       w3bs CLI, curl, wget, git, mise (node, bun, pnpm), readm3, hqterm + hqsh, threatcrush
   Box setup       cli-tools root-ubuntu.sh at first boot: nginx pages, firewall, oh-my-zsh, tmux
@@ -503,7 +515,7 @@ EOF
 		greetd tuigreet waybar foot fuzzel sway-notification-center swaybg swayidle swaylock grim slurp wl-clipboard \
 		xwayland brightnessctl pavucontrol fonts-dejavu fonts-noto-core fonts-font-awesome thunar libnotify-bin \
 		pipewire pipewire-pulse wireplumber firefox-esr qt6-wayland polkitd xdg-desktop-portal-gtk sway \
-		libgl1-mesa-dri dbus-user-session dbus-bin >>"$LOG" 2>&1 \
+		libgl1-mesa-dri dbus-user-session dbus-bin wayvnc >>"$LOG" 2>&1 \
 		|| fail "cannot install the desktop packages (see $LOG)"
 	# The desktop is W3BS DE (w3bs.org/de): its files live in each user's home and update with
 	# `w3bs-de update`; the copy on this ISO (same release) is kept in /usr/share/w3bs-os/de for
@@ -566,6 +578,19 @@ vt = 1
 command = "tuigreet --time --remember --asterisks --greeting 'W3BS OS · W3BS DE · log in as $_names (user name, then password)' --cmd /usr/local/bin/w3bs-hyprland"
 user = "_greetd"
 EOF
+	# The first user is logged in at boot, straight to the lock screen (w3bs-hyprland runs
+	# hyprlock when W3BS_LOCK_AT_START is set, and shares the session over VNC on a socket only
+	# that user can open): the console and w3bs.org/fleet show a lock screen, not a text greeter.
+	if [ -n "$AUTOLOGIN" ]; then
+		cat >>"$TARGET/etc/greetd/config.toml" <<EOF
+
+# Boot: log $FIRST_USER in on its own, straight to a locked W3BS DE. Delete this section to
+# always show the greeter (w3bs-os-install --no-autologin).
+[initial_session]
+command = "env W3BS_LOCK_AT_START=1 /usr/local/bin/w3bs-hyprland"
+user = "$FIRST_USER"
+EOF
+	fi
 	in_target systemctl disable getty@tty1.service >>"$LOG" 2>&1
 	in_target systemctl enable greetd.service >>"$LOG" 2>&1 || fail "cannot enable greetd"
 	in_target systemctl set-default graphical.target >>"$LOG" 2>&1
@@ -642,6 +667,44 @@ TimeoutStartSec=3600
 WantedBy=multi-user.target
 EOF
 in_target systemctl enable w3bs-first-boot.service >>"$LOG" 2>&1
+if [ -n "$FLEET_TOKEN" ]; then
+	# The fleet agent is a user service of the first user (lingering, so it runs without a
+	# login); on a desktop it relays the screen from the session's VNC socket.
+	install -d -m 0700 "$TARGET/etc/w3bs-os"
+	( umask 077; printf '%s\n' "$FLEET_TOKEN" >"$TARGET/etc/w3bs-os/fleet-token" )
+	_screen=""
+	[ "$DESKTOP" = hyprland ] && _screen='--screen control --vnc unix:/run/user/$uid/w3bs-vnc.sock'
+	cat >"$TARGET/usr/local/sbin/w3bs-os-fleet-join" <<EOF
+#!/bin/sh
+# W3BS OS first boot: join w3bs.org/fleet with the token given to the installer, then forget it.
+u=$FIRST_USER
+uid=\$(id -u "\$u") || exit 1
+tok=\$(head -n 1 /etc/w3bs-os/fleet-token) || exit 1
+loginctl enable-linger "\$u"
+for i in \$(seq 1 60); do [ -S "/run/user/\$uid/bus" ] && break; sleep 1; done
+runuser -l "\$u" -c "XDG_RUNTIME_DIR=/run/user/\$uid DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/\$uid/bus ~/.local/bin/w3bs fleet join \$tok --non-interactive $_screen" || exit 1
+rm -f /etc/w3bs-os/fleet-token
+EOF
+	chmod 0755 "$TARGET/usr/local/sbin/w3bs-os-fleet-join"
+	cat >"$TARGET/etc/systemd/system/w3bs-fleet-join.service" <<EOF
+[Unit]
+Description=W3BS OS first boot: join w3bs.org/fleet
+Wants=network-online.target
+After=network-online.target w3bs-first-boot.service
+ConditionPathExists=/etc/w3bs-os/fleet-token
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/w3bs-os-fleet-join
+StandardOutput=append:/var/log/w3bs-first-boot.log
+StandardError=append:/var/log/w3bs-first-boot.log
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target
+EOF
+	in_target systemctl enable w3bs-fleet-join.service >>"$LOG" 2>&1
+fi
 
 step "Installing developer tools (mise: node, bun, pnpm; readm3; hqterm; threatcrush)"
 cat >"$TARGET/etc/profile.d/w3bs-dev.sh" <<'EOF'

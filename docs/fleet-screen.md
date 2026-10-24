@@ -145,6 +145,17 @@ Docker, `w0vncserver`, the real /fleet page in Chromium.
 KDE's own `krfb` 26.08 does not work for this: it never opens its port unless started as
 `krfb-virtualmonitor`, which shares a new, empty monitor instead of the desktop.
 
+### W3BS OS (1.2.7 and later)
+
+A W3BS OS desktop shares its screen out of the box: every W3BS DE session runs wayvnc on a socket
+only its user can open (`/run/user/<uid>/w3bs-vnc.sock`, no TCP port), and the machine boots
+straight to a locked desktop, so the page shows the lock screen and, with control, you type the
+password there. Install with `--fleet-token fj_...` to join at first boot, or join later:
+
+```sh
+w3bs fleet join fj_... --screen control --vnc unix:/run/user/$(id -u)/w3bs-vnc.sock
+```
+
 ### Other desktops (not yet tested by us)
 
 - **GNOME (Wayland):** `w0vncserver` uses the same portal and should work; GNOME shows its

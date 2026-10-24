@@ -58,6 +58,42 @@ if [ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus" ]; then
 	systemctl --user import-environment XDG_CURRENT_DESKTOP XDG_SESSION_TYPE 2>/dev/null
 fi
 
+rt=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+# Once this session's Hyprland is up: lock it if greetd logged us in on its own (initial_session
+# sets W3BS_LOCK_AT_START, so the console shows a lock screen, not an open desktop), and share it
+# over VNC on a socket only this user can open ($rt is 0700), which `w3bs fleet screen` relays to
+# w3bs.org/fleet. Nothing listens on a TCP port.
+session_helpers() {
+	mark=$rt/w3bs-session.mark
+	: >"$mark"
+	(
+		i=0
+		while [ "$i" -lt 90 ]; do
+			i=$((i + 1)); sleep 1
+			sig=$(find "$rt/hypr" -mindepth 1 -maxdepth 1 -type d -newer "$mark" 2>/dev/null | head -n 1)
+			[ -n "$sig" ] && [ -S "$sig/.socket.sock" ] || continue
+			export HYPRLAND_INSTANCE_SIGNATURE="${sig##*/}"
+			sock=$(cd "$rt" && ls -t wayland-[0-9] 2>/dev/null | head -n 1)
+			[ -n "$sock" ] && export WAYLAND_DISPLAY="$sock"
+			if [ "${W3BS_LOCK_AT_START:-}" = 1 ]; then
+				# A plain Wayland client: no `hyprctl dispatch` (its argument is Lua in a Lua config).
+				hyprlock --config "$HOME/.local/share/w3bs-de/default/hypr/hyprlock.conf" >>"$log" 2>&1 &
+			fi
+			# wayvnc exits when the output it captures changes (the lock screen going away does it):
+			# start it again for as long as this Hyprland is running.
+			if command -v wayvnc >/dev/null 2>&1; then
+				while [ -S "$sig/.socket.sock" ]; do
+					rm -f "$rt/w3bs-vnc.sock"
+					wayvnc --unix-socket "$rt/w3bs-vnc.sock" >>"$log" 2>&1
+					sleep 1
+				done
+				rm -f "$rt/w3bs-vnc.sock"
+			fi
+			exit 0
+		done
+	) &
+}
+
 gpu() {
 	for c in /sys/class/drm/card[0-9]*; do
 		[ -e "$c/device" ] || continue
@@ -109,6 +145,7 @@ EOF
 run() {
 	start=$(date +%s)
 	{ echo "=== $(date) $*"; echo "vm=${vm:-none} drivers=$(gpu)"; } >>"$log"
+	[ -z "${W3BS_SESSION_CMD:-}" ] && session_helpers
 	env "$@" $bus ${W3BS_SESSION_CMD:-/usr/local/bin/w3bs-de session} >>"$log" 2>&1
 	rc=$?
 	# Copy Hyprland's own log (it lives under the runtime dir, gone at logout).

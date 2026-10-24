@@ -95,9 +95,10 @@ if "install" not in fails:
             vm.expect(r"[Pp]assphrase|unlock disk", 300); time.sleep(2); vm.send("w3bs-luks-pass\n")
         vm.expect(r"\S+ login: ", 600); time.sleep(3)
         if a.desktop:
-            # The greeter (tuigreet) on the screen: user name, then password.
-            time.sleep(8); vm.screenshot(os.path.join(a.out, f"greeter-{a.firmware}.png"))
-            vm.sendkeys("w3bs\n"); time.sleep(2); vm.sendkeys("w3bs-test-pass\n"); time.sleep(70)
+            # The first user is logged in at boot, straight to the lock screen (hyprlock): the
+            # password unlocks it.
+            time.sleep(90); vm.screenshot(os.path.join(a.out, f"locked-{a.firmware}.png"))
+            vm.sendkeys("w3bs-test-pass\n"); time.sleep(15)
             vm.screenshot(os.path.join(a.out, f"desktop-{a.firmware}.png"))
         vm.send("w3bs\n"); vm.expect(r"[Pp]assword: ", 60); vm.send("w3bs-test-pass\n")
         time.sleep(15); vm.send("PS1='> '; PROMPT='> '\n"); time.sleep(2)
@@ -125,6 +126,12 @@ if "install" not in fails:
             check("Waybar", re.search(r"WAYBAR=\d", o) is not None, o)
             check("notification center (swaync)", re.search(r"SWAYNC=\d", o) is not None, o)
             check("Hyprland config has no errors", "CFGERR=0" in o, o)
+            rc, o = vm.sh("grep -c '^user = \"w3bs\"' /etc/greetd/config.toml | sed 's/^/AUTOLOGIN=/'; "
+                          "grep -c 'Unlocked' ~/.local/state/w3bs-os/hyprland-session.log | sed 's/^/UNLOCKED=/'; "
+                          "test -S /run/user/1000/w3bs-vnc.sock && echo VNCSOCK=1; stat -c VNCMODE=%a /run/user/1000", 60)
+            check("autologin at boot (greetd initial_session)", "AUTOLOGIN=1" in o, o)
+            check("boots to the lock screen, unlocked from the keyboard", re.search(r"UNLOCKED=[1-9]", o) is not None, o)
+            check("VNC on the session's private socket (fleet screen)", "VNCSOCK=1" in o and "VNCMODE=700" in o, o)
             rc, o = vm.sh("test -x ~/.local/opt/hqterm-desktop/app/hqterm-desktop -o -x ~/.local/opt/hqterm-desktop/hqterm-desktop.AppImage && echo HQDESK=1; grep -c '^Exec' ~/.local/share/applications/hqterm.desktop | sed 's/^/HQENTRY=/'", 60)
             check("hqterm desktop app + launcher entry", "HQDESK=1" in o and "HQENTRY=1" in o, o)
             rc, o = vm.sh("w3bs-de doctor; echo DOCTOR=$?", 120)
