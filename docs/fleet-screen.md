@@ -123,8 +123,13 @@ TigerVNC 1.16's `w0vncserver` shares the running Wayland session through the des
 mkdir -p ~/.config/tigervnc
 vncpasswd ~/.config/tigervnc/passwd
 w0vncserver -localhost -rfbport 5900 -SecurityTypes VncAuth \
-  -PasswordFile ~/.config/tigervnc/passwd -AlwaysShared
+  -PasswordFile ~/.config/tigervnc/passwd -AlwaysShared -UseBlacklist=0
 ```
+
+`-UseBlacklist=0` matters: every viewer reaches the server through the agent, so they all come
+from 127.0.0.1, and TigerVNC locks an address out after five connections that never log in (a
+tab closed at the password prompt). The page then shows "Too many security failures" and every
+session ends at once, for longer each time. With `-localhost` nobody else can connect anyway.
 
 On a desktop with a person at it, KDE asks once to allow remote control. On a headless box
 there is nobody to click that, so pre-grant it (the same grant the Agentic Desktop Layer uses);

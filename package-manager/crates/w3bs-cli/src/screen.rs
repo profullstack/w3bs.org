@@ -80,6 +80,11 @@ static PROBE: Mutex<Option<(Instant, String, bool)>> = Mutex::new(None);
 
 /// Whether something accepts connections on the VNC address. Checked at most every two minutes so
 /// the VNC server is not poked on every heartbeat; `forget_probe` forces the next check.
+///
+/// Where it can, this looks for a listener without connecting: VNC servers black-mark every
+/// connection that does not log in, and TigerVNC locks the address out after five (for a timeout
+/// that doubles each time). On a Unix socket every client is the same address, so the old
+/// connect-and-drop probe locked the owner's own viewers out for good ("Too many security failures").
 pub fn reachable(addr: &str) -> bool {
     let mut cache = PROBE.lock().unwrap();
     if let Some((at, a, ok)) = cache.as_ref()
@@ -88,16 +93,39 @@ pub fn reachable(addr: &str) -> bool {
     {
         return *ok;
     }
-    use std::net::ToSocketAddrs;
-    #[cfg(unix)]
-    if let Some(path) = addr.strip_prefix("unix:") {
-        let ok = std::os::unix::net::UnixStream::connect(path).is_ok();
-        *cache = Some((Instant::now(), addr.to_owned(), ok));
-        return ok;
-    }
-    let ok = addr.to_socket_addrs().ok().into_iter().flatten().any(|sa| std::net::TcpStream::connect_timeout(&sa, Duration::from_secs(1)).is_ok());
+    let ok = listening(addr);
     *cache = Some((Instant::now(), addr.to_owned(), ok));
     ok
+}
+
+fn listening(addr: &str) -> bool {
+    #[cfg(unix)]
+    if let Some(path) = addr.strip_prefix("unix:") {
+        use std::os::unix::fs::FileTypeExt;
+        return std::fs::metadata(path).is_ok_and(|m| m.file_type().is_socket());
+    }
+    use std::net::ToSocketAddrs;
+    let addrs: Vec<_> = addr.to_socket_addrs().ok().into_iter().flatten().collect();
+    #[cfg(target_os = "linux")]
+    if !addrs.is_empty() && addrs.iter().all(|sa| sa.ip().is_loopback()) {
+        let tables = ["/proc/net/tcp", "/proc/net/tcp6"].map(|f| std::fs::read_to_string(f).unwrap_or_default());
+        if tables.iter().any(|t| !t.is_empty()) {
+            return addrs.iter().any(|sa| tables.iter().any(|t| tcp_listens(t, sa.port())));
+        }
+    }
+    addrs.iter().any(|sa| std::net::TcpStream::connect_timeout(sa, Duration::from_secs(1)).is_ok())
+}
+
+/// Whether a /proc/net/tcp{,6} table has a socket in LISTEN (state 0A) on `port`, on any local
+/// address (a loopback listener and a wildcard one both take the agent's connection).
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn tcp_listens(table: &str, port: u16) -> bool {
+    let want = format!(":{port:04X}");
+    table.lines().skip(1).any(|l| {
+        let mut f = l.split_whitespace();
+        let local = f.nth(1).unwrap_or("");
+        f.nth(1) == Some("0A") && local.ends_with(&want)
+    })
 }
 
 pub fn forget_probe() {
@@ -516,6 +544,29 @@ async fn session(origin: String, key: String, screen: Screen, id: String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn listener_found_without_connecting() {
+        let table = "  sl  local_address rem_address   st\n   0: 0100007F:170C 00000000:0000 0A 0\n   1: 0100007F:1F90 0100007F:9C40 01 0\n";
+        assert!(tcp_listens(table, 5900), "LISTEN on 127.0.0.1:5900");
+        assert!(!tcp_listens(table, 8080), "8080 is an established connection, not a listener");
+        assert!(!tcp_listens(table, 12), "the port is matched in full, not by suffix");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_probe_never_connects() {
+        let dir = std::env::temp_dir().join(format!("w3bs-probe-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let sock = dir.join("vnc.sock");
+        let _ = std::fs::remove_file(&sock);
+        let l = std::os::unix::net::UnixListener::bind(&sock).unwrap();
+        l.set_nonblocking(true).unwrap();
+        assert!(listening(&format!("unix:{}", sock.display())));
+        assert!(l.accept().is_err(), "the probe must not open a connection");
+        assert!(!listening(&format!("unix:{}", dir.join("none.sock").display())));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     fn handshake(g: &mut Gate, security: &[u8], pick: u8) -> Vec<u8> {
         assert_eq!(g.server_bytes(b"RFB 003.008\n").unwrap(), b"RFB 003.008\n");
