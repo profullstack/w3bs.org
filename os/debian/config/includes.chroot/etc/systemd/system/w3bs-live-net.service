@@ -1,0 +1,14 @@
+[Unit]
+Description=W3BS OS live: static network from the provider (cloud-init seed, ip=)
+DefaultDependencies=no
+After=local-fs.target systemd-udev-trigger.service
+Before=systemd-networkd.service network-pre.target
+Wants=network-pre.target
+ConditionPathExists=/run/live/medium
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/w3bs-live-net
+
+[Install]
+WantedBy=multi-user.target

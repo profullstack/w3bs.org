@@ -22,7 +22,7 @@ def log(*a):
 
 
 class VM:
-    def __init__(self, name, firmware="uefi", iso=None, disks=(), mem=4096, smp=4, outdir=".", vga="std"):
+    def __init__(self, name, firmware="uefi", iso=None, disks=(), mem=4096, smp=4, outdir=".", vga="std", extra=()):
         self.name, self.outdir = name, outdir
         self.serial_path = os.path.join(outdir, f"{name}.serial.sock")
         self.mon_path = os.path.join(outdir, f"{name}.mon.sock")
@@ -52,6 +52,7 @@ class VM:
         if iso:
             # Like a VPS "virtual DVD": a CD-ROM drive, booted first; the disk stays virtio.
             cmd += ["-cdrom", iso, "-boot", "order=dc"]
+        cmd += list(extra)
         self.proc = subprocess.Popen(cmd)
         self.buf = b""
         self.serial = self._connect(self.serial_path)

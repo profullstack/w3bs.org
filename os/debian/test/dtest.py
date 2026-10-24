@@ -14,6 +14,7 @@ p.add_argument("--iso", required=True); p.add_argument("--disk", required=True)
 p.add_argument("--firmware", default="uefi"); p.add_argument("--encrypt", action="store_true")
 p.add_argument("--desktop", action="store_true", help="install the Hyprland desktop and log in at the greeter")
 p.add_argument("--gui", action="store_true", help="install through the graphical installer (implies --desktop)")
+p.add_argument("--cidata", action="store_true", help="a VPS without DHCP: the static address comes on a cloud-init NoCloud CD")
 p.add_argument("--out", default="out"); p.add_argument("--timeout", type=int, default=3000)
 a = p.parse_args()
 if a.gui:
@@ -26,7 +27,23 @@ def check(name, ok, detail=""):
     if not ok:
         fails.append(name)
 
-vm = VM(f"live-{a.firmware}", a.firmware, iso=a.iso, disks=[a.disk], mem=4096, outdir=a.out)
+# --cidata: like Luxvps and other Proxmox hosts, the address is only on a "cidata" CD (network-config
+# v1, matched by MAC). QEMU's user network still offers DHCP (.15): the checks want the seed's .77.
+extra, CIDATA_IP = [], "10.0.2.77"
+if a.cidata:
+    import subprocess
+    seed = os.path.join(a.out, "seed"); os.makedirs(seed, exist_ok=True)
+    open(os.path.join(seed, "meta-data"), "w").write("instance-id: dtest\n")
+    open(os.path.join(seed, "user-data"), "w").write("#cloud-config\n")
+    open(os.path.join(seed, "network-config"), "w").write(
+        "version: 1\nconfig:\n  - type: physical\n    name: eth0\n    mac_address: '52:54:00:12:34:56'\n    subnets:\n"
+        f"    - type: static\n      address: '{CIDATA_IP}'\n      netmask: '255.255.255.0'\n      gateway: '10.0.2.2'\n"
+        "  - type: nameserver\n    address:\n    - '10.0.2.3'\n")
+    subprocess.check_call(["genisoimage", "-quiet", "-output", os.path.join(a.out, "seed.iso"), "-volid", "cidata", "-joliet", "-rock",
+                           os.path.join(seed, "meta-data"), os.path.join(seed, "user-data"), os.path.join(seed, "network-config")])
+    extra = ["-drive", f"file={os.path.join(a.out, 'seed.iso')},media=cdrom,index=3"]
+
+vm = VM(f"live-{a.firmware}", a.firmware, iso=a.iso, disks=[a.disk], mem=4096, outdir=a.out, extra=extra)
 try:
     vm.expect(r"root@w3bs-os:~# |# ", 600); time.sleep(20)
     rc, o = vm.sh("cat /etc/w3bs-os-version; curl -s -o /dev/null -w 'MIRROR=%{http_code}\\n' http://deb.debian.org/debian/dists/trixie/Release; "
@@ -34,6 +51,9 @@ try:
                   "who | grep -c '^root *tty1' | sed 's/^/TTY1ROOT=/'", 120)
     check("live network + DNS", "MIRROR=200" in o, o)
     check("live tty1: root, the installer menu", "TTY1ROOT=1" in o, o)
+    if a.cidata:
+        _, n = vm.sh("ip -4 -br addr | grep -c ' 10.0.2.77/24' | sed 's/^/CIDATA_LIVE=/'; cat /run/w3bs-net.env", 60)
+        check("live static network from the cloud-init seed", "CIDATA_LIVE=1" in n, n)
     check("live ssh one-time password", re.search(r"\b[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}\b", o) is not None, o)
     vm.screenshot(os.path.join(a.out, f"live-{a.firmware}.png"))
     if a.gui:
@@ -67,7 +87,7 @@ finally:
     vm.stop()
 
 if "install" not in fails:
-    vm = VM(f"installed-{a.firmware}", a.firmware, disks=[a.disk], mem=4096, outdir=a.out)
+    vm = VM(f"installed-{a.firmware}", a.firmware, disks=[a.disk], mem=4096, outdir=a.out, extra=extra)
     try:
         if a.encrypt:
             vm.expect(r"[Pp]assphrase|unlock disk", 300); time.sleep(2); vm.send("w3bs-luks-pass\n")
@@ -91,6 +111,9 @@ if "install" not in fails:
         for c in ("w3bs", "mise", "node", "bun", "pnpm", "readm3"):
             check(f"tool {c}", f"HAVE_{c}" in o, "")
         check("user session units", "USER_UNITS_FAILED=0" in o, o)
+        if a.cidata:
+            rc, o = vm.sh("ip -4 -br addr | grep -c ' 10.0.2.77/24' | sed 's/^/CIDATA_INST=/'; grep -l 10.0.2.77 /etc/systemd/network/*.network", 60)
+            check("installed system keeps the provider's static address", "CIDATA_INST=1" in o, o)
         if a.desktop:
             rc, o = vm.sh("echo HYPR=$(pidof Hyprland) WAYBAR=$(pidof waybar) SWAYNC=$(pidof swaync); "
                           "tr '\\0' ' ' </proc/$(pidof Hyprland | cut -d' ' -f1)/cmdline | grep -c 'w3bs-de/hypr/hyprland.lua' | sed 's/^/DECFG=/'; "

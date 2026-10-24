@@ -8,5 +8,13 @@ echo "root:$pw" | chpasswd
 umask 077
 echo "$pw" >/run/w3bs-live-ssh-password
 umask 022
+# SSH keys: the provider's (cloud-init user-data, read by w3bs-live-net) and any
+# w3bs.ssh_key=<base64 of an authorized_keys line> on the kernel command line.
+mkdir -p /root/.ssh && chmod 700 /root/.ssh
+[ -r /run/w3bs-live-ssh-keys ] && cat /run/w3bs-live-ssh-keys >>/root/.ssh/authorized_keys
+for a in $(cat /proc/cmdline); do
+	case "$a" in w3bs.ssh_key=*) echo "${a#w3bs.ssh_key=}" | base64 -d >>/root/.ssh/authorized_keys 2>/dev/null && echo >>/root/.ssh/authorized_keys ;; esac
+done
+[ -f /root/.ssh/authorized_keys ] && chmod 600 /root/.ssh/authorized_keys
 mkdir -p /etc/ssh/sshd_config.d
 printf 'PermitRootLogin yes\nPasswordAuthentication yes\n' >/etc/ssh/sshd_config.d/10-w3bs-live.conf

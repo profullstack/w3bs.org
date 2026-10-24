@@ -64,7 +64,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { id: uefi-server, firmware: uefi, flags: "" }
+          - { id: uefi-server-cidata, firmware: uefi, flags: "--cidata" }
           - { id: bios-encrypt, firmware: bios, flags: "--encrypt" }
           - { id: uefi-desktop, firmware: uefi, flags: "--desktop" }
           - { id: uefi-gui, firmware: uefi, flags: "--gui" }
@@ -80,7 +80,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
           sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends qemu-system-x86 qemu-utils ovmf python3-pil >/dev/null
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends qemu-system-x86 qemu-utils ovmf python3-pil genisoimage >/dev/null
       - name: Live boot, install, installed system
         run: |
           mkdir -p out && qemu-img create -q -f qcow2 out/disk.qcow2 20G

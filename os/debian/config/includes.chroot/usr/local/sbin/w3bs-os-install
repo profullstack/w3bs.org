@@ -195,6 +195,14 @@ cat <<EOF
 EOF
 
 # --- network: check now, before anything is erased -------------------------------------
+# A static address the live system took from the provider (cloud-init seed or ip=, see
+# w3bs-live-net) is the default: the installed system keeps it. --ip/--ip6 override it.
+NET_SOURCE=""
+if [ -z "$STATIC_IP$STATIC_IP6" ] && [ -r /run/w3bs-net.env ]; then
+	# shellcheck disable=SC1091
+	. /run/w3bs-net.env
+	log "network from the live system ($NET_SOURCE): ${STATIC_IP:-} ${STATIC_IP6:-} on $NET_IFACE"
+fi
 IFACES=$(wired_interfaces | tr '\n' ' ')
 [ -n "$IFACES" ] || fail "no wired network interface found"
 [ -n "$NET_IFACE" ] || NET_IFACE=$(echo $IFACES | cut -d' ' -f1)
@@ -202,11 +210,11 @@ net_ok() { curl -fsS -m 15 -o /dev/null "$MIRROR/dists/$SUITE/Release"; }
 apply_static() {
 	networkctl down "$NET_IFACE" >/dev/null 2>&1; ip link set "$NET_IFACE" up
 	if [ -n "$STATIC_IP" ]; then
-		ip -4 addr flush dev "$NET_IFACE"; ip addr add "$STATIC_IP" dev "$NET_IFACE" || fail "cannot set $STATIC_IP"
+		ip addr replace "$STATIC_IP" dev "$NET_IFACE" || fail "cannot set $STATIC_IP"
 		ip route replace default via "$STATIC_GW" dev "$NET_IFACE" onlink || fail "cannot use the gateway $STATIC_GW"
 	fi
 	if [ -n "$STATIC_IP6" ]; then
-		ip -6 addr add "$STATIC_IP6" dev "$NET_IFACE" 2>/dev/null
+		ip -6 addr replace "$STATIC_IP6" dev "$NET_IFACE" 2>/dev/null
 		ip -6 route replace default via "$STATIC_GW6" dev "$NET_IFACE" onlink || fail "cannot use the IPv6 gateway $STATIC_GW6"
 	fi
 	[ -n "$STATIC_DNS" ] || STATIC_DNS="1.1.1.1 2606:4700:4700::1111 9.9.9.9"
@@ -215,7 +223,9 @@ apply_static() {
 }
 [ -z "$STATIC_IP" ] || [ -n "$STATIC_GW" ] || fail "--ip needs --gateway"
 [ -z "$STATIC_IP6" ] || [ -n "$STATIC_GW6" ] || fail "--ip6 needs --gateway6 (often fe80::1)"
-if [ -n "$STATIC_IP$STATIC_IP6" ]; then
+if [ -n "$NET_SOURCE" ] && net_ok; then
+	: # the live system already runs the provider's static address
+elif [ -n "$STATIC_IP$STATIC_IP6" ]; then
 	apply_static
 elif ! net_ok; then
 	say "Waiting for the network (DHCP and IPv6 on $IFACES) ..."
@@ -308,7 +318,7 @@ $(lsblk -no NAME,SIZE,FSTYPE "$DISK" 2>/dev/null | sed 's/^/                    
   System          Debian 13 "trixie" (systemd), W3BS OS $OS_VERSION
   Hostname        $HOSTNAME_$( [ -n "$DOMAIN" ] && echo "  (web: https://$DOMAIN)" )
   Keyboard        $KEYMAP      Timezone  $TIMEZONE
-  Network         $( [ -n "$STATIC_IP$STATIC_IP6" ] && echo "static ${STATIC_IP:-} ${STATIC_IP6:-} on $NET_IFACE" || echo "automatic: systemd-networkd on every card (DHCPv4, IPv6)" )
+  Network         $( [ -n "$STATIC_IP$STATIC_IP6" ] && echo "static ${STATIC_IP:-} ${STATIC_IP6:-} on $NET_IFACE${NET_SOURCE:+ (from the $NET_SOURCE)}" || echo "automatic: systemd-networkd on every card (DHCPv4, IPv6)" )
   Root            $( [ -n "$ROOT_PASS" ] && echo "password set (su, console login)" || echo "locked: no password (users use sudo)" )
   Users           $USERS (zsh, sudo)
   Desktop         $( [ "$DESKTOP" = hyprland ] && echo "W3BS DE $(cat /usr/share/w3bs-os/de/share/VERSION 2>/dev/null) on Hyprland 0.55 (Debian backports): greetd login, Firefox, TronBrowser" || echo "none (server)" )
@@ -331,6 +341,15 @@ trap 'fail "interrupted"' INT TERM
 # --- partition, format ------------------------------------------------------------------
 step "Partitioning $DISK (GPT: BIOS boot, EFI, /boot, root)"
 cleanup
+# Reinstalling in place (the ISO file on this disk, booted with findiso= and toram): the live
+# system is in RAM, so let go of the old partitions that held the ISO, and swap on them.
+if grep -q toram /proc/cmdline; then
+	for m in /run/live/findiso /run/live/fromiso; do
+		src=$(findmnt -n -o SOURCE "$m" 2>/dev/null) || continue
+		case "$(lsblk -no PKNAME "$src" 2>/dev/null | head -n 1)" in "${DISK#/dev/}") umount -l "$m" >>"$LOG" 2>&1 ;; esac
+	done
+	swapoff -a 2>/dev/null
+fi
 wipefs -a "$DISK" >>"$LOG" 2>&1
 sfdisk --quiet --wipe always "$DISK" >>"$LOG" 2>&1 <<EOF || fail "cannot partition $DISK"
 label: gpt
