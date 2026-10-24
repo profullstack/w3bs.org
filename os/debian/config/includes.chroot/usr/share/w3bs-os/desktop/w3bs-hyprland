@@ -35,6 +35,19 @@ EOF
 else
 	echo "-- Written by w3bs-hyprland at login: nothing machine-specific here." >"$state/session.lua"
 fi
+# A display adapter with no 3D (the plain VGA of most VPS consoles: bochs, cirrus, QXL...)
+# leaves Hyprland drawing every frame on the CPU (Mesa llvmpipe): animations and rounded
+# corners make it crawl, more so through a VNC console. Turn them off there.
+for _d in /sys/class/drm/card[0-9]*/device/driver; do
+	case "$(basename "$(readlink -f "$_d")" 2>/dev/null)" in
+		bochs-drm|bochs|cirrus|cirrus-qemu|qxl|simpledrm|simplefb|efifb|vboxvideo|hyperv_drm|mgag200|ast)
+			cat >>"$state/session.lua" <<'EOF'
+-- No 3D on this display adapter (software rendering): no animations, square corners.
+hl.config({ animations = { enabled = false }, decoration = { rounding = 0 } })
+EOF
+			break ;;
+	esac
+done
 
 # systemd user session (logind + dbus-user-session): its bus; otherwise a bus of our own.
 bus=dbus-run-session
