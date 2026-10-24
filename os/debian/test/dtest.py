@@ -104,13 +104,13 @@ if "install" not in fails:
         rc, o = vm.sh("grep -E '^(ID|VERSION)=' /etc/w3bs-os-release; echo SHELL=$SHELL; "
                       "curl -s -o /dev/null -w 'NET=%{http_code}\\n' http://deb.debian.org/debian/dists/trixie/Release; "
                       "echo w3bs-test-pass | sudo -S -p '' id -u; "
-                      "for c in w3bs mise node bun pnpm readm3; do command -v $c >/dev/null && echo HAVE_$c; done; "
+                      "for c in w3bs mise node bun pnpm readm3 hqterm hqsh; do command -v $c >/dev/null && echo HAVE_$c; done; "
                       "systemctl --failed --no-legend --no-pager | grep -c 'user@' | sed 's/^/USER_UNITS_FAILED=/'", 300)
         check("os-release", "ID=w3bs-os" in o, o)
         check("zsh", "SHELL=/usr/bin/zsh" in o, o)
         check("network", "NET=200" in o, o)
         check("sudo", re.search(r"^0\s*$", o, re.M) is not None, o)
-        for c in ("w3bs", "mise", "node", "bun", "pnpm", "readm3"):
+        for c in ("w3bs", "mise", "node", "bun", "pnpm", "readm3", "hqterm", "hqsh"):
             check(f"tool {c}", f"HAVE_{c}" in o, "")
         check("user session units", "USER_UNITS_FAILED=0" in o, o)
         if a.cidata:
@@ -125,6 +125,8 @@ if "install" not in fails:
             check("Waybar", re.search(r"WAYBAR=\d", o) is not None, o)
             check("notification center (swaync)", re.search(r"SWAYNC=\d", o) is not None, o)
             check("Hyprland config has no errors", "CFGERR=0" in o, o)
+            rc, o = vm.sh("test -x ~/.local/opt/hqterm-desktop/app/hqterm-desktop -o -x ~/.local/opt/hqterm-desktop/hqterm-desktop.AppImage && echo HQDESK=1; grep -c '^Exec' ~/.local/share/applications/hqterm.desktop | sed 's/^/HQENTRY=/'", 60)
+            check("hqterm desktop app + launcher entry", "HQDESK=1" in o and "HQENTRY=1" in o, o)
             rc, o = vm.sh("w3bs-de doctor; echo DOCTOR=$?", 120)
             check("w3bs-de doctor", "DOCTOR=0" in o, o)
             rc, o = vm.sh("for i in $(seq 1 30); do [ $(pidof w3bs-desktop | wc -w) -ge 2 ] && break; sleep 2; done; "

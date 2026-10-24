@@ -575,7 +575,7 @@ class Installer(Gtk.ApplicationWindow):
             f"User:  {self.username.get_text().strip()} ({self.fullname.get_text().strip()}), administrator (sudo)",
             f"Root:  {'password set (su, console login)' if self.rpw1.get_text() else 'locked (administrators use sudo)'}",
             "W3BS:  w3bs CLI and the Agentic Desktop Layer (agent access OFF until you turn it on)",
-            "Dev tools:  curl, wget, mise (bun, pnpm), Node and readm3",
+            "Dev tools:  curl, wget, mise (bun, pnpm), Node, readm3, hqterm + hqsh" + (" (and the hqterm desktop app)" if desk != "none" else ""),
         ]
         while (child := self.review.get_first_child()) is not None:
             self.review.remove(child)

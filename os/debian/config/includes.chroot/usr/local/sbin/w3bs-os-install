@@ -324,7 +324,7 @@ $(lsblk -no NAME,SIZE,FSTYPE "$DISK" 2>/dev/null | sed 's/^/                    
   Desktop         $( [ "$DESKTOP" = hyprland ] && echo "W3BS DE $(cat /usr/share/w3bs-os/de/share/VERSION 2>/dev/null) on Hyprland 0.55 (Debian backports): greetd login, Firefox, TronBrowser" || echo "none (server)" )
   Agent access    $( [ "$DESKTOP" = hyprland ] && echo "Agentic Desktop Layer installed, agent access OFF until you turn it on in the tray" || echo "-" )
   SSH             on (password logins for users; root by key only)
-  Dev tools       w3bs CLI, curl, wget, git, mise (node, bun, pnpm), readm3
+  Dev tools       w3bs CLI, curl, wget, git, mise (node, bun, pnpm), readm3, hqterm + hqsh
   Box setup       cli-tools root-ubuntu.sh at first boot: nginx pages, firewall, oh-my-zsh, tmux
   Web page        the W3BS landing page at $( [ -n "$DOMAIN" ] && echo "https://$DOMAIN" || echo "http://$HOSTNAME_" )
 EOF
@@ -643,7 +643,7 @@ WantedBy=multi-user.target
 EOF
 in_target systemctl enable w3bs-first-boot.service >>"$LOG" 2>&1
 
-step "Installing developer tools (mise: node, bun, pnpm; readm3)"
+step "Installing developer tools (mise: node, bun, pnpm; readm3; hqterm)"
 cat >"$TARGET/etc/profile.d/w3bs-dev.sh" <<'EOF'
 # W3BS OS: mise-managed tools and pnpm global commands on PATH.
 export PNPM_HOME="$HOME/.local/share/pnpm"
@@ -663,6 +663,10 @@ for u in $USERS; do
 		mise use -g node@lts bun@latest npm:pnpm@latest
 		pnpm config set global-bin-dir "$PNPM_HOME"
 		pnpm i -g @profullstack/readm3
+		# hqterm + hqsh (persistent SSH sessions) through the w3bs package manager; a desktop
+		# also gets the hqterm desktop app (there is no display during the install to detect).
+		w3bs install --non-interactive hqterm.sh/hqterm
+		if [ -x /usr/bin/Hyprland ]; then curl -fsSL https://hqterm.sh/install | sh -s -- --desktop; fi
 		if [ -x /usr/bin/Hyprland ]; then curl -fsSL https://tronbrowser.dev/install.sh | TB_NO_KILL=1 sh; fi
 		node --version; bun --version; pnpm --version' >>"$LOG" 2>&1; then
 		log "dev tools installed for $u"
