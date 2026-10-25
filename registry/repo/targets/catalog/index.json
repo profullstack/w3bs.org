@@ -944,7 +944,7 @@
       "vendor": "Alibaba Qwen",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "0.26.0"
+      "latest_version": "0.26.1"
     },
     {
       "id": "kiro.dev/kiro-cli",
@@ -1188,7 +1188,7 @@
       "vendor": "Ollama",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.40.10"
+      "latest_version": "0.40.11"
     },
     {
       "id": "github.com/fabric",
