@@ -9,6 +9,7 @@ import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import { openTraining, VERSION } from '../core/service.mjs';
 import { defaultHome } from '../core/store.mjs';
+import { TEACH_HELP } from '../liquid/cli.mjs';
 
 const help = `W3BS Training ${VERSION}: review, curate and consume demonstrations
 
@@ -45,6 +46,8 @@ const help = `W3BS Training ${VERSION}: review, curate and consume demonstration
   w3bs training setup claude-code|claude|codex|opencode --consumer NAME
                                                        claude = Claude's desktop app
 
+Teach an agent (Liquid Agent; mock sites only, everything off until you turn it on):
+${TEACH_HELP}
 Human-only commands (review, label, approve, release, grant, export, delete,
 forget) need an interactive terminal and a typed confirmation code. Shell access
 alone is not consent. Sensitive text is read from files, never from arguments.
@@ -147,6 +150,28 @@ const { values, positionals } = (() => {
         api: { type: 'string' },
         workflow: { type: 'string' },
         'window-titles': { type: 'boolean' },
+        task: { type: 'string' },
+        app: { type: 'string' },
+        window: { type: 'string' },
+        profile: { type: 'string' },
+        screenshots: { type: 'boolean' },
+        discard: { type: 'boolean' },
+        count: { type: 'string' },
+        success: { type: 'string' },
+        risk: { type: 'string' },
+        'failure-reason-file': { type: 'string' },
+        step: { type: 'string' },
+        field: { type: 'string' },
+        redaction: { type: 'string' },
+        'retention-days': { type: 'string' },
+        worker: { type: 'string' },
+        'max-price': { type: 'string' },
+        'public-url': { type: 'string' },
+        epochs: { type: 'string' },
+        'per-workflow': { type: 'string' },
+        'max-steps': { type: 'string' },
+        seed: { type: 'string' },
+        variant: { type: 'string' },
       },
     });
   } catch (error) {
@@ -559,6 +584,11 @@ Deleting the episode does not unpublish it: run w3bs training unpublish.`,
       out(await unpublishTask(origin, need(sub, 'TASK_ID'), { token: await accessToken(origin) }));
       break;
     }
+    case 'teach': {
+      const { runTeach } = await import('../liquid/cli.mjs');
+      await runTeach(service, sub, rest, values, { humanActor, plainActor, out, fail, readText });
+      break;
+    }
     case 'deletions':
       out(await service.getDeletion(need(sub, 'REQUEST_ID')));
       break;
@@ -633,5 +663,5 @@ Deleting the episode does not unpublish it: run w3bs training unpublish.`,
   );
   process.exitCode = error.code === 'HUMAN_APPROVAL_REQUIRED' ? 3 : 1;
 } finally {
-  service?.close();
+  await service?.close();
 }

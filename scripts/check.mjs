@@ -17,6 +17,7 @@ for (const directory of [
   'training',
   'training/bin',
   'training/core',
+  'training/liquid',
   'training/schema',
   'training/fixtures',
   'training/ui',
