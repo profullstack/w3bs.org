@@ -488,7 +488,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.10.3"
+      "latest_version": "0.11.0"
     },
     {
       "id": "bl0ggers.com/bl0ggers",
@@ -560,7 +560,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.23.0"
+      "latest_version": "0.24.0"
     },
     {
       "id": "hdtilt.com/hdtilt",
@@ -578,7 +578,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.4.1"
+      "latest_version": "0.4.2"
     },
     {
       "id": "profullstack.com/g1tz",
@@ -1207,7 +1207,7 @@
       "vendor": "Daniel Miessler",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "1.4.553"
+      "latest_version": "1.4.555"
     },
     {
       "id": "w3bs.org/agentic-desktop-layer",
