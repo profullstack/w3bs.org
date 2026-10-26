@@ -25,6 +25,11 @@ jobs:
       - run: cargo test --workspace --locked
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo build --release --locked -p w3bs-desktop
+      # Browser channel against the runner's real Chrome over DevTools.
+      - run: sh tests/rig/browser-cdp.sh
+        env:
+          CHROME: google-chrome
+          W3BS_DESKTOP_BIN: target/release/w3bs-desktop
       - uses: actions/upload-artifact@v4
         with:
           name: w3bs-desktop-linux-x86_64-unsigned

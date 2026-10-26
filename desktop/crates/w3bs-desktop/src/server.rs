@@ -270,6 +270,12 @@ fn agent(b: &Arc<Broker>, c: &mut Conn, req: &Request) -> Result<Value> {
         }
         "memory.locate" => to(b.memory_locate(&pr, &str_param(p, "label")?, &str_param(p, "display")?, p.get("min_score").and_then(Value::as_f64).map(|v| v as f32))?),
         "memory.list" => to(b.memory_list(&pr)),
+        "browser.status" => b.browser_status(&pr),
+        "browser.pages" => b.browser_pages(&pr),
+        "browser.snapshot" => b.browser_snapshot(&pr, p.get("page").and_then(Value::as_str), p.get("max_lines").and_then(Value::as_u64).map(|n| n as usize)),
+        "browser.screenshot" => b.browser_screenshot(&pr, p.get("page").and_then(Value::as_str), p.get("full_page").and_then(Value::as_bool).unwrap_or(false)),
+        "browser.wait_for" => b.browser_wait_for(&pr, p.get("page").and_then(Value::as_str), &str_param(p, "text")?, p.get("timeout_ms").and_then(Value::as_u64)),
+        "browser.act" => b.browser_act(&pr, &str_param(p, "task")?, &str_param(p, "op")?, p.get("page").and_then(Value::as_str), p.get("args").unwrap_or(&json!({}))),
         m => Err(AdlError::denied(format!("`{m}` is not available to agents"))),
     }
 }
@@ -292,6 +298,7 @@ fn control(b: &Arc<Broker>, c: &mut Conn, req: &Request) -> Result<Value> {
     match req.method.as_str() {
         "status" => to(b.status()),
         "capabilities" => to(b.capabilities()),
+        "browser.probe" => Ok(b.browser_probe()),
         "doctor" => {
             // Showing the OS permission prompts is a human action, like enabling.
             let prompt = p.get("prompt").and_then(Value::as_bool).unwrap_or(false);

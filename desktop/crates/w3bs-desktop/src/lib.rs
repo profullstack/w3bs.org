@@ -103,6 +103,11 @@ enum Cmd {
         /// connect to the running broker instead of spawning `mcp serve --stdio`
         #[arg(long, value_name = "ADDR", env = "W3BS_DESKTOP_MCP_HTTP")]
         mcp_http: Option<String>,
+        /// Where the browser channel finds DevTools (http://127.0.0.1:9222 or a ws:// browser URL).
+        /// Default: TronBrowser's managed session (`w3bs desktop browser launch`), then any
+        /// DevToolsActivePort in a TronBrowser, Chromium or Chrome profile, then 127.0.0.1:9222
+        #[arg(long, value_name = "URL", env = "W3BS_DESKTOP_BROWSER_CDP")]
+        browser_cdp: Option<String>,
     },
     /// Terminal native control: shows state, enable codes and approvals; quitting disables access
     #[command(long_about = "Terminal native control: the on/off switch for agent access, in a terminal.\n\nRun it, then type a command and press Enter:\n  enable            turn agent access on (your desktop may ask for permission the first time)\n  disable           turn it off\n  stop              cancel all agent activity but stay enabled\n  approvals         list requests waiting for you\n  approve <id>      allow one request; deny <id> refuses it\n  allow | deny      answer an agent asking to drive (the latest; add its id to pick one)\n  postpone [min]    ask again later (10 minutes, or the minutes given)\n  always            allow every agent without asking; `always off` turns asking back on\n  confirm           confirm an enable request started from another terminal\n  tasks, status     what agents are doing\n  open              open the control app in your browser\n  quit              leave (this also turns agent access off)\n\nKeep it open while agents work. The tray icon or GNOME panel menu does the same thing.\n\nWith --open it does not start the terminal control: it opens the control app (agents, tasks,\napprovals, activity) in your browser with a one-time sign-in link and exits. Closing the app\ndoes not turn agent access off; its Quit and disable button does.")]
@@ -159,6 +164,9 @@ enum Cmd {
     /// Screen memory: targets agents saved for the fast locate path (list, forget; remember and locate are the agent side)
     #[command(subcommand)]
     Memory(MemoryCmd),
+    /// The browser channel: agents drive web pages through DevTools instead of screenshots
+    #[command(subcommand)]
+    Browser(BrowserCmd),
     /// Inspect and cancel tasks
     #[command(subcommand)]
     Tasks(TasksCmd),
@@ -324,7 +332,7 @@ enum Preset {
     Observe,
     /// Pointer and keyboard confined to the --app allowlist
     Restricted,
-    /// Whole-desktop observation and input (business-intent limits cannot be enforced)
+    /// Whole-desktop observation and input, and the browser through DevTools (business-intent limits cannot be enforced)
     Broad,
     /// Nothing until updated
     None,
@@ -408,6 +416,38 @@ enum HumanCmd {
         kind: String,
         /// What the person should do, e.g. "Solve the CAPTCHA in Firefox, then press Done"
         message: String,
+        #[command(flatten)]
+        auth: AgentAuth,
+    },
+}
+
+#[derive(Subcommand)]
+enum BrowserCmd {
+    /// Can DevTools control a browser right now (which one, where, how many pages)
+    Status,
+    /// Start the agents' own TronBrowser with a loopback DevTools port (`tron browser launch`).
+    /// It is a separate profile: your everyday browser is never opened to DevTools
+    Launch {
+        /// TronBrowser profile name (~/.tronbrowser-NAME); keeps its sign-ins between launches
+        #[arg(long, default_value = "agent")]
+        profile: String,
+        /// DevTools port on 127.0.0.1 (0 picks a free one)
+        #[arg(long, default_value_t = 0)]
+        port: u16,
+        /// No window (servers and rigs)
+        #[arg(long)]
+        headless: bool,
+    },
+    /// (agent) Run one browser_* tool, e.g. `call browser_snapshot` or `call browser_click '{"uid": 42}'`
+    Call {
+        /// Tool name as the MCP server lists it (browser_snapshot, browser_click, browser_fill, ...)
+        tool: String,
+        /// Tool arguments as a JSON object
+        #[arg(default_value = "{}")]
+        args: String,
+        /// browser_screenshot: write the PNG here instead of printing base64
+        #[arg(long)]
+        out: Option<PathBuf>,
         #[command(flatten)]
         auth: AgentAuth,
     },
@@ -704,12 +744,33 @@ fn run_input(auth: &AgentAuth, what: &str, window: Option<String>, actions: Vec<
     Ok(r)
 }
 
+/// `w3bs desktop browser launch`: TronBrowser's managed session is the agent browser. The broker
+/// finds it through the session descriptor `tron` writes, so nothing else needs configuring.
+fn browser_launch(profile: &str, port: u16, headless: bool) -> Result<Value> {
+    let mut cmd = std::process::Command::new("tron");
+    cmd.args(["browser", "launch", "--profile", profile, "--port", &port.to_string(), "--force"]);
+    if headless {
+        cmd.arg("--headless");
+    }
+    let status = cmd.status().map_err(|e| {
+        AdlError::new(ErrorCode::Blocked, format!("could not run `tron` ({e}). Install TronBrowser (curl -fsSL https://tronbrowser.dev/install.sh | sh), or start Chrome/Chromium with --remote-debugging-port=9222 --user-data-dir=<a separate profile> and set W3BS_DESKTOP_BROWSER_CDP=http://127.0.0.1:9222 for the daemon"))
+    })?;
+    if !status.success() {
+        return Err(AdlError::new(ErrorCode::Blocked, format!("`tron browser launch` failed ({status})")));
+    }
+    match control_client().and_then(|mut c| c.call("browser.probe", json!({}))) {
+        Ok(v) if v["available"] == true => Ok(v),
+        Ok(v) => Err(AdlError::new(ErrorCode::Blocked, "TronBrowser started but the desktop layer cannot reach its DevTools port").with_details(v)),
+        Err(_) => Ok(json!({"launched": true, "note": "the desktop layer daemon is not running; it will find this browser when it starts"})),
+    }
+}
+
 fn preset_policy(p: Preset, apps: Vec<String>, approve_for: Vec<String>, hours: Option<u64>) -> Policy {
     use Capability::*;
     let (mode, caps): (ControlMode, &[Capability]) = match p {
         Preset::Observe => (ControlMode::BroadDesktop, &[Windows, Accessibility, ScreenCapture]),
         Preset::Restricted => (ControlMode::Restricted, &[Windows, Accessibility, Pointer, Keyboard]),
-        Preset::Broad => (ControlMode::BroadDesktop, &[Windows, Accessibility, ScreenCapture, Pointer, Keyboard]),
+        Preset::Broad => (ControlMode::BroadDesktop, &[Windows, Accessibility, ScreenCapture, Pointer, Keyboard, Browser]),
         Preset::None => (ControlMode::Restricted, &[]),
     };
     Policy {
@@ -821,12 +882,12 @@ pub fn run_background() {
 fn run_with(cli: Cli) {
     let j = cli.json;
     let r: Result<Value> = (|| match cli.cmd {
-        Cmd::Daemon { adapter, no_native_control, enabled_by_default, retention_days, mcp_http } => {
+        Cmd::Daemon { adapter, no_native_control, enabled_by_default, retention_days, mcp_http, browser_cdp } => {
             let mcp_addr = mcp_http.filter(|s| !s.is_empty()).map(|s| http_mcp::parse_addr(&s)).transpose().map_err(AdlError::invalid)?;
             let adapter = platform::make_adapter(adapter)?;
             let store = AgentStore::open(paths::config_dir().join("agents.json"))?;
             let audit = Audit::open(paths::state_dir().join("audit"), retention_days);
-            let mut cfg = Config { require_native_control: !no_native_control && !enabled_by_default, enabled_by_default, ..Config::default() };
+            let mut cfg = Config { require_native_control: !no_native_control && !enabled_by_default, enabled_by_default, browser_cdp, ..Config::default() };
             cfg.training.spill_dir = paths::memory_backed_spill_dir();
             let memory = adl_broker::screen_memory::ScreenMemory::open(paths::state_dir().join("screen-memory.json"))?;
             let broker = Arc::new(Broker::new(adapter, store, audit, cfg).with_screen_memory(memory));
@@ -967,6 +1028,27 @@ fn run_with(cli: Cli) {
         }
         Cmd::Memory(MemoryCmd::Locate { display, min_score, label, auth }) => agent_client(&auth)?.call("memory.locate", json!({"label": label, "display": display, "min_score": min_score})),
         Cmd::Memory(MemoryCmd::Remember { capture, x, y, radius, label, auth }) => agent_client(&auth)?.call("memory.remember", json!({"label": label, "capture": capture, "x": x, "y": y, "radius": radius})),
+        Cmd::Browser(BrowserCmd::Status) => control_client()?.call("browser.probe", json!({})),
+        Cmd::Browser(BrowserCmd::Launch { profile, port, headless }) => browser_launch(&profile, port, headless),
+        Cmd::Browser(BrowserCmd::Call { tool, args, out, auth }) => {
+            if !tool.starts_with("browser_") {
+                return Err(AdlError::invalid("only browser_* tools run here; the other tools have their own commands"));
+            }
+            let a: Value = serde_json::from_str(&args).map_err(|e| AdlError::invalid(format!("args must be a JSON object: {e}")))?;
+            let mut s = mcp::Session::open(&token_for(&auth)?, json!({"client": "cli"}))?;
+            let mut v = s.one_shot(&tool, &a)?;
+            if let (Some(path), Some(png)) = (out, v.get("png_base64").and_then(Value::as_str)) {
+                use base64::Engine as _;
+                let bytes = base64::engine::general_purpose::STANDARD.decode(png).map_err(|e| AdlError::internal(e.to_string()))?;
+                std::fs::write(&path, bytes).map_err(|e| AdlError::internal(format!("{}: {e}", path.display())))?;
+                v["png_base64"] = json!(path.display().to_string());
+            }
+            // The outline reads better as text than as a JSON string.
+            if !j && let Some(text) = v.get("snapshot").and_then(Value::as_str) {
+                return Ok(json!(format!("page {} {}\n{}", v["page"].as_str().unwrap_or(""), v["url"].as_str().unwrap_or(""), text.trim_end())));
+            }
+            Ok(v)
+        }
         Cmd::Memory(MemoryCmd::List { of }) => control_client()?.call("memory.all", json!({"agent": of})),
         Cmd::Memory(MemoryCmd::Forget { agent, label }) => control_client()?.call("memory.forget", json!({"agent": agent, "label": label})),
         Cmd::Human(HumanCmd::Ask { kind, message, auth }) => {
