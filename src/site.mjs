@@ -392,7 +392,12 @@ const desktopPlatforms = [
   ['First', 'GNOME', 'Top-panel extension and settings app', 'Installable, testing'],
   ['Next', 'Windows', 'Taskbar notification-area icon', 'Installable, testing'],
   ['Next', 'macOS', 'Menu-bar item', 'Installable, testing'],
-  ['Next', 'Hyprland (and W3BS DE)', 'Tray in waybar; bar indicator in W3BS DE', 'Installable, testing'],
+  [
+    'Next',
+    'Hyprland (and W3BS DE)',
+    'Tray in waybar; bar indicator in W3BS DE',
+    'Installable, testing',
+  ],
   ['Next', 'Cinnamon, Xfce, MATE, LXQt', 'Tray or panel integration', 'Planned'],
   ['Expansion', 'Vela, Sway and others', 'Capability-based compositor adapters', 'Planned'],
 ];
@@ -787,6 +792,12 @@ export async function renderPage({ path, host, query, store, origin, browser }) 
     description =
       'Teach agents by doing the task yourself: record it from the Agentic Desktop Layer, review it, and let only the agents you choose retrieve the approved examples over MCP.';
     content = trainingPage();
+  } else if (path === '/training/liquid-agent') {
+    title = 'Teach an agent · W3BS Liquid Agent';
+    description =
+      'Show an agent a task a few times, review what it saw, and train a small liquid neural network (CfC) or GRU policy that suggests the next step. Off by default, local first, and every send or post waits for you.';
+    content = liquidAgentPage();
+    active = '/training';
   } else if (path === '/de') {
     title = 'W3BS DE';
     description = deDescription;
@@ -873,7 +884,10 @@ async function osPage() {
       'First release',
       'Docker images: <code>w3bs-os:server</code> and <code>w3bs-os:desktop</code> with the Agentic Desktop Layer installed',
     ],
-    ['Desktop', '<a class="inline-link" href="/de">W3BS DE</a> on Hyprland by default; KDE Plasma or GNOME selectable at install; LXQt and Xfce once qualified'],
+    [
+      'Desktop',
+      '<a class="inline-link" href="/de">W3BS DE</a> on Hyprland by default; KDE Plasma or GNOME selectable at install; LXQt and Xfce once qualified',
+    ],
     ['Shell', 'zsh for new users; bash and fish selectable'],
     [
       'Web server',
@@ -932,6 +946,35 @@ const TRAINING_QUICK_AGENT = [
   "  ssh -o BatchMode=yes you@desktop '~/.local/bin/w3bs-training' mcp serve --stdio --consumer claude-code",
   'claude mcp list                  # w3bs-training: Connected',
 ].join('\n');
+function liquidAgentPage() {
+  const steps = [
+    [
+      'Allow, then show it',
+      'Turn on <strong>recording</strong> in the Teach tab, pick one app and one task, and do the task. Passwords, PINs, one-time codes, tokens and card fields are masked as they are captured; the strict profile keeps no typed text at all.',
+    ],
+    [
+      'Review',
+      'Label each run (goal, success, risk), redact anything left, drop duplicates. Nothing becomes training data until you mark it reviewed and turn on <strong>training data</strong>.',
+    ],
+    [
+      'Train',
+      'Train on your own machine (default) with Infernet: a CfC liquid neural network and a GRU baseline on the same splits. The liquid model is chosen only if it beats the baseline. A trusted c0mpute worker is opt-in, behind a preview of exactly what leaves your machine.',
+    ],
+    [
+      'Evaluate, then use',
+      'Each model is replayed on mock email, Reddit and LinkedIn sites before it can be switched on. Then pick a mode per task: Off, Suggest, Execute with approval, or Bounded. Every send, post, publish, delete or submit waits for you in every mode.',
+    ],
+  ];
+  const perms = [
+    ['recording', 'capture a scoped Teach session'],
+    ['training data', 'use reviewed episodes to train'],
+    ['network upload', 'send a redacted dataset to a trusted worker'],
+    ['remote inference', 'ask a remote worker for suggestions'],
+    ['auto-execute', 'let a model act (external writes still ask you)'],
+  ];
+  return `<section class="page-head"><div class="eyebrow">W3BS TRAINING · LIQUID AGENT · NEW IN 0.3.0</div><h1>Teach an agent<br><em>by showing it.</em></h1><p>Do a desktop task a few times, review what was captured, and train a small model that suggests the next click. Liquid neural networks (CfC) and a GRU baseline, trained on your machine by default. Off until you turn it on, and nothing is sent or posted without you.</p><div class="desktop-install-box"><span class="eyebrow">MACOS AND LINUX</span><div class="identity-line"><code>${e(TRAINING_INSTALL)}</code><button class="small-button" type="button" data-copy="${e(TRAINING_INSTALL)}">Copy</button></div><span class="eyebrow">THEN</span><div class="identity-line"><code>w3bs training open</code></div><p class="muted">Open the <strong>Teach</strong> tab. To train, install the Infernet CLI and its runtime once: <code>npm i -g @infernetprotocol/cli &amp;&amp; infernet model runtime setup --yes</code>.</p><div class="actions"><a class="button primary" href="https://github.com/profullstack/w3bs.org/blob/main/docs/training/liquid-agent.md" rel="noopener">Read the guide <span aria-hidden="true">→</span></a><a class="text-link" href="/training">W3BS Training <span aria-hidden="true">←</span></a></div></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">HOW IT WORKS</div><h2>Four steps.</h2></div></div><ol class="desktop-steps">${steps.map(([t, d]) => `<li><h3>${t}</h3><p>${d}</p></li>`).join('')}</ol></section><section class="section"><div class="section-heading"><div><div class="eyebrow">YOU STAY IN CHARGE</div><h2>Five switches, all off.</h2></div></div><p>Each permission is separate, shown with who turned it on and when, and can be revoked in one click. A kill switch stops the agent before its next action. Every proposal, approval and action is in the audit log.</p><ul>${perms.map(([n, d]) => `<li><strong>${n}</strong>: ${d}</li>`).join('')}</ul></section><section class="section"><div class="section-heading"><div><div class="eyebrow">UNDER THE HOOD</div><h2>Open pieces, one contract.</h2></div></div><p><a class="inline-link" href="https://infernetprotocol.com/docs/liquid-agent" rel="noopener">Infernet</a> trains and serves the models (CfC and LTC from ncps, GRU baseline). <a class="inline-link" href="https://c0mpute.com/temporal" rel="noopener">c0mpute</a> runs them on a worker you trust when you ask it to, with end-to-end encrypted sessions. All three speak the liquid-agent/v1 schemas.</p></section><div class="draft-note"><strong>Status.</strong> Works end to end on mock sites. On synthetic traces GRU beat CfC (0.948 vs 0.869 episode success), so GRU is the default until your own data says otherwise, and no model is switched on unless it passes the mock replay. A trusted worker still sees the redacted data it trains on. Read the <a class="inline-link" href="https://github.com/profullstack/w3bs.org/blob/main/docs/training/liquid-agent.md" rel="noopener">guide and threat model</a>.</div>`;
+}
+
 function trainingPage() {
   const steps = [
     [
@@ -951,7 +994,7 @@ function trainingPage() {
       'Agents report each attempt with and without the examples. Failures come back to you, and the Runs page compares the two with confidence intervals instead of claims.',
     ],
   ];
-  return `<section class="page-head"><div class="eyebrow">W3BS TRAINING · COMMUNITY DRAFT</div><h1>Teach agents<br><em>by doing it yourself.</em></h1><p>Record a task on your own desktop, review what was captured, and let only the agents you choose learn from the approved examples. Local first: your recordings stay encrypted on your computer unless you push them to your w3bs.org workspace.</p><div class="desktop-install-box"><span class="eyebrow">MACOS AND LINUX</span><div class="identity-line"><code>${e(TRAINING_INSTALL)}</code><button class="small-button" type="button" data-copy="${e(TRAINING_INSTALL)}">Copy</button></div><span class="eyebrow">WINDOWS (POWERSHELL)</span><div class="identity-line"><code>${e(TRAINING_INSTALL_WIN)}</code><button class="small-button" type="button" data-copy="${e(TRAINING_INSTALL_WIN)}">Copy</button></div><p class="muted">One self-contained binary, checked against the release checksums. With the <a class="inline-link" href="/packages">w3bs CLI</a>: <code>w3bs install w3bs-training</code>. On Linux, also install libsecret's <code>secret-tool</code> (<code>sudo apt install libsecret-tools</code>) so the encryption key lives in your desktop keyring. Recording needs the <a class="inline-link" href="/desktop">Agentic Desktop Layer</a>.</p><div class="actions"><a class="button primary" href="/training/app/">Open your workspace <span aria-hidden="true">→</span></a><a class="text-link" href="#how">How it works <span aria-hidden="true">↓</span></a></div></div></section><section id="how" class="section"><div class="section-heading"><div><div class="eyebrow">HOW IT WORKS</div><h2>Four steps.</h2></div></div><ol class="desktop-steps">${steps.map(([t, d]) => `<li><h3>${t}</h3><p>${d}</p></li>`).join('')}</ol></section><section id="claude" class="section training-quick"><div class="section-heading"><div><div class="eyebrow">QUICK START</div><h2>Use it from Claude Code.</h2></div></div><p>Record on your desktop; Claude Code can run on another machine and reads the shared tasks over ssh. Recordings never leave the desktop.</p><h3>On the desktop</h3><pre><code>${e(TRAINING_QUICK_DESKTOP)}</code></pre><p>Then record (tray → <strong>Start training…</strong> → <strong>Finish task</strong>), review in <code>w3bs training open</code>, and click <strong>Consumers → Share all reviewed tasks</strong>.</p><h3>On the agent machine</h3><pre><code>${e(TRAINING_QUICK_AGENT)}</code></pre><p>Then ask Claude to use w3bs-training to find how you did the task. <a class="inline-link" href="https://github.com/profullstack/w3bs.org/blob/main/docs/training/README.md#quick-start-record-on-your-desktop-use-it-from-claude-code" rel="noopener">Full quick start</a>.</p></section><section class="section"><div class="section-heading"><div><div class="eyebrow">WHERE YOUR DATA LIVES</div><h2>Two places, one format.</h2></div></div><p><strong>On your computer:</strong> <code>w3bs training open</code> runs the review app locally, from a one-time link; frames are AES-256-GCM encrypted with a key from your keyring. <strong>On w3bs.org:</strong> your <a class="inline-link" href="/training/app/">workspace</a> is the same app, signed in with your W3BS account, in its own database schema. Send reviewed tasks there with <code>w3bs training push</code> to review on another device or to give a hosted agent access. The server can decrypt what you push to it; keep anything you would not hand to a server on your own machine.</p><p>Both speak the open <a class="inline-link" href="https://github.com/profullstack/w3bs.org/blob/main/docs/training/format-0.1.md" rel="noopener">W3BS Demonstration Dataset Format 0.1</a>, so you can export a bundle, a JSONL dataset or next-action training examples (with no future state in the input) and take them anywhere.</p></section><div class="draft-note"><strong>Status.</strong> Recording is verified on KDE Plasma; GNOME, Windows and macOS use the same code but have not been run through the rig. Recordings are screenshots of approved windows (the <code>visual-review</code> profile), so they help an agent see how a task is done but do not qualify as action-level training data. No model-training integration is offered yet. Read the <a class="inline-link" href="https://github.com/profullstack/w3bs.org/tree/main/docs/training" rel="noopener">docs and privacy guide</a>.</div>`;
+  return `<section class="page-head"><div class="eyebrow">W3BS TRAINING · COMMUNITY DRAFT</div><h1>Teach agents<br><em>by doing it yourself.</em></h1><p>Record a task on your own desktop, review what was captured, and let only the agents you choose learn from the approved examples. Local first: your recordings stay encrypted on your computer unless you push them to your w3bs.org workspace.</p><div class="desktop-install-box"><span class="eyebrow">MACOS AND LINUX</span><div class="identity-line"><code>${e(TRAINING_INSTALL)}</code><button class="small-button" type="button" data-copy="${e(TRAINING_INSTALL)}">Copy</button></div><span class="eyebrow">WINDOWS (POWERSHELL)</span><div class="identity-line"><code>${e(TRAINING_INSTALL_WIN)}</code><button class="small-button" type="button" data-copy="${e(TRAINING_INSTALL_WIN)}">Copy</button></div><p class="muted">One self-contained binary, checked against the release checksums. With the <a class="inline-link" href="/packages">w3bs CLI</a>: <code>w3bs install w3bs-training</code>. On Linux, also install libsecret's <code>secret-tool</code> (<code>sudo apt install libsecret-tools</code>) so the encryption key lives in your desktop keyring. Recording needs the <a class="inline-link" href="/desktop">Agentic Desktop Layer</a>.</p><div class="actions"><a class="button primary" href="/training/app/">Open your workspace <span aria-hidden="true">→</span></a><a class="text-link" href="/training/liquid-agent">New: teach an agent <span aria-hidden="true">→</span></a></div></div></section><section id="how" class="section"><div class="section-heading"><div><div class="eyebrow">HOW IT WORKS</div><h2>Four steps.</h2></div></div><ol class="desktop-steps">${steps.map(([t, d]) => `<li><h3>${t}</h3><p>${d}</p></li>`).join('')}</ol></section><section id="claude" class="section training-quick"><div class="section-heading"><div><div class="eyebrow">QUICK START</div><h2>Use it from Claude Code.</h2></div></div><p>Record on your desktop; Claude Code can run on another machine and reads the shared tasks over ssh. Recordings never leave the desktop.</p><h3>On the desktop</h3><pre><code>${e(TRAINING_QUICK_DESKTOP)}</code></pre><p>Then record (tray → <strong>Start training…</strong> → <strong>Finish task</strong>), review in <code>w3bs training open</code>, and click <strong>Consumers → Share all reviewed tasks</strong>.</p><h3>On the agent machine</h3><pre><code>${e(TRAINING_QUICK_AGENT)}</code></pre><p>Then ask Claude to use w3bs-training to find how you did the task. <a class="inline-link" href="https://github.com/profullstack/w3bs.org/blob/main/docs/training/README.md#quick-start-record-on-your-desktop-use-it-from-claude-code" rel="noopener">Full quick start</a>.</p></section><section class="section"><div class="section-heading"><div><div class="eyebrow">WHERE YOUR DATA LIVES</div><h2>Two places, one format.</h2></div></div><p><strong>On your computer:</strong> <code>w3bs training open</code> runs the review app locally, from a one-time link; frames are AES-256-GCM encrypted with a key from your keyring. <strong>On w3bs.org:</strong> your <a class="inline-link" href="/training/app/">workspace</a> is the same app, signed in with your W3BS account, in its own database schema. Send reviewed tasks there with <code>w3bs training push</code> to review on another device or to give a hosted agent access. The server can decrypt what you push to it; keep anything you would not hand to a server on your own machine.</p><p>Both speak the open <a class="inline-link" href="https://github.com/profullstack/w3bs.org/blob/main/docs/training/format-0.1.md" rel="noopener">W3BS Demonstration Dataset Format 0.1</a>, so you can export a bundle, a JSONL dataset or next-action training examples (with no future state in the input) and take them anywhere.</p></section><div class="draft-note"><strong>Status.</strong> Recording is verified on KDE Plasma; GNOME, Windows and macOS use the same code but have not been run through the rig. Recordings are screenshots of approved windows (the <code>visual-review</code> profile), so they help an agent see how a task is done but do not qualify as action-level training data. Model training: <a class="inline-link" href="/training/liquid-agent">Teach an agent</a> (new in 0.3.0). Read the <a class="inline-link" href="https://github.com/profullstack/w3bs.org/tree/main/docs/training" rel="noopener">docs and privacy guide</a>.</div>`;
 }
 export const escapeHtml = e;
 // CrawlProof page analytics (crawlproof.com/stats.js). The id is the CrawlProof project
