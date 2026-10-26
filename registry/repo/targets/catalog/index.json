@@ -542,7 +542,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.9.1"
+      "latest_version": "0.10.0"
     },
     {
       "id": "readm3.com/readm3",
@@ -1401,7 +1401,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.48.0"
+      "latest_version": "0.49.0"
     },
     {
       "id": "nightcell7.com/nightcell7",
@@ -2101,6 +2101,24 @@
       "license": "Apache-2.0",
       "agentic": true,
       "latest_version": "8.5.753"
+    },
+    {
+      "id": "github.com/tuxcleaner",
+      "name": "tuxcleaner",
+      "description": "Safety-first Linux cleanup, application uninstall, disk analysis and system status CLI written in Rust. Destructive commands need an explicit selection or --yes, and every one supports --dry-run.",
+      "commands": [
+        "tuxcleaner"
+      ],
+      "install": {
+        "url": "https://raw.githubusercontent.com/debba/tuxcleaner/main/install.sh",
+        "shell": "sh"
+      },
+      "homepage": "https://github.com/debba/tuxcleaner",
+      "repository": "https://github.com/debba/tuxcleaner",
+      "vendor": "debba",
+      "license": "GPL-3.0",
+      "agentic": false,
+      "latest_version": "0.5.0"
     },
     {
       "id": "profullstack.com/root-w3bs-os",
