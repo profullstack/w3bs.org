@@ -375,7 +375,7 @@ test('OAuth 2.1: PKCE code flow for the w3bs CLI, rotating refresh tokens, reuse
     assert.equal(consent.status, 200);
     assert.match(
       consent.headers.get('content-security-policy'),
-      /form-action 'self' http:\/\/127\.0\.0\.1:49152/,
+      /form-action 'self' https:\/\/pit\.world http:\/\/127\.0\.0\.1:49152/,
     );
     assert.match(await consent.text(), /w3bs CLI/);
     // Denied.

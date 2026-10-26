@@ -128,8 +128,8 @@ test('CrawlProof: only for https://w3bs.org, never on pages that can carry accou
     const home = await fetch(`${t.base}/`);
     assert.ok((await home.text()).includes(tag));
     const csp = home.headers.get('content-security-policy');
-    assert.match(csp, /script-src 'self' https:\/\/crawlproof\.com;/);
-    assert.match(csp, /connect-src 'self' https:\/\/crawlproof\.com;/);
+    assert.match(csp, /script-src 'self' https:\/\/crawlproof\.com 'sha256-[A-Za-z0-9+/=]+';/);
+    assert.match(csp, /connect-src 'self' https:\/\/crawlproof\.com https:\/\/pit\.world;/);
     for (const path of ['/pricing', '/signup', '/login', '/login?next=%2Ffleet'])
       assert.ok((await (await fetch(`${t.base}${path}`)).text()).includes(tag), path);
     // Email links, device codes and OAuth requests travel in the address; machine names on

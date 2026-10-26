@@ -7,7 +7,8 @@ import { FLEET_LIMITS } from './fleet.mjs';
 import { TTL } from './accounts.mjs';
 import { buildSuite } from './os-suite.mjs';
 import { latestOsIso } from './os-releases.mjs';
-import { footerHtml, footerHtmlSync } from '@profullstack/footer';
+import { createHash } from 'node:crypto';
+import { footerHtml, footerHtmlSync, subscribeForm } from '@profullstack/footer';
 import { MOSHPIT_EXAMPLES, WEB_EXAMPLES } from './browse-examples.mjs';
 
 const e = (value) =>
@@ -119,6 +120,13 @@ const SOCIALS = [
 // css:false because the CSP is style-src 'self'; its rules live in style.css.
 const HOUSE_FOOTER = { site: 'https://w3bs.org/', name: 'W3BS', since: 2026, css: false };
 let houseFooter = footerHtmlSync(HOUSE_FOOTER);
+// The CSP source for the footer's inline newsletter script (wireSubscribe, footer 0.4.0+), as
+// 'sha256-...'. The CSP has no 'unsafe-inline' and the footer is a cached string (no per-request
+// nonce), but the renderer emits the same script bytes every time, so its hash allows exactly it.
+export const FOOTER_SCRIPT_SRC = (() => {
+  const m = subscribeForm(HOUSE_FOOTER.site).match(/<script[^>]*>([\s\S]*?)<\/script>/);
+  return m?.[1] ? `'sha256-${createHash('sha256').update(m[1]).digest('base64')}'` : '';
+})();
 export async function refreshHouseFooter() {
   houseFooter = await footerHtml(HOUSE_FOOTER);
 }
