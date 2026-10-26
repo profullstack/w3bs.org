@@ -30,7 +30,7 @@
 
 adl_main() {
   set -u
-  VERSION="${W3BS_DESKTOP_VERSION:-0.8.0}"
+  VERSION="${W3BS_DESKTOP_VERSION:-0.9.0}"
   BASE="https://github.com/profullstack/w3bs.org/releases/download/desktop-v$VERSION"
 
   say() { printf '%s\n' "$*" >&2; }
