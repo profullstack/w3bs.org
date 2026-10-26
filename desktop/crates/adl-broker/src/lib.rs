@@ -3,6 +3,8 @@
 pub mod adapter;
 pub mod audit;
 pub mod broker;
+pub mod browser;
+pub mod cdp;
 pub mod mock;
 pub mod recorder;
 pub mod screen_memory;

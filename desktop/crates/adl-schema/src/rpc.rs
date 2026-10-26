@@ -49,6 +49,7 @@ pub const AGENT_METHODS: &[&str] = &[
     "task.begin", "task.end", "task.cancel", "task.list", "task.inspect", "lease.acquire", "lease.renew",
     "lease.release", "input", "approval.status", "human_step.request", "human_step.status",
     "memory.remember", "memory.locate", "memory.list",
+    "browser.status", "browser.pages", "browser.snapshot", "browser.screenshot", "browser.wait_for", "browser.act",
 ];
 
 /// Methods on the control socket.
@@ -61,4 +62,5 @@ pub const CONTROL_METHODS: &[&str] = &[
     "audit.recent", "session.event", "subscribe", "control.login", "native.shortcut",
     "training.status", "training.apps", "training.start", "training.pause", "training.resume", "training.mark",
     "training.explain", "training.finish", "training.discard", "training.forget", "training.handoff",
+    "browser.probe",
 ];

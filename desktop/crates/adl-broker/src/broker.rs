@@ -53,6 +53,9 @@ pub struct Config {
     pub drive_idle_ms: u64,
     /// How long a step handed to the person (CAPTCHA, 2FA, sign-in) waits before it lapses.
     pub human_step_ttl_ms: u64,
+    /// Where the browser channel finds DevTools: `http://127.0.0.1:9222` or a `ws://` browser
+    /// URL. None looks for TronBrowser's managed session and `DevToolsActivePort` files.
+    pub browser_cdp: Option<String>,
 }
 
 impl Default for Config {
@@ -73,6 +76,7 @@ impl Default for Config {
             drive_postpone_ms: 10 * 60_000,
             drive_idle_ms: 10 * 60_000,
             human_step_ttl_ms: 15 * 60_000,
+            browser_cdp: None,
         }
     }
 }
@@ -168,6 +172,7 @@ pub struct Broker {
     dispatch: Mutex<()>,
     pub(crate) rec: Mutex<crate::recorder::RecInner>,
     pub(crate) rec_blocks_leases: AtomicBool,
+    pub(crate) browser: Mutex<crate::browser::BrowserInner>,
 }
 
 /// Outcome of executing one action, for result accounting.
@@ -208,6 +213,7 @@ impl Broker {
             dispatch: Mutex::new(()),
             rec: Mutex::new(crate::recorder::RecInner::default()),
             rec_blocks_leases: AtomicBool::new(false),
+            browser: Mutex::new(crate::browser::BrowserInner::default()),
         }
     }
 
@@ -588,7 +594,9 @@ impl Broker {
     }
 
     pub fn capabilities(&self) -> Vec<CapabilityReport> {
-        self.adapter.capabilities()
+        let mut v: Vec<_> = self.adapter.capabilities().into_iter().filter(|c| c.capability != Capability::Browser).collect();
+        v.push(self.browser_capability());
+        v
     }
 
     pub fn tasks(&self) -> Vec<TaskInfo> {
@@ -714,7 +722,7 @@ impl Broker {
         Ok(a.policy)
     }
 
-    fn require_enabled(&self) -> Result<u64> {
+    pub(crate) fn require_enabled(&self) -> Result<u64> {
         let g = self.generation.load(Ordering::SeqCst);
         if !self.open.load(Ordering::SeqCst) {
             return Err(AdlError::disabled());
@@ -722,7 +730,7 @@ impl Broker {
         Ok(g)
     }
 
-    fn require_cap(&self, p: &Principal, cap: Capability) -> Result<Policy> {
+    pub(crate) fn require_cap(&self, p: &Principal, cap: Capability) -> Result<Policy> {
         let pol = self.policy(p)?;
         if !pol.capabilities.contains(&cap) {
             let e = AdlError::denied(format!("agent is not granted {}", serde_json::to_value(cap).unwrap().as_str().unwrap()));
@@ -733,7 +741,7 @@ impl Broker {
     }
 
     /// Discard results computed across a disable/stop (no late sensitive results).
-    fn still_valid(&self, gen0: u64) -> Result<()> {
+    pub(crate) fn still_valid(&self, gen0: u64) -> Result<()> {
         if !self.open.load(Ordering::SeqCst) || self.generation.load(Ordering::SeqCst) != gen0 {
             return Err(AdlError::disabled());
         }
@@ -1322,7 +1330,7 @@ impl Broker {
     // ---------------------------------------------------------------- input engine
 
     /// Checked before every primitive event.
-    fn checkpoint(&self, p: &Principal, task: &str, gen0: u64) -> Result<()> {
+    pub(crate) fn checkpoint(&self, p: &Principal, task: &str, gen0: u64) -> Result<()> {
         if !self.open.load(Ordering::SeqCst) || self.generation.load(Ordering::SeqCst) != gen0 {
             return Err(AdlError::new(ErrorCode::Cancelled, "access was stopped or revoked"));
         }
@@ -1584,8 +1592,14 @@ impl Broker {
         if !needs {
             return Ok(());
         }
-        let canonical = serde_json::to_vec(&json!({"agent": p.agent, "task": batch.task, "target": batch.target, "actions": batch.actions})).unwrap();
-        let digest = sha256_hex(&canonical);
+        let canonical = json!({"agent": p.agent, "task": batch.task, "target": batch.target, "actions": batch.actions});
+        self.require_approval(p, &batch.task, "input", target_app.unwrap_or("desktop"), canonical, Self::summarize(batch, target_app))
+    }
+
+    /// Consume a matching approval, or open one (or reuse the pending one) and refuse with
+    /// `approval_required`. `canonical` is what the person approves: the identical request.
+    pub(crate) fn require_approval(&self, p: &Principal, task: &str, operation: &str, target: &str, canonical: serde_json::Value, summary: String) -> Result<()> {
+        let digest = sha256_hex(&serde_json::to_vec(&canonical).unwrap());
         let now = now_ms();
         let mut g = self.lock();
         if let Some(a) = g.approvals.values_mut().find(|a| a.agent == p.agent && a.args_digest == digest && a.status == ApprovalStatus::Approved && a.expires_at_ms > now) {
@@ -1597,8 +1611,8 @@ impl Broker {
             Some(id) => id,
             None => {
                 let a = ApprovalInfo {
-                    id: random_id("appr", 8), agent: p.agent.clone(), task: batch.task.clone(), operation: "input".into(),
-                    target: target_app.unwrap_or("desktop").into(), args_digest: digest, summary: Self::summarize(batch, target_app),
+                    id: random_id("appr", 8), agent: p.agent.clone(), task: task.to_string(), operation: operation.into(),
+                    target: target.into(), args_digest: digest, summary,
                     status: ApprovalStatus::Pending, created_at_ms: now, expires_at_ms: now + self.cfg.approval_ttl_ms,
                 };
                 let id = a.id.clone();
@@ -1608,11 +1622,26 @@ impl Broker {
             }
         };
         drop(g);
-        self.audit.log("input", Some(&p.agent), Some(&batch.task), "approval_required", "", json!({"approval": id}));
-        Err(AdlError::new(ErrorCode::ApprovalRequired, "a human must approve this input; retry the identical request after approval").with_details(json!({"approval_id": id})))
+        self.audit.log(operation, Some(&p.agent), Some(task), "approval_required", "", json!({"approval": id}));
+        Err(AdlError::new(ErrorCode::ApprovalRequired, format!("a human must approve this {operation}; retry the identical request after approval")).with_details(json!({"approval_id": id})))
     }
 
-    fn check_rate(&self, p: &Principal, pol: &Policy, n: usize) -> Result<()> {
+    /// Serialize delivery with desktop input: one batch or browser act at a time.
+    pub(crate) fn try_dispatch(&self) -> Result<MutexGuard<'_, ()>> {
+        match self.dispatch.try_lock() {
+            Ok(g) => Ok(g),
+            Err(std::sync::TryLockError::Poisoned(e)) => Ok(e.into_inner()),
+            Err(std::sync::TryLockError::WouldBlock) => Err(AdlError::new(ErrorCode::Busy, "another input batch is being delivered")),
+        }
+    }
+
+    pub(crate) fn count_completed_batch(&self, task: &str) {
+        if let Some(t) = self.lock().tasks.get_mut(task) {
+            t.info.batches_completed += 1;
+        }
+    }
+
+    pub(crate) fn check_rate(&self, p: &Principal, pol: &Policy, n: usize) -> Result<()> {
         let limit = if pol.max_actions_per_minute == 0 { self.cfg.default_actions_per_minute } else { pol.max_actions_per_minute } as usize;
         let now = now_ms();
         let mut g = self.lock();
@@ -1661,11 +1690,7 @@ impl Broker {
         self.check_approval(p, &pol, batch, target_app.as_deref())?;
         self.check_rate(p, &pol, batch.actions.len())?;
 
-        let _dispatch = match self.dispatch.try_lock() {
-            Ok(g) => g,
-            Err(std::sync::TryLockError::Poisoned(e)) => e.into_inner(),
-            Err(std::sync::TryLockError::WouldBlock) => return Err(AdlError::new(ErrorCode::Busy, "another input batch is being delivered")),
-        };
+        let _dispatch = self.try_dispatch()?;
         let ctx = BatchCtx { task: batch.task.clone(), gen0, policy: pol, target_window: batch.target.window.clone() };
         let request = random_id("req", 8);
         let mut done = 0;

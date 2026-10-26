@@ -300,6 +300,55 @@ w3bs desktop memory remember --agent A --capture cap_x --x 450 --y 315 "Editor: 
 w3bs desktop memory locate --agent A --display DP-1 "Editor: Save button"
 ```
 
+## Browser channel (DevTools, not screenshots)
+
+Anything in a web page goes through Chrome DevTools (CDP), the protocol chrome-devtools-mcp
+uses, instead of the screenshot, find-the-pixel, click loop. The agent reads the page as an
+accessibility outline whose lines carry `uid`s, then acts by uid:
+
+```
+uid=31 textbox "Username" focused
+uid=42 button "Sign in"
+```
+
+`browser_snapshot` → `browser_fill {uid, value}` / `browser_click {uid}` → `browser_snapshot` again
+to verify. One round trip per step, no image, no coordinates, no screen capture permission, and it
+works on a window that is covered or on another workspace. Also `browser_type`, `browser_press_key`
+(`Enter`, `Control+A`), `browser_scroll`, `browser_navigate` (http/https only, or back, forward,
+reload), `browser_new_page` (`like_page` keeps an incognito context), `browser_close_page`,
+`browser_wait_for`, `browser_evaluate`, `browser_pages`, `browser_screenshot` (the page itself).
+
+**The agent browser.** `w3bs desktop browser launch [--profile agent] [--headless]` starts
+TronBrowser's managed session (`tron browser launch`): its own profile (`~/.tronbrowser-agent`)
+with DevTools on a loopback port. Your everyday browser is never opened to DevTools. The broker
+finds it through the session file `tron` writes, then any `DevToolsActivePort` in a TronBrowser,
+Chromium or Chrome profile, then `127.0.0.1:9222`; `daemon --browser-cdp URL`
+(`W3BS_DESKTOP_BROWSER_CDP`) pins one instead.
+
+**No silent fallback.** When DevTools cannot reach a browser, every `browser_*` call fails with
+`blocked` and `details.browser_unavailable: true`, and `w3bs desktop capabilities` shows `browser`
+unsupported. Agents are told to stop and say so (a training run is reported as failed with that
+error) instead of quietly going back to screenshots. The screenshot and mouse/keyboard tools stay
+as the fallback when the person says to use them, and for everything that is not a web page.
+
+Safety: the same gates as desktop input. Reading needs the layer Enabled and the `browser` grant
+(the `broad` preset includes it; `agents update NAME --policy broad` adds it to an existing agent).
+Every act needs `task_begin`'s input lease, so the drive prompt, human steps, training recordings,
+emergency stop and takeover all apply; `--approve-for browser` (or one tool, `browser_click`) makes
+each act wait for your approval; the per-minute action limit counts them. A uid only resolves in
+the page's current document, so a uid from the previous page fails as `target_stale` instead of
+clicking whatever is now at its old position. The audit log keeps the operation and page id, never
+typed text, values or page content.
+
+```bash
+w3bs desktop browser launch                    # the agent browser (TronBrowser, own profile, loopback DevTools)
+w3bs desktop browser status                    # reachable? product, endpoint, pages
+# agent side (MCP: browser_*), one tool per command; acts take the lease for that call:
+w3bs desktop browser call --agent A browser_snapshot
+w3bs desktop browser call --agent A browser_fill '{"uid": 31, "value": "riotcoder"}'
+w3bs desktop browser call --agent A browser_click '{"uid": 42}'
+```
+
 ## Control app
 
 A local, installable web app with everything the tray has and more: status (Disabled, Enabling,
@@ -465,6 +514,7 @@ cargo test --workspace   # broker conformance, Vela fake socket, KWin and GNOME 
 desktop/tests/rig/kde-portal.sh     # KDE Plasma in a container (TRAY=1 adds the tray stage)
 desktop/tests/rig/gnome-portal.sh   # GNOME Shell in a container, with the W3BS Shell extension
 desktop/tests/rig/macos-e2e.sh      # macOS logged-in session (GitHub macos-latest job `macos-e2e`)
+desktop/tests/rig/browser-cdp.sh    # browser channel against a real headless Chrome (CHROME=..., W3BS_DESKTOP_BIN=...)
 desktop/tests/installer/alpine.sh    # install.sh on Alpine (musl, no systemd) in alpine:3.24, x86_64 + aarch64 (job `installer-alpine`)
 desktop/tests/installer/macos.sh     # install.sh on macOS: LaunchAgents, launchd broker, menu bar, uninstall (job `installer-macos`)
 desktop/tests/installer/windows.ps1  # install.ps1 on Windows: autostart, windowless broker + tray, uninstall (job `installer-windows`)

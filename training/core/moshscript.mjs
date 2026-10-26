@@ -113,7 +113,8 @@ const prompt = [
     : "",
   "",
   "Use the w3bs-desktop MCP tools. Observe the screen before every action and never reuse old",
-  "coordinates.",
+  "coordinates. In a web page use its browser_* tools (browser_snapshot, then click and fill by",
+  "uid), not screenshots; if they fail with browser_unavailable, stop and tell me.",
   task.source && task.source.episode
     ? \`If the w3bs-training MCP is connected, training_get_frames with episode_id \${task.source.episode} shows the screenshots I recorded.\`
     : "",
