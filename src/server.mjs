@@ -59,7 +59,7 @@ export function createApp({
       'Referrer-Policy': 'strict-origin-when-cross-origin',
       'Cache-Control': 'no-store',
       'Content-Security-Policy':
-        "default-src 'self'; script-src 'self' https://crawlproof.com; style-src 'self'; img-src 'self' data: https://built.indie.pit.world; connect-src 'self' https://crawlproof.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+        "default-src 'self'; script-src 'self' https://crawlproof.com; style-src 'self'; img-src 'self' data: https://built.indie.pit.world https://pwamart.com; connect-src 'self' https://crawlproof.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
       'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
     });
     const railwayHealth =
