@@ -179,7 +179,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.2.33"
+      "latest_version": "0.2.34"
     },
     {
       "id": "infernetprotocol.com/infernet",
@@ -197,7 +197,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.1.65"
+      "latest_version": "0.1.66"
     },
     {
       "id": "diskpush.com/diskpush",
@@ -542,7 +542,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.10.0"
+      "latest_version": "0.11.0"
     },
     {
       "id": "readm3.com/readm3",
@@ -1261,7 +1261,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.2.7"
+      "latest_version": "0.3.0"
     },
     {
       "id": "submitfleet.com/submitfleet",
