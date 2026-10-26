@@ -394,7 +394,7 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
     // The consent form posts here and is redirected to the app; form-action must allow it.
     res.set(
       'Content-Security-Policy',
-      `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://built.indie.pit.world; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self' ${target.origin}`,
+      `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://built.indie.pit.world https://pwamart.com; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self' ${target.origin}`,
     );
     page(res, {
       title: `Sign in to ${request.client.name}`,
