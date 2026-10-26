@@ -3632,7 +3632,7 @@
     "publisher": "third-party"
   },
   {
-    "id": "github.com/debba/tuxcleaner",
+    "id": "github.com/tuxcleaner",
     "name": "tuxcleaner",
     "commands": [
       "tuxcleaner"
