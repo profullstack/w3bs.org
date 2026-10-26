@@ -14,7 +14,7 @@ import {
   TTL,
   formatUserCode,
 } from './accounts.mjs';
-import { escapeHtml as e, pageShell } from './site.mjs';
+import { escapeHtml as e, FOOTER_SCRIPT_SRC, pageShell } from './site.mjs';
 
 // Paths a third party may call cross-origin: no cookies are read on them.
 export const OPEN_CORS = [
@@ -394,7 +394,7 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
     // The consent form posts here and is redirected to the app; form-action must allow it.
     res.set(
       'Content-Security-Policy',
-      `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://built.indie.pit.world https://pwamart.com; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self' ${target.origin}`,
+      `default-src 'self'; script-src 'self' ${FOOTER_SCRIPT_SRC}; style-src 'self'; img-src 'self' data: https://built.indie.pit.world https://pwamart.com; connect-src 'self' https://pit.world; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self' https://pit.world ${target.origin}`,
     );
     page(res, {
       title: `Sign in to ${request.client.name}`,

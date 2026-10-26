@@ -28,7 +28,7 @@
     "@logicsrc/validators": "0.6.0",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@profullstack/bridges": "0.2.0",
-    "@profullstack/footer": "0.2.5",
+    "@profullstack/footer": "0.4.0",
     "@profullstack/hqtui": "0.10.3",
     "@profullstack/stack": "0.4.0",
     "@profullstack/threatcrush": "0.13.30",
