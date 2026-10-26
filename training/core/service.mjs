@@ -29,7 +29,7 @@ import { defaultHome } from './store.mjs';
 import { fsBlobs, openSqliteDb } from './db.mjs';
 import { writeZip } from './zip.mjs';
 
-export const VERSION = '0.2.7';
+export const VERSION = '0.3.0';
 const DAY = 86400000;
 const RETRIEVAL_PURPOSES = ['private_retrieval', 'external_retrieval'];
 // Purposes that send data beyond the person's own private use need declared rights.
@@ -137,7 +137,10 @@ export async function openTraining({
   keys,
   config: configStore,
   backupsNote = 'The local store keeps no backups. Copies made by your own backup tools are outside W3BS.',
+  // The Liquid Agent (Teach an agent) runs subprocesses and acts on mock sites: local store only.
+  liquid: withLiquid,
 } = {}) {
+  withLiquid ??= !db;
   if (!db) {
     home ??= defaultHome(env);
     mkdirSync(home, { recursive: true, mode: 0o700 });
@@ -2867,5 +2870,14 @@ This copy is outside W3BS. Revoking the version or deleting episodes in W3BS doe
   }
 
   await gc();
+  if (withLiquid) {
+    const { openLiquid } = await import('../liquid/service.mjs');
+    service.liquid = await openLiquid({ db, blobs, keys, home, env, now, training: service });
+    const closeDb = service.close;
+    service.close = async () => {
+      await service.liquid.close();
+      return closeDb();
+    };
+  }
   return service;
 }

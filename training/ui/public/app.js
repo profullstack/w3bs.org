@@ -1571,6 +1571,1029 @@ function versionCard(id, v) {
   );
 }
 
+// ------------------------------------------------------------------ Teach an agent (Liquid Agent)
+// Local app only. Everything starts off: recording, training-data use, upload, remote
+// inference and action execution are separate permissions a person turns on here.
+const LQ = (path, options) => api(`/liquid${path}`, options);
+const TEACH_TASKS = ['email.reply_draft', 'reddit.post_compose', 'linkedin.notifications_review'];
+const TEACH_APPS = {
+  'email.reply_draft': 'mail',
+  'reddit.post_compose': 'browser',
+  'linkedin.notifications_review': 'browser',
+};
+const MODE_NAMES = {
+  off: 'Off',
+  suggest: 'Suggest',
+  approve: 'Execute with approval',
+  bounded: 'Bounded automation',
+};
+const short = (hash) => (hash ? `${hash.slice(0, 15)}…${hash.slice(-6)}` : 'none');
+const pct = (x) => (typeof x === 'number' ? `${Math.round(x * 100)}%` : 'n/a');
+
+async function refreshIndicator() {
+  const el = document.getElementById('teach-indicator');
+  if (!el || HOSTED) return;
+  try {
+    const s = await LQ('/status');
+    const rec = s.recording;
+    el.hidden = !(rec.state === 'recording' || rec.state === 'paused' || s.kill_switch);
+    el.replaceChildren(
+      rec.state === 'recording'
+        ? h(
+            'a',
+            { href: '#/teach', class: 'rec' },
+            `● Recording ${rec.app} · ${rec.task} · ${rec.steps} step(s)`,
+          )
+        : rec.state === 'paused'
+          ? h('a', { href: '#/teach' }, `❚❚ Recording paused (${rec.app})`)
+          : null,
+      s.kill_switch ? h('a', { href: '#/teach', class: 'killed' }, 'Kill switch ON') : null,
+    );
+  } catch {
+    el.hidden = true;
+  }
+}
+
+function teachEpisode(id) {
+  return (async () => {
+    const d = await LQ(`/episodes/${encodeURIComponent(id)}`);
+    const ep = d.episode;
+    const goal = h('textarea', { 'aria-label': 'Goal', rows: 2 }, ep.labels.goal ?? '');
+    const success = h(
+      'select',
+      { 'aria-label': 'Outcome' },
+      h('option', { value: 'yes', selected: ep.labels.success || undefined }, 'Success'),
+      h('option', { value: 'no', selected: !ep.labels.success || undefined }, 'Failure'),
+    );
+    const reason = h('input', {
+      'aria-label': 'Failure reason',
+      value: ep.labels.failure_reason ?? '',
+      placeholder: 'Why it failed (failures only)',
+    });
+    const risk = h(
+      'select',
+      { 'aria-label': 'Risk' },
+      ['low', 'medium', 'high'].map((r) =>
+        h('option', { value: r, selected: ep.labels.risk === r || undefined }, r),
+      ),
+    );
+    const save = (reviewed) =>
+      run(async () => {
+        const ok = success.value === 'yes';
+        await LQ(`/episodes/${id}/review`, {
+          method: 'POST',
+          body: {
+            goal: goal.value,
+            success: ok,
+            failure_reason: ok ? '' : reason.value,
+            risk: risk.value,
+            reviewed,
+          },
+        });
+        toast(reviewed ? 'Reviewed' : 'Saved');
+        render();
+      });
+    const redact = (step, field) =>
+      run(async () => {
+        await LQ(`/episodes/${id}/redact`, { method: 'POST', body: { step, field } });
+        render();
+      });
+    return [
+      h('p', {}, h('a', { href: '#/teach' }, '← Teach an agent')),
+      h('h1', {}, `${ep.task}`),
+      h(
+        'div',
+        { class: 'chips' },
+        chip(d.state, d.state === 'reviewed' ? 'ok' : d.state === 'proposed' ? 'warn' : ''),
+        chip(d.source),
+        chip(`${ep.steps.length} steps`),
+        chip(`content ${short(ep.content_hash)}`),
+      ),
+      d.state === 'proposed'
+        ? h(
+            'p',
+            { class: 'notice' },
+            'A correction from an agent run. It joins nothing until you accept it for review.',
+            ' ',
+            h(
+              'button',
+              {
+                onclick: run(
+                  async () => (await LQ(`/episodes/${id}/accept`, { method: 'POST' }), render()),
+                ),
+              },
+              'Accept for review',
+            ),
+          )
+        : null,
+      h('h2', {}, 'Labels'),
+      h('div', { class: 'row' }, h('label', {}, h('span', {}, 'Goal'), goal)),
+      h(
+        'div',
+        { class: 'row' },
+        h('label', {}, h('span', {}, 'Outcome'), success),
+        h('label', {}, h('span', {}, 'Risk'), risk),
+        h('label', {}, h('span', {}, 'Failure reason'), reason),
+      ),
+      d.state === 'proposed'
+        ? null
+        : h(
+            'div',
+            { class: 'actions' },
+            h('button', { onclick: save(false) }, 'Save'),
+            h('button', { class: 'primary', onclick: save(true) }, 'Mark reviewed'),
+            h(
+              'button',
+              {
+                class: 'danger',
+                onclick: run(
+                  async () => (
+                    confirm('Discard this episode?') &&
+                      (await LQ(`/episodes/${id}/discard`, { method: 'POST' })),
+                    render()
+                  ),
+                ),
+              },
+              'Discard',
+            ),
+          ),
+      h('h2', {}, 'Timeline'),
+      h(
+        'p',
+        { class: 'muted' },
+        'What a model would see: app, URL pattern, focus and the visible controls. Typed text in secret fields was never kept. Redactions can be undone on this device.',
+      ),
+      h(
+        'div',
+        { class: 'scroll' },
+        h(
+          'table',
+          {},
+          h(
+            'thead',
+            {},
+            h(
+              'tr',
+              {},
+              ['#', 't', 'Screen', 'Action', 'Target', 'Text', ''].map((x) => h('th', {}, x)),
+            ),
+          ),
+          h(
+            'tbody',
+            {},
+            ep.steps.map((s, i) =>
+              h(
+                'tr',
+                {},
+                h('td', {}, String(i)),
+                h('td', {}, `${(s.t_ms / 1000).toFixed(1)}s`),
+                h(
+                  'td',
+                  {},
+                  `${s.observation.app} ${s.observation.url_pattern ?? ''}${s.observation.loading ? ' (loading)' : ''}`,
+                ),
+                h('td', {}, s.action.type),
+                h(
+                  'td',
+                  {},
+                  s.action.target ? `${s.action.target.role} “${s.action.target.name}”` : '',
+                ),
+                h('td', {}, s.action.text_redacted ? '[not kept]' : (s.action.text ?? '')),
+                h(
+                  'td',
+                  {},
+                  s.action.text !== undefined
+                    ? h('button', { onclick: redact(i, 'action.text') }, 'Redact text')
+                    : null,
+                  s.action.target && s.action.target.name !== '[redacted]'
+                    ? h('button', { onclick: redact(i, 'action.target.name') }, 'Redact target')
+                    : null,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      d.redactions.length
+        ? [
+            h('h2', {}, 'Redactions'),
+            h(
+              'ul',
+              {},
+              d.redactions.map((r) =>
+                h(
+                  'li',
+                  {},
+                  `step ${r.step} ${r.field} `,
+                  h(
+                    'button',
+                    {
+                      onclick: run(
+                        async () => (
+                          await LQ(`/episodes/${id}/unredact`, {
+                            method: 'POST',
+                            body: { redaction_id: r.redaction_id },
+                          }),
+                          render()
+                        ),
+                      ),
+                    },
+                    'Undo',
+                  ),
+                ),
+              ),
+            ),
+          ]
+        : null,
+    ];
+  })();
+}
+
+views.teach = async (arg) => {
+  if (HOSTED)
+    return [
+      h('h1', {}, 'Teach an agent'),
+      h('p', {}, 'Teaching runs only in the local app (w3bs training open).'),
+    ];
+  if (arg?.startsWith('ep_')) return teachEpisode(arg);
+  const [s, episodes, datasets, jobs, models, asks, runs, auditRows] = await Promise.all([
+    LQ('/status'),
+    LQ('/episodes'),
+    LQ('/datasets'),
+    LQ('/jobs'),
+    LQ('/models'),
+    LQ('/asks'),
+    LQ('/runs'),
+    LQ('/audit'),
+  ]);
+  const perm = Object.fromEntries(s.permissions.map((p) => [p.name, p]));
+  const post = (path, body) => LQ(path, { method: 'POST', body: body ?? {} });
+
+  // Kill switch and permissions
+  const killer = h(
+    'div',
+    { class: `card${s.kill_switch ? ' warn' : ''}` },
+    h('h2', {}, 'Kill switch'),
+    h(
+      'p',
+      {},
+      s.kill_switch
+        ? 'ON: no agent action runs. Pending approvals were cancelled.'
+        : 'Off. Throwing it stops every agent action before the next one runs.',
+    ),
+    s.kill_switch
+      ? h(
+          'button',
+          {
+            onclick: run(
+              async () => (
+                confirm('Let agents act again in the modes you set?') &&
+                  (await post('/kill-switch', { on: false })),
+                render()
+              ),
+            ),
+          },
+          'Release',
+        )
+      : h(
+          'button',
+          {
+            class: 'danger',
+            onclick: run(async () => (await post('/kill-switch', { on: true }), render())),
+          },
+          'Stop all agent actions',
+        ),
+  );
+  const permissions = h(
+    'div',
+    { class: 'card' },
+    h('h2', {}, 'Permissions'),
+    h(
+      'p',
+      { class: 'muted' },
+      'Each is off until you turn it on, and each can be revoked at any time. Every change is in the audit log.',
+    ),
+    h(
+      'table',
+      {},
+      h(
+        'tbody',
+        {},
+        s.permissions.map((p) =>
+          h(
+            'tr',
+            {},
+            h('td', {}, h('strong', {}, p.name.replace('_', ' '))),
+            h('td', {}, p.description),
+            h(
+              'td',
+              {},
+              p.on ? chip('on', 'ok') : chip('off'),
+              p.changed_at ? h('span', { class: 'meta' }, ` ${when(p.changed_at)}`) : null,
+            ),
+            h(
+              'td',
+              {},
+              h(
+                'button',
+                {
+                  class: p.on ? 'danger' : '',
+                  onclick: run(async () => {
+                    if (!p.on && !confirm(`Turn on ${p.name.replace('_', ' ')}? ${p.description}.`))
+                      return;
+                    await post(`/permissions/${p.name}`, { on: !p.on });
+                    render();
+                  }),
+                },
+                p.on ? 'Revoke' : 'Turn on',
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  // Record
+  const task = h(
+    'select',
+    { 'aria-label': 'Task' },
+    TEACH_TASKS.map((t) => h('option', { value: t }, t)),
+  );
+  const app = h('input', { 'aria-label': 'App or window', value: 'mail', placeholder: 'mail' });
+  task.addEventListener('change', () => (app.value = TEACH_APPS[task.value] ?? ''));
+  const profile = h(
+    'select',
+    { 'aria-label': 'Redaction profile' },
+    h('option', { value: 'strict' }, 'strict: keep no typed text'),
+    h('option', { value: 'standard' }, 'standard: keep non-secret text'),
+  );
+  const shots = h('input', { type: 'checkbox', 'aria-label': 'Screenshot hashes' });
+  const rec = s.recording;
+  const record = h(
+    'div',
+    { class: 'card' },
+    h('h2', {}, '1. Record'),
+    rec.state === 'recording' || rec.state === 'paused'
+      ? [
+          h(
+            'p',
+            { class: rec.state === 'recording' ? 'notice' : '' },
+            `${rec.state === 'recording' ? '● Recording' : '❚❚ Paused'}: ${rec.app}, task ${rec.task}, ${rec.steps} step(s) since ${when(rec.since)}.`,
+          ),
+          h(
+            'div',
+            { class: 'actions' },
+            rec.state === 'recording'
+              ? h(
+                  'button',
+                  {
+                    onclick: run(
+                      async () => (await post(`/captures/${rec.capture_id}/pause`), render()),
+                    ),
+                  },
+                  'Pause',
+                )
+              : h(
+                  'button',
+                  {
+                    onclick: run(
+                      async () => (await post(`/captures/${rec.capture_id}/resume`), render()),
+                    ),
+                  },
+                  'Resume',
+                ),
+            h(
+              'button',
+              {
+                class: 'primary',
+                onclick: run(
+                  async () => (await post(`/captures/${rec.capture_id}/stop`), render()),
+                ),
+              },
+              'Stop',
+            ),
+            h(
+              'button',
+              {
+                class: 'danger',
+                onclick: run(
+                  async () => (
+                    confirm('Throw this recording away?') &&
+                      (await post(`/captures/${rec.capture_id}/stop`, { discard: true })),
+                    render()
+                  ),
+                ),
+              },
+              'Discard',
+            ),
+          ),
+        ]
+      : [
+          h(
+            'p',
+            { class: 'muted' },
+            perm.recording.on
+              ? 'One app or window, one task. Secret fields never carry text. Nothing is recorded until you press Start.'
+              : 'Turn on the recording permission first.',
+          ),
+          h(
+            'div',
+            { class: 'row' },
+            h('label', {}, h('span', {}, 'Task'), task),
+            h('label', {}, h('span', {}, 'App or window'), app),
+            h('label', {}, h('span', {}, 'Profile'), profile),
+            h('label', {}, shots, ' screenshot hashes'),
+          ),
+          h(
+            'div',
+            { class: 'actions' },
+            h(
+              'button',
+              {
+                class: 'primary',
+                disabled: !perm.recording.on || undefined,
+                onclick: run(
+                  async () => (
+                    await post('/captures', {
+                      task: task.value,
+                      app: app.value,
+                      profile: profile.value,
+                      screenshots: shots.checked,
+                    }),
+                    render()
+                  ),
+                ),
+              },
+              'Start recording',
+            ),
+            h(
+              'button',
+              {
+                disabled: !perm.recording.on || undefined,
+                title:
+                  'A scripted person performs the three tasks on the mock sites while recording',
+                onclick: run(async () => {
+                  const r = await LQ('/demo', { method: 'POST', body: { count: 20 } });
+                  toast(`Recorded ${r.episodes.length} demonstrations on the mock sites`);
+                  render();
+                }),
+              },
+              'Record 20 on the mock sites',
+            ),
+          ),
+        ],
+  );
+
+  // Review
+  const byState = (st) => episodes.filter((e) => e.state === st);
+  const epList = (list) =>
+    list.length
+      ? h(
+          'ul',
+          {},
+          list
+            .slice(0, 50)
+            .map((e) =>
+              h(
+                'li',
+                {},
+                h('a', { href: `#/teach/${e.episode_id}` }, `${e.task} · ${e.steps} steps`),
+                ' ',
+                chip(e.state, e.state === 'reviewed' ? 'ok' : ''),
+                e.labels?.success ? chip('success', 'ok') : null,
+              ),
+            ),
+        )
+      : h('p', { class: 'muted' }, 'None.');
+  const review = h(
+    'div',
+    { class: 'card' },
+    h('h2', {}, '2. Review'),
+    h(
+      'p',
+      {},
+      `${byState('review_required').length} to review · ${byState('reviewed').length} reviewed · ${byState('duplicate').length} duplicates · ${byState('proposed').length} proposed corrections`,
+    ),
+    h(
+      'div',
+      { class: 'actions' },
+      h(
+        'button',
+        {
+          onclick: run(
+            async () =>
+              toast(
+                `${(await post('/episodes/dedupe')).duplicates.length} duplicate(s) set aside`,
+              ) || render(),
+          ),
+        },
+        'Find duplicates',
+      ),
+    ),
+    h('h3', {}, 'To review'),
+    epList(byState('review_required')),
+    byState('proposed').length
+      ? [h('h3', {}, 'Proposed corrections'), epList(byState('proposed'))]
+      : null,
+    h('h3', {}, 'Reviewed'),
+    epList(byState('reviewed')),
+  );
+
+  // Dataset + train
+  const dsSelect = h(
+    'select',
+    { 'aria-label': 'Dataset' },
+    datasets.map((d) =>
+      h(
+        'option',
+        { value: d.dataset_id },
+        `${d.name} · ${d.episodes} episodes · ${short(d.dataset_hash)}`,
+      ),
+    ),
+  );
+  const where = h(
+    'select',
+    { 'aria-label': 'Where to train' },
+    h('option', { value: 'local' }, 'Train local (this computer)'),
+    h(
+      'option',
+      { value: 'c0mpute', disabled: !perm.network_upload.on || undefined },
+      'Trusted c0mpute worker',
+    ),
+  );
+  const worker = h('input', { 'aria-label': 'Worker peer id', placeholder: 'worker peer id' });
+  const cap = h('input', {
+    'aria-label': 'Cost cap USD',
+    type: 'number',
+    min: '0',
+    step: '0.01',
+    value: '1',
+  });
+  const previewBox = h('div', {});
+  const train = h(
+    'div',
+    { class: 'card' },
+    h('h2', {}, '3. Dataset and training'),
+    h(
+      'p',
+      { class: 'muted' },
+      perm.training_data.on
+        ? 'A dataset holds every reviewed episode, split by recording session, after a secret scan.'
+        : 'Turn on training-data use first.',
+    ),
+    h(
+      'div',
+      { class: 'actions' },
+      h(
+        'button',
+        {
+          disabled: !perm.training_data.on || undefined,
+          onclick: run(async () => {
+            const d = await post('/datasets', {});
+            toast(
+              `Dataset ${short(d.dataset_hash)}: ${d.counts.train}/${d.counts.validation}/${d.counts.test}`,
+            );
+            render();
+          }),
+        },
+        'Build dataset from reviewed episodes',
+      ),
+    ),
+    datasets.length
+      ? [
+          h(
+            'div',
+            { class: 'row' },
+            h('label', {}, h('span', {}, 'Dataset'), dsSelect),
+            h('label', {}, h('span', {}, 'Where'), where),
+          ),
+          h(
+            'div',
+            { class: 'row' },
+            h('label', {}, h('span', {}, 'Worker (c0mpute only)'), worker),
+            h('label', {}, h('span', {}, 'Cost cap $'), cap),
+          ),
+          h(
+            'div',
+            { class: 'actions' },
+            h(
+              'button',
+              {
+                class: 'primary',
+                disabled: !perm.training_data.on || undefined,
+                onclick: run(async () => {
+                  if (where.value === 'local') {
+                    await post('/jobs', { dataset_id: dsSelect.value, target: 'local' });
+                    toast('Training CfC and the GRU baseline on this computer');
+                    return render();
+                  }
+                  const p = await post('/jobs/preview', {
+                    dataset_id: dsSelect.value,
+                    worker: worker.value,
+                    max_price_usd: Number(cap.value),
+                  });
+                  previewBox.replaceChildren(
+                    h(
+                      'div',
+                      { class: 'card warn' },
+                      h('h3', {}, 'Upload preview'),
+                      kv([
+                        ['Dataset hash', p.dataset_hash],
+                        ['Episodes', String(p.episodes)],
+                        ['Worker', p.worker],
+                        ['Cost cap', `$${p.max_price_usd}`],
+                        ['Retention', p.retention.dataset],
+                        ['Privacy', p.privacy],
+                      ]),
+                      h(
+                        'button',
+                        {
+                          class: 'primary',
+                          onclick: run(async () => {
+                            await post('/jobs', {
+                              dataset_id: p.dataset_id,
+                              target: 'c0mpute',
+                              preview_id: p.preview_id,
+                              confirm: true,
+                            });
+                            toast('Sent to the worker');
+                            render();
+                          }),
+                        },
+                        'I understand, send it',
+                      ),
+                    ),
+                  );
+                }),
+              },
+              'Train',
+            ),
+          ),
+          previewBox,
+        ]
+      : null,
+    jobs.length
+      ? h(
+          'table',
+          {},
+          h(
+            'tbody',
+            {},
+            jobs
+              .slice(0, 10)
+              .map((j) =>
+                h(
+                  'tr',
+                  {},
+                  h('td', {}, j.job_id),
+                  h(
+                    'td',
+                    {},
+                    chip(
+                      j.state,
+                      j.state === 'succeeded' ? 'ok' : j.state === 'failed' ? 'warn' : '',
+                    ),
+                  ),
+                  h('td', {}, j.target === 'local' ? 'local' : `c0mpute ${j.worker}`),
+                  h('td', {}, j.recommendation ?? j.error?.message ?? ''),
+                ),
+              ),
+          ),
+        )
+      : null,
+  );
+
+  // Models: evaluate, activate
+  const modelsCard = h(
+    'div',
+    { class: 'card' },
+    h('h2', {}, '4. Evaluate and activate'),
+    h(
+      'p',
+      { class: 'muted' },
+      'Evaluation replays each workflow on the mock sites (and a changed layout) through the guarded executor. A liquid family is recommended only when it beats the GRU baseline; activation needs a passing evaluation.',
+    ),
+    models.length
+      ? h(
+          'table',
+          {},
+          h(
+            'thead',
+            {},
+            h(
+              'tr',
+              {},
+              ['Model', 'Family', 'Source', 'Weights hash', 'Episode success', '', ''].map((x) =>
+                h('th', {}, x),
+              ),
+            ),
+          ),
+          h(
+            'tbody',
+            {},
+            models.map((m) =>
+              h(
+                'tr',
+                {},
+                h('td', {}, m.model_id),
+                h('td', {}, m.family, m.selected ? chip('recommended', 'ok') : null),
+                h('td', {}, m.source),
+                h('td', { title: m.model_hash }, short(m.model_hash)),
+                h('td', {}, pct(m.metrics.episode_success)),
+                h(
+                  'td',
+                  {},
+                  h(
+                    'button',
+                    {
+                      onclick: run(async () => {
+                        const r = await post('/evaluate', { model_id: m.model_id });
+                        toast(
+                          r.pass ? 'Passed on the mock sites' : `Not ready: ${r.gaps.join('; ')}`,
+                          !r.pass,
+                        );
+                        render();
+                      }),
+                    },
+                    'Evaluate',
+                  ),
+                  m.eval_pass ? chip('passed', 'ok') : null,
+                ),
+                h(
+                  'td',
+                  {},
+                  h(
+                    'button',
+                    {
+                      class: 'primary',
+                      disabled: !m.eval_pass || undefined,
+                      onclick: run(
+                        async () => (await post(`/models/${m.model_id}/activate`, {}), render()),
+                      ),
+                    },
+                    'Activate',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        )
+      : h('p', { class: 'muted' }, 'No models yet.'),
+  );
+
+  // Use: modes per task, runs, approvals
+  const caps = await Promise.all(TEACH_TASKS.map((t) => LQ(`/tasks/${t}/capability`)));
+  const use = h(
+    'div',
+    { class: 'card' },
+    h('h2', {}, '5. Use'),
+    h(
+      'p',
+      { class: 'muted' },
+      'Off by default. Suggest is recommended once checks pass; acting needs the action-execution permission. Every send, post, publish or delete asks you first, in every mode. Runs only on the mock sites.',
+    ),
+    h(
+      'table',
+      {},
+      h(
+        'tbody',
+        {},
+        caps.map((c) => {
+          const mode = h(
+            'select',
+            { 'aria-label': `Mode for ${c.task}` },
+            Object.entries(MODE_NAMES).map(([k, v]) =>
+              h('option', { value: k, selected: c.mode === k || undefined }, v),
+            ),
+          );
+          const steps = h('input', {
+            'aria-label': 'Max steps',
+            type: 'number',
+            min: '1',
+            max: '100',
+            value: '20',
+          });
+          return h(
+            'tr',
+            {},
+            h(
+              'td',
+              {},
+              h('strong', {}, c.task),
+              h('br'),
+              c.active_model
+                ? h(
+                    'span',
+                    { class: 'meta' },
+                    `${c.active_model.family} · ${c.active_model.source} · ${short(c.active_model.model_hash)}`,
+                  )
+                : h('span', { class: 'meta' }, 'no active model'),
+            ),
+            h(
+              'td',
+              {},
+              c.checks_pass
+                ? chip(`recommended: ${MODE_NAMES[c.recommended_mode]}`, 'ok')
+                : h('span', { class: 'meta' }, c.reasons.join('; ')),
+            ),
+            h(
+              'td',
+              {},
+              mode,
+              ' ',
+              steps,
+              ' ',
+              h(
+                'button',
+                {
+                  onclick: run(
+                    async () => (
+                      await post(`/tasks/${c.task}/mode`, {
+                        mode: mode.value,
+                        bounds:
+                          mode.value === 'bounded' ? { max_steps: Number(steps.value) } : undefined,
+                      }),
+                      render()
+                    ),
+                  ),
+                },
+                'Set',
+              ),
+            ),
+            h(
+              'td',
+              {},
+              h(
+                'button',
+                {
+                  disabled: c.mode === 'off' || undefined,
+                  onclick: run(
+                    async () => (
+                      await post('/runs', { task: c.task, seed: Date.now() % 1000 }),
+                      render()
+                    ),
+                  ),
+                },
+                'Run on mock site',
+              ),
+            ),
+          );
+        }),
+      ),
+    ),
+    h('h3', {}, 'Waiting for you'),
+    asks.length
+      ? h(
+          'ul',
+          {},
+          asks.map((q) =>
+            h(
+              'li',
+              {},
+              q.kind === 'approval'
+                ? [
+                    `${q.external ? 'EXTERNAL WRITE: ' : ''}${q.action.type} ${q.action.target?.name ?? ''} (${q.task}) `,
+                    h(
+                      'button',
+                      {
+                        class: 'primary',
+                        onclick: run(
+                          async () => (
+                            await post(`/asks/${q.ask_id}`, { approve: true }),
+                            render()
+                          ),
+                        ),
+                      },
+                      'Approve',
+                    ),
+                    ' ',
+                    h(
+                      'button',
+                      {
+                        class: 'danger',
+                        onclick: run(
+                          async () => (
+                            await post(`/asks/${q.ask_id}`, { approve: false }),
+                            render()
+                          ),
+                        ),
+                      },
+                      'Deny',
+                    ),
+                  ]
+                : [
+                    `${q.kind === 'suggestion' ? 'Suggestion' : 'Take over'}: ${q.proposal ? `${q.proposal.type} ${q.proposal.target?.name ?? ''}` : `none (${q.abstain_reason ?? 'abstained'})`} (${q.task}) `,
+                    q.proposal
+                      ? h(
+                          'button',
+                          {
+                            onclick: run(
+                              async () => (
+                                await post(`/asks/${q.ask_id}`, { accept: true }),
+                                render()
+                              ),
+                            ),
+                          },
+                          'Do it',
+                        )
+                      : null,
+                    ' ',
+                    h(
+                      'button',
+                      {
+                        onclick: run(
+                          async () => (await post(`/asks/${q.ask_id}`, { stop: true }), render()),
+                        ),
+                      },
+                      'Stop',
+                    ),
+                  ],
+            ),
+          ),
+        )
+      : h('p', { class: 'muted' }, 'Nothing.'),
+    runs.length
+      ? [
+          h('h3', {}, 'Runs'),
+          h(
+            'table',
+            {},
+            h(
+              'tbody',
+              {},
+              runs
+                .slice(0, 10)
+                .map((r) =>
+                  h(
+                    'tr',
+                    {},
+                    h('td', {}, r.task),
+                    h('td', {}, MODE_NAMES[r.mode]),
+                    h('td', {}, chip(r.state, r.report?.success ? 'ok' : '')),
+                    h(
+                      'td',
+                      {},
+                      r.report
+                        ? `${r.report.executed.length} executed · ${r.report.approvals_requested} approvals · stopped by ${r.report.stopped_by ?? 'done'}`
+                        : (r.error?.message ?? ''),
+                    ),
+                  ),
+                ),
+            ),
+          ),
+        ]
+      : null,
+  );
+
+  const auditCard = h(
+    'div',
+    { class: 'card' },
+    h('h2', {}, 'Audit log'),
+    h(
+      'div',
+      { class: 'scroll' },
+      h(
+        'table',
+        {},
+        h(
+          'tbody',
+          {},
+          auditRows
+            .slice(0, 60)
+            .map((r) =>
+              h(
+                'tr',
+                {},
+                h('td', {}, when(r.at)),
+                h('td', {}, r.actor),
+                h('td', {}, r.kind),
+                h('td', {}, r.subject ?? ''),
+              ),
+            ),
+        ),
+      ),
+    ),
+  );
+
+  return [
+    h('h1', {}, 'Teach an agent'),
+    h(
+      'p',
+      {},
+      'Show W3BS a task a few times; it trains a small temporal policy (CfC liquid network, with a GRU baseline) and can then suggest or, with your approval, perform the next step. Mock sites only for now; nothing real is sent, posted or logged in to.',
+    ),
+    killer,
+    permissions,
+    record,
+    review,
+    train,
+    modelsCard,
+    use,
+    auditCard,
+  ];
+};
+
 // ------------------------------------------------------------------ router
 async function render() {
   const [, view = 'overview', arg] = location.hash.match(/^#\/([a-z]+)\/?(.*)$/) || [];
@@ -1580,7 +2603,8 @@ async function render() {
     if (
       target === view ||
       (view === 'episode' && target === 'sessions') ||
-      (view === 'dataset' && target === 'datasets')
+      (view === 'dataset' && target === 'datasets') ||
+      (view === 'teach' && target === 'teach')
     )
       a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
@@ -1594,6 +2618,7 @@ async function render() {
     );
   }
   refreshStatus();
+  refreshIndicator();
 }
 
 // Keyboard-first inbox: c/p/f/u act on the first card, j/k move focus.
@@ -1627,10 +2652,14 @@ document.addEventListener('keydown', (event) => {
 });
 
 window.addEventListener('hashchange', render);
-new EventSource(`${API}/events`).addEventListener('change', () => refreshStatus());
+new EventSource(`${API}/events`).addEventListener('change', () => {
+  refreshStatus();
+  refreshIndicator();
+});
 api('/status')
   .then((s) => {
     HOSTED = s.key_store === 'server-managed';
+    if (HOSTED) document.querySelector('.tabs a[href="#/teach"]')?.remove();
   })
   .catch(() => {})
   .finally(render);

@@ -101,8 +101,15 @@ approved applications only, `visual-review` profile, verified on a KDE Plasma
 rig; no input events or text are captured (see the capability matrix). The
 hosted workspace is at [w3bs.org/training/app](https://w3bs.org/training/app/):
 the same app with your W3BS account, `w3bs training push` to send reviewed
-tasks there, and MCP over HTTP with per-agent tokens. There is no
-model-training adapter yet (M4). See the [capability matrix](capability-matrix.md).
+tasks there, and MCP over HTTP with per-agent tokens. See the
+[capability matrix](capability-matrix.md).
+
+**Teach an agent (2026-10-26):** the local app's **Teach** tab and
+`w3bs training teach` record scoped demonstrations, train a CfC liquid policy
+with a GRU baseline through Infernet (locally, or on a trusted c0mpute worker
+after an upload preview), evaluate it on mock sites and let it suggest or act
+with your approval. Everything is off until you turn it on. See
+[Teach an agent](liquid-agent.md).
 
 ## Install
 
@@ -144,6 +151,7 @@ log out or restart the desktop layer.
 | [Capability matrix](capability-matrix.md)                       | what exists, per platform and per surface                  |
 | [Threat model](threat-model.md)                                 | actors, controls, tests, known limits                      |
 | [ADR 0001](adr-0001-integration.md)                             | layout, versions, routing, sessions, stack deviation       |
+| [Teach an agent (Liquid Agent)](liquid-agent.md)                | wireflow, permissions, executor, threat model, how to run  |
 
 ## Code
 
@@ -156,4 +164,5 @@ log out or restart the desktop layer.
 | `training/bin/w3bs-training.mjs` | CLI (`w3bs training ...`)                                               |
 | `training/ui/`                   | local web app and hqtui terminal review                                 |
 | `training/fixtures/`             | synthetic bundles, valid/invalid examples                               |
+| `training/liquid/`               | Teach an agent: liquid-agent/v1 contract, masking, executor, mock sites |
 | `test/training*.test.mjs`        | core and surface tests                                                  |

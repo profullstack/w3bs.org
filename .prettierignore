@@ -8,3 +8,4 @@ training/schema/json/
 training/fixtures/valid/
 training/fixtures/invalid/
 training/ui/assets.mjs
+training/liquid/contract/

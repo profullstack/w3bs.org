@@ -369,3 +369,23 @@ section > h3 {
 section > button {
   margin-bottom: 0.75rem;
 }
+.teach-indicator {
+  margin: 0;
+  display: flex;
+  gap: 0.5rem;
+}
+.teach-indicator a {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--sage);
+  text-decoration: none;
+  font-weight: 700;
+}
+.teach-indicator a.rec,
+.teach-indicator a.killed {
+  background: var(--orange);
+  color: #fff;
+}
+.teach-indicator[hidden] {
+  display: none;
+}
