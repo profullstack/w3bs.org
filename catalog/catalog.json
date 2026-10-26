@@ -3632,6 +3632,45 @@
     "publisher": "third-party"
   },
   {
+    "id": "github.com/debba/tuxcleaner",
+    "name": "tuxcleaner",
+    "commands": [
+      "tuxcleaner"
+    ],
+    "examples": [
+      {
+        "run": "tuxcleaner",
+        "does": "Open the interactive menu for cleanup, uninstall and disk analysis"
+      },
+      {
+        "run": "tuxcleaner clean --dry-run --yes",
+        "does": "Show which caches would be cleaned without deleting anything"
+      },
+      {
+        "run": "tuxcleaner analyze ~/Downloads --min-size 1GiB",
+        "does": "List large files under a directory (read-only)"
+      },
+      {
+        "run": "tuxcleaner purge --path ~/Projects --older-than-days 30 --dry-run --yes",
+        "does": "Find old project build artifacts that a purge would remove"
+      },
+      {
+        "run": "tuxcleaner status",
+        "does": "Show a read-only system health snapshot"
+      }
+    ],
+    "description": "Safety-first Linux cleanup, application uninstall, disk analysis and system status CLI written in Rust. Destructive commands need an explicit selection or --yes, and every one supports --dry-run.",
+    "homepage": "https://github.com/debba/tuxcleaner",
+    "repository": "https://github.com/debba/tuxcleaner",
+    "license": "GPL-3.0",
+    "agentic": false,
+    "latest_version": "0.5.0",
+    "vendor": "debba",
+    "install": "curl -LsSf https://raw.githubusercontent.com/debba/tuxcleaner/main/install.sh | sh",
+    "evidence": "raw install.sh 200 (POSIX sh, sha256-verified release tarball, installs to ~/.local/bin); gh release view -R debba/tuxcleaner v0.5.0; tuxcleaner --version = 0.5.0; LICENSE GPL-3.0; examples: https://github.com/debba/tuxcleaner (README Commands)",
+    "publisher": "third-party"
+  },
+  {
     "id": "profullstack.com/root-w3bs-os",
     "name": "root-w3bs-os",
     "commands": [
