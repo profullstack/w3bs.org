@@ -163,7 +163,7 @@ fn modifier(m: &str) -> Option<(u32, &'static str, u32)> {
     }
 }
 
-const FILL_PREP: &str = "function(){const t=this.nodeType===1?this:this.parentElement;if(!t)return 'none';t.scrollIntoView({block:'center',inline:'nearest'});if(t.tagName==='SELECT')return 'select';t.focus();if(typeof t.select==='function'&&'value' in t){t.select();}else if(t.isContentEditable){const r=document.createRange();r.selectNodeContents(t);const s=getSelection();s.removeAllRanges();s.addRange(r);}const a=document.activeElement;return (a===t||t.contains(a))?'focused':'unfocused';}";
+const FILL_PREP: &str = "function(){const t=this.nodeType===1?this:this.parentElement;if(!t)return 'none';t.scrollIntoView({block:'center',inline:'nearest'});if(t.tagName==='SELECT')return 'select';t.focus();if(typeof t.select==='function'&&'value' in t){t.select();}else if(t.isContentEditable){const r=document.createRange();r.selectNodeContents(t);const s=getSelection();s.removeAllRanges();s.addRange(r);}let a=document.activeElement;while(a&&a.shadowRoot&&a.shadowRoot.activeElement)a=a.shadowRoot.activeElement;return (a&&(a===t||t.contains(a)||(t.shadowRoot&&t.shadowRoot.contains(a))))?'focused':'unfocused';}";
 const FILL_SELECT: &str = "function(v){const o=[...this.options].find(o=>o.value===v)||[...this.options].find(o=>o.textContent.trim()===v);if(!o)return null;this.value=o.value;this.dispatchEvent(new Event('input',{bubbles:true}));this.dispatchEvent(new Event('change',{bubbles:true}));return o.textContent.trim();}";
 const FILL_READ: &str = "function(){const t=this.nodeType===1?this:this.parentElement;return t&&('value' in t)?String(t.value):(t?t.innerText:'');}";
 

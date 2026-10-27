@@ -24,6 +24,8 @@ cat > "$T/www/index.html" <<'HTML'
 <button onclick="document.getElementById('out').textContent='Hello '+document.getElementById('name').value+' on '+document.getElementById('plan').value">Submit</button>
 <p id="out"></p>
 <a href="/two.html">Next page</a>
+<shadow-field></shadow-field>
+<script>customElements.define('shadow-field', class extends HTMLElement { connectedCallback() { this.attachShadow({mode: 'open'}).innerHTML = '<label>Handle <input id="h"></label>'; } });</script>
 HTML
 echo '<!doctype html><title>Two</title><h1>Second page</h1>' > "$T/www/two.html"
 
@@ -61,6 +63,8 @@ NAME=$(uid 'textbox "Name"'); PLAN=$(uid 'combobox "Plan"'); BIO=$(uid 'textbox 
 out=$(B browser_fill "{$P, \"uid\": $NAME, \"value\": \"Ada\"}" --json); echo "$out" | grep -q '"verified": true' && ok "fill input (verified)" || no "fill input" "$out"
 out=$(B browser_fill "{$P, \"uid\": $PLAN, \"value\": \"Pro\"}" --json); echo "$out" | grep -q '"selected": "Pro"' && ok "fill select by label" || no "fill select" "$out"
 out=$(B browser_fill "{$P, \"uid\": $BIO, \"value\": \"line one\"}" --json); echo "$out" | grep -q '"verified": true' && ok "fill textarea" || no "fill textarea" "$out"
+SH=$(uid 'textbox "Handle"')
+out=$(B browser_fill "{$P, \"uid\": ${SH:-0}, \"value\": \"rc#1 x\"}" --json); echo "$out" | grep -q '"verified": true' && ok "fill an input inside a shadow root" || no "fill shadow-DOM input" "$out"
 out=$(B browser_click "{$P, \"uid\": $BTN}" --json); echo "$out" | grep -q '"x"' && ok "click by uid" || no "click" "$out"
 out=$(B browser_wait_for "{$P, \"text\": \"Hello Ada on pro\"}" --json); echo "$out" | grep -q '"found": true' && ok "click ran the page's handler" || no "wait_for after click" "$out"
 out=$(B browser_evaluate "{$P, \"expression\": \"document.querySelector('textarea').value\"}" --json); echo "$out" | grep -q '"result": "line one"' && ok "evaluate" || no "evaluate" "$out"
