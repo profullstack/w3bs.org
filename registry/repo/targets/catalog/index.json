@@ -87,7 +87,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.3.6"
+      "latest_version": "0.3.7"
     },
     {
       "id": "logicsrc.com/logicsrc",
@@ -142,7 +142,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.22.5"
+      "latest_version": "0.23.0"
     },
     {
       "id": "hqterm.sh/hqterm",
@@ -197,7 +197,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.1.67"
+      "latest_version": "0.1.68"
     },
     {
       "id": "diskpush.com/diskpush",
@@ -233,7 +233,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.78.2"
+      "latest_version": "0.78.4"
     },
     {
       "id": "threatcrush.com/threatcrush",
@@ -251,7 +251,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.13.50"
+      "latest_version": "0.13.51"
     },
     {
       "id": "coinpayportal.com/coinpay",
@@ -287,7 +287,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "1.1.21"
+      "latest_version": "1.2.1"
     },
     {
       "id": "rssamplifier.com/rssamplifier",
@@ -324,7 +324,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.2.1"
+      "latest_version": "0.3.0"
     },
     {
       "id": "tronbrowser.dev/tronbrowser",
@@ -379,7 +379,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "1.6.0"
+      "latest_version": "1.7.0"
     },
     {
       "id": "pairux.com/pairux",
@@ -397,7 +397,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.18.0"
+      "latest_version": "0.19.0"
     },
     {
       "id": "wx93.me/wx93-mcp",
@@ -415,7 +415,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.2.1"
+      "latest_version": "0.3.0"
     },
     {
       "id": "profullstack.com/x402",
@@ -542,7 +542,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.15.1"
+      "latest_version": "0.17.0"
     },
     {
       "id": "readm3.com/readm3",
@@ -797,7 +797,7 @@
       "vendor": "Anthropic",
       "license": "proprietary",
       "agentic": true,
-      "latest_version": "2.1.310"
+      "latest_version": "2.1.311"
     },
     {
       "id": "openai.com/codex",
@@ -835,7 +835,7 @@
       "vendor": "GitHub",
       "license": "proprietary",
       "agentic": true,
-      "latest_version": "1.0.103"
+      "latest_version": "1.0.104"
     },
     {
       "id": "aider.chat/aider",
@@ -1056,7 +1056,7 @@
       "vendor": "Mistral AI",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "3.0.2"
+      "latest_version": "3.0.3"
     },
     {
       "id": "openhands.dev/openhands-cli",
@@ -1207,7 +1207,7 @@
       "vendor": "Daniel Miessler",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "1.4.555"
+      "latest_version": "1.4.556"
     },
     {
       "id": "w3bs.org/agentic-desktop-layer",
@@ -1401,7 +1401,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.50.0"
+      "latest_version": "0.51.0"
     },
     {
       "id": "nightcell7.com/nightcell7",
@@ -1437,7 +1437,7 @@
       "vendor": "Profullstack",
       "license": "proprietary",
       "agentic": false,
-      "latest_version": "0.19.1"
+      "latest_version": "0.23.7"
     },
     {
       "id": "p0dcasters.com/p0dcasters",
@@ -1472,7 +1472,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.10.1"
+      "latest_version": "0.11.0"
     },
     {
       "id": "r4ck.dev/r4ck",
@@ -1490,7 +1490,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.1.0"
+      "latest_version": "0.2.0"
     },
     {
       "id": "reeleel.com/reeleel",
@@ -1561,7 +1561,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.4.2"
+      "latest_version": "0.5.0"
     },
     {
       "id": "typeheard.com/typeheard",
@@ -2100,7 +2100,7 @@
       "vendor": "Hanzo AI",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "8.5.753"
+      "latest_version": "8.5.890"
     },
     {
       "id": "github.com/tuxcleaner",
