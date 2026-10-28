@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash, randomBytes } from 'node:crypto';
 import { startServer } from '../src/server.mjs';
 import { openStore } from '../src/store.mjs';
 
@@ -15,10 +16,42 @@ async function boot() {
   });
   const base = `http://localhost:${instance.server.address().port}`;
   const accounts = store.accounts(ORIGIN);
+  const ids = new Map(); // session cookie -> user id
   const user = async (username) => {
     const signup = await accounts.startSignup({ username, email: `${username}@example.com` });
     const { user: created } = await accounts.consumeLink(signup.link);
-    return `w3bs_session=${await accounts.createSession(created.id)}`;
+    const cookie = `w3bs_session=${await accounts.createSession(created.id)}`;
+    ids.set(cookie, created.id);
+    return cookie;
+  };
+  // An OAuth access token for the account behind `cookie`, minted the way /oauth/token does:
+  // client 'w3bs-cli' is `w3bs login`; any other client is a third-party "Sign in with W3BS" app.
+  const oauthToken = async (cookie, clientId = 'w3bs-cli') => {
+    let redirect = 'http://127.0.0.1:49152/callback';
+    if (clientId !== 'w3bs-cli') {
+      redirect = 'https://app.example/callback';
+      clientId = (
+        await accounts.createClient(ids.get(cookie), { name: clientId, redirectUris: [redirect] })
+      ).id;
+    }
+    const verifier = randomBytes(32).toString('base64url');
+    const request = await accounts.authorizationRequest({
+      client_id: clientId,
+      redirect_uri: redirect,
+      response_type: 'code',
+      code_challenge: createHash('sha256').update(verifier).digest('base64url'),
+      code_challenge_method: 'S256',
+      scope: 'profile',
+    });
+    const code = await accounts.issueCode(ids.get(cookie), request);
+    const tokens = await accounts.exchange({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirect,
+      client_id: clientId,
+      code_verifier: verifier,
+    });
+    return tokens.access_token;
   };
   const http = (path, { body, cookie, bearer, method } = {}) =>
     fetch(`${base}${path}`, {
@@ -31,7 +64,7 @@ async function boot() {
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
-  return { http, user, close: () => instance.close() };
+  return { http, user, oauthToken, close: () => instance.close() };
 }
 
 const INFO = {
@@ -182,6 +215,123 @@ test('fleet: allowlisted actions queue, run on the next report, and record their
         .status,
       401,
     );
+  } finally {
+    await t.close();
+  }
+});
+
+test('fleet: one account cannot see, command, rename, remove or screen another account’s machines', async () => {
+  const t = await boot();
+  try {
+    const alice = await t.user('alice');
+    const bob = await t.user('bob');
+    const { token } = await (
+      await t.http('/api/fleet/tokens', { cookie: alice, body: { allowActions: true } })
+    ).json();
+    const machine = await (
+      await t.http('/api/fleet/join', {
+        body: { token, info: { ...INFO, screen: { mode: 'control', vnc: '127.0.0.1:5900' } } },
+      })
+    ).json();
+    const id = machine.machine_id;
+    assert.equal(
+      (await t.http('/api/fleet/inventory', { cookie: alice, method: 'PUT', body: INVENTORY }))
+        .status,
+      200,
+    );
+    // Bob, by session and by his own `w3bs login` token.
+    for (const as of [{ cookie: bob }, { bearer: await t.oauthToken(bob) }]) {
+      const view = await (await t.http('/api/fleet', as)).json();
+      assert.deepEqual(view.machines, []);
+      assert.deepEqual(view.devices, []);
+      assert.deepEqual(await (await t.http('/api/fleet/machines', as)).json(), []);
+      assert.equal(
+        (await t.http('/api/fleet/inventory', as)).status,
+        404,
+        'no inventory of his own',
+      );
+      for (const [path, opts] of [
+        [`/api/fleet/machines/${id}/actions`, { body: { action: 'update' } }],
+        [`/api/fleet/machines/${id}`, { method: 'PATCH', body: { name: 'mine now' } }],
+        [`/api/fleet/machines/${id}`, { method: 'DELETE' }],
+      ]) {
+        const res = await t.http(path, { ...as, ...opts });
+        assert.equal(res.status, 404, `${opts.method ?? 'POST'} ${path}`);
+        assert.equal((await res.json()).error.code, 'NOT_FOUND');
+      }
+    }
+    assert.equal((await t.http(`/fleet/${id}/screen`, { cookie: bob })).status, 404);
+    // Bob's inventory naming Alice's machine id does not pull it into his fleet.
+    const pinned = {
+      ...INVENTORY,
+      devices: [{ id: 'x', name: 'x', profile: 'server', agents: [{ name: 'w3bs', id }] }],
+    };
+    await t.http('/api/fleet/inventory', { cookie: bob, method: 'PUT', body: pinned });
+    assert.deepEqual((await (await t.http('/api/fleet', { cookie: bob })).json()).machines, []);
+    // Bob's own agent key cannot hand in a result for Alice's action.
+    const { token: bobToken } = await (
+      await t.http('/api/fleet/tokens', { cookie: bob, body: { allowActions: true } })
+    ).json();
+    const bobs = await (
+      await t.http('/api/fleet/join', { body: { token: bobToken, info: INFO } })
+    ).json();
+    const queued = await (
+      await t.http(`/api/fleet/machines/${id}/actions`, {
+        cookie: alice,
+        body: { action: 'refresh' },
+      })
+    ).json();
+    await t.http('/api/fleet/heartbeat', { bearer: machine.agent_key, body: { info: INFO } });
+    await t.http(`/api/fleet/actions/${queued.id}/result`, {
+      bearer: bobs.agent_key,
+      body: { status: 'done', output: 'forged' },
+    });
+    // Alice still has everything, untouched.
+    const [mine] = await (await t.http('/api/fleet/machines', { cookie: alice })).json();
+    assert.equal(mine.id, id);
+    assert.equal(mine.name, 'dev2.profullstack.com');
+    assert.equal(mine.actions[0].status, 'running');
+    assert.equal(mine.actions[0].output, '');
+    assert.equal((await t.http('/api/fleet/inventory', { cookie: alice })).status, 200);
+  } finally {
+    await t.close();
+  }
+});
+
+test('fleet: only a `w3bs login` token acts as the account; a third-party app token cannot', async () => {
+  const t = await boot();
+  try {
+    const alice = await t.user('alice');
+    const cli = await t.oauthToken(alice);
+    const app = await t.oauthToken(alice, 'Some app');
+    // The app's token is good for what the person consented to: their profile.
+    const me = await t.http('/api/me', { bearer: app });
+    assert.equal(me.status, 200);
+    assert.equal((await me.json()).username, 'alice');
+    const { token } = await (
+      await t.http('/api/fleet/tokens', { bearer: cli, body: { allowActions: true } })
+    ).json();
+    const { machine_id: id } = await (
+      await t.http('/api/fleet/join', { body: { token, info: INFO } })
+    ).json();
+    assert.equal((await (await t.http('/api/fleet', { bearer: cli })).json()).machines.length, 1);
+    for (const [path, opts] of [
+      ['/api/fleet', {}],
+      ['/api/fleet/machines', {}],
+      ['/api/fleet/inventory', {}],
+      ['/api/fleet/tokens', { body: { allowActions: true } }],
+      ['/api/fleet/inventory', { method: 'PUT', body: INVENTORY }],
+      [`/api/fleet/machines/${id}/actions`, { body: { action: 'update' } }],
+      [`/api/fleet/machines/${id}`, { method: 'PATCH', body: { name: 'x' } }],
+      [`/api/fleet/machines/${id}`, { method: 'DELETE' }],
+      ['/api/social/invite', { body: {} }],
+    ]) {
+      const res = await t.http(path, { bearer: app, ...opts });
+      assert.equal(res.status, 401, `${opts.method ?? (opts.body ? 'POST' : 'GET')} ${path}`);
+    }
+    const [still] = await (await t.http('/api/fleet/machines', { bearer: cli })).json();
+    assert.equal(still.id, id);
+    assert.deepEqual(still.actions, []);
   } finally {
     await t.close();
   }

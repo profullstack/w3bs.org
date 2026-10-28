@@ -134,7 +134,7 @@ Over SSH, or on a machine without a display, `w3bs login` shows a code instead o
 - Device authorization grant (RFC 8628) for devices without a browser: `POST /oauth/device_authorization` with `client_id`, show the `user_code` and `verification_uri` (`/device`), then poll `/oauth/token` with `grant_type=urn:ietf:params:oauth:grant-type:device_code`, `device_code`, `client_id` every `interval` seconds.
 - `POST /oauth/revoke` (RFC 7009) with `token` and `client_id`.
 - `GET /api/me` with `Authorization: Bearer <access token>` returns `sub` (stable, never reuse email as the key), `username`, `email` and `email_verified`.
-- Scope: `profile`.
+- Scope: `profile`. That is all an app's token can do: it reads `/api/me` and nothing else. Only the w3bs CLI (`w3bs login`) gets a token that acts as the account (fleet, publishing, invites).
 
 First-party sites that share a secret with w3bs.org can use the silent `prompt=none` bridge from [@profullstack/bridges](https://www.npmjs.com/package/@profullstack/bridges) at `/api/v1/bridge/authorize` and `/api/v1/bridge/token`; clients are configured by the operator in `W3BS_BRIDGE_CLIENTS`.
 

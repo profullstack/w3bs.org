@@ -564,10 +564,17 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
     });
   });
   // Account helpers for other signed-in surfaces (src/fleet-routes.mjs).
+  // A bearer acts as the account only when `w3bs login` minted it. Third-party apps that
+  // use "Sign in with W3BS" get scope `profile`: their token reads /api/me and nothing
+  // else, so an app a person signed in to cannot list, command or remove their fleet,
+  // publish as them, or touch anything else these routes guard.
   const accountUser = async (req) => {
     const bearer = bearerOf(req);
-    if (bearer)
-      return bearer.startsWith('fm_') ? null : (await accounts.bearerUser(bearer)) || null;
+    if (bearer) {
+      if (bearer.startsWith('fm_')) return null;
+      const user = await accounts.bearerUser(bearer);
+      return user?.clientId === CLI_CLIENT_ID ? user : null;
+    }
     return req.hostname === host ? currentUser(req) : null;
   };
   return { accounts, currentUser, accountUser, page, onMainHost };
