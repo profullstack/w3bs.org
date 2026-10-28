@@ -344,11 +344,47 @@ export function createApp({
   app.get('/robots.txt', (_req, res) =>
     res.type('text/plain').send(`User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`),
   );
+  // For agents: what W3BS is and every way in, as plain text (llmstxt.org).
+  app.get('/llms.txt', (_req, res) =>
+    res.type('text/plain').send(
+      [
+        '# W3BS',
+        '',
+        '> Open standards for a Web where humans, agents and devices can discover, communicate and collaborate, plus W3BS Fleet: watch your servers from one page, free.',
+        '',
+        '## Start here',
+        `- [Fleet](${origin}/fleet): watch your servers from one page. Install the CLI: \`curl -fsSL ${origin}/install.sh | sh\``,
+        `- [Pricing](${origin}/pricing): Fleet is free`,
+        `- [Specs](${origin}/specs): the W3BS community drafts`,
+        `- [Developers](${origin}/developers): build with W3BS`,
+        '',
+        '## For agents',
+        `- [MCP](${origin}/mcp): streamable HTTP MCP server (POST JSON-RPC)`,
+        `- [API](${origin}/api): the reference operations, as JSON`,
+        `- [Tasks API](${origin}/api/v1/tasks) and [Workflows](${origin}/workflows)`,
+        `- [Manifest schema](${origin}/schemas/manifest.json)`,
+        `- [Discovery](${origin}/.well-known/w3bs.json)`,
+        '',
+        '## Products',
+        `- [Packages](${origin}/packages): signed packages, installed with curl`,
+        `- [Prompts](${origin}/prompts): the open prompt registry`,
+        `- [Agentic Desktop Layer](${origin}/desktop) and [W3BS DE](${origin}/de)`,
+        `- [W3BS OS](${origin}/os)`,
+        `- [Training](${origin}/training): teach agents by doing the task yourself`,
+        `- [A/B testing](${origin}/ab-testing)`,
+        `- [Social](${origin}/social)`,
+        '',
+        '## Policy',
+        `- [Governance](${origin}/governance), [Terms](${origin}/terms), [Privacy](${origin}/privacy)`,
+        '',
+      ].join('\n'),
+    ),
+  );
   app.get('/sitemap.xml', (_req, res) =>
     res
       .type('application/xml')
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/mission', '/pricing', '/packages', '/packages/publish', '/specs', '/browse', '/prompts', '/desktop', '/de', '/training', '/training/liquid-agent', '/tasks', '/workflows', '/os', '/ab-testing', '/social', '/governance', '/developers', '/signup', '/terms', '/privacy'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/', '/pricing', '/packages', '/packages/publish', '/specs', '/browse', '/prompts', '/desktop', '/de', '/training', '/training/liquid-agent', '/tasks', '/workflows', '/os', '/ab-testing', '/social', '/governance', '/developers', '/signup', '/terms', '/privacy'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
       ),
   );
   app.get('/docs/:file', (req, res) => {

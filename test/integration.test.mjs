@@ -270,7 +270,17 @@ test('Agentic Desktop Layer page, typo redirect, raw PRD and navigation', async 
       markdown.startsWith('# Agentic Desktop Layer\n## W3BS Product Requirements Document'),
     );
     assert.ok(markdown.includes('Interactive preview - does not control your device'));
-    assert.ok((await (await fetch(`${origin}/sitemap.xml`)).text()).includes('/desktop</loc>'));
+    const sitemap = await (await fetch(`${origin}/sitemap.xml`)).text();
+    assert.ok(sitemap.includes('/desktop</loc>'));
+    assert.match(sitemap, /<loc>https?:\/\/[^/<]+\/<\/loc>/);
+    const llms = await fetch(`${origin}/llms.txt`);
+    assert.equal(llms.status, 200);
+    assert.match(llms.headers.get('content-type'), /^text\/plain/);
+    assert.ok((await llms.text()).startsWith('# W3BS'));
+    const front = await (await fetch(`${origin}/`)).text();
+    assert.match(front, /<link rel="canonical" href="[^"]+\/">/);
+    assert.match(front, /<meta property="og:title"/);
+    assert.match(front, /<meta name="twitter:card" content="summary">/);
     const script = await (await fetch(`${origin}/assets/desktop.js`)).text();
     assert.ok(!/localhost|127\.0\.0\.1|requestPermission|getUserMedia/.test(script));
   } finally {

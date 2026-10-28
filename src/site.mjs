@@ -820,7 +820,9 @@ export async function renderPage({ path, host, query, store, origin, browser }) 
     content = document(title, title);
     active = '/specs';
   } else throw new W3bsError('NOT_FOUND', 'Page not found.', 404);
-  return pageShell({ title, description, active, content, scripts });
+  // /mission is the homepage under its own name; both name the root.
+  const canonical = origin ? `${origin}${path === '/mission' ? '/' : path}` : '';
+  return pageShell({ title, description, active, content, scripts, canonical });
 }
 // What can be installed today (docs/os-prd.md §15, §20): set each once its artifact exists and
 // has passed its checks; until then the page says it is coming instead of offering a link.
@@ -1029,6 +1031,9 @@ export function pageShell({
   // Off for pages whose address or buttons can carry account data (email links, device
   // codes, machine names): stats.js reports the full URL and the text of clicked buttons.
   track = true,
+  // The page's own absolute URL: rel=canonical and og:url.
+  canonical = '',
 }) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${e(title)} — W3BS</title><meta name="description" content="${e(description)}">${robots ? `<meta name="robots" content="${e(robots)}">` : ''}<meta name="theme-color" content="#f6f4ed"><link rel="icon" type="image/svg+xml" href="/assets/mark.svg"><link rel="manifest" href="/manifest.webmanifest"><link rel="stylesheet" href="/assets/style.css"><script type="module" src="/assets/app.js"></script>${scripts}${track ? tracker(trackerSite()) : ''}</head><body>${header(active)}<main id="main">${content}</main>${footer()}<div id="toast" class="toast" role="status" aria-live="polite" hidden></div></body></html>`;
+  const share = `<meta property="og:type" content="website"><meta property="og:site_name" content="W3BS"><meta property="og:title" content="${e(title)} — W3BS"><meta property="og:description" content="${e(description)}">${canonical ? `<meta property="og:url" content="${e(canonical)}">` : ''}<meta name="twitter:card" content="summary"><meta name="twitter:title" content="${e(title)} — W3BS"><meta name="twitter:description" content="${e(description)}">`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${e(title)} — W3BS</title><meta name="description" content="${e(description)}">${robots ? `<meta name="robots" content="${e(robots)}">` : ''}${canonical ? `<link rel="canonical" href="${e(canonical)}">` : ''}${share}<meta name="theme-color" content="#f6f4ed"><link rel="icon" type="image/svg+xml" href="/assets/mark.svg"><link rel="manifest" href="/manifest.webmanifest"><link rel="stylesheet" href="/assets/style.css"><script type="module" src="/assets/app.js"></script>${scripts}${track ? tracker(trackerSite()) : ''}</head><body>${header(active)}<main id="main">${content}</main>${footer()}<div id="toast" class="toast" role="status" aria-live="polite" hidden></div></body></html>`;
 }
