@@ -291,6 +291,21 @@ test('fleet: an OpenDevice inventory merges with joined machines and adds up the
     assert.equal(view.summary.matched, 1);
     assert.equal(view.summary.agentless, 4);
     assert.deepEqual(view.summary.by_profile, { server: 2, desktop: 1, phone: 1, tablet: 1 });
+    // A device can name its machine by id when name and hostname do not line up.
+    const { token: t2 } = await (
+      await t.http('/api/fleet/tokens', { cookie: dana, body: { name: 'box' } })
+    ).json();
+    const other = await (
+      await t.http('/api/fleet/join', { body: { token: t2, info: { hostname: 'odd-host' } } })
+    ).json();
+    const pinned = structuredClone(INVENTORY);
+    pinned.devices[1].agents = [{ name: 'w3bs', id: other.machine_id }];
+    await t.http('/api/fleet/inventory', { cookie: dana, method: 'PUT', body: pinned });
+    const pinnedView = await (await t.http('/api/fleet', { cookie: dana })).json();
+    assert.equal(pinnedView.machines.find((m) => m.name === 'box').device.id, 'eu1');
+    assert.equal(pinnedView.summary.agentless, 3);
+    await t.http(`/api/fleet/machines/${other.machine_id}`, { cookie: dana, method: 'DELETE' });
+    await t.http('/api/fleet/inventory', { cookie: dana, method: 'PUT', body: INVENTORY });
     // `w3bs fleet ls` keeps its array, now with the device on each machine.
     const [listed] = await (await t.http('/api/fleet/machines', { cookie: dana })).json();
     assert.equal(listed.device.id, 'dev2');

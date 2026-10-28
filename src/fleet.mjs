@@ -435,17 +435,26 @@ export function createFleet(db, { events } = {}) {
     const inv = parseInventory(stored.document);
     const cost = fleetCost(inv);
     const monthlyOf = new Map(cost.devices.map((d) => [d.id, d.monthly]));
-    const joined = matchAgents(inv, list, {
-      hostname: (m) => m.info?.hostname,
-      name: (m) => m.name,
-      ip: () => null,
-    });
+    // A device can name its machine outright: `agents: [{ "name": "w3bs", "id": "m_…" }]`.
+    // Those pair first; the rest match by name or hostname.
+    const pinned = new Map();
+    for (const device of inv.devices)
+      for (const agent of Array.isArray(device.agents) ? device.agents : [])
+        if (agent?.name === 'w3bs' && typeof agent.id === 'string') pinned.set(agent.id, device.id);
+    const ids = new Set(list.map((m) => m.id));
+    const joined = matchAgents(
+      inv,
+      list.filter((m) => !pinned.has(m.id)),
+      { hostname: (m) => m.info?.hostname, name: (m) => m.name, ip: () => null },
+    );
     const deviceOf = new Map();
     const agentless = [];
     for (const { device, agents } of joined.devices) {
       const view = deviceView(device, monthlyOf.get(device.id));
+      const mine = [...pinned].filter(([id, d]) => d === device.id && ids.has(id));
+      for (const [id] of mine) deviceOf.set(id, view);
       if (agents.length) for (const m of agents) deviceOf.set(m.id, view);
-      else agentless.push(view);
+      else if (!mine.length) agentless.push(view);
     }
     const byProfile = {};
     for (const d of inv.devices) byProfile[d.profile] = (byProfile[d.profile] ?? 0) + 1;
