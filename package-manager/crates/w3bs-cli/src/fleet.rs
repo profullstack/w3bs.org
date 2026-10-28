@@ -360,11 +360,13 @@ fn run_with_timeout(program: &str, args: &[String], timeout: Duration) -> (bool,
 
 // ------------------------------------------------------------------ systemd
 
-/// The unit text. A system unit when installed as root, else a user unit.
+/// The unit text. A system unit when installed as root, else a user unit. Restart=always:
+/// systemd counts a SIGTERM death as clean, so on-failure left agents dead after a stray
+/// kill; exit 3 (removed from the fleet) still stops it for good.
 pub fn unit_text(exe: &str, config: &Path, system: bool) -> String {
     let wanted = if system { "multi-user.target" } else { "default.target" };
     format!(
-        "[Unit]\nDescription=W3BS fleet agent (reports this machine to w3bs.org/fleet)\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nExecStart={exe} fleet agent --config {config}\nRestart=on-failure\nRestartSec=10\nRestartPreventExitStatus={EXIT_REMOVED}\n\n[Install]\nWantedBy={wanted}\n",
+        "[Unit]\nDescription=W3BS fleet agent (reports this machine to w3bs.org/fleet)\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nExecStart={exe} fleet agent --config {config}\nRestart=always\nRestartSec=10\nRestartPreventExitStatus={EXIT_REMOVED}\n\n[Install]\nWantedBy={wanted}\n",
         config = config.display(),
     )
 }
@@ -927,7 +929,7 @@ mod tests {
         assert!(user.contains("ExecStart=/home/a/.local/bin/w3bs fleet agent --config /home/a/.config/w3bs/fleet.json\n"));
         assert!(user.contains("WantedBy=default.target"));
         assert!(user.contains("RestartPreventExitStatus=3"));
-        assert!(user.contains("Restart=on-failure"));
+        assert!(user.contains("Restart=always"));
         let root = unit_text("/usr/local/bin/w3bs", Path::new("/root/.config/w3bs/fleet.json"), true);
         assert!(root.contains("WantedBy=multi-user.target"));
         assert!(root.contains("After=network-online.target"));
