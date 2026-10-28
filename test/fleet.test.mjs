@@ -186,3 +186,129 @@ test('fleet: allowlisted actions queue, run on the next report, and record their
     await t.close();
   }
 });
+
+// An OpenDevice inventory (logicsrc.com/docs/opendevice) in the shape @profullstack/fleet reads.
+const INVENTORY = {
+  $schema: 'https://logicsrc.com/docs/opendevice',
+  currency: 'USD',
+  devices: [
+    {
+      id: 'dev2',
+      name: 'dev2',
+      profile: 'server',
+      hostnames: ['dev2.profullstack.com'],
+      provider: { name: 'DediRock' },
+      cost: { amount: 149, interval: 'month' },
+    },
+    {
+      id: 'eu1',
+      name: 'eu1',
+      profile: 'server',
+      cost: { amount: 120, interval: 'year', currency: 'EUR' },
+    },
+    { id: 'laptop', name: 'laptop', profile: 'desktop', cost: { amount: 40, interval: 'month' } },
+    { id: 'ops-phone', name: 'ops phone', profile: 'phone', cost: { interval: 'month' } },
+    { id: 'tab', name: 'tab', profile: 'tablet' },
+  ],
+};
+
+test('fleet: an OpenDevice inventory merges with joined machines and adds up the month', async () => {
+  const t = await boot();
+  try {
+    const dana = await t.user('dana');
+    assert.equal(
+      (await t.http('/api/fleet/inventory', { cookie: dana })).status,
+      404,
+      'no inventory yet',
+    );
+    const empty = await (await t.http('/api/fleet', { cookie: dana })).json();
+    assert.deepEqual(empty.devices, []);
+    assert.equal(empty.summary.devices, 0);
+
+    // Validated on write: credentials never belong in one, and it must have devices.
+    const bad = await t.http('/api/fleet/inventory', {
+      cookie: dana,
+      method: 'PUT',
+      body: { devices: [{ name: 'x', password: 'hunter2' }] },
+    });
+    assert.equal(bad.status, 400);
+    const badBody = await bad.json();
+    assert.equal(badBody.error.code, 'INVALID_INVENTORY');
+    assert.match(badBody.error.details.errors[0], /credentials/);
+    assert.equal(
+      (await t.http('/api/fleet/inventory', { cookie: dana, method: 'PUT', body: { nope: 1 } }))
+        .status,
+      400,
+    );
+    // Owner only.
+    assert.equal(
+      (await t.http('/api/fleet/inventory', { method: 'PUT', body: INVENTORY })).status,
+      401,
+    );
+
+    const saved = await (
+      await t.http('/api/fleet/inventory', { cookie: dana, method: 'PUT', body: INVENTORY })
+    ).json();
+    assert.equal(saved.devices, 5);
+    assert.ok(saved.warnings.length >= 2, 'unstated costs are warnings, not errors');
+    assert.deepEqual(saved.summary.monthly, { EUR: 10, USD: 189 });
+    // Read back whole, so `fleet list <url>` can use it.
+    assert.deepEqual(
+      await (await t.http('/api/fleet/inventory', { cookie: dana })).json(),
+      INVENTORY,
+    );
+
+    // dev2 joins: it matches the inventory device by hostname/name and gets its cost.
+    const { token } = await (
+      await t.http('/api/fleet/tokens', { cookie: dana, body: { name: 'dev2' } })
+    ).json();
+    await t.http('/api/fleet/join', { body: { token, info: INFO } });
+    const view = await (await t.http('/api/fleet', { cookie: dana })).json();
+    assert.equal(view.machines.length, 1);
+    assert.equal(view.machines[0].device.id, 'dev2');
+    assert.equal(view.machines[0].device.profile, 'server');
+    assert.equal(view.machines[0].device.provider, 'DediRock');
+    assert.deepEqual(view.machines[0].device.monthly, {
+      amount: 149,
+      currency: 'USD',
+      state: 'stated',
+    });
+    // Devices without an agent are rows of their own.
+    assert.deepEqual(
+      view.devices.map((d) => [d.id, d.profile]),
+      [
+        ['eu1', 'server'],
+        ['laptop', 'desktop'],
+        ['ops-phone', 'phone'],
+        ['tab', 'tablet'],
+      ],
+    );
+    assert.equal(view.devices.find((d) => d.id === 'ops-phone').monthly.state, 'unstated');
+    assert.equal(view.devices.find((d) => d.id === 'eu1').monthly.amount, 10, 'year / 12');
+    assert.deepEqual(view.summary.unstated, ['ops-phone', 'tab'], 'never guessed');
+    assert.equal(view.summary.monthly_text, '€10.00 + $189.00');
+    assert.equal(view.summary.devices, 5);
+    assert.equal(view.summary.matched, 1);
+    assert.equal(view.summary.agentless, 4);
+    assert.deepEqual(view.summary.by_profile, { server: 2, desktop: 1, phone: 1, tablet: 1 });
+    // `w3bs fleet ls` keeps its array, now with the device on each machine.
+    const [listed] = await (await t.http('/api/fleet/machines', { cookie: dana })).json();
+    assert.equal(listed.device.id, 'dev2');
+    // The page renders it.
+    assert.match(await (await t.http('/fleet', { cookie: dana })).text(), /"agentless":4/);
+
+    // Another account sees none of it.
+    const erin = await t.user('erin');
+    assert.equal((await t.http('/api/fleet/inventory', { cookie: erin })).status, 404);
+    assert.deepEqual((await (await t.http('/api/fleet', { cookie: erin })).json()).devices, []);
+
+    // Deleting it leaves the machines.
+    await t.http('/api/fleet/inventory', { cookie: dana, method: 'DELETE' });
+    const after = await (await t.http('/api/fleet', { cookie: dana })).json();
+    assert.equal(after.machines.length, 1);
+    assert.equal(after.machines[0].device, null);
+    assert.deepEqual(after.devices, []);
+  } finally {
+    await t.close();
+  }
+});

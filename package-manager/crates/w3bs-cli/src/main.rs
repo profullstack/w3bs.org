@@ -42,6 +42,8 @@ Apps:
   fleet      w3bs fleet join <token>  add this machine to your fleet on w3bs.org/fleet
              w3bs fleet ls            your machines, online state and health
              w3bs fleet run <m> <a>   queue refresh, update or restart-desktop on a machine
+             w3bs fleet inventory import <file>  store your OpenDevice inventory (every device)
+             w3bs fleet cost          every device, agent or not, and the monthly total
              w3bs fleet screen on     let the fleet owner watch this desktop (VNC, view only)
              w3bs fleet view <m>      watch a machine's desktop in the browser
              w3bs fleet desktop start a headless Kubuntu desktop (Docker) for AI agents, shared there
@@ -671,6 +673,17 @@ enum FleetCmd {
         #[command(flatten)]
         a: Api,
     },
+    /// Your OpenDevice inventory on w3bs.org/fleet: every device you run (servers, desktops,
+    /// phones, tablets), with or without an agent, and what each costs a month
+    Inventory {
+        #[command(subcommand)]
+        action: InventoryCmd,
+    },
+    /// Every device, joined or only in the inventory, its class and monthly cost, and the total
+    Cost {
+        #[command(flatten)]
+        a: Api,
+    },
     /// Take this machine out of the fleet and remove its agent service
     Leave {
         #[arg(long, hide = true, value_name = "PATH")]
@@ -680,6 +693,28 @@ enum FleetCmd {
     Rm {
         /// Machine name or id from `w3bs fleet ls`
         machine: String,
+        #[command(flatten)]
+        a: Api,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+enum InventoryCmd {
+    /// Store an OpenDevice inventory file (logicsrc.com/docs/opendevice; `-` reads stdin).
+    /// Replaces the one stored; the server validates it first
+    Import {
+        /// opendevice.json
+        file: PathBuf,
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Print the stored inventory as JSON
+    Show {
+        #[command(flatten)]
+        a: Api,
+    },
+    /// Delete the stored inventory (joined machines stay)
+    Rm {
         #[command(flatten)]
         a: Api,
     },
@@ -1352,6 +1387,12 @@ async fn run_fleet(cmd: FleetCmd) -> (&'static str, w3bs_core::Result<OperationR
         FleetCmd::Ls { a } => ("fleet.ls", account("fleet.ls", &a, |o| async move { fleet::ls(&o).await }).await),
         FleetCmd::Run { machine, action, a } => ("fleet.run", account("fleet.run", &a, |o| async move { fleet::run_action(&o, &machine, &action).await }).await),
         FleetCmd::Rm { machine, a } => ("fleet.rm", account("fleet.rm", &a, |o| async move { fleet::rm(&o, &machine).await }).await),
+        FleetCmd::Inventory { action } => match action {
+            InventoryCmd::Import { file, a } => ("fleet.inventory.import", account("fleet.inventory.import", &a, |o| async move { fleet::inventory_import(&o, &file).await }).await),
+            InventoryCmd::Show { a } => ("fleet.inventory.show", account("fleet.inventory.show", &a, |o| async move { fleet::inventory_show(&o).await }).await),
+            InventoryCmd::Rm { a } => ("fleet.inventory.rm", account("fleet.inventory.rm", &a, |o| async move { fleet::inventory_rm(&o).await }).await),
+        },
+        FleetCmd::Cost { a } => ("fleet.cost", account("fleet.cost", &a, |o| async move { fleet::cost(&o).await }).await),
     }
 }
 

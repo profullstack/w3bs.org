@@ -2,7 +2,19 @@
 // one runs `w3bs fleet agent`, which reports its health and picks up actions. Actions
 // are a fixed allowlist, queued only by the owner, and only on machines that joined
 // with actions allowed; the agent enforces the same list on its side.
+//
+// An account can also store an OpenDevice inventory (logicsrc.com/docs/opendevice):
+// every device it runs, servers to phones, with what each costs a month. The fleet
+// view merges it with the enrolled machines through @profullstack/fleet, so devices
+// that never ran `w3bs fleet join` still show up, with their class and cost.
 import { createHash, randomBytes } from 'node:crypto';
+import {
+  fleetCost,
+  formatMonthly,
+  matchAgents,
+  parseInventory,
+  validateInventory,
+} from '@profullstack/fleet';
 import { W3bsError } from './core.mjs';
 
 const tables = () => `
@@ -10,7 +22,8 @@ const tables = () => `
   CREATE TABLE IF NOT EXISTS fleet_machines (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, name TEXT NOT NULL, agent_key_hash TEXT NOT NULL UNIQUE, allow_actions INTEGER NOT NULL, info TEXT NOT NULL, created_at TEXT NOT NULL, last_seen_at TEXT);
   CREATE INDEX IF NOT EXISTS fleet_machines_user ON fleet_machines(user_id);
   CREATE TABLE IF NOT EXISTS fleet_actions (id TEXT PRIMARY KEY, machine_id TEXT NOT NULL REFERENCES fleet_machines(id) ON DELETE CASCADE, user_id TEXT NOT NULL, action TEXT NOT NULL, status TEXT NOT NULL, output TEXT NOT NULL, created_at TEXT NOT NULL, started_at TEXT, finished_at TEXT);
-  CREATE INDEX IF NOT EXISTS fleet_actions_machine ON fleet_actions(machine_id, created_at);`;
+  CREATE INDEX IF NOT EXISTS fleet_actions_machine ON fleet_actions(machine_id, created_at);
+  CREATE TABLE IF NOT EXISTS fleet_inventories (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, document TEXT NOT NULL, updated_at TEXT NOT NULL);`;
 export const FLEET_SCHEMA = { sqlite: tables(), postgres: tables() };
 
 export const ACTIONS = {
@@ -31,6 +44,8 @@ export const FLEET_LIMITS = {
   actionTimeoutMinutes: 20,
   actionHistory: 20, // newest actions and screen sessions kept per machine
   actionOutputKB: 16, // the tail of an action's output that is kept
+  inventoryDevices: 500, // devices in one OpenDevice inventory
+  inventoryKB: 256, // the largest inventory document stored
 };
 const INTERVAL = FLEET_LIMITS.intervalSeconds;
 const ONLINE_WITHIN = FLEET_LIMITS.offlineAfterSeconds * 1000;
@@ -327,6 +342,129 @@ export function createFleet(db, { events } = {}) {
     ]);
     return { ok: true };
   }
+
+  // ---------------------------------------------------------------- inventory
+  async function inventoryRow(userId) {
+    return db.get('SELECT document, updated_at FROM fleet_inventories WHERE user_id = ?', [userId]);
+  }
+  async function setInventory(userId, input) {
+    let doc = input;
+    if (typeof doc === 'string') {
+      try {
+        doc = JSON.parse(doc);
+      } catch {
+        throw fail('INVALID_INVENTORY', 'The inventory is not JSON.');
+      }
+    }
+    if (!doc || typeof doc !== 'object' || Array.isArray(doc))
+      throw fail(
+        'INVALID_INVENTORY',
+        'Send an OpenDevice inventory: an object with a "devices" array.',
+      );
+    const checked = validateInventory(doc);
+    if (!checked.valid)
+      throw Object.assign(
+        fail(
+          'INVALID_INVENTORY',
+          `The inventory has ${checked.errors.length} error(s): ${checked.errors.slice(0, 5).join('; ')}`,
+        ),
+        { details: { errors: checked.errors, warnings: checked.warnings } },
+      );
+    if (doc.devices.length > FLEET_LIMITS.inventoryDevices)
+      throw fail(
+        'INVENTORY_TOO_LARGE',
+        `An inventory holds up to ${FLEET_LIMITS.inventoryDevices} devices.`,
+        413,
+      );
+    const text = JSON.stringify(doc);
+    if (text.length > FLEET_LIMITS.inventoryKB * 1024)
+      throw fail(
+        'INVENTORY_TOO_LARGE',
+        `An inventory is at most ${FLEET_LIMITS.inventoryKB} KB.`,
+        413,
+      );
+    const at = nowIso();
+    await db.transaction(async (tx) => {
+      await tx.run('DELETE FROM fleet_inventories WHERE user_id = ?', [userId]);
+      await tx.run('INSERT INTO fleet_inventories VALUES (?, ?, ?)', [userId, text, at]);
+    });
+    return { ok: true, devices: doc.devices.length, warnings: checked.warnings, updated_at: at };
+  }
+  async function inventory(userId) {
+    const row = await inventoryRow(userId);
+    return row ? { document: JSON.parse(row.document), updated_at: row.updated_at } : null;
+  }
+  async function deleteInventory(userId) {
+    await db.run('DELETE FROM fleet_inventories WHERE user_id = ?', [userId]);
+    return { ok: true };
+  }
+  // Only what the fleet page shows about an inventory device; the stored document
+  // keeps everything (GET /api/fleet/inventory returns it whole).
+  const deviceView = (device, monthly) => ({
+    id: device.id,
+    name: device.name,
+    profile: device.profile,
+    status: device.status,
+    role: typeof device.role === 'string' ? device.role : null,
+    provider: device.provider?.name ?? null,
+    location:
+      [device.location?.region, device.location?.country].filter(Boolean).join(', ') || null,
+    hostnames: device.hostnames,
+    monthly,
+  });
+  // The whole fleet: enrolled machines (each with its inventory device, if one
+  // matches by name, hostname or id), the inventory devices without an agent, and
+  // the monthly run rate. Costs stay per currency; unstated ones are never guessed.
+  async function overview(userId) {
+    const list = await machines(userId);
+    const stored = await inventoryRow(userId);
+    const summary = {
+      machines: list.length,
+      devices: 0,
+      matched: 0,
+      agentless: 0,
+      monthly: {},
+      monthly_text: formatMonthly({}),
+      counted: 0,
+      unstated: [],
+      by_profile: {},
+      inventory_updated_at: stored?.updated_at ?? null,
+    };
+    if (!stored)
+      return { machines: list.map((m) => ({ ...m, device: null })), devices: [], summary };
+    const inv = parseInventory(stored.document);
+    const cost = fleetCost(inv);
+    const monthlyOf = new Map(cost.devices.map((d) => [d.id, d.monthly]));
+    const joined = matchAgents(inv, list, {
+      hostname: (m) => m.info?.hostname,
+      name: (m) => m.name,
+      ip: () => null,
+    });
+    const deviceOf = new Map();
+    const agentless = [];
+    for (const { device, agents } of joined.devices) {
+      const view = deviceView(device, monthlyOf.get(device.id));
+      if (agents.length) for (const m of agents) deviceOf.set(m.id, view);
+      else agentless.push(view);
+    }
+    const byProfile = {};
+    for (const d of inv.devices) byProfile[d.profile] = (byProfile[d.profile] ?? 0) + 1;
+    return {
+      machines: list.map((m) => ({ ...m, device: deviceOf.get(m.id) ?? null })),
+      devices: agentless,
+      summary: {
+        ...summary,
+        devices: inv.devices.length,
+        matched: inv.devices.length - agentless.length,
+        agentless: agentless.length,
+        monthly: cost.monthly,
+        monthly_text: formatMonthly(cost.monthly),
+        counted: cost.counted,
+        unstated: cost.unstated,
+        by_profile: byProfile,
+      },
+    };
+  }
   return {
     createToken,
     join,
@@ -338,6 +476,10 @@ export function createFleet(db, { events } = {}) {
     removeMachine,
     rename,
     logScreen,
+    setInventory,
+    inventory,
+    deleteInventory,
+    overview,
     // For the screen relay: the machine behind an agent key, and an owner's machine.
     machineByKey: async (key) => {
       const row = await agentMachine(key);
