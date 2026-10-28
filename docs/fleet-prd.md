@@ -4,7 +4,7 @@
 **Date:** October 19, 2026  
 **Owner:** Profullstack, Inc.  
 **Product home:** https://w3bs.org/fleet  
-**Status:** Specification. Today's Fleet (servers, live stats, three actions, screen sharing) is live; everything else here is proposed work.
+**Status:** Specification. Today's Fleet (servers, live stats, three actions, screen sharing, OpenDevice inventories with monthly cost) is live; everything else here is proposed work.
 
 ## 1 Direction
 
@@ -19,16 +19,29 @@ Both use the same API, CLI (`w3bs fleet …`), MCP tools and TUI, per the house 
 
 `w3bs fleet join <token>` enrolls a machine; `w3bs fleet agent` reports hostname, OS, kernel, CPU, memory, root disk, load, uptime and the w3bs version every 30 seconds; the owner can queue three allowlisted actions (report now, update w3bs packages, restart the desktop layer) on machines that joined with actions allowed; screens are shared view-only or with control over an outbound relay (docs/fleet-screen.md). Limits: 50 machines per account, free.
 
+**Inventory (since 2026-10-28).** An account can also store an [OpenDevice](https://logicsrc.com/docs/opendevice) inventory: one JSON file listing every device it runs, agent or not, with provider, location and what each costs. w3bs.org reads it with the shared package [`@profullstack/fleet`](https://www.npmjs.com/package/@profullstack/fleet) (the same reader ThreatCrush uses): `validateInventory` on write, `matchAgents` to pair inventory devices with joined machines by id, name or hostname (or outright, when a device lists `{"name": "w3bs", "id": "m_…"}` in its `agents`), `fleetCost` for the monthly run rate. The fleet page shows one row per device with its class and $/mo, joined machines with their live stats, devices without an agent with a join hint, and the monthly total. Totals stay per currency; a device with no stated amount shows as *unstated* and is never guessed or converted.
+
+| Surface | Call |
+| --- | --- |
+| Store (replaces) | `PUT /api/fleet/inventory` with the document as the body; `w3bs fleet inventory import opendevice.json` (`-` reads stdin). Errors come back in `error.details.errors`; warnings in the reply |
+| Read back | `GET /api/fleet/inventory` returns the document whole (so `npx @profullstack/fleet list https://w3bs.org/api/fleet/inventory --header "Authorization: Bearer …"` works); `w3bs fleet inventory show` |
+| Delete | `DELETE /api/fleet/inventory`; `w3bs fleet inventory rm` (joined machines stay) |
+| Merged fleet | `GET /api/fleet` returns `{ machines, devices, summary }`: each machine with its `device` (or null), the agentless `devices`, and `summary.monthly`, `monthly_text`, `unstated`, `by_profile`; `w3bs fleet cost` prints it. `GET /api/fleet/machines` keeps its array, each machine now with `device` |
+
+All of these are owner only (session cookie or a `w3bs login` bearer). Limits: 500 devices, 256 KB per inventory.
+
 ## 3 Device classes
+
+Device classes are the OpenDevice profiles (logicsrc.com/docs/opendevice): **server**, **desktop** (laptops included), **phone**, **tablet** and **other**. An inventory device states its profile; one that does not is a server when it has a hostname or address, else other (the rule in `@profullstack/fleet`). The page shows each class with its own icon. A joined machine takes the class of the inventory device it matches; one that matches none shows as "not in inventory". The rows below say how each class joins and what it can do once it has an agent; without an agent, every class still appears from the inventory with its cost.
 
 | Class | How it joins | What it reports | What it can do |
 | --- | --- | --- | --- |
-| Server (Linux) | `w3bs fleet join` (systemd or OpenRC service) | Stats today, plus services, open ports, pending updates, ThreatCrush findings when installed | Actions, updates, service restart, screen (when a desktop exists), shell session |
-| Desktop / laptop (Linux, macOS, Windows) | Same agent, user-level, tray toggle | Stats, battery, displays, logged-in user, desktop-layer state | Actions, updates, screen, lock, locate (laptops, opt-in) |
-| W3BS OS device (any edition) | Joined during setup if the user chooses | Everything above plus edition, release and suite manifest | OS update (`w3bs os update`), suite repair |
-| Android phone / tablet | W3BS app (Nura/W3BS Mobile has the agent built in; stock Android uses the app with Android's own permissions) | Battery, storage, network, OS version, app inventory the user allows | Notifications, open URL, ring, app updates through the W3BS app; nothing Android does not grant an app |
-| iPhone / iPad | W3BS companion app | What iOS lets an app read (battery, storage, OS version) | Notifications, open URL. No remote control: iOS gives apps no system-wide input or screen access. Full device management on iOS needs Apple MDM enrollment, a later, separate track |
-| Other (router, SBC, VM, container, IoT) | Agentless over SSH from a joined machine or the desktop app, or the agent where it runs | Reachability, SSH host key, uptime, a command allowlist per device | The allowlisted commands only |
+| Server (Linux) · profile `server` | `w3bs fleet join` (systemd or OpenRC service) | Stats today, plus services, open ports, pending updates, ThreatCrush findings when installed | Actions, updates, service restart, screen (when a desktop exists), shell session |
+| Desktop / laptop (Linux, macOS, Windows) · profile `desktop` | Same agent, user-level, tray toggle | Stats, battery, displays, logged-in user, desktop-layer state | Actions, updates, screen, lock, locate (laptops, opt-in) |
+| W3BS OS device (any edition) · profile of the hardware | Joined during setup if the user chooses | Everything above plus edition, release and suite manifest | OS update (`w3bs os update`), suite repair |
+| Android phone / tablet · profile `phone` / `tablet` | W3BS app (Nura/W3BS Mobile has the agent built in; stock Android uses the app with Android's own permissions) | Battery, storage, network, OS version, app inventory the user allows | Notifications, open URL, ring, app updates through the W3BS app; nothing Android does not grant an app |
+| iPhone / iPad · profile `phone` / `tablet` | W3BS companion app | What iOS lets an app read (battery, storage, OS version) | Notifications, open URL. No remote control: iOS gives apps no system-wide input or screen access. Full device management on iOS needs Apple MDM enrollment, a later, separate track |
+| Other (router, SBC, VM, container, IoT) · profile `other` | Agentless over SSH from a joined machine or the desktop app, or the agent where it runs | Reachability, SSH host key, uptime, a command allowlist per device | The allowlisted commands only |
 
 ## 4 Teams and permissions
 

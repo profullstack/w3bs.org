@@ -1,6 +1,9 @@
-// w3bs.org/fleet: renders the signed-in person's machines and refreshes every 10 s.
+// w3bs.org/fleet: renders the signed-in person's fleet (joined machines merged with the
+// OpenDevice inventory, through @profullstack/fleet on the server) and refreshes every 10 s.
 const data = JSON.parse(document.getElementById('fleet-data').textContent);
 const list = document.getElementById('fleet-list');
+const summaryBox = document.getElementById('fleet-summary');
+const devicesBox = document.getElementById('fleet-devices');
 const ACTIONS = data.actions;
 const HISTORY = data.history;
 
@@ -22,6 +25,59 @@ const el = (tag, { dataset, ...props } = {}, children = []) => {
   Object.assign(node.dataset, dataset);
   for (const child of [].concat(children)) if (child != null) node.append(child);
   return node;
+};
+
+// Device classes are the OpenDevice profiles.
+const PROFILES = {
+  server: 'Server',
+  desktop: 'Desktop',
+  phone: 'Phone',
+  tablet: 'Tablet',
+  other: 'Other',
+};
+const ICONS = {
+  server: ['M4 4h16v6H4z', 'M4 14h16v6H4z', 'M7 7h.01', 'M7 17h.01'],
+  desktop: ['M3 4h18v12H3z', 'M8 20h8', 'M12 16v4'],
+  phone: ['M7 2h10v20H7z', 'M11 18h2'],
+  tablet: ['M4 3h16v18H4z', 'M11 17h2'],
+  other: ['M12 3l9 5v8l-9 5-9-5V8z'],
+  none: [
+    'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18',
+    'M9.5 9.5a2.5 2.5 0 1 1 3 2.4c-.6.2-1 .7-1 1.3v.8',
+    'M12 17h.01',
+  ],
+};
+const SVG = 'http://www.w3.org/2000/svg';
+function icon(profile) {
+  const svg = document.createElementNS(SVG, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('class', 'fleet-icon');
+  for (const d of ICONS[profile] || ICONS.none) {
+    const path = document.createElementNS(SVG, 'path');
+    path.setAttribute('d', d);
+    svg.append(path);
+  }
+  return svg;
+}
+const classLabel = (profile) =>
+  el('span', { className: 'fleet-class' }, [
+    icon(profile),
+    el('span', { textContent: PROFILES[profile] || 'Not in inventory' }),
+  ]);
+const money = (amount, currency) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(amount);
+const STATES = {
+  unstated: 'unstated',
+  grouped: 'shared bill',
+  retired: 'retired',
+  ended: 'ended',
+  once: 'one-off',
+};
+const monthlyText = (monthly) => {
+  if (!monthly) return '—';
+  if (monthly.state === 'stated') return money(monthly.amount, monthly.currency);
+  return STATES[monthly.state] || monthly.state;
 };
 const bytes = (n) => {
   if (!Number.isFinite(n)) return '?';
@@ -84,7 +140,17 @@ function card(machine) {
     const value = index ? diskPct : memPct;
     node.querySelector('.fleet-fill').style.width = `${Math.min(100, value ?? 0)}%`;
   });
+  const device = machine.device;
   const facts = [
+    ['Device', device && `${PROFILES[device.profile] || device.profile} · ${device.name}`],
+    ['Role', device?.role],
+    ['Provider', device?.provider],
+    ['Location', device?.location],
+    [
+      'Cost',
+      device &&
+        `${monthlyText(device.monthly)}${device.monthly?.state === 'stated' ? ' / mo' : ''}`,
+    ],
     ['Host', info.hostname],
     ['OS', info.os],
     ['Kernel', info.kernel && `${info.kernel} ${info.arch || ''}`],
@@ -154,6 +220,7 @@ function card(machine) {
           className: `fleet-dot ${machine.online ? 'on' : ''}`,
           title: machine.online ? 'online' : 'offline',
         }),
+        icon(device?.profile),
         ` ${machine.name}`,
       ]),
       el('span', {
@@ -195,19 +262,141 @@ function card(machine) {
   ]);
 }
 
-function render(machines) {
-  list.replaceChildren(
-    ...(machines.length
-      ? machines.map(card)
-      : [
-          el('div', { className: 'empty' }, [
-            el('h2', { textContent: 'No servers yet.' }),
-            el('p', { textContent: 'Make a join command below and run it on a server.' }),
+// One row per device: joined machines first (with or without an inventory device),
+// then inventory devices that have no agent.
+function deviceTable(view) {
+  const rows = [
+    ...view.machines.map((m) => ({
+      profile: m.device?.profile,
+      name: m.device && m.device.name !== m.name ? `${m.name} (${m.device.name})` : m.name,
+      provider: m.device?.provider,
+      agent: el('span', {
+        className: `pill ${m.online ? 'green' : ''}`,
+        textContent: m.online ? 'online' : 'offline',
+      }),
+      monthly: m.device?.monthly,
+      inInventory: Boolean(m.device),
+    })),
+    ...view.devices.map((d) => ({
+      profile: d.profile,
+      name: d.name,
+      provider: d.provider,
+      role: d.role,
+      agent: el('a', {
+        className: 'inline-link fleet-join-hint',
+        href: '#fleet-name',
+        textContent:
+          d.profile === 'server' || d.profile === 'desktop' ? 'no agent: join' : 'no agent',
+        title:
+          d.profile === 'server' || d.profile === 'desktop'
+            ? `Make a join command below and run it on ${d.name}; it matches by name or hostname.`
+            : 'Phones and tablets are listed from the inventory; the W3BS app agent is not out yet.',
+      }),
+      monthly: d.monthly,
+      inInventory: true,
+    })),
+  ];
+  if (!rows.length) return null;
+  const s = view.summary;
+  return el('table', { className: 'fleet-table' }, [
+    el('thead', {}, [
+      el('tr', {}, [
+        el('th', { scope: 'col', textContent: 'Class' }),
+        el('th', { scope: 'col', textContent: 'Device' }),
+        el('th', { scope: 'col', className: 'fleet-col-provider', textContent: 'Provider' }),
+        el('th', { scope: 'col', textContent: 'Agent' }),
+        el('th', { scope: 'col', className: 'fleet-num', textContent: '$/mo' }),
+      ]),
+    ]),
+    el(
+      'tbody',
+      {},
+      rows.map((r) =>
+        el('tr', { className: r.inInventory ? '' : 'fleet-row-extra' }, [
+          el('td', {}, [classLabel(r.profile)]),
+          el('td', {}, [
+            el('span', { className: 'fleet-device-name', textContent: r.name }),
+            r.role
+              ? el('span', { className: 'muted fleet-device-role', textContent: r.role })
+              : null,
           ]),
+          el('td', { className: 'fleet-col-provider', textContent: r.provider || '—' }),
+          el('td', {}, [r.agent]),
+          el('td', {
+            className: `fleet-num${r.monthly?.state === 'stated' ? '' : ' muted'}`,
+            textContent: monthlyText(r.monthly),
+          }),
         ]),
+      ),
+    ),
+    s.devices
+      ? el('tfoot', {}, [
+          el('tr', {}, [
+            el('th', {
+              scope: 'row',
+              colSpan: 2,
+              className: 'fleet-total-label',
+              textContent: 'Monthly total',
+            }),
+            el('td', { className: 'fleet-col-provider' }),
+            el('td', {
+              className: 'muted',
+              textContent: s.unstated.length ? `${s.unstated.length} unstated` : '',
+            }),
+            el('td', { className: 'fleet-num fleet-total', textContent: s.monthly_text }),
+          ]),
+        ])
+      : null,
+  ]);
+}
+
+function summary(view) {
+  const s = view.summary;
+  const stats = s.devices
+    ? [
+        [String(s.devices), s.devices === 1 ? 'device' : 'devices'],
+        [String(s.machines), 'joined'],
+        [String(s.agentless), 'without an agent'],
+        [s.monthly_text, 'a month'],
+        [String(s.unstated.length), 'cost unstated'],
+      ]
+    : [[String(s.machines), s.machines === 1 ? 'machine' : 'machines']];
+  summaryBox.replaceChildren(
+    ...stats.map(([value, label]) =>
+      el('div', { className: 'fleet-stat' }, [
+        el('strong', { textContent: value }),
+        el('span', { className: 'muted', textContent: label }),
+      ]),
+    ),
+  );
+  const state = document.getElementById('fleet-inventory-state');
+  if (state)
+    state.textContent = s.inventory_updated_at
+      ? `Inventory: ${s.devices} devices, imported ${ago(s.inventory_updated_at)}. Importing again replaces it.`
+      : 'No inventory yet.';
+}
+
+function render(view) {
+  summary(view);
+  const table = deviceTable(view);
+  devicesBox.replaceChildren(...(table ? [table] : []));
+  list.replaceChildren(
+    ...(view.machines.length
+      ? view.machines.map(card)
+      : view.devices.length
+        ? []
+        : [
+            el('div', { className: 'empty' }, [
+              el('h2', { textContent: 'No devices yet.' }),
+              el('p', {
+                textContent:
+                  'Make a join command below and run it on a server, or import an OpenDevice inventory.',
+              }),
+            ]),
+          ]),
   );
 }
-render(data.machines);
+render(data);
 
 let timer;
 async function refresh() {
@@ -217,7 +406,7 @@ async function refresh() {
         (d) => d.closest('.fleet-card')?.querySelector('h3')?.textContent,
       ),
     );
-    render(await call('/api/fleet/machines'));
+    render(await call('/api/fleet'));
     for (const d of list.querySelectorAll('details'))
       if (open.has(d.closest('.fleet-card')?.querySelector('h3')?.textContent)) d.open = true;
   } catch {
@@ -275,6 +464,29 @@ form.addEventListener('submit', async (event) => {
     });
     document.getElementById('fleet-command').textContent = command;
     document.querySelector('.fleet-command').hidden = false;
+  } catch (error) {
+    status.textContent = error.message;
+  }
+});
+
+const inventoryForm = document.querySelector('form[data-form="fleet-inventory"]');
+inventoryForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const status = inventoryForm.querySelector('.form-status');
+  status.textContent = '';
+  const file = inventoryForm.querySelector('input[type="file"]').files[0];
+  if (!file) return;
+  try {
+    let doc;
+    try {
+      doc = JSON.parse(await file.text());
+    } catch {
+      throw new Error(`${file.name} is not JSON.`);
+    }
+    const saved = await call('/api/fleet/inventory', { method: 'PUT', body: doc });
+    status.textContent = `Imported ${saved.devices} devices${saved.warnings.length ? ` (${saved.warnings.length} warnings)` : ''}.`;
+    inventoryForm.reset();
+    await refresh();
   } catch (error) {
     status.textContent = error.message;
   }

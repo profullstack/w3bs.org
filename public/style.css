@@ -2054,6 +2054,118 @@ main > .auth-small:last-child {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+/* Fleet: summary stats and the device table (machines merged with the OpenDevice inventory). */
+.fleet-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  margin-bottom: 18px;
+}
+.fleet-summary:empty {
+  display: none;
+}
+.fleet-stat {
+  display: grid;
+  gap: 2px;
+}
+.fleet-stat strong {
+  font-size: 22px;
+  line-height: 1.1;
+}
+.fleet-stat .muted {
+  font-size: 13px;
+}
+.fleet-devices {
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+.fleet-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.fleet-table th,
+.fleet-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.fleet-table thead th {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+.fleet-table .fleet-num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.fleet-table tfoot th,
+.fleet-table tfoot td {
+  border-bottom: 0;
+  font-weight: 600;
+}
+.fleet-total-label {
+  text-align: left;
+}
+.fleet-class {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.fleet-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -3px;
+}
+.fleet-card h3 .fleet-icon {
+  margin-left: 6px;
+}
+.fleet-device-name {
+  display: block;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.fleet-device-role {
+  display: block;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.fleet-join-hint {
+  white-space: nowrap;
+  font-size: 13px;
+}
+.fleet-inventory {
+  margin-bottom: 24px;
+}
+@media (max-width: 640px) {
+  .fleet-col-provider,
+  .fleet-device-role {
+    display: none;
+  }
+  .fleet-table th,
+  .fleet-table td {
+    padding: 8px 6px;
+  }
+  .fleet-class span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
 /* Fleet screens: the "View screen" link on a card, and /fleet/<id>/screen. */
 .fleet-screen-link {
   margin-left: 0;

@@ -428,6 +428,7 @@ pub fn human(r: &OperationResult) {
                     let i = &m["info"];
                     vec![
                         s(&m["name"]),
+                        m["device"]["profile"].as_str().unwrap_or("-").to_owned(),
                         if m["online"] == true { "yes".into() } else { "no".into() },
                         m["last_seen_at"].as_str().map(crate::fleet::ago).unwrap_or_else(|| "never".into()),
                         s(&i["os"]),
@@ -438,7 +439,71 @@ pub fn human(r: &OperationResult) {
                     ]
                 })
                 .collect();
-            table(&["NAME", "ONLINE", "LAST SEEN", "OS", "LOAD", "MEM%", "DISK%", "ID"], rows);
+            table(&["NAME", "CLASS", "ONLINE", "LAST SEEN", "OS", "LOAD", "MEM%", "DISK%", "ID"], rows);
+            return;
+        }
+        "fleet.inventory.import" => {
+            let sum = &r.data["summary"];
+            let unstated = sum["unstated"].as_array().map(|a| a.len()).unwrap_or(0);
+            println!(
+                "Imported {} devices from {} into {}/fleet. Monthly: {}{}",
+                s(&r.data["devices"]),
+                s(&r.data["file"]),
+                s(&r.data["origin"]),
+                s(&sum["monthly_text"]),
+                if unstated > 0 { format!(" ({unstated} unstated)") } else { String::new() }
+            );
+            for w in r.data["warnings"].as_array().cloned().unwrap_or_default() {
+                eprintln!("warning: {}", s(&w));
+            }
+            return;
+        }
+        "fleet.inventory.show" => {
+            println!("{}", serde_json::to_string_pretty(&r.data["document"]).unwrap_or_default());
+            return;
+        }
+        "fleet.inventory.rm" => {
+            println!("Removed the inventory from {}/fleet (joined machines stay).", s(&r.data["origin"]));
+            return;
+        }
+        "fleet.cost" => {
+            let sum = &r.data["summary"];
+            let class = |d: &Value| d["profile"].as_str().unwrap_or("-").to_owned();
+            let mut rows: Vec<Vec<String>> = r.data["machines"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+                .iter()
+                .map(|m| {
+                    let d = &m["device"];
+                    vec![
+                        if d.is_null() { "-".into() } else { class(d) },
+                        s(&m["name"]),
+                        s(&d["provider"]),
+                        if m["online"] == true { "online".into() } else { "offline".into() },
+                        if d.is_null() { "not in inventory".into() } else { crate::fleet::monthly_text(&d["monthly"]) },
+                    ]
+                })
+                .collect();
+            rows.extend(r.data["devices"].as_array().cloned().unwrap_or_default().iter().map(|d| {
+                vec![class(d), s(&d["name"]), s(&d["provider"]), "none".into(), crate::fleet::monthly_text(&d["monthly"])]
+            }));
+            if rows.is_empty() {
+                println!("No devices yet. Run `w3bs fleet inventory import opendevice.json`, or join a machine from {}/fleet.", s(&r.data["origin"]));
+                return;
+            }
+            table(&["CLASS", "DEVICE", "PROVIDER", "AGENT", "$/MO"], rows);
+            let unstated: Vec<String> = sum["unstated"].as_array().cloned().unwrap_or_default().iter().map(s).collect();
+            if sum["devices"].as_u64().unwrap_or(0) == 0 {
+                println!("\nNo inventory: import one to see costs (w3bs fleet inventory import opendevice.json).");
+            } else {
+                println!(
+                    "\nMonthly: {}  ({} counted{})",
+                    s(&sum["monthly_text"]),
+                    s(&sum["counted"]),
+                    if unstated.is_empty() { String::new() } else { format!(", unstated: {}", unstated.join(", ")) }
+                );
+            }
             return;
         }
         "fleet.run" => {

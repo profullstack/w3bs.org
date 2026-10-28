@@ -9,6 +9,11 @@
 //!
 //! `w3bs fleet ls / run / rm` act on the whole fleet with the account from `w3bs login`.
 //!
+//! `w3bs fleet inventory import <file>` stores the account's OpenDevice inventory
+//! (logicsrc.com/docs/opendevice) on w3bs.org: every device it runs, agent or not, with its
+//! monthly cost. `w3bs fleet cost` lists the merged fleet and the monthly total; the server
+//! reads the inventory with @profullstack/fleet.
+//!
 //! `w3bs fleet screen on` lets the owner watch this machine's desktop from the page; see
 //! `screen.rs`. `w3bs fleet view <machine>` opens that page.
 
@@ -355,11 +360,13 @@ fn run_with_timeout(program: &str, args: &[String], timeout: Duration) -> (bool,
 
 // ------------------------------------------------------------------ systemd
 
-/// The unit text. A system unit when installed as root, else a user unit.
+/// The unit text. A system unit when installed as root, else a user unit. Restart=always:
+/// systemd counts a SIGTERM death as clean, so on-failure left agents dead after a stray
+/// kill; exit 3 (removed from the fleet) still stops it for good.
 pub fn unit_text(exe: &str, config: &Path, system: bool) -> String {
     let wanted = if system { "multi-user.target" } else { "default.target" };
     format!(
-        "[Unit]\nDescription=W3BS fleet agent (reports this machine to w3bs.org/fleet)\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nExecStart={exe} fleet agent --config {config}\nRestart=on-failure\nRestartSec=10\nRestartPreventExitStatus={EXIT_REMOVED}\n\n[Install]\nWantedBy={wanted}\n",
+        "[Unit]\nDescription=W3BS fleet agent (reports this machine to w3bs.org/fleet)\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nExecStart={exe} fleet agent --config {config}\nRestart=always\nRestartSec=10\nRestartPreventExitStatus={EXIT_REMOVED}\n\n[Install]\nWantedBy={wanted}\n",
         config = config.display(),
     )
 }
@@ -664,6 +671,90 @@ pub async fn ls(origin: &str) -> Result<Value> {
     Ok(json!({ "origin": origin, "machines": list }))
 }
 
+fn signed_out(origin: &str) -> Error {
+    Error::package("NOT_SIGNED_IN", format!("Your session has ended. Run: w3bs login{}", if origin == "https://w3bs.org" { String::new() } else { format!(" --api {origin}") }))
+}
+
+/// Read an OpenDevice inventory file (or `-` for stdin) and store it as the account's.
+/// The server validates it with @profullstack/fleet and answers with the errors if any.
+pub async fn inventory_import(origin: &str, file: &Path) -> Result<Value> {
+    let text = if file == Path::new("-") {
+        let mut s = String::new();
+        std::io::stdin().read_to_string(&mut s).map_err(|e| Error::preflight("INVENTORY_FILE", format!("stdin: {e}")))?;
+        s
+    } else {
+        std::fs::read_to_string(file).map_err(|e| Error::preflight("INVENTORY_FILE", format!("{}: {e}", file.display())))?
+    };
+    let doc: Value = serde_json::from_str(&text).map_err(|e| Error::usage("INVENTORY_NOT_JSON", format!("{}: not JSON ({e})", file.display())))?;
+    if !doc["devices"].is_array() {
+        return Err(Error::usage("INVALID_INVENTORY", format!("{}: an OpenDevice inventory needs a \"devices\" array (logicsrc.com/docs/opendevice)", file.display())));
+    }
+    let token = auth::access_token(origin).await?;
+    let (status, v) = call(&http(), reqwest::Method::PUT, &format!("{origin}/api/fleet/inventory"), Some(&token), Some(&doc)).await?;
+    match status {
+        200 => Ok(json!({ "origin": origin, "file": file.display().to_string(), "devices": v["devices"], "warnings": v["warnings"], "summary": v["summary"] })),
+        401 => Err(signed_out(origin)),
+        _ => {
+            let details: Vec<String> = v["error"]["details"]["errors"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_owned)).collect()).unwrap_or_default();
+            let mut e = server_error("INVENTORY_IMPORT_FAILED", status, &v);
+            if !details.is_empty() {
+                e = Error::package("INVALID_INVENTORY", format!("{}:\n  {}", file.display(), details.join("\n  ")));
+            }
+            Err(e)
+        }
+    }
+}
+
+/// The stored inventory document, whole.
+pub async fn inventory_show(origin: &str) -> Result<Value> {
+    let token = auth::access_token(origin).await?;
+    let (status, v) = call(&http(), reqwest::Method::GET, &format!("{origin}/api/fleet/inventory"), Some(&token), None).await?;
+    match status {
+        200 => Ok(json!({ "origin": origin, "document": v })),
+        401 => Err(signed_out(origin)),
+        _ => Err(server_error("INVENTORY_SHOW_FAILED", status, &v)),
+    }
+}
+
+pub async fn inventory_rm(origin: &str) -> Result<Value> {
+    let token = auth::access_token(origin).await?;
+    let (status, v) = call(&http(), reqwest::Method::DELETE, &format!("{origin}/api/fleet/inventory"), Some(&token), None).await?;
+    match status {
+        200 => Ok(json!({ "origin": origin, "removed": true })),
+        401 => Err(signed_out(origin)),
+        _ => Err(server_error("INVENTORY_RM_FAILED", status, &v)),
+    }
+}
+
+/// The merged fleet: joined machines with their inventory devices, devices without an
+/// agent, and the monthly run rate per currency (unstated costs listed, never guessed).
+pub async fn cost(origin: &str) -> Result<Value> {
+    let token = auth::access_token(origin).await?;
+    let (status, v) = call(&http(), reqwest::Method::GET, &format!("{origin}/api/fleet"), Some(&token), None).await?;
+    match status {
+        200 => Ok(json!({ "origin": origin, "machines": v["machines"], "devices": v["devices"], "summary": v["summary"] })),
+        401 => Err(signed_out(origin)),
+        _ => Err(server_error("FLEET_COST_FAILED", status, &v)),
+    }
+}
+
+/// One line of `w3bs fleet cost`: a device's monthly cost as text.
+pub fn monthly_text(m: &Value) -> String {
+    match m["state"].as_str() {
+        Some("stated") => match (m["amount"].as_f64(), m["currency"].as_str()) {
+            (Some(a), Some("USD")) => format!("${a:.2}"),
+            (Some(a), Some("EUR")) => format!("\u{20ac}{a:.2}"),
+            (Some(a), Some("GBP")) => format!("\u{a3}{a:.2}"),
+            (Some(a), Some(c)) => format!("{a:.2} {c}"),
+            _ => "-".into(),
+        },
+        Some("grouped") => "shared bill".into(),
+        Some("once") => "one-off".into(),
+        Some(other) => other.into(),
+        None => "-".into(),
+    }
+}
+
 /// A machine by exact id, else by unique name.
 pub fn find_machine<'a>(list: &'a [Value], key: &str) -> Result<&'a Value> {
     if let Some(m) = list.iter().find(|m| m["id"].as_str() == Some(key)) {
@@ -757,6 +848,16 @@ mod tests {
     }
 
     #[test]
+    fn monthly_text_never_guesses() {
+        assert_eq!(monthly_text(&json!({ "amount": 149, "currency": "USD", "state": "stated" })), "$149.00");
+        assert_eq!(monthly_text(&json!({ "amount": 10, "currency": "EUR", "state": "stated" })), "\u{20ac}10.00");
+        assert_eq!(monthly_text(&json!({ "amount": 5.5, "currency": "CHF", "state": "stated" })), "5.50 CHF");
+        assert_eq!(monthly_text(&json!({ "amount": null, "currency": null, "state": "unstated" })), "unstated");
+        assert_eq!(monthly_text(&json!({ "amount": null, "state": "grouped" })), "shared bill");
+        assert_eq!(monthly_text(&Value::Null), "-");
+    }
+
+    #[test]
     fn interval_is_clamped() {
         assert_eq!(clamp_interval(None), 30);
         assert_eq!(clamp_interval(Some(1)), 10);
@@ -828,7 +929,7 @@ mod tests {
         assert!(user.contains("ExecStart=/home/a/.local/bin/w3bs fleet agent --config /home/a/.config/w3bs/fleet.json\n"));
         assert!(user.contains("WantedBy=default.target"));
         assert!(user.contains("RestartPreventExitStatus=3"));
-        assert!(user.contains("Restart=on-failure"));
+        assert!(user.contains("Restart=always"));
         let root = unit_text("/usr/local/bin/w3bs", Path::new("/root/.config/w3bs/fleet.json"), true);
         assert!(root.contains("WantedBy=multi-user.target"));
         assert!(root.contains("After=network-online.target"));

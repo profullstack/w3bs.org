@@ -426,7 +426,11 @@ export function createApp({
             : 'INTERNAL_ERROR');
     if (status === 500) process.stderr.write(`W3BS ${req.method} ${req.path}: ${error.message}\n`);
     res.status(status).json({
-      error: { code, message: status === 500 ? 'Internal server error.' : error.message },
+      error: {
+        code,
+        message: status === 500 ? 'Internal server error.' : error.message,
+        ...(status !== 500 && error.details ? { details: error.details } : {}),
+      },
     });
   });
   return { app, store };
