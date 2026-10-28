@@ -179,7 +179,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.2.34"
+      "latest_version": "0.2.36"
     },
     {
       "id": "infernetprotocol.com/infernet",
@@ -197,7 +197,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.1.68"
+      "latest_version": "0.1.71"
     },
     {
       "id": "diskpush.com/diskpush",
@@ -797,7 +797,7 @@
       "vendor": "Anthropic",
       "license": "proprietary",
       "agentic": true,
-      "latest_version": "2.1.311"
+      "latest_version": "2.1.312"
     },
     {
       "id": "openai.com/codex",
@@ -835,7 +835,7 @@
       "vendor": "GitHub",
       "license": "proprietary",
       "agentic": true,
-      "latest_version": "1.0.104"
+      "latest_version": "1.0.105"
     },
     {
       "id": "aider.chat/aider",
@@ -873,7 +873,7 @@
       "vendor": "Anomaly (formerly SST)",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "2.0.27"
+      "latest_version": "2.2.0"
     },
     {
       "id": "block.xyz/goose",
@@ -944,7 +944,7 @@
       "vendor": "Alibaba Qwen",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "0.26.1"
+      "latest_version": "0.26.2"
     },
     {
       "id": "kiro.dev/kiro-cli",
@@ -1188,7 +1188,7 @@
       "vendor": "Ollama",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.40.11"
+      "latest_version": "0.40.12"
     },
     {
       "id": "github.com/fabric",
