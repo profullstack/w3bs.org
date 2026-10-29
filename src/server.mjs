@@ -25,6 +25,7 @@ import { mountPublishing } from './publishing-routes.mjs';
 import { mountInstallLinks } from './install-links.mjs';
 import { mountRegistryFront } from './registry-front.mjs';
 import { createBrowser } from './browse.mjs';
+import { createNet } from './net-routes.mjs';
 
 export function createApp({
   store,
@@ -40,6 +41,8 @@ export function createApp({
   socialFetch = fetch,
   // /browse and /api/browse: Moshpit names over DoH, pit.world gateways, discovery documents.
   browser = createBrowser(),
+  // W3BS Net fronts pit.world search and manually approved Moshpit gateway names.
+  net = createNet(),
   // W3BS Training workspaces need PostgreSQL and a master key (W3BS_TRAINING_MASTER_KEY, from the
   // vault); without them /training/app and /api/v1/training answer "not enabled".
   training = {
@@ -69,6 +72,8 @@ export function createApp({
     });
     const railwayHealth =
       req.method === 'GET' && req.path === '/healthz' && req.hostname === 'healthcheck.railway.app';
+    const netName = net.nameFromHost(req.hostname);
+    if (netName) return net.gateway(req, res, netName).catch(next);
     if (!hosts.has(req.hostname.toLowerCase()) && !railwayHealth)
       return next(new W3bsError('INVALID_HOST', 'Unrecognized service host.', 403));
     // OAuth token/revoke/metadata, and /api/me with a bearer token, are called by apps on
@@ -111,6 +116,7 @@ export function createApp({
     next();
   });
   app.use(express.json({ limit: '256kb', strict: true }));
+  net.mount(app);
   const token = (req) => /^Bearer (.+)$/.exec(req.headers.authorization || '')?.[1];
   const invoke = (req, name, args) =>
     dispatch(store, name, args, { token: token(req), publishToken });
@@ -387,6 +393,7 @@ export function createApp({
           `- [Training](${origin}/training): teach agents by doing the task yourself`,
           `- [A/B testing](${origin}/ab-testing)`,
           `- [Social](${origin}/social)`,
+          `- [W3BS Net](${origin}/net): moderated Moshpit gateway and search`,
           '',
           '## Policy',
           `- [Governance](${origin}/governance), [Terms](${origin}/terms), [Privacy](${origin}/privacy)`,
@@ -398,7 +405,7 @@ export function createApp({
     res
       .type('application/xml')
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/', '/pricing', '/packages', '/packages/publish', '/specs', '/browse', '/prompts', '/desktop', '/de', '/training', '/training/liquid-agent', '/tasks', '/workflows', '/os', '/ab-testing', '/social', '/governance', '/developers', '/signup', '/terms', '/privacy'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/', '/pricing', '/packages', '/packages/publish', '/specs', '/browse', '/net', '/search', '/prompts', '/desktop', '/de', '/training', '/training/liquid-agent', '/tasks', '/workflows', '/os', '/ab-testing', '/social', '/governance', '/developers', '/signup', '/terms', '/privacy'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
       ),
   );
   app.get('/docs/:file', (req, res) => {
