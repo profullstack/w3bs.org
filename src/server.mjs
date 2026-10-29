@@ -49,6 +49,9 @@ export function createApp({
   // The /fleet "SSH access checks" panel (@profullstack/fleetbar). Defaults read
   // CRAWLPROOF_UPTIME_TOKEN per request; tests pass { token, fetch, emailVerified }.
   fleetbar,
+  // Sign in with CoinPay. Defaults to COINPAY_OAUTH_CLIENT_ID/_SECRET; tests pass
+  // { clientId, clientSecret, base, fetch }.
+  coinpay,
 } = {}) {
   if (!store) throw new Error('createApp requires an opened store; use startServer or openStore.');
   const app = express();
@@ -61,8 +64,7 @@ export function createApp({
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'strict-origin-when-cross-origin',
       'Cache-Control': 'no-store',
-      'Content-Security-Policy':
-        `default-src 'self'; script-src 'self' https://crawlproof.com ${FOOTER_SCRIPT_SRC}; style-src 'self'; img-src 'self' data: https://built.indie.pit.world https://pwamart.com; connect-src 'self' https://crawlproof.com https://pit.world; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self' https://pit.world`,
+      'Content-Security-Policy': `default-src 'self'; script-src 'self' https://crawlproof.com ${FOOTER_SCRIPT_SRC}; style-src 'self'; img-src 'self' data: https://built.indie.pit.world https://pwamart.com; connect-src 'self' https://crawlproof.com https://pit.world; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self' https://pit.world`,
       'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
     });
     const railwayHealth =
@@ -311,7 +313,14 @@ export function createApp({
       .set('Allow', 'POST')
       .json({ error: { code: 'METHOD_NOT_ALLOWED', message: 'Use Streamable HTTP POST.' } }),
   );
-  const helpers = mountAccounts(app, { store, origin, mailer, formGuard, bridgeClients });
+  const helpers = mountAccounts(app, {
+    store,
+    origin,
+    mailer,
+    formGuard,
+    bridgeClients,
+    ...(coinpay !== undefined ? { coinpay } : {}),
+  });
   // WebSocket upgrades (fleet screens) skip Express; startServer hands them to this.
   app.locals.fleet = mountFleet(app, { store, origin, helpers, fleetbar });
   mountSocial(app, { store, helpers, config: social, fetchImpl: socialFetch });
@@ -349,39 +358,41 @@ export function createApp({
   );
   // For agents: what W3BS is and every way in, as plain text (llmstxt.org).
   app.get('/llms.txt', (_req, res) =>
-    res.type('text/plain').send(
-      [
-        '# W3BS',
-        '',
-        '> Open standards for a Web where humans, agents and devices can discover, communicate and collaborate, plus W3BS Fleet: watch your servers from one page, free.',
-        '',
-        '## Start here',
-        `- [Fleet](${origin}/fleet): watch your servers from one page. Install the CLI: \`curl -fsSL ${origin}/install.sh | sh\``,
-        `- [Pricing](${origin}/pricing): Fleet is free`,
-        `- [Specs](${origin}/specs): the W3BS community drafts`,
-        `- [Developers](${origin}/developers): build with W3BS`,
-        '',
-        '## For agents',
-        `- [MCP](${origin}/mcp): streamable HTTP MCP server (POST JSON-RPC)`,
-        `- [API](${origin}/api): the reference operations, as JSON`,
-        `- [Tasks API](${origin}/api/v1/tasks) and [Workflows](${origin}/workflows)`,
-        `- [Manifest schema](${origin}/schemas/manifest.json)`,
-        `- [Discovery](${origin}/.well-known/w3bs.json)`,
-        '',
-        '## Products',
-        `- [Packages](${origin}/packages): signed packages, installed with curl`,
-        `- [Prompts](${origin}/prompts): the open prompt registry`,
-        `- [Agentic Desktop Layer](${origin}/desktop) and [W3BS DE](${origin}/de)`,
-        `- [W3BS OS](${origin}/os)`,
-        `- [Training](${origin}/training): teach agents by doing the task yourself`,
-        `- [A/B testing](${origin}/ab-testing)`,
-        `- [Social](${origin}/social)`,
-        '',
-        '## Policy',
-        `- [Governance](${origin}/governance), [Terms](${origin}/terms), [Privacy](${origin}/privacy)`,
-        '',
-      ].join('\n'),
-    ),
+    res
+      .type('text/plain')
+      .send(
+        [
+          '# W3BS',
+          '',
+          '> Open standards for a Web where humans, agents and devices can discover, communicate and collaborate, plus W3BS Fleet: watch your servers from one page, free.',
+          '',
+          '## Start here',
+          `- [Fleet](${origin}/fleet): watch your servers from one page. Install the CLI: \`curl -fsSL ${origin}/install.sh | sh\``,
+          `- [Pricing](${origin}/pricing): Fleet is free`,
+          `- [Specs](${origin}/specs): the W3BS community drafts`,
+          `- [Developers](${origin}/developers): build with W3BS`,
+          '',
+          '## For agents',
+          `- [MCP](${origin}/mcp): streamable HTTP MCP server (POST JSON-RPC)`,
+          `- [API](${origin}/api): the reference operations, as JSON`,
+          `- [Tasks API](${origin}/api/v1/tasks) and [Workflows](${origin}/workflows)`,
+          `- [Manifest schema](${origin}/schemas/manifest.json)`,
+          `- [Discovery](${origin}/.well-known/w3bs.json)`,
+          '',
+          '## Products',
+          `- [Packages](${origin}/packages): signed packages, installed with curl`,
+          `- [Prompts](${origin}/prompts): the open prompt registry`,
+          `- [Agentic Desktop Layer](${origin}/desktop) and [W3BS DE](${origin}/de)`,
+          `- [W3BS OS](${origin}/os)`,
+          `- [Training](${origin}/training): teach agents by doing the task yourself`,
+          `- [A/B testing](${origin}/ab-testing)`,
+          `- [Social](${origin}/social)`,
+          '',
+          '## Policy',
+          `- [Governance](${origin}/governance), [Terms](${origin}/terms), [Privacy](${origin}/privacy)`,
+          '',
+        ].join('\n'),
+      ),
   );
   app.get('/sitemap.xml', (_req, res) =>
     res

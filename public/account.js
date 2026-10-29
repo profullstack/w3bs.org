@@ -110,6 +110,12 @@ const handlers = {
     await call('/api/account/password', { method: 'PUT', body: values });
     location.reload();
   },
+  async 'add-email'(form, values) {
+    const { message } = await call('/api/account/email', { body: values });
+    form.replaceChildren(
+      Object.assign(document.createElement('p'), { className: 'auth-sent', textContent: message }),
+    );
+  },
   async app(_form, values) {
     const redirectUris = values.redirectUris.split(/\s+/).filter(Boolean);
     await call('/api/account/apps', { body: { name: values.name, redirectUris } });
@@ -182,6 +188,25 @@ document.addEventListener('click', async (event) => {
         'Delete this app? Everyone signed in through it is signed out.',
         `/api/account/apps/${id}`,
         { method: 'DELETE' },
+      );
+    case 'coinpay-connect':
+      button.disabled = true;
+      try {
+        const { url } = await call('/api/account/coinpay');
+        location.assign(url);
+      } catch (error) {
+        button.disabled = false;
+        alert(error.message);
+      }
+      break;
+    case 'coinpay-disconnect':
+      return confirmAndCall(
+        button,
+        'Disconnect CoinPay from this account?',
+        '/api/account/coinpay',
+        {
+          method: 'DELETE',
+        },
       );
     case 'logout':
       await call('/api/auth/logout');

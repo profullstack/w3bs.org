@@ -5,6 +5,14 @@ import express from 'express';
 import { randomBytes } from 'node:crypto';
 import { createBridgeHost } from '@profullstack/bridges';
 import { createFormGuard } from '@profullstack/stack/email';
+import {
+  SIGN_IN_SCOPES,
+  authorizeUrl,
+  finishSignIn,
+  pkce,
+  randomToken,
+  sameState,
+} from '@profullstack/coinpay-onboard/oauth';
 import { W3bsError } from './core.mjs';
 import {
   CLI_CLIENT_ID,
@@ -42,7 +50,22 @@ const parseCookies = (header = '') =>
       .map(([name, ...rest]) => [name, decodeURIComponent(rest.join('='))]),
   );
 
-export function mountAccounts(app, { store, origin, mailer, formGuard = {}, bridgeClients }) {
+// Sign in with CoinPay: a confidential client registered at coinpayportal.com. Tests pass
+// { clientId, clientSecret, base, fetch }.
+export const coinpayFromEnv = () =>
+  process.env.COINPAY_OAUTH_CLIENT_ID && process.env.COINPAY_OAUTH_CLIENT_SECRET
+    ? {
+        clientId: process.env.COINPAY_OAUTH_CLIENT_ID,
+        clientSecret: process.env.COINPAY_OAUTH_CLIENT_SECRET,
+      }
+    : undefined;
+export const COINPAY_CALLBACK_PATH = '/api/v1/coinpay/oauth/callback';
+const COINPAY_COOKIE_PATH = '/api/v1/coinpay/oauth';
+
+export function mountAccounts(
+  app,
+  { store, origin, mailer, formGuard = {}, bridgeClients, coinpay = coinpayFromEnv() },
+) {
   const accounts = store.accounts(origin);
   const host = new URL(origin).hostname;
   const secure = origin.startsWith('https:');
@@ -104,16 +127,22 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
     if (!result.link) return;
     const url = `${origin}/auth/link?token=${encodeURIComponent(result.link)}`;
     const signup = result.purpose === 'signup';
-    const subject = signup ? 'Confirm your email for W3BS' : 'Your W3BS sign-in link';
+    const subject =
+      signup || result.purpose === 'email'
+        ? 'Confirm your email for W3BS'
+        : 'Your W3BS sign-in link';
+    const adding = result.purpose === 'email';
     const lead = signup
       ? `Confirm this address to finish creating the W3BS account @${result.username}.`
-      : `Sign in to W3BS as @${result.username}.`;
+      : adding
+        ? `Confirm this address for the W3BS account @${result.username}.`
+        : `Sign in to W3BS as @${result.username}.`;
     const text = `${lead}\n\n${url}\n\nThe link works once and expires in 20 minutes. If you did not ask for it, ignore this email.\n`;
     await mailer.send({
       to: result.email,
       subject,
       text,
-      html: `<p>${e(lead)}</p><p><a href="${e(url)}">${signup ? 'Confirm and create account' : 'Sign in'}</a></p><p style="color:#6b7268">The link works once and expires in 20 minutes. If you did not ask for it, ignore this email.</p>`,
+      html: `<p>${e(lead)}</p><p><a href="${e(url)}">${signup ? 'Confirm and create account' : adding ? 'Confirm address' : 'Sign in'}</a></p><p style="color:#6b7268">The link works once and expires in 20 minutes. If you did not ask for it, ignore this email.</p>`,
     });
   };
   const guarded = async (req, binding) => {
@@ -208,7 +237,104 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
     await accounts.deleteClient((await requireUser(req)).id, req.params.id);
     res.json({ ok: true });
   });
+  // An account CoinPay created adds (and proves) its first email address.
+  api.post('/account/email', async (req, res) => {
+    const user = await requireUser(req);
+    if (!(await guarded(req, 'email'))) return res.json(sentMessage(String(req.body?.email ?? '')));
+    const result = await accounts.startEmailAdd(user.id, req.body?.email);
+    await sendLink(result);
+    res.json(sentMessage(result.email));
+  });
+  api.post('/account/coinpay', async (req, res) => {
+    const user = await requireUser(req);
+    if (!coinpay) throw new W3bsError('NOT_ENABLED', 'Sign in with CoinPay is not set up.', 404);
+    if (await accounts.coinpayIdentity(user.id))
+      throw new W3bsError('ALREADY_LINKED', 'CoinPay is already connected.', 409);
+    res.json({ url: await beginCoinpay(res, { mode: 'link', next: '/account', userId: user.id }) });
+  });
+  api.delete('/account/coinpay', async (req, res) => {
+    await accounts.coinpayUnlink((await requireUser(req)).id);
+    res.json({ ok: true });
+  });
   app.use('/api', api);
+
+  // ---- Sign in with CoinPay (relying party) ----------------------------------
+  // Auth code + PKCE S256 + state + nonce; the pending request is a single-use server
+  // row whose id rides in an httpOnly cookie scoped to the callback path.
+  const coinpayCookie = secure ? 'w3bs_coinpay_secure' : 'w3bs_coinpay';
+  const coinpayRedirectUri = `${origin}${COINPAY_CALLBACK_PATH}`;
+  async function beginCoinpay(res, { mode, next, userId }) {
+    const { verifier, challenge } = pkce();
+    const state = randomToken();
+    const nonce = randomToken();
+    const id = await accounts.coinpayBegin({ mode, next, userId, state, nonce, verifier });
+    res.cookie(coinpayCookie, id, {
+      httpOnly: true,
+      secure,
+      // lax: it must ride the top-level redirect back from coinpayportal.com.
+      sameSite: 'lax',
+      path: COINPAY_COOKIE_PATH,
+      maxAge: TTL.challenge,
+    });
+    return authorizeUrl({
+      clientId: coinpay.clientId,
+      redirectUri: coinpayRedirectUri,
+      state,
+      nonce,
+      challenge,
+      scopes: SIGN_IN_SCOPES,
+      ...(coinpay.base ? { base: coinpay.base } : {}),
+    });
+  }
+  app.get('/api/v1/coinpay/oauth/start', onMainHost, async (req, res) => {
+    if (!coinpay) return res.redirect(302, '/login?coinpay=unavailable');
+    const next = safeNext(req.query.next);
+    res.redirect(302, await beginCoinpay(res, { mode: 'login', next }));
+  });
+  app.get(COINPAY_CALLBACK_PATH, onMainHost, async (req, res) => {
+    const id = parseCookies(req.headers.cookie)[coinpayCookie];
+    res.clearCookie(coinpayCookie, {
+      path: COINPAY_COOKIE_PATH,
+      secure,
+      httpOnly: true,
+      sameSite: 'lax',
+    });
+    if (!coinpay) return res.redirect(302, '/login?coinpay=unavailable');
+    const pending = id ? await accounts.coinpayTake(id) : undefined;
+    if (!pending || !sameState(pending.state, String(req.query.state ?? '')))
+      return res.redirect(302, '/login?coinpay=state');
+    const fail = (reason) =>
+      res.redirect(
+        302,
+        pending.mode === 'link' ? `/account?coinpay=${reason}` : `/login?coinpay=${reason}`,
+      );
+    if (req.query.error) return fail('denied');
+    if (typeof req.query.code !== 'string' || !req.query.code) return fail('failed');
+    // Linking needs the same signed-in session that started it.
+    const signedIn = pending.mode === 'link' ? await currentUser(req) : null;
+    if (pending.mode === 'link' && signedIn?.id !== pending.userId) return fail('signed_out');
+    let who;
+    try {
+      who = await finishSignIn({
+        code: req.query.code,
+        verifier: pending.verifier,
+        nonce: pending.nonce,
+        clientId: coinpay.clientId,
+        clientSecret: coinpay.clientSecret,
+        redirectUri: coinpayRedirectUri,
+        ...(coinpay.base ? { base: coinpay.base } : {}),
+        ...(coinpay.fetch ? { fetch: coinpay.fetch } : {}),
+      });
+    } catch (error) {
+      process.stderr.write(`W3BS: CoinPay sign-in failed: ${error.message}\n`);
+      return fail('failed');
+    }
+    if (pending.mode === 'link')
+      return res.redirect(302, `/account?coinpay=${await accounts.coinpayLink(signedIn.id, who)}`);
+    const { user, created } = await accounts.coinpayLogin(who);
+    setSession(res, await accounts.createSession(user.id));
+    res.redirect(302, created && pending.next === '/account' ? '/account?welcome' : pending.next);
+  });
 
   // userinfo: an OAuth access token, or the browser session on the main host.
   app.get('/api/me', async (req, res) => {
@@ -226,7 +352,7 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
       sub: user.id,
       username: user.username,
       email: user.email,
-      email_verified: true,
+      email_verified: user.emailVerified,
       created_at: user.createdAt,
     });
   });
@@ -450,8 +576,8 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
             sub: user.id,
             username: user.username,
             name: user.username,
-            email: user.email,
-            emailVerified: true,
+            email: user.email ?? undefined,
+            emailVerified: user.emailVerified,
           }
         );
       },
@@ -498,6 +624,25 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
   };
   const emailForm = async (next) =>
     `<form class="auth-form" data-form="email" data-next="${e(next)}"><label class="input-label" for="email-link">Email</label><input id="email-link" name="email" type="email" autocomplete="email" required maxlength="254">${await guardFields('email')}<button class="button" type="submit">Email me a sign-in link</button><p class="form-status" role="status" aria-live="polite"></p></form>`;
+  const COINPAY_NOTES = {
+    state: 'That CoinPay sign-in expired or did not start in this browser. Try again.',
+    denied: 'CoinPay sign-in was cancelled.',
+    failed: 'CoinPay sign-in failed. Try again.',
+    unavailable: 'Sign in with CoinPay is not available right now.',
+    signed_out: 'Your W3BS session ended before CoinPay finished. Sign in and connect again.',
+    linked: 'CoinPay is connected. You can now sign in with CoinPay.',
+    already_linked: 'CoinPay was already connected to this account.',
+    sub_taken: 'That CoinPay account is already connected to a different W3BS account.',
+    user_has_other: 'A different CoinPay account is already connected. Disconnect it first.',
+  };
+  const coinpayNote = (req) => {
+    const note = COINPAY_NOTES[String(req.query.coinpay ?? '')];
+    return note ? `<p class="form-status" role="status">${e(note)}</p>` : '';
+  };
+  const coinpayButton = (next, label = 'Sign in with CoinPay') =>
+    coinpay
+      ? `<a class="button primary auth-wide" href="/api/v1/coinpay/oauth/start?next=${encodeURIComponent(next)}">${label}</a><div class="auth-or"><span>or</span></div>`
+      : '';
   app.get('/login', onMainHost, async (req, res) => {
     const next = safeNext(req.query.next);
     if (await currentUser(req)) {
@@ -508,7 +653,7 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
       track: !req.originalUrl.includes('?') || ['/fleet', '/account'].includes(next),
       title: 'Sign in',
       active: '/account',
-      content: `<section class="auth-card"><div class="eyebrow">W3BS ACCOUNT</div><h1>Sign <em>in.</em></h1><button class="button primary auth-wide" type="button" data-action="passkey-login" data-next="${e(next)}">Sign in with a passkey</button><div class="auth-or"><span>or</span></div><form class="auth-form" data-form="login" data-next="${e(next)}"><label class="input-label" for="login">Username or email</label><input id="login" name="login" autocomplete="username webauthn" required maxlength="254"><label class="input-label" for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256"><button class="button dark" type="submit">Sign in</button><p class="form-status" role="status" aria-live="polite"></p></form><details class="auth-fallback"><summary>Forgot your password, or no passkey on this device?</summary>${await emailForm(next)}</details><p class="auth-small">New here? <a href="/signup${next !== '/account' ? `?next=${encodeURIComponent(next)}` : ''}">Create an account</a></p></section>`,
+      content: `<section class="auth-card"><div class="eyebrow">W3BS ACCOUNT</div><h1>Sign <em>in.</em></h1>${coinpayNote(req)}${coinpayButton(next)}<button class="button${coinpay ? '' : ' primary'} auth-wide" type="button" data-action="passkey-login" data-next="${e(next)}">Sign in with a passkey</button><div class="auth-or"><span>or</span></div><form class="auth-form" data-form="login" data-next="${e(next)}"><label class="input-label" for="login">Username or email</label><input id="login" name="login" autocomplete="username webauthn" required maxlength="254"><label class="input-label" for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256"><button class="button dark" type="submit">Sign in</button><p class="form-status" role="status" aria-live="polite"></p></form><details class="auth-fallback"><summary>Forgot your password, or no passkey on this device?</summary>${await emailForm(next)}</details><p class="auth-small">New here? <a href="/signup${next !== '/account' ? `?next=${encodeURIComponent(next)}` : ''}">Create an account</a></p></section>`,
     });
   });
   app.get('/signup', onMainHost, async (req, res) => {
@@ -517,7 +662,7 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
       title: 'Create an account',
       track: true,
       active: '/account',
-      content: `<section class="auth-card"><div class="eyebrow">W3BS ACCOUNT</div><h1>Create an <em>account.</em></h1><p>One account for w3bs.org, the <code>w3bs</code> CLI and apps that offer "Sign in with W3BS".</p><form class="auth-form" data-form="signup"><label class="input-label" for="username">Username</label><input id="username" name="username" autocomplete="username" required minlength="3" maxlength="32" pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" spellcheck="false" autocapitalize="none"><p class="field-description">3 to 32 lowercase letters, digits and hyphens. Public.</p><label class="input-label" for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required maxlength="254"><p class="field-description">We send a link to confirm it. Never shown publicly.</p><label class="input-label" for="new-password">Password <span class="muted">(optional)</span></label><input id="new-password" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="256"><p class="field-description">At least 10 characters. Leave it empty to use a passkey instead; you add one right after confirming.</p>${await guardFields('signup')}<button class="button primary" type="submit">Create account</button><p class="form-status" role="status" aria-live="polite"></p></form><p class="auth-small">Free. By creating an account you agree to the <a href="/terms">terms</a>; the <a href="/privacy">privacy page</a> says what we keep.</p><p class="auth-small">Have an account? <a href="/login">Sign in</a></p></section>`,
+      content: `<section class="auth-card"><div class="eyebrow">W3BS ACCOUNT</div><h1>Create an <em>account.</em></h1><p>One account for w3bs.org, the <code>w3bs</code> CLI and apps that offer "Sign in with W3BS".</p>${coinpayButton('/account', 'Sign up with CoinPay')}<form class="auth-form" data-form="signup"><label class="input-label" for="username">Username</label><input id="username" name="username" autocomplete="username" required minlength="3" maxlength="32" pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" spellcheck="false" autocapitalize="none"><p class="field-description">3 to 32 lowercase letters, digits and hyphens. Public.</p><label class="input-label" for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required maxlength="254"><p class="field-description">We send a link to confirm it. Never shown publicly.</p><label class="input-label" for="new-password">Password <span class="muted">(optional)</span></label><input id="new-password" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="256"><p class="field-description">At least 10 characters. Leave it empty to use a passkey instead; you add one right after confirming.</p>${await guardFields('signup')}<button class="button primary" type="submit">Create account</button><p class="form-status" role="status" aria-live="polite"></p></form><p class="auth-small">Free. By creating an account you agree to the <a href="/terms">terms</a>; the <a href="/privacy">privacy page</a> says what we keep.</p><p class="auth-small">Have an account? <a href="/login">Sign in</a></p></section>`,
     });
   });
   app.get('/auth/link', onMainHost, async (req, res) => {
@@ -525,30 +670,42 @@ export function mountAccounts(app, { store, origin, mailer, formGuard = {}, brid
     const link = await accounts.peekLink(token);
     // Opening the link never uses it (mail scanners open links); the button does.
     page(res, {
-      title: link?.purpose === 'signup' ? 'Confirm your email' : 'Sign in',
+      title:
+        link?.purpose === 'signup' || link?.purpose === 'email' ? 'Confirm your email' : 'Sign in',
       active: '/account',
       content: link
-        ? `<section class="auth-card"><div class="eyebrow">W3BS ACCOUNT</div><h1>${link.purpose === 'signup' ? 'Confirm and <em>create.</em>' : 'Continue to <em>sign in.</em>'}</h1><p>${link.purpose === 'signup' ? 'Confirm' : 'Sign in with'} <strong>${e(link.email)}</strong>.</p><form class="auth-form" data-form="link"><input type="hidden" name="token" value="${e(token)}"><button class="button primary" type="submit">${link.purpose === 'signup' ? 'Confirm and create account' : 'Sign in'}</button><p class="form-status" role="status" aria-live="polite"></p></form></section>`
+        ? `<section class="auth-card"><div class="eyebrow">W3BS ACCOUNT</div><h1>${link.purpose === 'signup' ? 'Confirm and <em>create.</em>' : link.purpose === 'email' ? 'Confirm your <em>email.</em>' : 'Continue to <em>sign in.</em>'}</h1><p>${link.purpose === 'login' ? 'Sign in with' : 'Confirm'} <strong>${e(link.email)}</strong>.</p><form class="auth-form" data-form="link"><input type="hidden" name="token" value="${e(token)}"><button class="button primary" type="submit">${link.purpose === 'signup' ? 'Confirm and create account' : link.purpose === 'email' ? 'Confirm address' : 'Sign in'}</button><p class="form-status" role="status" aria-live="polite"></p></form></section>`
         : `<section class="auth-card"><div class="eyebrow">W3BS ACCOUNT</div><h1>This link has <em>expired.</em></h1><p>Links work once and for 20 minutes. <a href="/login">Request a new one</a>.</p></section>`,
     });
   });
   app.get('/account', onMainHost, async (req, res) => {
     const user = await currentUser(req);
     if (!user) return res.redirect(302, `/login?next=${encodeURIComponent(req.originalUrl)}`);
-    const [passkeys, grants, apps] = await Promise.all([
+    const [passkeys, grants, apps, coinpayId] = await Promise.all([
       accounts.listPasskeys(user.id),
       accounts.grants(user.id),
       accounts.listClients(user.id),
+      accounts.coinpayIdentity(user.id),
     ]);
+    const emailPanel = user.email
+      ? ''
+      : `<section class="inspector-panel"><h3>Email</h3><p>No confirmed email yet: you signed up with CoinPay, and CoinPay's address is not confirmed by W3BS. Add one to get sign-in links and fleet alerts; we send a link to confirm it.</p><form class="auth-form inline" data-form="add-email"><label class="input-label" for="add-email">Email</label><input id="add-email" name="email" type="email" autocomplete="email" required maxlength="254"${coinpayId?.email ? ` value="${e(coinpayId.email)}"` : ''}>${await guardFields('email')}<button class="button primary" type="submit">Send confirmation link</button><p class="form-status" role="status" aria-live="polite"></p></form></section>`;
+    const coinpayPanel = coinpay
+      ? `<section class="inspector-panel"><h3>CoinPay</h3>${coinpayNote(req)}${
+          coinpayId
+            ? `<p>Connected${coinpayId.name ? ` as <strong>${e(coinpayId.name)}</strong>` : ''}${coinpayId.email ? ` (${e(coinpayId.email)})` : ''}. You can sign in with CoinPay.</p><button class="small-button" type="button" data-action="coinpay-disconnect">Disconnect CoinPay</button>`
+            : '<p>Connect your CoinPay account to sign in to W3BS with CoinPay.</p><button class="button primary" type="button" data-action="coinpay-connect">Connect CoinPay</button>'
+        }</section>`
+      : '';
     const date = (value) => (value ? e(value.slice(0, 10)) : 'never');
     page(res, {
       title: 'Your account',
       active: '/account',
-      content: `<section class="page-head compact"><div class="eyebrow">W3BS ACCOUNT</div><h1>@${e(user.username)}</h1><p>${e(user.email)} · member since ${date(user.createdAt)}</p></section>${
+      content: `<section class="page-head compact"><div class="eyebrow">W3BS ACCOUNT</div><h1>@${e(user.username)}</h1><p>${user.email ? e(user.email) : 'No confirmed email'} · member since ${date(user.createdAt)}</p></section>${
         req.query.welcome !== undefined
           ? `<div class="callout"><strong>Welcome. Next, add a server.</strong><p>Open your fleet and make a join command, or run <code>w3bs login</code> then <code>w3bs fleet join &lt;token&gt;</code> on the server.${passkeys.length ? '' : ' Then add a passkey below: it signs you in with your fingerprint, face or device PIN, and cannot be phished.'}</p><a href="/fleet">Open your fleet →</a></div>`
           : ''
-      }<div class="account-grid"><section class="inspector-panel"><h3>Passkeys</h3>${
+      }<div class="account-grid">${emailPanel}${coinpayPanel}<section class="inspector-panel"><h3>Passkeys</h3>${
         passkeys.length
           ? `<ul class="account-list">${passkeys.map((key) => `<li><span><strong>${e(key.name)}</strong><span class="muted">added ${date(key.createdAt)} · last used ${date(key.lastUsedAt)}</span></span><button class="small-button" type="button" data-action="delete-passkey" data-id="${e(key.id)}">Remove</button></li>`).join('')}</ul>`
           : '<p>No passkeys yet.</p>'

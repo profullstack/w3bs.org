@@ -26,6 +26,7 @@ const tables = (serial) => `
   CREATE TABLE IF NOT EXISTS oauth_tokens (token_hash TEXT PRIMARY KEY, kind TEXT NOT NULL, family TEXT NOT NULL, client_id TEXT NOT NULL, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, scope TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, used INTEGER NOT NULL, revoked INTEGER NOT NULL);
   CREATE INDEX IF NOT EXISTS oauth_tokens_family ON oauth_tokens(family);
   CREATE INDEX IF NOT EXISTS oauth_tokens_user ON oauth_tokens(user_id);
+  CREATE TABLE IF NOT EXISTS coinpay_identities (sub TEXT PRIMARY KEY, user_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE, email TEXT, name TEXT, created_at TEXT NOT NULL, last_login_at TEXT);
   CREATE TABLE IF NOT EXISTS oauth_devices (device_hash TEXT PRIMARY KEY, user_code TEXT NOT NULL UNIQUE, client_id TEXT NOT NULL, scope TEXT NOT NULL, status TEXT NOT NULL, user_id TEXT REFERENCES users(id) ON DELETE CASCADE, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, last_poll_at TEXT, poll_interval INTEGER NOT NULL);`;
 export const ACCOUNT_SCHEMA = {
   sqlite: `PRAGMA foreign_keys=ON;${tables('INTEGER PRIMARY KEY AUTOINCREMENT')}`,
@@ -94,9 +95,42 @@ export function normalizeEmail(value) {
   const email = String(value ?? '')
     .trim()
     .toLowerCase();
-  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+  // .invalid (RFC 2606) can never receive mail; it also marks CoinPay placeholders.
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.endsWith('.invalid'))
     throw fail('INVALID_EMAIL', 'Enter a valid email address.');
   return email;
+}
+
+// Sign in with CoinPay. STANDING rule: an account is found by the CoinPay `sub` only
+// (coinpay_identities), never by email; CoinPay's email is unverified contact information
+// and is never stored as users.email. A brand-new CoinPay login creates an account whose
+// users.email is this placeholder (users.email is NOT NULL UNIQUE): it can receive no mail,
+// so it proves nothing, is never reported as verified, and the person can replace it with
+// an address they confirm by emailed link (startEmailAdd).
+const PLACEHOLDER_DOMAIN = 'coinpay.w3bs.invalid';
+export const placeholderEmail = (userId) => `${userId}@${PLACEHOLDER_DOMAIN}`;
+export const isPlaceholderEmail = (email) =>
+  typeof email === 'string' && email.toLowerCase().endsWith(`@${PLACEHOLDER_DOMAIN}`);
+// A public username from CoinPay's preferred_username or name, else a random one.
+function usernameCandidates(hint) {
+  const base = String(hint ?? '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 24)
+    .replace(/-$/, '');
+  const suffix = () => randomBytes(3).toString('hex');
+  const out = [];
+  if (base.length >= 3 && !RESERVED.has(base)) out.push(base);
+  if (base.length >= 3) out.push(`${base}-${suffix()}`);
+  out.push(
+    `coinpay-${suffix()}`,
+    `coinpay-${suffix()}`,
+    `coinpay-${randomBytes(6).toString('hex')}`,
+  );
+  return out;
 }
 function checkPassword(value) {
   if (typeof value !== 'string' || value.length < 10 || value.length > 256)
@@ -177,7 +211,10 @@ export function createAccounts(db, { origin, events }) {
     row && {
       id: row.id,
       username: row.username,
-      email: row.email,
+      // null for an account CoinPay created until its owner confirms a real address.
+      email: isPlaceholderEmail(row.email) ? null : row.email,
+      // Every real users.email was proven by an emailed link; the placeholder proves nothing.
+      emailVerified: !isPlaceholderEmail(row.email),
       hasPassword: Boolean(row.password_hash),
       createdAt: row.created_at,
     };
@@ -270,6 +307,20 @@ export function createAccounts(db, { origin, events }) {
       username: user.username,
     };
   }
+  // An account CoinPay created adds its first real address: a link to that address proves
+  // it. Never says whether the address already has an account (the link would just fail).
+  async function startEmailAdd(userId, value) {
+    const email = normalizeEmail(value);
+    const user = await userById(userId);
+    if (!user || !isPlaceholderEmail(user.email))
+      throw fail('EMAIL_SET', 'This account already has a confirmed email address.', 409);
+    return {
+      email,
+      purpose: 'email',
+      link: await issueLink(email, 'email', { userId }),
+      username: user.username,
+    };
+  }
   async function peekLink(value) {
     if (typeof value !== 'string' || value.length > 100) return undefined;
     const row = await db.get(
@@ -321,6 +372,17 @@ export function createAccounts(db, { origin, events }) {
           user.created_at,
         ]);
         return { user: publicUser(user), created: true };
+      }
+      if (row.purpose === 'email') {
+        // Confirms an address for an account CoinPay created (startEmailAdd).
+        const { userId } = JSON.parse(row.data);
+        if (user)
+          throw fail('EMAIL_TAKEN', 'That address already belongs to another W3BS account.', 409);
+        const owner = await tx.get('SELECT * FROM users WHERE id = ?', [userId]);
+        if (!owner || !isPlaceholderEmail(owner.email))
+          throw fail('INVALID_LINK', 'This link is invalid or has expired.');
+        await tx.run('UPDATE users SET email = ? WHERE id = ?', [row.email, userId]);
+        return { user: publicUser({ ...owner, email: row.email }), created: false };
       }
       if (!user) throw fail('INVALID_LINK', 'This link is invalid or has expired.');
       // Signing in by email is a success, so it clears any password lockout.
@@ -883,8 +945,135 @@ export function createAccounts(db, { origin, events }) {
       userId,
     ]);
 
+  // ---- Sign in with CoinPay (relying party) -----------------------------------
+  // The pending request lives in auth_challenges (single use, five minutes); the browser
+  // holds only its id in a cookie, so the state must come back to the browser that began.
+  async function coinpayBegin({ mode, next, userId = null, state, nonce, verifier }) {
+    if (mode === 'link' && !userId) throw fail('SIGNED_OUT', 'Sign in first.', 401);
+    return saveChallenge(
+      JSON.stringify({ state, nonce, verifier, next }),
+      mode === 'link' ? 'coinpay-link' : 'coinpay-login',
+      mode === 'link' ? userId : null,
+    );
+  }
+  async function coinpayTake(id) {
+    if (typeof id !== 'string' || id.length > 64) return undefined;
+    return db.transaction(async (tx) => {
+      const row = await tx.get(
+        "SELECT * FROM auth_challenges WHERE id = ? AND purpose IN ('coinpay-login', 'coinpay-link') AND expires_at > ?",
+        [id, nowIso()],
+      );
+      await tx.run('DELETE FROM auth_challenges WHERE id = ?', [id]);
+      if (!row) return undefined;
+      return {
+        mode: row.purpose === 'coinpay-link' ? 'link' : 'login',
+        userId: row.user_id,
+        ...JSON.parse(row.challenge),
+      };
+    });
+  }
+  const coinpayIdentity = async (userId) =>
+    db.get('SELECT sub, email, name, created_at FROM coinpay_identities WHERE user_id = ?', [
+      userId,
+    ]);
+  // A CoinPay login: the account bound to `sub`, else a brand-new one. Never by email.
+  async function coinpayLogin({ sub, email, name }) {
+    if (typeof sub !== 'string' || !sub || sub.length > 200)
+      throw fail('COINPAY_FAILED', 'CoinPay did not say who you are.');
+    const contact = typeof email === 'string' ? email.slice(0, 254) : null;
+    const label = typeof name === 'string' ? name.slice(0, 120) : null;
+    const bound = await db.get('SELECT user_id FROM coinpay_identities WHERE sub = ?', [sub]);
+    if (bound) {
+      await db.run(
+        'UPDATE coinpay_identities SET email = ?, name = ?, last_login_at = ? WHERE sub = ?',
+        [contact, label, nowIso(), sub],
+      );
+      await db.run('INSERT INTO login_attempts(user_id, ok, at) VALUES (?, 1, ?)', [
+        bound.user_id,
+        nowIso(),
+      ]);
+      return { user: publicUser(await userById(bound.user_id)), created: false };
+    }
+    const result = await db.transaction(async (tx) => {
+      if (await tx.get('SELECT user_id FROM coinpay_identities WHERE sub = ?', [sub]))
+        return undefined;
+      const id = token(16);
+      let username;
+      for (const candidate of usernameCandidates(label)) {
+        if (!(await tx.get('SELECT id FROM users WHERE username = ?', [candidate]))) {
+          username = candidate;
+          break;
+        }
+      }
+      if (!username) throw fail('COINPAY_FAILED', 'Could not pick a username. Try again.');
+      const user = {
+        id,
+        username,
+        email: placeholderEmail(id),
+        password_hash: null,
+        created_at: nowIso(),
+      };
+      await tx.run('INSERT INTO users VALUES (?, ?, ?, ?, ?)', [
+        user.id,
+        user.username,
+        user.email,
+        null,
+        user.created_at,
+      ]);
+      await tx.run('INSERT INTO coinpay_identities VALUES (?, ?, ?, ?, ?, ?)', [
+        sub,
+        id,
+        contact,
+        label,
+        user.created_at,
+        user.created_at,
+      ]);
+      return { user: publicUser(user), created: true };
+    });
+    if (!result) return coinpayLogin({ sub, email, name });
+    await events?.record('signup_completed', result.user.id, { method: 'coinpay' });
+    return result;
+  }
+  // "Connect CoinPay" for the signed-in account. Never moves a sub between accounts.
+  async function coinpayLink(userId, { sub, email, name }) {
+    const bound = await db.get('SELECT user_id FROM coinpay_identities WHERE sub = ?', [sub]);
+    if (bound) return bound.user_id === userId ? 'already_linked' : 'sub_taken';
+    if (await coinpayIdentity(userId)) return 'user_has_other';
+    try {
+      await db.run('INSERT INTO coinpay_identities VALUES (?, ?, ?, ?, ?, NULL)', [
+        sub,
+        userId,
+        typeof email === 'string' ? email.slice(0, 254) : null,
+        typeof name === 'string' ? name.slice(0, 120) : null,
+        nowIso(),
+      ]);
+    } catch {
+      return 'sub_taken';
+    }
+    return 'linked';
+  }
+  // Refused when CoinPay is the only way in: no confirmed address, password or passkey.
+  async function coinpayUnlink(userId) {
+    const user = await userById(userId);
+    const passkey = await db.get('SELECT id FROM passkeys WHERE user_id = ?', [userId]);
+    if (isPlaceholderEmail(user?.email) && !user?.password_hash && !passkey)
+      throw fail(
+        'LAST_CREDENTIAL',
+        'CoinPay is the only way into this account. Add an email, a password or a passkey first.',
+        409,
+      );
+    await db.run('DELETE FROM coinpay_identities WHERE user_id = ?', [userId]);
+  }
+
   return {
     seedClients,
+    startEmailAdd,
+    coinpayBegin,
+    coinpayTake,
+    coinpayIdentity,
+    coinpayLogin,
+    coinpayLink,
+    coinpayUnlink,
     createSession,
     sessionUser,
     endSession,
