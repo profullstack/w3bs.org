@@ -41,8 +41,8 @@ export function createApp({
   socialFetch = fetch,
   // /browse and /api/browse: Moshpit names over DoH, pit.world gateways, discovery documents.
   browser = createBrowser(),
-  // W3BS Net fronts pit.world search and manually approved Moshpit gateway names.
-  net = createNet(),
+  // The independent W3BS registry, event relay, federation outbox and Moshpit backfill.
+  net,
   // W3BS Training workspaces need PostgreSQL and a master key (W3BS_TRAINING_MASTER_KEY, from the
   // vault); without them /training/app and /api/v1/training answer "not enabled".
   training = {
@@ -59,6 +59,7 @@ export function createApp({
   if (!store) throw new Error('createApp requires an opened store; use startServer or openStore.');
   const app = express();
   const origin = new URL(publicOrigin).origin;
+  net ??= createNet({ store, origin });
   const hosts = new Set(allowedHosts.map((host) => host.trim().toLowerCase()));
   hosts.add(new URL(origin).hostname);
   app.disable('x-powered-by');
@@ -116,7 +117,6 @@ export function createApp({
     next();
   });
   app.use(express.json({ limit: '256kb', strict: true }));
-  net.mount(app);
   const token = (req) => /^Bearer (.+)$/.exec(req.headers.authorization || '')?.[1];
   const invoke = (req, name, args) =>
     dispatch(store, name, args, { token: token(req), publishToken });
@@ -147,6 +147,7 @@ export function createApp({
       mcp: `${origin}/mcp`,
       schemas: [`${origin}/schemas/manifest.json`],
       trust: `${origin}/api/trust`,
+      net: `${origin}/.well-known/w3bs-net.json`,
       accounts: {
         signup: `${origin}/signup`,
         oauth: `${origin}/.well-known/oauth-authorization-server`,
@@ -327,6 +328,8 @@ export function createApp({
     bridgeClients,
     ...(coinpay !== undefined ? { coinpay } : {}),
   });
+  net.mount(app, { helpers });
+  app.locals.net = net;
   // WebSocket upgrades (fleet screens) skip Express; startServer hands them to this.
   app.locals.fleet = mountFleet(app, { store, origin, helpers, fleetbar });
   mountSocial(app, { store, helpers, config: social, fetchImpl: socialFetch });
@@ -393,7 +396,7 @@ export function createApp({
           `- [Training](${origin}/training): teach agents by doing the task yourself`,
           `- [A/B testing](${origin}/ab-testing)`,
           `- [Social](${origin}/social)`,
-          `- [W3BS Net](${origin}/net): moderated Moshpit gateway and search`,
+          `- [W3BS Net](${origin}/net): W3BS-owned namespace registry, moderated event relay and opt-in federation`,
           '',
           '## Policy',
           `- [Governance](${origin}/governance), [Terms](${origin}/terms), [Privacy](${origin}/privacy)`,
@@ -526,6 +529,7 @@ export async function startServer(options = {}) {
     store,
     close: async () => {
       scanner?.stop();
+      app.locals.net.stop?.();
       app.locals.fleet.close();
       await app.locals.training.close();
       server.closeAllConnections();

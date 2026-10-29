@@ -13,6 +13,9 @@ The service is deployment-ready source. Production launch requires publishing th
 | `DATABASE_URL`       | PostgreSQL connection string. On Railway, `${{Postgres.DATABASE_URL}}` from the self-hosted Postgres service            |
 | `W3BS_DATA_DIR`      | Only used without `DATABASE_URL`: SQLite directory for local development                                                 |
 | `W3BS_PUBLISH_TOKEN` | Random administrative secret, at least 32 characters; absent means read-only                                             |
+| `W3BS_NET_OPERATOR_USERNAMES` | Comma-separated W3BS usernames allowed to moderate registrations and manage federation peers           |
+| `W3BS_NET_HOSTED_TLDS` | Comma-separated namespace suffixes routed through W3BS; DNS wildcard, proxy and TLS must be configured for each |
+| `W3BS_NET_SYNC` | Set to `off` to pause the production backfill and federation worker; otherwise it starts with W3BS                      |
 | `W3BS_TRUST_FILE`    | Optional path to a mounted operator-managed trust file; otherwise bundled example public keys                            |
 | `RESEND_API_KEY`     | Sends account email (signup and sign-in links). w3bs.org is a Resend domain; without it production sends nothing        |
 | `W3BS_MAIL_FROM`     | `W3BS <noreply@w3bs.org>`                                                                                                |
@@ -47,3 +50,5 @@ The service is initially safe to run read-only. Publishing requires explicit adm
 ## Current operational limits
 
 The server bounds request and response sizes and verifies Host and Origin headers. Platform-level request limiting should be configured for an internet-facing service. No billing, arbitrary tool execution, third-party messages, remote model calls or device control is enabled by this stack.
+
+W3BS Net stores its primary registry in separate `net_*` tables. See `docs/w3bs-net.md` for the public API, OAuth 2.1/CLI operator access and peer setup. A name host uses `<label>.<tld>.w3bs.org`; each opted-in namespace suffix needs its own DNS wildcard, edge proxy host and TLS wildcard certificate.

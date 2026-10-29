@@ -9,6 +9,7 @@ import { TASKS_SCHEMA, createTasks } from './tasks.mjs';
 import { SOCIAL_SCHEMA, createSocial } from './social.mjs';
 import { EVENT_SCHEMA, createEvents } from './events.mjs';
 import { PUBLISHING_SCHEMA, createPublishing } from './publishing.mjs';
+import { NET_SCHEMA, createNetworkStore } from './net-store.mjs';
 
 export const ROOT = fileURLToPath(new URL('../', import.meta.url));
 
@@ -46,6 +47,7 @@ async function openSqlite(path) {
   db.exec(SOCIAL_SCHEMA.sqlite);
   db.exec(EVENT_SCHEMA.sqlite);
   db.exec(PUBLISHING_SCHEMA.sqlite);
+  db.exec(NET_SCHEMA.sqlite);
   const bind = (target) => ({
     all: async (sql, params = []) => target.prepare(sql).all(...params),
     get: async (sql, params = []) => target.prepare(sql).get(...params),
@@ -101,6 +103,7 @@ async function openPostgres(connectionString) {
   await pool.query(SOCIAL_SCHEMA.postgres);
   await pool.query(EVENT_SCHEMA.postgres);
   await pool.query(PUBLISHING_SCHEMA.postgres);
+  await pool.query(NET_SCHEMA.postgres);
   return {
     ...bind(pool),
     dialect: 'postgres',
@@ -135,6 +138,8 @@ export async function openStore({
       readFileSync(process.env.W3BS_TRUST_FILE || resolve(ROOT, 'fixtures/trust.json'), 'utf8'),
     );
   const db = databaseUrl ? await openPostgres(databaseUrl) : await openSqlite(path);
+  const network = createNetworkStore(db, { instance: process.env.PUBLIC_ORIGIN || 'https://w3bs.org' });
+  await network.ensureDefaults();
   async function revoked(id, tx = db) {
     return Boolean(await tx.get('SELECT id FROM revocations WHERE id = ?', [id]));
   }
@@ -424,6 +429,7 @@ export async function openStore({
     events,
     social: createSocial(db),
     publishing,
+    network,
     trust,
     dialect: db.dialect,
     close: () => db.close(),

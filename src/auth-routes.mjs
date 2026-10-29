@@ -28,6 +28,7 @@ import { escapeHtml as e, FOOTER_SCRIPT_SRC, pageShell } from './site.mjs';
 export const OPEN_CORS = [
   /^\/oauth\/(token|revoke|device_authorization)$/,
   /^\/\.well-known\/oauth-authorization-server$/,
+  /^\/api\/net\/v1\/(registry|events|instances|resolve\/[^/]+|federation\/events)$/,
 ];
 export const bearerOf = (req) =>
   /^Bearer ([A-Za-z0-9_-]{1,100})$/.exec(req.headers.authorization || '')?.[1];
