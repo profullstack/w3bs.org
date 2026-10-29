@@ -39,6 +39,11 @@ async function refresh() {
   const peers = data.peers.map((item) => `<article class="net-row"><div><strong>${escape(item.endpoint)}</strong><p class="net-row-meta">${escape(item.kind)} · ${escape(item.status)} · sent cursor ${escape(item.cursor)} · received cursor ${escape(item.inboundCursor)} · last seen ${escape(item.lastSeenAt || 'never')}</p>${item.lastError ? `<p class="net-row-meta">Last error: ${escape(item.lastError)}</p>` : ''}</div><button class="button" data-remove-peer="${escape(item.id)}">Remove</button></article>`).join('');
   peerList.innerHTML = `${peers || '<p class="muted">No remote W3BS peers are opted in yet.</p>'}<article class="net-row"><div><strong>https://pit.moshcode.sh</strong><p class="net-row-meta">Moshpit · public read-only backfill source</p></div></article>`;
 
+  const instances = document.querySelector('#net-instances');
+  instances.innerHTML = data.instances.length
+    ? data.instances.map((item) => `<article class="net-row"><div><strong><a class="inline-link" href="${escape(item.instance)}">${escape(item.instance)}</a></strong><p class="net-row-meta">${item.local ? 'This primary instance' : item.optedIn ? 'Opted-in peer' : 'Announced through federation'} · ${escape(item.protocol || 'announcement pending')}</p></div></article>`).join('')
+    : '<p class="muted">No W3BS instances have announced yet.</p>';
+
   const backfill = document.querySelector('#net-backfill');
   backfill.textContent = data.backfill.length
     ? data.backfill.map((item) => `${item.source} · ${item.kind}: ${item.count} · updated ${item.importedAt}`).join(' | ')
@@ -141,6 +146,7 @@ document.getElementById('net-backfill-now').addEventListener('click', async (eve
 refresh().catch((error) => {
   document.querySelector('#net-queue').textContent = error.message;
   document.querySelector('#net-peers').textContent = error.message;
+  document.querySelector('#net-instances').textContent = error.message;
   document.querySelector('#net-backfill').textContent = error.message;
 });
 setInterval(() => refresh().catch(() => {}), 15_000);

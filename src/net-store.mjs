@@ -165,7 +165,12 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
         await announce(tx, {
           type: 'instance.announce',
           subject: instance,
-          data: { instance, protocol: 'W3BS-NET-1-draft-1', registry: `${instance}/api/net/v1/registry` },
+          data: {
+            instance,
+            protocol: 'W3BS-NET-1-draft-1',
+            registry: `${instance}/api/net/v1/registry`,
+            events: `${instance}/api/net/v1/events`,
+          },
         });
       for (const tld of ['agent', 'whatever']) {
         const namespace = await tx.get('SELECT tld FROM net_tlds WHERE tld = ?', [tld]);
@@ -556,6 +561,50 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
     }));
   }
 
+  async function knownInstances() {
+    const direct = (await peerList()).filter((peer) => peer.kind === 'w3bs' && peer.status === 'active');
+    const directByEndpoint = new Map(direct.map((peer) => [peer.endpoint, peer]));
+    const known = new Map([
+      [instance, {
+        instance,
+        protocol: 'W3BS-NET-1-draft-1',
+        registry: `${instance}/api/net/v1/registry`,
+        events: `${instance}/api/net/v1/events`,
+        local: true,
+        optedIn: false,
+      }],
+    ]);
+    for (const peer of direct) known.set(peer.endpoint, {
+      instance: peer.endpoint,
+      protocol: null,
+      registry: `${peer.endpoint}/api/net/v1/registry`,
+      events: `${peer.endpoint}/api/net/v1/events`,
+      local: false,
+      optedIn: true,
+      lastSeenAt: peer.lastSeenAt,
+    });
+    for (const row of await federationEvents()) {
+      const event = parse(row.payload);
+      if (event?.type !== 'instance.announce') continue;
+      const endpoint = event.data?.instance;
+      let origin;
+      try { origin = new URL(endpoint).origin; } catch { continue; }
+      if (origin !== endpoint || endpoint !== event.instance || endpoint !== event.subject) continue;
+      if (endpoint === instance) continue;
+      const peer = directByEndpoint.get(endpoint);
+      known.set(endpoint, {
+        instance: endpoint,
+        protocol: event.data?.protocol ?? null,
+        registry: event.data?.registry ?? `${endpoint}/api/net/v1/registry`,
+        events: event.data?.events ?? `${endpoint}/api/net/v1/events`,
+        local: false,
+        optedIn: Boolean(peer),
+        lastSeenAt: peer?.lastSeenAt ?? row.imported_at,
+      });
+    }
+    return [...known.values()].sort((left, right) => Number(right.local) - Number(left.local) || left.instance.localeCompare(right.instance));
+  }
+
   async function addPeer({ endpoint, outboundToken }) {
     const inboundToken = randomUUID() + randomUUID();
     const existing = await db.get('SELECT id FROM net_peers WHERE endpoint = ?', [endpoint]);
@@ -631,6 +680,10 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
     );
   }
 
+  async function markPeerActivity(id) {
+    await db.run('UPDATE net_peers SET last_seen_at = ?, last_error = NULL WHERE id = ?', [now(), id]);
+  }
+
   async function disablePeer(id) {
     await db.run("UPDATE net_peers SET status = 'disabled' WHERE id = ?", [id]);
     await db.run('DELETE FROM net_outbox WHERE peer_id = ?', [id]);
@@ -649,7 +702,8 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
       if (Number.isSafeInteger(sequence) && sequence >= 0) cursor = Math.max(cursor, sequence);
       let sourceMatches = false;
       try {
-        sourceMatches = Boolean(event?.instance) && new URL(event.instance).origin === peer.endpoint;
+        const source = new URL(event?.instance ?? '');
+        sourceMatches = source.protocol === 'https:' && source.origin === event.instance;
       } catch {
         sourceMatches = false;
       }
@@ -658,7 +712,7 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
         typeof event.id !== 'string' ||
         !/^[a-f0-9]{64}$/.test(event.id) ||
         typeof event.type !== 'string' ||
-        !['namespace.activated', 'namespace.suspended', 'name.activated', 'name.suspended'].includes(event.type) ||
+        !['instance.announce', 'namespace.activated', 'namespace.suspended', 'name.activated', 'name.suspended'].includes(event.type) ||
         typeof event.subject !== 'string' ||
         !Number.isSafeInteger(sequence) ||
         sequence < 0 ||
@@ -679,6 +733,11 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
       if ((tld && !safeTld(tld)) || (name && !safeName(name))) continue;
       if ((tld && event.subject.toLowerCase() !== `.${tld}`) ||
           (name && event.subject.toLowerCase() !== name.toLowerCase())) continue;
+      if (event.type === 'instance.announce') {
+        let announced;
+        try { announced = new URL(event.data.instance).origin; } catch { continue; }
+        if (announced !== event.instance || announced !== event.subject || typeof event.data.protocol !== 'string') continue;
+      }
       const body = {
         type: event.type,
         subject: event.subject,
@@ -689,11 +748,30 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
       };
       if (hash(json(body)) !== event.id) continue;
       const foreignId = `${event.instance}/${event.id}`;
-      await db.run(
-        'INSERT INTO net_foreign_records(source, kind, foreign_id, payload, imported_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (source, kind, foreign_id) DO NOTHING',
-        [event.instance, 'federation-event', foreignId, json(event), now()],
-      );
-      accepted++;
+      const imported = await db.transaction(async (tx) => {
+        const existing = await tx.get(
+          'SELECT event_id FROM net_events WHERE event_id = ?',
+          [event.id],
+        );
+        await tx.run(
+          'INSERT INTO net_foreign_records(source, kind, foreign_id, payload, imported_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (source, kind, foreign_id) DO NOTHING',
+          [event.instance, 'federation-event', foreignId, json(event), now()],
+        );
+        if (existing) return false;
+        await tx.run(
+          'INSERT INTO net_events(event_id, type, subject, payload, actor_id, instance, created_at, public_event) VALUES (?, ?, ?, ?, ?, ?, ?, 1) ON CONFLICT (event_id) DO NOTHING',
+          [event.id, event.type, event.subject, json(event.data), event.actor ?? null, event.instance, event.createdAt],
+        );
+        const stored = await tx.get('SELECT seq FROM net_events WHERE event_id = ?', [event.id]);
+        const peers = await tx.all("SELECT id FROM net_peers WHERE kind = 'w3bs' AND status = 'active' AND id <> ?", [peer.id]);
+        for (const destination of peers)
+          await tx.run(
+            'INSERT INTO net_outbox(peer_id, event_id, next_attempt_at) VALUES (?, ?, ?) ON CONFLICT (peer_id, event_id) DO NOTHING',
+            [destination.id, event.id, now()],
+          );
+        return Boolean(stored);
+      });
+      if (imported) accepted++;
     }
     return { accepted, cursor };
   }
@@ -739,6 +817,7 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
     moderate,
     events,
     peerList,
+    knownInstances,
     addPeer,
     disablePeer,
     peersForWorker,
@@ -747,6 +826,7 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
     markDeliveryFailed,
     markPeerSeen,
     markPeerReceived,
+    markPeerActivity,
     incomingPeer,
     receiveEvents,
     importRecord,

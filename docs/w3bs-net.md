@@ -9,7 +9,7 @@ The initial open W3BS namespaces are `.agent` and `.whatever`. W3BS reviews ever
 - `GET /api/net/v1/registry?q=...` returns local W3BS names first, then opted-in federation announcements, then the Moshpit backfill. The response labels each record with its source.
 - `GET /api/net/v1/resolve/:name` resolves an exact name with the same local-first precedence.
 - `GET /api/net/v1/events?since=0&limit=100` reads the append-only public event log. Keep the returned `sequence` as a cursor and request later events with `since`.
-- `GET /api/net/v1/instances` and `GET /.well-known/w3bs-net.json` publish this instance and its opted-in peers.
+- `GET /api/net/v1/instances` and `GET /.well-known/w3bs-net.json` publish this instance, discovered instance announcements and opted-in peers.
 - `GET /.well-known/w3bs-net.json` describes the instance and its endpoints.
 - `POST /api/net/v1/federation/events` receives public announcements from an opted-in W3BS peer. It requires that peer's inbound bearer token. Imported peer announcements are attributed to their source and never become W3BS-owned registrations.
 
@@ -19,7 +19,9 @@ Local user requests use `POST /api/net/v1/tlds` and `POST /api/net/v1/names`. A 
 
 Set `W3BS_NET_OPERATOR_USERNAMES` to a comma-separated list of W3BS usernames. Operators sign in to `/net/operator` with the browser session or use a CLI bearer from the existing W3BS OAuth 2.1 device authorization flow. The operator API controls moderation, peer opt-in, peer removal and backfill.
 
-To connect two W3BS instances, each operator adds the other instance's HTTPS origin and the other instance's inbound token. The console creates a local inbound token once; share it with the remote operator and have them save it as their outbound token. Each instance sends public registration events to its opted-in peers and pulls their public event log from its stored cursor. Delivery retries with bounded exponential backoff.
+To connect two W3BS instances, each operator adds the other instance's HTTPS origin and the other instance's inbound token. The console creates a local inbound token once; share it with the remote operator and have them save it as their outbound token. Instances announce themselves and their public event streams. Each instance pulls from its direct peers, records the cursor, and relays new public events to its other opted-in peers. Delivery retries with bounded exponential backoff.
+
+Peer delivery is authenticated with exchanged bearer tokens. Event IDs are SHA-256 integrity hashes, not cryptographic origin signatures, so operators should only connect peers they trust to relay accurate origin attribution.
 
 The production daemon also imports public Moshpit allocation history and names in bounded pages. Moshpit records are stored with `https://pit.moshcode.sh` provenance and do not grant W3BS ownership. The importer reads Moshpit's public APIs; it does not attempt to claim names on behalf of users or mutate the Moshpit registry.
 

@@ -105,7 +105,7 @@ function searchMarkup(query, local, backfill, webResults, error) {
 }
 
 function operatorMarkup(username) {
-  return `<section class="page-head compact"><div class="eyebrow">W3BS NET · OPERATOR</div><h1>Network control room.</h1><p>Signed in as <strong>@${e(username)}</strong>. Review every local registration, keep no-sale policy on, and manage opted-in federation peers.</p><div class="actions"><a class="button" href="/net">Back to W3BS Net</a><a class="text-link" href="/api/net/v1/operator/overview">Operator API ↗</a></div></section><div class="net-console"><section class="net-block"><h2>Moderation queue</h2><p class="net-help">New namespace and name requests stay private until approved. Approvals publish an immutable event to W3BS Net and enqueue it for every active federation peer.</p><div id="net-queue" class="net-queue"><p class="net-status">Loading queue…</p></div></section><section class="net-block"><h2>Active registrations</h2><p class="net-help">Suspend a local namespace or name to stop resolving it and announce the change to peers. Suspended entries can be restored here.</p><div id="net-managed" class="net-queue"><p class="net-status">Loading registrations…</p></div></section><section class="net-block"><h2>Open a namespace</h2><form id="net-tld-form"><label for="net-tld">Namespace label</label><input id="net-tld" name="tld" placeholder="example" maxlength="63" required><label><input type="checkbox" name="open" value="1"> Let any signed-in W3BS account request names under this namespace</label><button class="button primary" type="submit">Submit for moderation</button><p class="net-status" data-status></p></form></section><section class="net-block"><h2>Register a name</h2><form id="net-name-form"><label for="net-name">Name</label><input id="net-name" name="name" placeholder="myname.agent" required maxlength="127"><label for="net-target">Optional HTTPS destination</label><input id="net-target" name="target" type="url" placeholder="https://example.org"><button class="button primary" type="submit">Submit for moderation</button><p class="net-status" data-status></p></form></section><section class="net-block"><h2>Federation peers</h2><p class="net-help">Each W3BS peer is opted in by an operator. Exchange the one-time inbound token shown after adding a peer; that token authenticates delivery from that peer to this instance. Moshpit is a read-only backfill source.</p><form id="net-peer-form"><label for="net-peer-url">Peer base URL</label><input id="net-peer-url" name="endpoint" type="url" placeholder="https://net.example.org" required><label for="net-peer-token">Peer’s inbound token</label><input id="net-peer-token" name="outboundToken" autocomplete="off" required><button class="button primary" type="submit">Opt in to peer</button><p class="net-status" data-status></p><div id="net-peer-secret" hidden></div></form><div id="net-peers" class="net-list"><p class="net-status">Loading peers…</p></div></section><section class="net-block"><h2>Moshpit backfill</h2><p class="net-help">The daemon imports public namespaces, names and allocation history from pit.moshcode.sh. Imported records remain attributed as backfill and do not become W3BS-owned registrations.</p><div id="net-backfill" class="net-status">Loading backfill status…</div><button id="net-backfill-now" class="button" type="button">Run backfill now</button></section><p class="net-help">Automation uses the existing W3BS OAuth 2.1 authorization server and <code>w3bs login</code> device flow. The CLI bearer can manage namespaces, names and federation peers only when its W3BS account is in <code>W3BS_NET_OPERATOR_USERNAMES</code>.</p></div><script type="module" src="/assets/net-operator.js"></script>`;
+  return `<section class="page-head compact"><div class="eyebrow">W3BS NET · OPERATOR</div><h1>Network control room.</h1><p>Signed in as <strong>@${e(username)}</strong>. Review every local registration, keep no-sale policy on, and manage opted-in federation peers.</p><div class="actions"><a class="button" href="/net">Back to W3BS Net</a><a class="text-link" href="/api/net/v1/operator/overview">Operator API ↗</a></div></section><div class="net-console"><section class="net-block"><h2>Moderation queue</h2><p class="net-help">New namespace and name requests stay private until approved. Approvals publish an immutable event to W3BS Net and enqueue it for every active federation peer.</p><div id="net-queue" class="net-queue"><p class="net-status">Loading queue…</p></div></section><section class="net-block"><h2>Active registrations</h2><p class="net-help">Suspend a local namespace or name to stop resolving it and announce the change to peers. Suspended entries can be restored here.</p><div id="net-managed" class="net-queue"><p class="net-status">Loading registrations…</p></div></section><section class="net-block"><h2>Open a namespace</h2><form id="net-tld-form"><label for="net-tld">Namespace label</label><input id="net-tld" name="tld" placeholder="example" maxlength="63" required><label><input type="checkbox" name="open" value="1"> Let any signed-in W3BS account request names under this namespace</label><button class="button primary" type="submit">Submit for moderation</button><p class="net-status" data-status></p></form></section><section class="net-block"><h2>Register a name</h2><form id="net-name-form"><label for="net-name">Name</label><input id="net-name" name="name" placeholder="myname.agent" required maxlength="127"><label for="net-target">Optional HTTPS destination</label><input id="net-target" name="target" type="url" placeholder="https://example.org"><button class="button primary" type="submit">Submit for moderation</button><p class="net-status" data-status></p></form></section><section class="net-block"><h2>Federation peers</h2><p class="net-help">Each W3BS peer is opted in by an operator. Exchange the one-time inbound token shown after adding a peer; that token authenticates delivery from that peer to this instance. Peer event streams relay public announcements across connected instances. Moshpit remains the read-only backfill source.</p><h3>Known network instances</h3><div id="net-instances" class="net-list"><p class="net-status">Loading instances…</p></div><form id="net-peer-form"><label for="net-peer-url">Peer base URL</label><input id="net-peer-url" name="endpoint" type="url" placeholder="https://net.example.org" required><label for="net-peer-token">Peer’s inbound token</label><input id="net-peer-token" name="outboundToken" autocomplete="off" required><button class="button primary" type="submit">Opt in to peer</button><p class="net-status" data-status></p><div id="net-peer-secret" hidden></div></form><div id="net-peers" class="net-list"><p class="net-status">Loading peers…</p></div></section><section class="net-block"><h2>Moshpit backfill</h2><p class="net-help">The daemon imports public namespaces, names and allocation history from pit.moshcode.sh. Imported records remain attributed as backfill and do not become W3BS-owned registrations.</p><div id="net-backfill" class="net-status">Loading backfill status…</div><button id="net-backfill-now" class="button" type="button">Run backfill now</button></section><p class="net-help">Automation uses the existing W3BS OAuth 2.1 authorization server and <code>w3bs login</code> device flow. The CLI bearer can manage namespaces, names and federation peers only when its W3BS account is in <code>W3BS_NET_OPERATOR_USERNAMES</code>.</p></div><script type="module" src="/assets/net-operator.js"></script>`;
 }
 
 export function createNet({
@@ -438,7 +438,7 @@ export function createNet({
       federationInbox: `${root}/api/net/v1/federation/events`,
       operator: `${root}/net/operator`,
       authentication: `${root}/.well-known/oauth-authorization-server`,
-      federation: 'Opt-in peer delivery of public, moderated registration events.',
+      federation: 'Opt-in peer delivery and onward relay of public, moderated registration events and instance announcements.',
       backfill: `${MOSHPIT}/api/moshpit/log`,
     }));
 
@@ -468,9 +468,11 @@ export function createNet({
       const peers = (await network.peerList())
         .filter((peer) => peer.kind === 'w3bs' && peer.status === 'active')
         .map((peer) => ({ instance: peer.endpoint, lastSeenAt: peer.lastSeenAt }));
+      const known = await network.knownInstances();
       res.json({
         local: { instance: root, wellKnown: `${root}/.well-known/w3bs-net.json`, registry: `${root}/api/net/v1/registry` },
         optedIn: peers,
+        known,
       });
     });
     app.options('/api/net/v1/federation/events', (_req, res) => res.status(204).end());
@@ -479,7 +481,7 @@ export function createNet({
       const peer = await network.incomingPeer(token);
       if (!peer) throw new W3bsError('FEDERATION_AUTH_REQUIRED', 'Unknown federation peer token.', 401);
       try {
-        if (req.body?.instance && new URL(req.body.instance).origin !== peer.endpoint)
+        if (typeof req.body?.instance !== 'string' || new URL(req.body.instance).origin !== peer.endpoint)
           throw new W3bsError('FEDERATION_INSTANCE_MISMATCH', 'Event source does not match the configured peer.', 403);
       } catch (error) {
         if (error instanceof W3bsError) throw error;
@@ -487,7 +489,7 @@ export function createNet({
       }
       const batch = Array.isArray(req.body?.events) ? req.body.events.slice(0, 100) : [];
       const result = await network.receiveEvents(peer, batch);
-      await network.markPeerReceived(peer.id, result.cursor);
+      await network.markPeerActivity(peer.id);
       res.status(202).json({ accepted: result.accepted, source: peer.endpoint, storedAs: 'federated announcements' });
     });
 
@@ -518,13 +520,14 @@ export function createNet({
 
     app.get('/api/net/v1/operator/overview', async (req, res) => {
       await requireOperator(req);
-      const [queue, peers, backfill] = await Promise.all([
+      const [queue, peers, backfill, instances] = await Promise.all([
         network.pending(),
         network.peerList(),
         network.backfillSummary(),
+        network.knownInstances(),
       ]);
       const managed = await network.managed();
-      res.json({ instance: root, queue, managed, peers, backfill, hostedTlds: hostedTlds(), noSales: true, operatorUsernamesConfigured: operators().size });
+      res.json({ instance: root, queue, managed, peers, instances, backfill, hostedTlds: hostedTlds(), noSales: true, operatorUsernamesConfigured: operators().size });
     });
     app.post('/api/net/v1/operator/moderate', async (req, res) => {
       const user = await requireOperator(req);
