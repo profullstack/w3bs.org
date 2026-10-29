@@ -51,7 +51,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.72.0"
+      "latest_version": "0.73.0"
     },
     {
       "id": "mynaposter.com/myna",
@@ -69,7 +69,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.47.0"
+      "latest_version": "0.50.1"
     },
     {
       "id": "sh1pt.com/sh1pt",
@@ -105,7 +105,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.7.0"
+      "latest_version": "0.15.0"
     },
     {
       "id": "logicsrc.com/openmcp",
@@ -233,7 +233,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.78.4"
+      "latest_version": "0.78.6"
     },
     {
       "id": "threatcrush.com/threatcrush",
@@ -251,7 +251,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.13.51"
+      "latest_version": "0.13.63"
     },
     {
       "id": "coinpayportal.com/coinpay",
@@ -287,7 +287,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "1.2.1"
+      "latest_version": "1.5.1"
     },
     {
       "id": "rssamplifier.com/rssamplifier",
@@ -324,7 +324,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.3.0"
+      "latest_version": "0.4.1"
     },
     {
       "id": "tronbrowser.dev/tronbrowser",
@@ -361,7 +361,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.3.0"
+      "latest_version": "0.15.0"
     },
     {
       "id": "smshub.dev/smshub",
@@ -379,7 +379,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "1.7.0"
+      "latest_version": "1.11.0"
     },
     {
       "id": "pairux.com/pairux",
@@ -397,7 +397,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.19.0"
+      "latest_version": "0.21.1"
     },
     {
       "id": "wx93.me/wx93-mcp",
@@ -415,7 +415,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.3.0"
+      "latest_version": "0.4.1"
     },
     {
       "id": "profullstack.com/x402",
@@ -542,7 +542,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.17.0"
+      "latest_version": "0.20.0"
     },
     {
       "id": "readm3.com/readm3",
@@ -560,7 +560,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.24.0"
+      "latest_version": "0.27.0"
     },
     {
       "id": "hdtilt.com/hdtilt",
@@ -891,7 +891,7 @@
       "vendor": "AAIF (originally Block)",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "1.56.0"
+      "latest_version": "1.57.0"
     },
     {
       "id": "ampcode.com/amp",
@@ -944,7 +944,7 @@
       "vendor": "Alibaba Qwen",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "0.26.2"
+      "latest_version": "0.26.3"
     },
     {
       "id": "kiro.dev/kiro-cli",
@@ -1188,7 +1188,7 @@
       "vendor": "Ollama",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.40.12"
+      "latest_version": "0.40.13"
     },
     {
       "id": "github.com/fabric",
@@ -1401,7 +1401,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.51.0"
+      "latest_version": "0.56.0"
     },
     {
       "id": "nightcell7.com/nightcell7",
@@ -1437,7 +1437,7 @@
       "vendor": "Profullstack",
       "license": "proprietary",
       "agentic": false,
-      "latest_version": "0.23.7"
+      "latest_version": "0.25.3"
     },
     {
       "id": "p0dcasters.com/p0dcasters",
@@ -1454,7 +1454,7 @@
       "repository": "https://github.com/profullstack/p0dcasters",
       "vendor": "Profullstack",
       "agentic": false,
-      "latest_version": "0.2.3"
+      "latest_version": "0.4.2"
     },
     {
       "id": "pwamart.com/pwamart",
@@ -1490,7 +1490,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.2.0"
+      "latest_version": "0.3.0"
     },
     {
       "id": "reeleel.com/reeleel",
@@ -1543,7 +1543,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "1.1.1"
+      "latest_version": "1.2.0"
     },
     {
       "id": "tleehealth.com/tleehealth",
