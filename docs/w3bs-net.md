@@ -2,7 +2,7 @@
 
 W3BS Net is an independent namespace registry hosted by W3BS. Its PostgreSQL/SQLite tables are separate from Moshpit and its local records have priority during name lookup. Namespace and name requests remain private until an operator approves them. There are no sales, pre-buys, paid reservations or auction states.
 
-The first open namespace is `.agent`. The W3BS launch seeds `riotcoder.agent` and `cha0spunk.agent` as active operator-created names without assigning ownership. Only the matching W3BS username can request a claim; each claim goes back through moderation.
+The initial open W3BS namespaces are `.agent` and `.whatever`. W3BS reviews every new name request in both namespaces; Moshpit records are backfill and do not reserve or sell W3BS names. The launch seeds `riotcoder.agent` and `cha0spunk.agent` as active operator-created names without assigning ownership. Only the matching W3BS username can request a claim; each claim goes back through moderation.
 
 ## Public API
 

@@ -167,16 +167,18 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
           subject: instance,
           data: { instance, protocol: 'W3BS-NET-1-draft-1', registry: `${instance}/api/net/v1/registry` },
         });
-      const tld = await tx.get("SELECT tld FROM net_tlds WHERE tld = 'agent'");
-      if (!tld) {
+      for (const tld of ['agent', 'whatever']) {
+        const namespace = await tx.get('SELECT tld FROM net_tlds WHERE tld = ?', [tld]);
+        if (namespace) continue;
+        const policy = { open: true, noSales: true };
         await tx.run(
           'INSERT INTO net_tlds(tld, owner_id, status, policy, source, created_at, moderated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          ['agent', null, 'active', json({ open: true, noSales: true }), 'w3bs', createdAt, createdAt],
+          [tld, null, 'active', json(policy), 'w3bs', createdAt, createdAt],
         );
         await announce(tx, {
           type: 'namespace.activated',
-          subject: '.agent',
-          data: { tld: 'agent', policy: { open: true, noSales: true } },
+          subject: `.${tld}`,
+          data: { tld, policy },
         });
       }
       for (const label of ['riotcoder', 'cha0spunk']) {
