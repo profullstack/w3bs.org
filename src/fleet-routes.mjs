@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { fleetbarExpress } from '@profullstack/fleetbar/server';
 import { STYLES as FLEETBAR_STYLES } from '@profullstack/fleetbar/element';
 import { W3bsError } from './core.mjs';
+import { placeholderEmail } from './accounts.mjs';
 import { ACTIONS, FLEET_LIMITS, HISTORY, SCREEN_MODES } from './fleet.mjs';
 import { createScreenRelay } from './fleet-screen.mjs';
 import { bearerOf } from './auth-routes.mjs';
@@ -31,7 +32,10 @@ export function mountFleet(app, { store, origin, helpers, fleetbar = {} }) {
   // session on the main host counts: any bearer (even `w3bs login`'s) gets 401 here.
   // w3bs.org proves every address: an account exists only once its emailed link was opened
   // (accounts.consumeLink), and the address cannot be changed afterwards.
-  const emailVerified = fleetbar.emailVerified ?? ((user) => Boolean(user.email));
+  // An account CoinPay created has no confirmed address until its owner adds one
+  // (accounts.startEmailAdd), so user.emailVerified is false for it.
+  const emailVerified =
+    fleetbar.emailVerified ?? ((user) => Boolean(user.email) && user.emailVerified);
   app.use(
     fleetbarExpress({
       token: fleetbar.token ?? (() => process.env.CRAWLPROOF_UPTIME_TOKEN),
@@ -41,7 +45,15 @@ export function mountFleet(app, { store, origin, helpers, fleetbar = {} }) {
       getUser: async (_request, { req }) => {
         if (bearerOf(req) || req.hostname !== mainHost) return null;
         const user = await currentUser(req);
-        return user ? { email: user.email, emailVerified: emailVerified(user) === true } : null;
+        if (!user) return null;
+        // With CoinPay linked, the panel also gets the CoinPay sub (fleetbar >= 0.2.0
+        // forwards it to crawlproof as X-Fleet-User-CoinPay-Sub).
+        const coinpayId = await helpers.accounts.coinpayIdentity(user.id);
+        return {
+          email: user.email ?? placeholderEmail(user.id),
+          emailVerified: emailVerified(user) === true,
+          ...(coinpayId ? { coinpaySub: coinpayId.sub } : {}),
+        };
       },
     }),
   );

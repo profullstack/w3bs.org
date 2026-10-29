@@ -60,9 +60,12 @@ export function mountInstallLinks(app, { store, origin, mailer, helpers }) {
       ),
       ios: elsewhere('iPhone and iPad install apps only from the App Store.'),
     }[device];
-    const send = user
-      ? `<form method="post" action="/i/${e(id)}/send" class="auth-form inline"><button class="button" type="submit">Email me this link</button><p class="muted">Sends ${e(link)} to ${e(masked(user.email))}, your account's address. Nobody else can be sent this.</p></form>`
-      : `<p class="muted"><a class="inline-link" href="/login?next=${encodeURIComponent(`/i/${id}`)}">Sign in</a> to email this link to yourself.</p>`;
+    const send =
+      user && !user.email
+        ? `<p class="muted"><a class="inline-link" href="/account">Add an email to your account</a> to email this link to yourself.</p>`
+        : user
+          ? `<form method="post" action="/i/${e(id)}/send" class="auth-form inline"><button class="button" type="submit">Email me this link</button><p class="muted">Sends ${e(link)} to ${e(masked(user.email))}, your account's address. Nobody else can be sent this.</p></form>`
+          : `<p class="muted"><a class="inline-link" href="/login?next=${encodeURIComponent(`/i/${id}`)}">Sign in</a> to email this link to yourself.</p>`;
     page(
       res,
       {
@@ -87,6 +90,8 @@ export function mountInstallLinks(app, { store, origin, mailer, helpers }) {
           303,
           `/login?next=${encodeURIComponent(req.path.replace(/\/send$/, ''))}`,
         );
+      // An account CoinPay created has no confirmed address to send to yet.
+      if (!user.email) return res.redirect(303, '/account');
       const id = `${req.params.namespace}/${req.params.name}`;
       const item = await store.package(id);
       const now = Date.now();

@@ -102,7 +102,16 @@ async function boot({ emailVerified } = {}) {
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
-  return { http, user, appToken, calls, close: () => instance.close() };
+  // An account Sign in with CoinPay created: placeholder email, no verified address.
+  const coinpayUser = async (sub) => {
+    const { user: created } = await accounts.coinpayLogin({
+      sub,
+      email: 'cp@example.com',
+      name: null,
+    });
+    return `w3bs_session=${await accounts.createSession(created.id)}`;
+  };
+  return { http, user, coinpayUser, accounts, ids, appToken, calls, close: () => instance.close() };
 }
 
 test('fleetbar: no session is 401 and nothing reaches crawlproof', async () => {
@@ -156,6 +165,36 @@ test('fleetbar: a session proxies to crawlproof with the partner token and the e
     assert.equal(call.headers.get('authorization'), `Bearer ${TOKEN}`);
     assert.equal(call.headers.get('x-fleet-user-email'), 'carol@example.com');
     assert.equal(call.headers.get('cookie'), null);
+  } finally {
+    await app.close();
+  }
+});
+
+test('fleetbar: a CoinPay-only account goes up by CoinPay sub, never with an email', async () => {
+  const app = await boot();
+  try {
+    const cookie = await app.coinpayUser('cp_sub_only');
+    const res = await app.http('/api/fleetbar/monitors', { cookie });
+    assert.equal(res.status, 200);
+    assert.equal(app.calls[0].headers.get('x-fleet-user-coinpay-sub'), 'cp_sub_only');
+    assert.equal(app.calls[0].headers.get('x-fleet-user-email'), null);
+  } finally {
+    await app.close();
+  }
+});
+
+test('fleetbar: a linked account sends both its verified email and its CoinPay sub', async () => {
+  const app = await boot();
+  try {
+    const cookie = await app.user('carol');
+    assert.equal(
+      await app.accounts.coinpayLink(app.ids.get(cookie), { sub: 'cp_carol' }),
+      'linked',
+    );
+    const res = await app.http('/api/fleetbar/monitors', { cookie });
+    assert.equal(res.status, 200);
+    assert.equal(app.calls[0].headers.get('x-fleet-user-coinpay-sub'), 'cp_carol');
+    assert.equal(app.calls[0].headers.get('x-fleet-user-email'), 'carol@example.com');
   } finally {
     await app.close();
   }
