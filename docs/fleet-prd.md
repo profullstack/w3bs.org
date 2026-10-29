@@ -54,6 +54,7 @@ Adopt the model ThreatCrush runs in production: organization, teams under it, fl
 - Alerts: offline, disk, memory, failed update, ThreatCrush finding; delivered by email and to the desktop app, and by SMS/call through smshub for teams that turn it on.
 - Bulk actions on a selection or a tag, always previewed with the exact device list.
 - Installable PWA, usable on phones.
+- SSH access checks (shipped 2026-10-29): the shared `@profullstack/fleetbar` panel, identical to threatcrush.com/fleet. crawlproof runs the checks 24/7 in the user's Fleet project and asks each server whether it would accept a public key from the user's logicsrc keyring (never logs in). w3bs.org proxies `/api/fleetbar/*` with its partner token and the session's email; browser session only, bearers get 401.
 
 ## 6 Desktop app (W3BS Fleet)
 

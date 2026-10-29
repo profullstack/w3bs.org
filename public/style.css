@@ -1947,6 +1947,26 @@ main > .auth-small:last-child {
     grid-template-columns: 1fr;
   }
 }
+/* Fleet: the "SSH access checks" panel, <fleet-bar> from @profullstack/fleetbar, in the site's
+   own tokens. The site is light-only, so the element is pinned with theme="light". */
+fleet-bar {
+  --fleetbar-bg: #fcfbf5;
+  --fleetbar-surface: var(--paper);
+  --fleetbar-fg: var(--ink);
+  --fleetbar-muted: var(--muted);
+  --fleetbar-border: var(--line);
+  --fleetbar-accent: var(--orange);
+  --fleetbar-accent-fg: #fff;
+  --fleetbar-up: var(--green);
+  --fleetbar-down: #c0392b;
+  --fleetbar-paused: var(--muted);
+  --fleetbar-pending: #c8962a;
+  --fleetbar-radius: 5px;
+  --fleetbar-gap: 12px;
+  --fleetbar-font: inherit;
+  --fleetbar-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  margin-top: 17px;
+}
 /* Fleet: /fleet machine cards. */
 .fleet-list {
   display: grid;

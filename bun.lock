@@ -9,6 +9,7 @@
         "@modelcontextprotocol/sdk": "1.30.0",
         "@profullstack/bridges": "0.2.0",
         "@profullstack/fleet": "0.1.1",
+        "@profullstack/fleetbar": "0.1.0",
         "@profullstack/footer": "0.4.0",
         "@profullstack/hqtui": "0.10.3",
         "@profullstack/stack": "0.4.0",
@@ -148,6 +149,8 @@
     "@profullstack/emailer": ["@profullstack/emailer@1.0.3", "", {}, "sha512-VyAtCcfnSI6LOwJvWogCr3ZNmEsaZw+iuWrqnosLsdcKsbRyCrCmXigMNZJZEjlgYlR+lK//PwNPG+xtCFvWAw=="],
 
     "@profullstack/fleet": ["@profullstack/fleet@0.1.1", "", { "bin": { "fleet": "bin/fleet.js" } }, "sha512-TYxqRUos6LETiw/CtB2zoIPgJEuLaztS8Qi12dqiOebteTnE2g7YDSqGsJZSE7phVBTPF45E/oE1+ZiqYoQi2w=="],
+
+    "@profullstack/fleetbar": ["@profullstack/fleetbar@0.1.0", "", {}, "sha512-u9pk3iOVxx5pvl5SUf9JTFJeEAkp/muVo9RCqIi9rEjnqYhDkGCjoYpysIi+hWC+LDzHXrZskA0cG6EQJKRY+Q=="],
 
     "@profullstack/footer": ["@profullstack/footer@0.4.0", "", { "peerDependencies": { "react": ">=18" }, "optionalPeers": ["react"], "bin": { "profullstack-footer": "bin/profullstack-footer.js" } }, "sha512-EJZnMUQmWDi9Gzx6BAjogloeaPFFSSCHtHJuC9dsXiOz8M87hfn6Z+Zx9AMYWk8s6xemPrPlkXKGB3PZugkcEA=="],
 
