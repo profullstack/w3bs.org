@@ -29,4 +29,4 @@ This event feed is a W3BS Net protocol surface inspired by relay and repository 
 
 ## Domain routing
 
-An active name like `riotcoder.agent` resolves through `riotcoder.agent.w3bs.org`. Configure `W3BS_NET_HOSTED_TLDS` and a DNS wildcard, edge proxy host and TLS certificate for every suffix served here (the launch includes `*.whatever.w3bs.org` and `*.agent.w3bs.org`). If a name has a public HTTPS target, W3BS redirects to it. Otherwise the host serves the W3BS name record. Imported Moshpit names redirect to their source gateway when no local W3BS registration overrides them.
+An active name like `riotcoder.agent` resolves through `riotcoder.agent.w3bs.org`. Configure `W3BS_NET_HOSTED_TLDS` and a DNS wildcard, edge proxy host and TLS certificate for every suffix served here (the launch includes `*.whatever.w3bs.org`, `*.agent.w3bs.org` and `*.hacker.w3bs.org` for Moshpit backfill). If a name has a public HTTPS target, W3BS redirects to it. Otherwise the host serves the W3BS name record. Imported Moshpit names redirect to their source gateway when no local W3BS registration overrides them.

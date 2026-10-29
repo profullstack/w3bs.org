@@ -38,7 +38,7 @@ const operators = () =>
   );
 const nameHost = (name) => `https://${name}.w3bs.org`;
 const page = (options) => pageShell({ track: false, ...options });
-const hostedTlds = () => [...new Set(String(process.env.W3BS_NET_HOSTED_TLDS ?? 'whatever,agent').split(',').map((value) => safeTld(value)).filter(Boolean))];
+const hostedTlds = () => [...new Set(String(process.env.W3BS_NET_HOSTED_TLDS ?? 'whatever,agent,hacker').split(',').map((value) => safeTld(value)).filter(Boolean))];
 
 function shell(title, description, active, content, robots = '') {
   return page({
