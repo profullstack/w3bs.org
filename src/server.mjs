@@ -46,6 +46,9 @@ export function createApp({
     databaseUrl: process.env.DATABASE_URL,
     masterKey: process.env.W3BS_TRAINING_MASTER_KEY,
   },
+  // The /fleet "SSH access checks" panel (@profullstack/fleetbar). Defaults read
+  // CRAWLPROOF_UPTIME_TOKEN per request; tests pass { token, fetch, emailVerified }.
+  fleetbar,
 } = {}) {
   if (!store) throw new Error('createApp requires an opened store; use startServer or openStore.');
   const app = express();
@@ -310,7 +313,7 @@ export function createApp({
   );
   const helpers = mountAccounts(app, { store, origin, mailer, formGuard, bridgeClients });
   // WebSocket upgrades (fleet screens) skip Express; startServer hands them to this.
-  app.locals.fleet = mountFleet(app, { store, origin, helpers });
+  app.locals.fleet = mountFleet(app, { store, origin, helpers, fleetbar });
   mountSocial(app, { store, helpers, config: social, fetchImpl: socialFetch });
   mountAbTest(app, { store, origin, helpers });
   mountTasks(app, { store, origin, helpers });

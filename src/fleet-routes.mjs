@@ -1,15 +1,54 @@
 // w3bs.org/fleet: the signed-in fleet page, the account API it and `w3bs fleet ls/run/rm`
 // use (session or a `w3bs login` bearer), the agent API (`fm_` machine keys), and the screen
 // viewer /fleet/<id>/screen with its WebSocket relay (src/fleet-screen.mjs).
+// The "SSH access checks" section is @profullstack/fleetbar, mounted as published (the same
+// panel threatcrush.com/fleet mounts): <fleet-bar> talks to /api/fleetbar, which proxies to
+// the user's crawlproof Fleet project with the w3bs partner token (CRAWLPROOF_UPTIME_TOKEN).
 import express from 'express';
+import { createHash } from 'node:crypto';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { fleetbarExpress } from '@profullstack/fleetbar/server';
+import { STYLES as FLEETBAR_STYLES } from '@profullstack/fleetbar/element';
 import { W3bsError } from './core.mjs';
 import { ACTIONS, FLEET_LIMITS, HISTORY, SCREEN_MODES } from './fleet.mjs';
 import { createScreenRelay } from './fleet-screen.mjs';
 import { bearerOf } from './auth-routes.mjs';
 import { escapeHtml as e } from './site.mjs';
 
-export function mountFleet(app, { store, origin, helpers }) {
+const fleetbarDist = dirname(
+  fileURLToPath(import.meta.resolve('@profullstack/fleetbar/dist/fleetbar.js')),
+);
+const cspHash = (text) => `'sha256-${createHash('sha256').update(text).digest('base64')}'`;
+// <fleet-bar> writes its stylesheet as a <style> in its shadow root and one inline style
+// attribute. The site CSP is style-src 'self', so /fleet allows exactly those two by hash.
+export const FLEETBAR_STYLE_SRC = `'self' ${cspHash(FLEETBAR_STYLES)} 'unsafe-hashes' ${cspHash('gap: var(--fleetbar-gap)')}`;
+
+export function mountFleet(app, { store, origin, helpers, fleetbar = {} }) {
   const { accountUser, currentUser, page, onMainHost } = helpers;
+  const mainHost = new URL(origin).hostname;
+  // The panel acts as the signed-in person on their crawlproof account, so only a browser
+  // session on the main host counts: any bearer (even `w3bs login`'s) gets 401 here.
+  // w3bs.org proves every address: an account exists only once its emailed link was opened
+  // (accounts.consumeLink), and the address cannot be changed afterwards.
+  const emailVerified = fleetbar.emailVerified ?? ((user) => Boolean(user.email));
+  app.use(
+    fleetbarExpress({
+      token: fleetbar.token ?? (() => process.env.CRAWLPROOF_UPTIME_TOKEN),
+      crawlproofUrl:
+        fleetbar.crawlproofUrl ?? process.env.CRAWLPROOF_URL ?? 'https://crawlproof.com',
+      ...(fleetbar.fetch ? { fetch: fleetbar.fetch } : {}),
+      getUser: async (_request, { req }) => {
+        if (bearerOf(req) || req.hostname !== mainHost) return null;
+        const user = await currentUser(req);
+        return user ? { email: user.email, emailVerified: emailVerified(user) === true } : null;
+      },
+    }),
+  );
+  app.use(
+    '/vendor/fleetbar',
+    express.static(fleetbarDist, { maxAge: '1h', index: false, fallthrough: false }),
+  );
   const fleet = store.fleet;
   const screen = createScreenRelay({ fleet, origin, currentUser });
   const withScreen = (machines) =>
@@ -99,11 +138,19 @@ export function mountFleet(app, { store, origin, helpers }) {
     const user = await currentUser(req);
     if (!user) return res.redirect(302, `/login?next=${encodeURIComponent('/fleet')}`);
     const view = await overview(user.id);
+    res.set(
+      'Content-Security-Policy',
+      String(res.get('Content-Security-Policy')).replace(
+        "style-src 'self'",
+        `style-src ${FLEETBAR_STYLE_SRC}`,
+      ),
+    );
     page(res, {
       title: 'Fleet',
       active: '/fleet',
-      scripts: '<script type="module" src="/assets/fleet.js"></script>',
-      content: `<section class="page-head compact"><div class="eyebrow">W3BS FLEET</div><h1>Your <em>devices.</em></h1><p>Every machine that ran <code>w3bs fleet join</code> for @${e(user.username)}, plus every device in your <a class="inline-link" href="https://logicsrc.com/docs/opendevice">OpenDevice</a> inventory: servers, desktops, phones and tablets, with what each costs a month. Joined machines report every ${FLEET_LIMITS.intervalSeconds} seconds. Free for up to ${FLEET_LIMITS.machines} machines; <a class="inline-link" href="/pricing">limits</a>.</p></section><script type="application/json" id="fleet-data">${JSON.stringify({ ...view, actions: ACTIONS, history: HISTORY }).replaceAll('<', '\\u003c')}</script><div id="fleet-summary" class="fleet-summary" aria-live="polite"></div><div id="fleet-devices" class="fleet-devices"></div><div id="fleet-list" class="fleet-list" aria-live="polite"></div><section class="inspector-panel fleet-add"><h3>Add a server</h3><p>Makes a one-time join command, valid for an hour. Run it on the server as the user the agent should run as.</p><form class="auth-form inline" data-form="fleet-token"><label class="input-label" for="fleet-name">Name <span class="muted">(optional, defaults to the hostname)</span></label><input id="fleet-name" name="name" maxlength="60" placeholder="dev2"><label class="consent"><input type="checkbox" name="allowActions" value="1"> Allow actions from this page (update w3bs, restart the desktop layer, report now). Nothing else can run.</label><label class="input-label" for="fleet-screen">Screen <span class="muted">(watch the desktop from this page; needs a VNC server on the machine, or run <code>w3bs fleet desktop start</code> on a server without a desktop; see <a class="inline-link" href="/docs/fleet-screen.md">screen sharing</a>)</span></label><select id="fleet-screen" name="screen"><option value="">Not shared</option><option value="view">View only</option><option value="control">View and control</option></select><button class="button primary" type="submit">Make join command</button><p class="form-status" role="status" aria-live="polite"></p></form><div class="fleet-command" hidden><p>Run this on the server:</p><pre class="instructions" id="fleet-command"></pre><button class="small-button" type="button" data-action="copy-command">Copy</button></div></section><section class="inspector-panel fleet-inventory"><h3>Inventory</h3><p>An <a class="inline-link" href="https://logicsrc.com/docs/opendevice">OpenDevice</a> file lists every device you run, with or without an agent, and what it costs. Devices match joined machines by name or hostname, or by a <code>{"name": "w3bs", "id": "m_…"}</code> entry in their <code>agents</code>. Up to ${FLEET_LIMITS.inventoryDevices} devices, ${FLEET_LIMITS.inventoryKB} KB. A cost with no amount shows as unstated; nothing is guessed or converted.</p><form class="auth-form inline" data-form="fleet-inventory"><label class="input-label" for="fleet-inventory-file">opendevice.json</label><input id="fleet-inventory-file" name="file" type="file" accept=".json,application/json" required><button class="button primary" type="submit">Import inventory</button><p class="form-status" role="status" aria-live="polite"></p></form><p class="muted fleet-note" id="fleet-inventory-state"></p></section><section class="inspector-panel"><h3>From the terminal</h3><pre class="instructions">w3bs login
+      scripts:
+        '<script type="module" src="/assets/fleet.js"></script><script src="/vendor/fleetbar/fleetbar.js" defer></script>',
+      content: `<section class="page-head compact"><div class="eyebrow">W3BS FLEET</div><h1>Your <em>devices.</em></h1><p>Every machine that ran <code>w3bs fleet join</code> for @${e(user.username)}, plus every device in your <a class="inline-link" href="https://logicsrc.com/docs/opendevice">OpenDevice</a> inventory: servers, desktops, phones and tablets, with what each costs a month. Joined machines report every ${FLEET_LIMITS.intervalSeconds} seconds. Free for up to ${FLEET_LIMITS.machines} machines; <a class="inline-link" href="/pricing">limits</a>.</p></section><script type="application/json" id="fleet-data">${JSON.stringify({ ...view, actions: ACTIONS, history: HISTORY }).replaceAll('<', '\\u003c')}</script><div id="fleet-summary" class="fleet-summary" aria-live="polite"></div><div id="fleet-devices" class="fleet-devices"></div><div id="fleet-list" class="fleet-list" aria-live="polite"></div><section class="inspector-panel fleet-add"><h3>Add a server</h3><p>Makes a one-time join command, valid for an hour. Run it on the server as the user the agent should run as.</p><form class="auth-form inline" data-form="fleet-token"><label class="input-label" for="fleet-name">Name <span class="muted">(optional, defaults to the hostname)</span></label><input id="fleet-name" name="name" maxlength="60" placeholder="dev2"><label class="consent"><input type="checkbox" name="allowActions" value="1"> Allow actions from this page (update w3bs, restart the desktop layer, report now). Nothing else can run.</label><label class="input-label" for="fleet-screen">Screen <span class="muted">(watch the desktop from this page; needs a VNC server on the machine, or run <code>w3bs fleet desktop start</code> on a server without a desktop; see <a class="inline-link" href="/docs/fleet-screen.md">screen sharing</a>)</span></label><select id="fleet-screen" name="screen"><option value="">Not shared</option><option value="view">View only</option><option value="control">View and control</option></select><button class="button primary" type="submit">Make join command</button><p class="form-status" role="status" aria-live="polite"></p></form><div class="fleet-command" hidden><p>Run this on the server:</p><pre class="instructions" id="fleet-command"></pre><button class="small-button" type="button" data-action="copy-command">Copy</button></div></section><section class="inspector-panel fleet-inventory"><h3>Inventory</h3><p>An <a class="inline-link" href="https://logicsrc.com/docs/opendevice">OpenDevice</a> file lists every device you run, with or without an agent, and what it costs. Devices match joined machines by name or hostname, or by a <code>{"name": "w3bs", "id": "m_…"}</code> entry in their <code>agents</code>. Up to ${FLEET_LIMITS.inventoryDevices} devices, ${FLEET_LIMITS.inventoryKB} KB. A cost with no amount shows as unstated; nothing is guessed or converted.</p><form class="auth-form inline" data-form="fleet-inventory"><label class="input-label" for="fleet-inventory-file">opendevice.json</label><input id="fleet-inventory-file" name="file" type="file" accept=".json,application/json" required><button class="button primary" type="submit">Import inventory</button><p class="form-status" role="status" aria-live="polite"></p></form><p class="muted fleet-note" id="fleet-inventory-state"></p></section><section class="inspector-panel fleet-checks" id="ssh-checks"><h3>SSH access checks</h3><p>Checks that run 24/7 on <a class="inline-link" href="https://crawlproof.com">crawlproof</a> and call or email you when one goes down: is each server still accepting your SSH key, plus HTTP, keyword, SSL and TCP checks. An SSH check never logs in and never needs a private key: crawlproof asks the server whether it would accept a public key from your <a class="inline-link" href="https://app.logicsrc.com/keyring">logicsrc keyring</a> and hangs up. These are the same checks threatcrush.com/fleet and your crawlproof Fleet project show.</p><fleet-bar endpoint="/api/fleetbar" theme="light"></fleet-bar></section><section class="inspector-panel"><h3>From the terminal</h3><pre class="instructions">w3bs login
 w3bs fleet ls
 w3bs fleet inventory import opendevice.json
 w3bs fleet cost              # every device and the monthly total

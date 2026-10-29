@@ -18,6 +18,7 @@ The service is deployment-ready source. Production launch requires publishing th
 | `W3BS_MAIL_FROM`     | `W3BS <noreply@w3bs.org>`                                                                                                |
 | `W3BS_FORM_SECRET`   | Stable random secret for the signup/email-link form tokens (@profullstack/form-guard)                                    |
 | `W3BS_BRIDGE_CLIENTS`| Optional JSON of @profullstack/bridges clients: `{"<id>":{"secret":"…","redirectUris":["https://…"]}}`                   |
+| `CRAWLPROOF_UPTIME_TOKEN` | crawlproof partner token (`cpu_…`) for the /fleet "SSH access checks" panel (@profullstack/fleetbar). Without it `/api/fleetbar` answers 503 `fleetbar_not_configured` |
 
 Account secrets live in the logicsrc team vault `profullstack w3bs-org--prod` and in dev2's `~/www/w3bs.org/app.env`. Accounts, passkeys, sessions and OAuth tokens share the registry database; their tables are created on first start.
 
