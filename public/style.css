@@ -155,7 +155,7 @@ main {
   background: #183b3a;
   color: #f7f5e9;
 }
-.mobile-hero h1 {
+.mobile-hero h2 {
   max-width: 620px;
   font-size: clamp(52px, 5.8vw, 78px);
 }
@@ -2481,7 +2481,7 @@ footer > div > .eyebrow.footer-gap {
     gap: 30px;
     padding: 34px 22px;
   }
-  .mobile-hero h1 {
+  .mobile-hero h2 {
     font-size: 48px;
   }
   .fleet-hero h1 {
