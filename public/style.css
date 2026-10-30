@@ -481,6 +481,29 @@ main {
   display: flex;
   justify-content: space-between;
 }
+.device-card {
+  display: flex;
+  flex-direction: column;
+}
+.device-price {
+  display: grid;
+  gap: 4px;
+  margin: auto 0 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.device-price span,
+.device-price small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.device-price strong {
+  color: var(--green);
+  font-size: 18px;
+}
+.device-home-feature {
+  border-top: 1px solid var(--line);
+}
 .resource-feature {
   padding-top: 0;
   display: grid;
