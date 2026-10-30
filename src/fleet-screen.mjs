@@ -90,6 +90,12 @@ export function createScreenRelay({ fleet, origin, currentUser }) {
         CLOSE.NOT_SHARED,
         'This machine does not share its screen. On it, run: w3bs fleet screen on',
       );
+    if (!machine.permissions?.['desktop.view'])
+      return ws.close(CLOSE.NOT_SHARED, 'Desktop viewing is disabled in Fleet permissions.');
+    // The relay forwards RFB unchanged, so a control-mode desktop cannot safely be
+    // downgraded to view-only here. Require both grants before opening that stream.
+    if (mode === 'control' && !machine.permissions?.['desktop.control'])
+      return ws.close(CLOSE.NOT_SHARED, 'Desktop control is disabled in Fleet permissions.');
     const listener = listeners.get(machine.id);
     if (!listener)
       return ws.close(
@@ -220,6 +226,11 @@ export function createScreenRelay({ fleet, origin, currentUser }) {
         if (session.machine.id === machineId) end(session, { note: 'The machine was removed' });
       listeners.get(machineId)?.close(1000, 'Removed from the fleet.');
       listeners.delete(machineId);
+    },
+    revokeSessions(machineId) {
+      for (const session of sessions.values())
+        if (session.machine.id === machineId)
+          end(session, { status: 'failed', note: 'Fleet desktop permissions changed' });
     },
     close() {
       for (const session of sessions.values()) end(session, { note: 'The server restarted' });

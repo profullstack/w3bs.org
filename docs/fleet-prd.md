@@ -4,7 +4,7 @@
 **Date:** October 19, 2026  
 **Owner:** Profullstack, Inc.  
 **Product home:** https://w3bs.org/fleet  
-**Status:** Specification. Today's Fleet (servers, live stats, three actions, screen sharing, OpenDevice inventories with monthly cost) is live; everything else here is proposed work.
+**Status:** Specification with an incremental permissions implementation. Today's Fleet includes servers, live stats, three allowlisted actions, screen sharing, OpenDevice inventories and per-machine permission checks for supported tasks. Team roles, shell, file access, desktop app automation and the native app remain proposed work.
 
 ## 1 Direction
 
@@ -17,16 +17,16 @@ Both use the same API, CLI (`w3bs fleet …`), MCP tools and TUI, per the house 
 
 ## 2 What exists today
 
-`w3bs fleet join <token>` enrolls a machine; `w3bs fleet agent` reports hostname, OS, kernel, CPU, memory, root disk, load, uptime and the w3bs version every 30 seconds; the owner can queue three allowlisted actions (report now, update w3bs packages, restart the desktop layer) on machines that joined with actions allowed; screens are shared view-only or with control over an outbound relay (docs/fleet-screen.md). Limits: 50 machines per account, free.
+`w3bs fleet join <token>` enrolls a machine; `w3bs fleet agent` reports hostname, OS, kernel, CPU, memory, root disk, load, uptime and the w3bs version every 30 seconds. The owner can grant each supported task separately: report now, update w3bs packages, restart the desktop layer, view a screen and control a screen. Every Fleet task request from the page, API or CLI checks the same server policy; a queued task is checked again when the agent asks for work. New grants are off by default. A machine’s local OS permission remains an independent gate. Shell, files and browser DevTools are not implemented in the current Fleet agent. Limits: 50 machines per account, free.
 
-**Inventory (since 2026-10-28).** An account can also store an [OpenDevice](https://logicsrc.com/docs/opendevice) inventory: one JSON file listing every device it runs, agent or not, with provider, location and what each costs. w3bs.org reads it with the shared package [`@profullstack/fleet`](https://www.npmjs.com/package/@profullstack/fleet) (the same reader ThreatCrush uses): `validateInventory` on write, `matchAgents` to pair inventory devices with joined machines by id, name or hostname (or outright, when a device lists `{"name": "w3bs", "id": "m_…"}` in its `agents`), `fleetCost` for the monthly run rate. The fleet page shows one row per device with its class and $/mo, joined machines with their live stats, devices without an agent with a join hint, and the monthly total. Totals stay per currency; a device with no stated amount shows as *unstated* and is never guessed or converted.
+**Inventory (since 2026-10-28).** An account can also store an [OpenDevice](https://logicsrc.com/docs/opendevice) inventory: one JSON file listing every device it runs, agent or not, with provider, location and what each costs. w3bs.org reads it with the shared package [`@profullstack/fleet`](https://www.npmjs.com/package/@profullstack/fleet) (the same reader ThreatCrush uses): `validateInventory` on write, `matchAgents` to pair inventory devices with joined machines by id, name or hostname (or outright, when a device lists `{"name": "w3bs", "id": "m_…"}` in its `agents`), `fleetCost` for the monthly run rate. The fleet page shows one row per device with its class and $/mo, joined machines with their live stats, devices without an agent with a join hint, and the monthly total. Totals stay per currency; a device with no stated amount shows as _unstated_ and is never guessed or converted.
 
-| Surface | Call |
-| --- | --- |
-| Store (replaces) | `PUT /api/fleet/inventory` with the document as the body; `w3bs fleet inventory import opendevice.json` (`-` reads stdin). Errors come back in `error.details.errors`; warnings in the reply |
-| Read back | `GET /api/fleet/inventory` returns the document whole (so `npx @profullstack/fleet list https://w3bs.org/api/fleet/inventory --header "Authorization: Bearer …"` works); `w3bs fleet inventory show` |
-| Delete | `DELETE /api/fleet/inventory`; `w3bs fleet inventory rm` (joined machines stay) |
-| Merged fleet | `GET /api/fleet` returns `{ machines, devices, summary }`: each machine with its `device` (or null), the agentless `devices`, and `summary.monthly`, `monthly_text`, `unstated`, `by_profile`; `w3bs fleet cost` prints it. `GET /api/fleet/machines` keeps its array, each machine now with `device` |
+| Surface          | Call                                                                                                                                                                                                                                                                                                  |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Store (replaces) | `PUT /api/fleet/inventory` with the document as the body; `w3bs fleet inventory import opendevice.json` (`-` reads stdin). Errors come back in `error.details.errors`; warnings in the reply                                                                                                          |
+| Read back        | `GET /api/fleet/inventory` returns the document whole (so `npx @profullstack/fleet list https://w3bs.org/api/fleet/inventory --header "Authorization: Bearer …"` works); `w3bs fleet inventory show`                                                                                                  |
+| Delete           | `DELETE /api/fleet/inventory`; `w3bs fleet inventory rm` (joined machines stay)                                                                                                                                                                                                                       |
+| Merged fleet     | `GET /api/fleet` returns `{ machines, devices, summary }`: each machine with its `device` (or null), the agentless `devices`, and `summary.monthly`, `monthly_text`, `unstated`, `by_profile`; `w3bs fleet cost` prints it. `GET /api/fleet/machines` keeps its array, each machine now with `device` |
 
 All of these are owner only (session cookie or a `w3bs login` bearer). Limits: 500 devices, 256 KB per inventory.
 
@@ -34,18 +34,31 @@ All of these are owner only (session cookie or a `w3bs login` bearer). Limits: 5
 
 Device classes are the OpenDevice profiles (logicsrc.com/docs/opendevice): **server**, **desktop** (laptops included), **phone**, **tablet** and **other**. An inventory device states its profile; one that does not is a server when it has a hostname or address, else other (the rule in `@profullstack/fleet`). The page shows each class with its own icon. A joined machine takes the class of the inventory device it matches; one that matches none shows as "not in inventory". The rows below say how each class joins and what it can do once it has an agent; without an agent, every class still appears from the inventory with its cost.
 
-| Class | How it joins | What it reports | What it can do |
-| --- | --- | --- | --- |
-| Server (Linux) · profile `server` | `w3bs fleet join` (systemd or OpenRC service) | Stats today, plus services, open ports, pending updates, ThreatCrush findings when installed | Actions, updates, service restart, screen (when a desktop exists), shell session |
-| Desktop / laptop (Linux, macOS, Windows) · profile `desktop` | Same agent, user-level, tray toggle | Stats, battery, displays, logged-in user, desktop-layer state | Actions, updates, screen, lock, locate (laptops, opt-in) |
-| W3BS OS device (any edition) · profile of the hardware | Joined during setup if the user chooses | Everything above plus edition, release and suite manifest | OS update (`w3bs os update`), suite repair |
-| Android phone / tablet · profile `phone` / `tablet` | W3BS app (Nura/W3BS Mobile has the agent built in; stock Android uses the app with Android's own permissions) | Battery, storage, network, OS version, app inventory the user allows | Notifications, open URL, ring, app updates through the W3BS app; nothing Android does not grant an app |
-| iPhone / iPad · profile `phone` / `tablet` | W3BS companion app | What iOS lets an app read (battery, storage, OS version) | Notifications, open URL. No remote control: iOS gives apps no system-wide input or screen access. Full device management on iOS needs Apple MDM enrollment, a later, separate track |
-| Other (router, SBC, VM, container, IoT) · profile `other` | Agentless over SSH from a joined machine or the desktop app, or the agent where it runs | Reachability, SSH host key, uptime, a command allowlist per device | The allowlisted commands only |
+| Class                                                        | How it joins                                                                                                  | What it reports                                                                              | What it can do                                                                                                                                                                      |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Server (Linux) · profile `server`                            | `w3bs fleet join` (systemd or OpenRC service)                                                                 | Stats today, plus services, open ports, pending updates, ThreatCrush findings when installed | Actions, updates, service restart, screen (when a desktop exists), shell session                                                                                                    |
+| Desktop / laptop (Linux, macOS, Windows) · profile `desktop` | Same agent, user-level, tray toggle                                                                           | Stats, battery, displays, logged-in user, desktop-layer state                                | Actions, updates, screen, lock, locate (laptops, opt-in)                                                                                                                            |
+| W3BS OS device (any edition) · profile of the hardware       | Joined during setup if the user chooses                                                                       | Everything above plus edition, release and suite manifest                                    | OS update (`w3bs os update`), suite repair                                                                                                                                          |
+| Android phone / tablet · profile `phone` / `tablet`          | W3BS app (Nura/W3BS Mobile has the agent built in; stock Android uses the app with Android's own permissions) | Battery, storage, network, OS version, app inventory the user allows                         | Notifications, open URL, ring, app updates through the W3BS app; nothing Android does not grant an app                                                                              |
+| iPhone / iPad · profile `phone` / `tablet`                   | W3BS companion app                                                                                            | What iOS lets an app read (battery, storage, OS version)                                     | Notifications, open URL. No remote control: iOS gives apps no system-wide input or screen access. Full device management on iOS needs Apple MDM enrollment, a later, separate track |
+| Other (router, SBC, VM, container, IoT) · profile `other`    | Agentless over SSH from a joined machine or the desktop app, or the agent where it runs                       | Reachability, SSH host key, uptime, a command allowlist per device                           | The allowlisted commands only                                                                                                                                                       |
 
 ## 4 Teams and permissions
 
 Adopt the model ThreatCrush runs in production: organization, teams under it, fleets owned by a team, roles read | write | admin, invited guests who see only their team's fleets, and agent keys (`w3bs_agent_…`, hashed, one team and one role, revocable, last used shown). Access rules live in one module. An unknown device and a forbidden one both answer 404. Agent keys can never manage people, invites or keys.
+
+### Per-machine task permissions
+
+Fleet stores a separate owner grant for every supported capability. A missing grant means denied. Changing a grant is available through the Fleet page or owner API, so CLI and browser calls pass through the same check. The agent heartbeat checks the grant again before queued work leaves the server. Revoking screen access closes live Fleet screen sessions. Unsupported capabilities (HQTerm shell, file read/write, browser DevTools and general desktop app use) appear as unavailable, never as working toggles. When those agents ship, each tool must call the same permission service and honor device-local controls.
+
+| Permission                                                                        | Today                               | Default                                |
+| --------------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------- |
+| `system.refresh`                                                                  | Report now                          | Denied                                 |
+| `system.update`                                                                   | Update w3bs                         | Denied                                 |
+| `desktop.restart`                                                                 | Restart the desktop layer           | Denied                                 |
+| `desktop.view`                                                                    | View the configured screen relay    | Denied unless chosen during enrollment |
+| `desktop.control`                                                                 | Control the configured screen relay | Denied unless chosen during enrollment |
+| `terminal.shell`, `files.read`, `files.write`, `browser.devtools`, `desktop.apps` | Not in the current agent            | Denied and unavailable                 |
 
 ## 5 Cloud app (w3bs.org/fleet)
 
@@ -84,11 +97,11 @@ Keep Fleet free at the current 50 devices per account. Teams above that, longer 
 
 ## 11 Milestones
 
-| Stage | Deliverable |
-| --- | --- |
-| F1 | Device classes and tags in the data model; desktops and laptops (Linux, macOS, Windows agent with tray toggle) |
-| F2 | Teams, fleets, roles, invites, agent keys (ThreatCrush model) |
-| F3 | W3BS Fleet desktop app (Linux, macOS, Windows) with local discovery and agentless SSH devices |
-| F4 | Remote shell, alerts (email, desktop, smshub), bulk actions |
-| F5 | Android agent in the W3BS app and built into W3BS Mobile; iOS companion app with what iOS allows |
-| F6 | Apple MDM track for iPhone/iPad fleets (separate enrollment and Apple requirements) |
+| Stage | Deliverable                                                                                                    |
+| ----- | -------------------------------------------------------------------------------------------------------------- |
+| F1    | Device classes and tags in the data model; desktops and laptops (Linux, macOS, Windows agent with tray toggle) |
+| F2    | Teams, fleets, roles, invites, agent keys (ThreatCrush model)                                                  |
+| F3    | W3BS Fleet desktop app (Linux, macOS, Windows) with local discovery and agentless SSH devices                  |
+| F4    | Remote shell, alerts (email, desktop, smshub), bulk actions                                                    |
+| F5    | Android agent in the W3BS app and built into W3BS Mobile; iOS companion app with what iOS allows               |
+| F6    | Apple MDM track for iPhone/iPad fleets (separate enrollment and Apple requirements)                            |

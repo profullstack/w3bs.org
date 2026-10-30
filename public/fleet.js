@@ -6,6 +6,12 @@ const summaryBox = document.getElementById('fleet-summary');
 const devicesBox = document.getElementById('fleet-devices');
 const ACTIONS = data.actions;
 const HISTORY = data.history;
+const PERMISSIONS = data.permissions;
+const ACTION_PERMISSION = {
+  refresh: 'system.refresh',
+  update: 'system.update',
+  'restart-desktop': 'desktop.restart',
+};
 
 async function call(path, { method = 'GET', body } = {}) {
   const response = await fetch(path, {
@@ -177,21 +183,52 @@ function card(machine) {
         } ${info.screen.vnc || ''}`,
     ],
   ].filter(([, v]) => v != null && v !== '');
-  const actionButtons = machine.allow_actions
-    ? Object.entries(ACTIONS).map(([action, label]) =>
-        el('button', {
-          className: 'small-button',
-          type: 'button',
-          textContent: label,
-          dataset: { action: 'queue', id: machine.id, name: action },
-        }),
-      )
-    : [
-        el('p', {
-          className: 'muted fleet-note',
-          textContent: 'Actions are off for this machine (it joined without them).',
-        }),
-      ];
+  const actionButtons = Object.entries(ACTIONS).map(([action, label]) => {
+    const allowed = machine.permissions?.[ACTION_PERMISSION[action]] === true;
+    return el('button', {
+      className: 'small-button',
+      type: 'button',
+      textContent: label,
+      disabled: !allowed,
+      title: allowed ? label : 'Enable this task in Fleet permissions below.',
+      dataset: { action: 'queue', id: machine.id, name: action },
+    });
+  });
+  const capabilities = Object.entries(PERMISSIONS).map(([key, permission]) => {
+    const screenReady =
+      (key !== 'desktop.view' || Boolean(info.screen?.mode)) &&
+      (key !== 'desktop.control' || info.screen?.mode === 'control');
+    const enabled = permission.available && screenReady;
+    const unavailableReason = !permission.available
+      ? `${permission.description} Not available in this Fleet agent yet.`
+      : !screenReady
+        ? key === 'desktop.view'
+          ? 'Turn on screen sharing on the machine first.'
+          : 'Set the machine screen mode to control first.'
+        : permission.description;
+    const input = el('input', {
+      type: 'checkbox',
+      checked: machine.permissions?.[key] === true,
+      disabled: !enabled,
+      dataset: enabled ? { permission: key, id: machine.id } : {},
+    });
+    return el('label', { className: `fleet-permission${enabled ? '' : ' unavailable'}` }, [
+      input,
+      el('span', {}, [
+        el('strong', { textContent: permission.label }),
+        el('small', { textContent: unavailableReason }),
+      ]),
+    ]);
+  });
+  const permissionsPanel = el('details', { className: 'fleet-permissions' }, [
+    el('summary', { textContent: 'Permissions · default deny' }),
+    el('p', {
+      className: 'muted',
+      textContent:
+        'Each task path uses the same server check. The local OS can still refuse desktop access.',
+    }),
+    el('div', { className: 'fleet-permission-list' }, capabilities),
+  ]);
   const history = machine.actions.length
     ? el('details', { className: 'fleet-history' }, [
         el('summary', { textContent: `Recent actions (${machine.actions.length})` }),
@@ -213,53 +250,65 @@ function card(machine) {
         ),
       ])
     : null;
-  return el('article', { className: 'inspector-panel fleet-card' }, [
-    el('div', { className: 'fleet-head' }, [
-      el('h3', {}, [
+  return el(
+    'article',
+    { className: 'inspector-panel fleet-card', dataset: { machine: machine.id } },
+    [
+      el('div', { className: 'fleet-head' }, [
+        el('h3', {}, [
+          el('span', {
+            className: `fleet-dot ${machine.online ? 'on' : ''}`,
+            title: machine.online ? 'online' : 'offline',
+          }),
+          icon(device?.profile),
+          ` ${machine.name}`,
+        ]),
         el('span', {
-          className: `fleet-dot ${machine.online ? 'on' : ''}`,
-          title: machine.online ? 'online' : 'offline',
+          className: 'muted',
+          textContent: machine.online
+            ? `online · ${ago(machine.last_seen_at)}`
+            : `offline · last seen ${ago(machine.last_seen_at)}`,
         }),
-        icon(device?.profile),
-        ` ${machine.name}`,
       ]),
-      el('span', {
-        className: 'muted',
-        textContent: machine.online
-          ? `online · ${ago(machine.last_seen_at)}`
-          : `offline · last seen ${ago(machine.last_seen_at)}`,
-      }),
-    ]),
-    el('div', { className: 'fleet-meters' }, meters),
-    el(
-      'dl',
-      { className: 'fleet-facts' },
-      facts.flatMap(([k, v]) => [
-        el('dt', { textContent: k }),
-        el('dd', { textContent: String(v) }),
+      el('div', { className: 'fleet-meters' }, meters),
+      el(
+        'dl',
+        { className: 'fleet-facts' },
+        facts.flatMap(([k, v]) => [
+          el('dt', { textContent: k }),
+          el('dd', { textContent: String(v) }),
+        ]),
+      ),
+      el('div', { className: 'fleet-actions' }, [
+        info.screen &&
+        machine.permissions?.['desktop.view'] &&
+        (info.screen.mode !== 'control' || machine.permissions?.['desktop.control'])
+          ? el('a', {
+              className: `small-button fleet-screen-link${machine.screen_listening ? ' live' : ''}`,
+              href: `/fleet/${encodeURIComponent(machine.id)}/screen`,
+              textContent: 'View screen',
+              title: machine.screen_listening
+                ? 'Watch this machine\u2019s desktop'
+                : 'The agent is not connected for screen sharing right now',
+            })
+          : info.screen
+            ? el('span', {
+                className: 'muted fleet-note',
+                textContent: 'Screen access disabled by Fleet permissions.',
+              })
+            : null,
+        ...actionButtons,
+        el('button', {
+          className: 'small-button fleet-remove',
+          type: 'button',
+          textContent: 'Remove',
+          dataset: { action: 'remove', id: machine.id, name: machine.name },
+        }),
       ]),
-    ),
-    el('div', { className: 'fleet-actions' }, [
-      info.screen
-        ? el('a', {
-            className: `small-button fleet-screen-link${machine.screen_listening ? ' live' : ''}`,
-            href: `/fleet/${encodeURIComponent(machine.id)}/screen`,
-            textContent: 'View screen',
-            title: machine.screen_listening
-              ? 'Watch this machine\u2019s desktop'
-              : 'The agent is not connected for screen sharing right now',
-          })
-        : null,
-      ...actionButtons,
-      el('button', {
-        className: 'small-button fleet-remove',
-        type: 'button',
-        textContent: 'Remove',
-        dataset: { action: 'remove', id: machine.id, name: machine.name },
-      }),
-    ]),
-    history,
-  ]);
+      permissionsPanel,
+      history,
+    ],
+  );
 }
 
 // One row per device: joined machines first (with or without an inventory device),
@@ -403,12 +452,12 @@ async function refresh() {
   try {
     const open = new Set(
       [...list.querySelectorAll('details[open]')].map(
-        (d) => d.closest('.fleet-card')?.querySelector('h3')?.textContent,
+        (d) => `${d.closest('.fleet-card')?.dataset.machine}:${d.className}`,
       ),
     );
     render(await call('/api/fleet'));
     for (const d of list.querySelectorAll('details'))
-      if (open.has(d.closest('.fleet-card')?.querySelector('h3')?.textContent)) d.open = true;
+      if (open.has(`${d.closest('.fleet-card')?.dataset.machine}:${d.className}`)) d.open = true;
   } catch {
     // Keep showing the last state; the next tick tries again.
   }
@@ -444,6 +493,26 @@ document.addEventListener('click', async (event) => {
     alert(error.message);
   } finally {
     button.disabled = false;
+  }
+});
+
+document.addEventListener('change', async (event) => {
+  const input = event.target.closest('input[data-permission]');
+  if (!input) return;
+  const { permission, id } = input.dataset;
+  const enabled = input.checked;
+  input.disabled = true;
+  try {
+    await call(`/api/fleet/machines/${encodeURIComponent(id)}/permissions`, {
+      method: 'PATCH',
+      body: { permission, enabled },
+    });
+    await refresh();
+  } catch (error) {
+    input.checked = !enabled;
+    alert(error.message);
+  } finally {
+    input.disabled = false;
   }
 });
 
