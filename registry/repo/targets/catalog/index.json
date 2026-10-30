@@ -105,7 +105,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.15.0"
+      "latest_version": "0.16.0"
     },
     {
       "id": "logicsrc.com/openmcp",
@@ -251,7 +251,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.13.63"
+      "latest_version": "0.13.64"
     },
     {
       "id": "coinpayportal.com/coinpay",
@@ -361,7 +361,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.15.0"
+      "latest_version": "0.16.0"
     },
     {
       "id": "smshub.dev/smshub",
@@ -797,7 +797,7 @@
       "vendor": "Anthropic",
       "license": "proprietary",
       "agentic": true,
-      "latest_version": "2.1.312"
+      "latest_version": "2.1.314"
     },
     {
       "id": "openai.com/codex",
@@ -873,7 +873,7 @@
       "vendor": "Anomaly (formerly SST)",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "2.2.0"
+      "latest_version": "2.2.2"
     },
     {
       "id": "block.xyz/goose",
@@ -944,7 +944,7 @@
       "vendor": "Alibaba Qwen",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "0.26.3"
+      "latest_version": "0.26.4"
     },
     {
       "id": "kiro.dev/kiro-cli",
@@ -1207,7 +1207,7 @@
       "vendor": "Daniel Miessler",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "1.4.556"
+      "latest_version": "1.4.557"
     },
     {
       "id": "w3bs.org/agentic-desktop-layer",
