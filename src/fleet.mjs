@@ -23,6 +23,7 @@ const tables = () => `
   CREATE INDEX IF NOT EXISTS fleet_machines_user ON fleet_machines(user_id);
   CREATE TABLE IF NOT EXISTS fleet_actions (id TEXT PRIMARY KEY, machine_id TEXT NOT NULL REFERENCES fleet_machines(id) ON DELETE CASCADE, user_id TEXT NOT NULL, action TEXT NOT NULL, status TEXT NOT NULL, output TEXT NOT NULL, created_at TEXT NOT NULL, started_at TEXT, finished_at TEXT);
   CREATE INDEX IF NOT EXISTS fleet_actions_machine ON fleet_actions(machine_id, created_at);
+  CREATE TABLE IF NOT EXISTS fleet_machine_permissions (machine_id TEXT NOT NULL REFERENCES fleet_machines(id) ON DELETE CASCADE, permission TEXT NOT NULL, enabled INTEGER NOT NULL, updated_by TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(machine_id, permission));
   CREATE TABLE IF NOT EXISTS fleet_inventories (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, document TEXT NOT NULL, updated_at TEXT NOT NULL);`;
 export const FLEET_SCHEMA = { sqlite: tables(), postgres: tables() };
 
@@ -30,6 +31,67 @@ export const ACTIONS = {
   refresh: 'Report now',
   update: 'Update w3bs packages',
   'restart-desktop': 'Restart the desktop layer',
+};
+// Every Fleet task is checked against a named permission on the server. New grants
+// are off unless an owner explicitly enables them. `available` separates permissions
+// enforced by today's agent from future tools that must not be advertised as working.
+export const PERMISSIONS = {
+  'system.refresh': {
+    label: 'Report machine health',
+    description: 'Ask this machine to send a fresh Fleet report.',
+    available: true,
+  },
+  'system.update': {
+    label: 'Update w3bs packages',
+    description: 'Install w3bs package updates on this machine.',
+    available: true,
+  },
+  'desktop.restart': {
+    label: 'Restart the desktop layer',
+    description: 'Restart the local Agentic Desktop Layer service.',
+    available: true,
+  },
+  'desktop.view': {
+    label: 'View the desktop',
+    description:
+      'Watch this machine through its configured screen relay. A control-mode relay also requires the control grant because RFB is passed through unchanged.',
+    available: true,
+  },
+  'desktop.control': {
+    label: 'Control the desktop',
+    description: 'Send keyboard and pointer input through the configured screen relay.',
+    available: true,
+  },
+  'terminal.shell': {
+    label: 'Terminal shell (HQTerm)',
+    description: 'Run a scoped terminal task as the machine agent user.',
+    available: false,
+  },
+  'files.read': {
+    label: 'Read files',
+    description: 'Read approved files from this machine.',
+    available: false,
+  },
+  'files.write': {
+    label: 'Write files',
+    description: 'Change approved files on this machine.',
+    available: false,
+  },
+  'browser.devtools': {
+    label: 'Browser DevTools',
+    description: 'Use browser debugging tools through the Fleet permission broker.',
+    available: false,
+  },
+  'desktop.apps': {
+    label: 'Use desktop apps',
+    description: 'Run approved desktop applications through the local desktop broker.',
+    available: false,
+  },
+};
+const ACTION_PERMISSION = {
+  refresh: 'system.refresh',
+  update: 'system.update',
+  'restart-desktop': 'desktop.restart',
 };
 // Labels for the history list: the actions above plus what the relay logs.
 export const HISTORY = { ...ACTIONS, screen: 'Screen session' };
@@ -111,7 +173,7 @@ function cleanInfo(info) {
 }
 
 export function createFleet(db, { events } = {}) {
-  const machineRow = (row, actions = []) => ({
+  const machineRow = (row, actions = [], permissions = {}) => ({
     id: row.id,
     name: row.name,
     hostname: JSON.parse(row.info).hostname ?? null,
@@ -119,9 +181,31 @@ export function createFleet(db, { events } = {}) {
     last_seen_at: row.last_seen_at,
     created_at: row.created_at,
     allow_actions: Boolean(Number(row.allow_actions)),
+    permissions,
     info: JSON.parse(row.info),
     actions,
   });
+  async function permissionMap(machine, query = db) {
+    const stored = await query.all(
+      'SELECT permission, enabled FROM fleet_machine_permissions WHERE machine_id = ?',
+      [machine.id],
+    );
+    const saved = new Map(stored.map((row) => [row.permission, Boolean(Number(row.enabled))]));
+    const info = JSON.parse(machine.info);
+    return Object.fromEntries(
+      Object.keys(PERMISSIONS).map((permission) => {
+        if (saved.has(permission)) return [permission, saved.get(permission)];
+        // Compatibility for machines enrolled before per-task policies shipped. The
+        // old owner opt-in covers only the three fixed actions. A configured screen
+        // is an explicit local opt-in for its selected view/control mode.
+        if (machine.allow_actions && Object.values(ACTION_PERMISSION).includes(permission))
+          return [permission, true];
+        if (permission === 'desktop.view') return [permission, Boolean(info.screen?.mode)];
+        if (permission === 'desktop.control') return [permission, info.screen?.mode === 'control'];
+        return [permission, false];
+      }),
+    );
+  }
   const actionRow = (row) => ({
     id: row.id,
     action: row.action,
@@ -190,12 +274,28 @@ export function createFleet(db, { events } = {}) {
         nowIso(),
         nowIso(),
       ]);
+      const permissions = Object.fromEntries(Object.keys(PERMISSIONS).map((key) => [key, false]));
+      const grants = [];
+      if (Number(row.allow_actions))
+        grants.push('system.refresh', 'system.update', 'desktop.restart');
+      if (clean.screen?.mode) grants.push('desktop.view');
+      if (clean.screen?.mode === 'control') grants.push('desktop.control');
+      for (const permission of grants) {
+        permissions[permission] = true;
+        await tx.run('INSERT INTO fleet_machine_permissions VALUES (?, ?, 1, ?, ?)', [
+          machine.id,
+          permission,
+          row.user_id,
+          nowIso(),
+        ]);
+      }
       return {
         machine_id: machine.id,
         agent_key: machine.key,
         name: machine.name,
         interval: INTERVAL,
         allow_actions: Boolean(Number(row.allow_actions)),
+        permissions,
       };
     });
   }
@@ -217,12 +317,28 @@ export function createFleet(db, { events } = {}) {
         "SELECT id, action FROM fleet_actions WHERE machine_id = ? AND status = 'queued' ORDER BY created_at",
         [machine.id],
       );
-      for (const action of queued)
+      const grants = await permissionMap(machine, tx);
+      const actions = [];
+      for (const action of queued) {
+        const permission = ACTION_PERMISSION[action.action];
+        if (!permission || !grants[permission]) {
+          await tx.run(
+            "UPDATE fleet_actions SET status = 'failed', output = ?, finished_at = ? WHERE id = ?",
+            [
+              `Permission ${permission ?? 'unknown'} was off when the agent checked in.`,
+              nowIso(),
+              action.id,
+            ],
+          );
+          continue;
+        }
         await tx.run("UPDATE fleet_actions SET status = 'running', started_at = ? WHERE id = ?", [
           nowIso(),
           action.id,
         ]);
-      return { actions: queued, interval: INTERVAL };
+        actions.push(action);
+      }
+      return { actions, interval: INTERVAL };
     });
     // Activation: the agent on one of this account's machines is reporting.
     await events?.firstReport(machine.user_id);
@@ -266,6 +382,7 @@ export function createFleet(db, { events } = {}) {
               [row.id],
             )
           ).map(actionRow),
+          await permissionMap(row),
         ),
       ),
     );
@@ -282,10 +399,12 @@ export function createFleet(db, { events } = {}) {
     const machine = await owned(userId, id);
     if (!Object.hasOwn(ACTIONS, action))
       throw fail('UNKNOWN_ACTION', `Actions: ${Object.keys(ACTIONS).join(', ')}.`);
-    if (!Number(machine.allow_actions))
+    const permission = ACTION_PERMISSION[action];
+    const grants = await permissionMap(machine);
+    if (!grants[permission])
       throw fail(
         'ACTIONS_OFF',
-        'This machine joined without actions. Join it again with actions allowed to use them.',
+        `The “${PERMISSIONS[permission].label}” permission is off for this machine. Enable it in Fleet permissions first.`,
         409,
       );
     const pending = await db.get(
@@ -311,6 +430,37 @@ export function createFleet(db, { events } = {}) {
       [machine.id, machine.id],
     );
     return { ...row, status: 'queued' };
+  }
+  async function setPermission(userId, id, permission, enabled) {
+    const machine = await owned(userId, id);
+    const definition = PERMISSIONS[permission];
+    if (!definition) throw fail('UNKNOWN_PERMISSION', 'That Fleet permission does not exist.');
+    if (!definition.available)
+      throw fail(
+        'PERMISSION_UNAVAILABLE',
+        `${definition.label} is not supported by the current Fleet agent yet.`,
+        409,
+      );
+    if (typeof enabled !== 'boolean')
+      throw fail('INVALID_PERMISSION', 'Set enabled to true or false.');
+    const screenMode = JSON.parse(machine.info).screen?.mode;
+    if (enabled && permission === 'desktop.view' && !screenMode)
+      throw fail(
+        'SCREEN_NOT_SHARED',
+        'Enable screen sharing on the machine before granting desktop viewing.',
+        409,
+      );
+    if (enabled && permission === 'desktop.control' && screenMode !== 'control')
+      throw fail(
+        'SCREEN_NOT_CONTROL',
+        'Set the machine screen mode to control before granting desktop control.',
+        409,
+      );
+    await db.run(
+      'INSERT INTO fleet_machine_permissions VALUES (?, ?, ?, ?, ?) ON CONFLICT(machine_id, permission) DO UPDATE SET enabled = excluded.enabled, updated_by = excluded.updated_by, updated_at = excluded.updated_at',
+      [machine.id, permission, enabled ? 1 : 0, userId, nowIso()],
+    );
+    return { machine_id: machine.id, permissions: await permissionMap(machine) };
   }
   // A finished (or refused) screen session, kept with the machine's action history.
   async function logScreen(machineId, userId, { status, output, startedAt }) {
@@ -482,6 +632,8 @@ export function createFleet(db, { events } = {}) {
     leave,
     machines,
     queueAction,
+    setPermission,
+    permissions: PERMISSIONS,
     removeMachine,
     rename,
     logScreen,
@@ -492,8 +644,11 @@ export function createFleet(db, { events } = {}) {
     // For the screen relay: the machine behind an agent key, and an owner's machine.
     machineByKey: async (key) => {
       const row = await agentMachine(key);
-      return row && machineRow(row);
+      return row && machineRow(row, [], await permissionMap(row));
     },
-    ownedMachine: async (userId, id) => machineRow(await owned(userId, id)),
+    ownedMachine: async (userId, id) => {
+      const row = await owned(userId, id);
+      return machineRow(row, [], await permissionMap(row));
+    },
   };
 }
