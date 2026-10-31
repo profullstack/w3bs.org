@@ -50,7 +50,7 @@ for(const databaseUrl of [null,...(process.env.W3BS_TEST_DATABASE_URL?[process.e
 test('record validation rejects private addresses, URLs, invalid TTLs and self aliases',()=>{
  for(const bad of [
   {type:'A',value:'127.0.0.1'}, {type:'AAAA',value:'::1'}, {type:'AAAA',value:'::ffff:127.0.0.1'},
-  {type:'AAAA',value:'fd00::1'}, {type:'AAAA',value:'fe80::1'}, {type:'CNAME',value:'https://example.com/'},
+  {type:'AAAA',value:'fd00::1'}, {type:'AAAA',value:'fe80::1%eth0'}, {type:'AAAA',value:'fe80::1'}, {type:'CNAME',value:'https://example.com/'},
   {type:'CNAME',value:'dumb.fuck.w3bs.org'}, {type:'MX',value:'mx.example.com',priority:-1},
   {type:'TXT',value:'x',ttl:1}, {type:'TXT',value:'x'.repeat(1025)},
  ])assert.throws(()=>normalizeNetRecord(bad,'dumb.fuck'));

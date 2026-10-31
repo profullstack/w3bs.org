@@ -17,7 +17,7 @@ export function normalizeNetRecord(input, name) {
   let priority = 0;
   if (type === 'AAAA') {
     value = value.replace(/^\[|\]$/g, '').toLowerCase();
-    if (isIP(value) !== 6) throw new W3bsError('INVALID_RECORD', 'AAAA needs an IPv6 address. Use CNAME for a hostname.', 400);
+    if (isIP(value) !== 6 || value.includes('%')) throw new W3bsError('INVALID_RECORD', 'AAAA needs an IPv6 address. Use CNAME for a hostname.', 400);
     value = new URL(`http://[${value}]/`).hostname.slice(1,-1);
     if (/^(?:::(?:1)?$|::ffff:|f[cd]|fe[89ab]|ff)/i.test(value)) throw new W3bsError('INVALID_RECORD', 'Use a public IPv6 address, not a local, mapped or multicast address.', 400);
   } else if (type === 'CNAME' || type === 'MX') {
@@ -68,7 +68,7 @@ export function createNetRecords(db) {
         const existing = await rows(tx,tld,label);
         if (existing.some(r=>r.type==='CNAME' && (record.type!=='CNAME' || r.value!==record.value)) || (record.type==='CNAME' && existing.some(r=>r.type!=='CNAME')))
           throw new W3bsError('CNAME_CONFLICT','CNAME must be the only record on a name. Remove the existing records first.',409);
-        if (existing.length >= 100 && !existing.some(r=>r.type===record.type && r.value===record.value && r.priority===record.priority)) throw new W3bsError('RECORD_LIMIT','A name can have at most 100 records.',409);
+        if (existing.length >= 50 && !existing.some(r=>r.type===record.type && r.value===record.value && r.priority===record.priority)) throw new W3bsError('RECORD_LIMIT','A name can have at most 50 records.',409);
         await tx.run('INSERT INTO net_dns_records(id,tld,label,type,value,ttl,priority,created_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(tld,label,type,value,priority) DO UPDATE SET ttl=excluded.ttl',[randomUUID(),tld,label,record.type,record.value,record.ttl,record.priority,new Date().toISOString()]);
         return rows(tx,tld,label);
       });
