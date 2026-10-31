@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 
+export const RESERVED_NET_TLDS = new Set(['w3bs', 'www', 'api', 'net', 'search', 'admin', 'root']);
+
 const now = () => new Date().toISOString();
 const json = (value) => JSON.stringify(value);
 const parse = (value) => {
@@ -404,56 +406,56 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
     return { created: true, row };
   }
 
-  async function requestName({ tld, label, ownerId, ownerName = '', target = null }) {
-    const namespace = await db.get('SELECT * FROM net_tlds WHERE tld = ? AND status = ?', [
-      tld,
-      'active',
-    ]);
-    if (!namespace) return { error: 'namespace_unavailable' };
-    if (
-      namespace.owner_id &&
-      namespace.owner_id !== ownerId &&
-      !((parse(namespace.policy) ?? {}).open)
-    )
-      return { error: 'namespace_owner_required' };
-    const createdAt = now();
-    const seed = await db.get('SELECT * FROM net_names WHERE tld = ? AND label = ?', [tld, label]);
-    if (seed?.source === 'w3bs-operator-seed' && !seed.owner_id && seed.status === 'active') {
-      if (String(ownerName).toLowerCase() !== label)
-        return { error: 'seed_owner_required' };
-      await db.run(
-        "UPDATE net_names SET owner_id = ?, target = ?, status = 'pending', source = 'w3bs', created_at = ? WHERE tld = ? AND label = ? AND owner_id IS NULL AND status = 'active'",
-        [ownerId, target, createdAt, tld, label],
-      );
-      const claimed = await db.get('SELECT * FROM net_names WHERE tld = ? AND label = ?', [tld, label]);
-      if (claimed.owner_id !== ownerId || claimed.status !== 'pending') return { created: false, row: claimed };
-      await db.transaction((tx) =>
-        announce(tx, {
-          type: 'name.claim.requested',
-          subject: `${label}.${tld}`,
-          data: { name: `${label}.${tld}`, target, status: 'pending', claim: true },
-          actor: ownerId,
-          publicEvent: false,
-        }),
-      );
-      return { created: true, row: claimed };
-    }
-    await db.run(
-      "INSERT INTO net_names(tld, label, owner_id, target, status, source, created_at) VALUES (?, ?, ?, ?, 'pending', 'w3bs', ?) ON CONFLICT (tld, label) DO NOTHING",
-      [tld, label, ownerId, target, createdAt],
-    );
-    const row = await db.get('SELECT * FROM net_names WHERE tld = ? AND label = ?', [tld, label]);
-    if (row.owner_id !== ownerId || row.status !== 'pending') return { created: false, row };
-    await db.transaction((tx) =>
-      announce(tx, {
-        type: 'name.requested',
-        subject: `${label}.${tld}`,
-        data: { name: `${label}.${tld}`, target, status: 'pending' },
-        actor: ownerId,
-        publicEvent: false,
-      }),
-    );
-    return { created: true, row };
+  async function requestName({ tld, label, ownerId, ownerName = '', target = null, requestNamespace = false }) {
+    return db.transaction(async (tx) => {
+      let namespace = await tx.get('SELECT * FROM net_tlds WHERE tld = ?', [tld]);
+      let namespaceRequested = false;
+      const createdAt = now();
+      if (!namespace && requestNamespace) {
+        if (RESERVED_NET_TLDS.has(tld)) return { error: 'reserved_namespace' };
+        const inserted = await tx.get(
+          "INSERT INTO net_tlds(tld, owner_id, status, policy, source, created_at) VALUES (?, ?, 'pending', ?, 'w3bs', ?) ON CONFLICT (tld) DO NOTHING RETURNING *",
+          [tld, ownerId, json({ open: false, noSales: true }), createdAt],
+        );
+        namespace = inserted || await tx.get('SELECT * FROM net_tlds WHERE tld = ?', [tld]);
+        if (inserted) {
+          namespaceRequested = true;
+          await announce(tx, {
+            type: 'namespace.requested', subject: `.${tld}`,
+            data: { tld, status: 'pending', policy: parse(namespace.policy) },
+            actor: ownerId, publicEvent: false,
+          });
+        }
+      }
+      if (!namespace) return { error: 'namespace_missing' };
+      const ownPending = namespace.status === 'pending' && namespace.owner_id === ownerId;
+      if (namespace.status !== 'active' && !ownPending)
+        return { error: 'namespace_unavailable', namespaceStatus: namespace.status };
+      if (namespace.owner_id && namespace.owner_id !== ownerId && !(parse(namespace.policy) ?? {}).open)
+        return { error: 'namespace_owner_required' };
+      const seed = await tx.get('SELECT * FROM net_names WHERE tld = ? AND label = ?', [tld, label]);
+      const claim = seed?.source === 'w3bs-operator-seed' && !seed.owner_id && seed.status === 'active';
+      if (claim) {
+        if (String(ownerName).toLowerCase() !== label) return { error: 'seed_owner_required' };
+        await tx.run(
+          "UPDATE net_names SET owner_id = ?, target = ?, status = 'pending', source = 'w3bs', created_at = ? WHERE tld = ? AND label = ? AND owner_id IS NULL AND status = 'active'",
+          [ownerId, target, createdAt, tld, label],
+        );
+      } else {
+        await tx.run(
+          "INSERT INTO net_names(tld, label, owner_id, target, status, source, created_at) VALUES (?, ?, ?, ?, 'pending', 'w3bs', ?) ON CONFLICT (tld, label) DO NOTHING",
+          [tld, label, ownerId, target, createdAt],
+        );
+      }
+      const row = await tx.get('SELECT * FROM net_names WHERE tld = ? AND label = ?', [tld, label]);
+      if (row.owner_id !== ownerId || row.status !== 'pending') return { created: false, row };
+      await announce(tx, {
+        type: claim ? 'name.claim.requested' : 'name.requested', subject: `${label}.${tld}`,
+        data: { name: `${label}.${tld}`, target, status: 'pending', ...(claim ? { claim: true } : {}) },
+        actor: ownerId, publicEvent: false,
+      });
+      return { created: true, row, namespaceRequested, namespacePending: namespace.status === 'pending' };
+    });
   }
 
   async function pending() {
@@ -517,6 +519,10 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
     const [label, tld] = String(subject).toLowerCase().split('.');
     const row = await db.get('SELECT * FROM net_names WHERE tld = ? AND label = ?', [tld, label]);
     if (!row) return { error: 'not_found' };
+    if (status === 'active') {
+      const namespace = await db.get('SELECT status FROM net_tlds WHERE tld = ?', [tld]);
+      if (namespace?.status !== 'active') return { error: 'namespace_not_active' };
+    }
     await db.run(
       'UPDATE net_names SET status = ?, moderated_at = ?, moderation_note = ? WHERE tld = ? AND label = ?',
       [status, moderatedAt, note.slice(0, 500), tld, label],

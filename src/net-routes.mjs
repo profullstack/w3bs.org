@@ -1,4 +1,5 @@
 import express from 'express';
+import { RESERVED_NET_TLDS } from './net-store.mjs';
 import { pageShell, escapeHtml as e } from './site.mjs';
 import { W3bsError } from './core.mjs';
 
@@ -497,8 +498,7 @@ export function createNet({
       const user = await requireAccount(req);
       const tld = safeTld(req.body?.tld);
       if (!tld) throw new W3bsError('INVALID_TLD', 'Namespace labels use letters, digits and hyphens.', 400);
-      const reserved = new Set(['w3bs', 'www', 'api', 'net', 'search', 'admin', 'root']);
-      if (reserved.has(tld)) throw new W3bsError('RESERVED_TLD', 'That namespace label is reserved.', 409);
+      if (RESERVED_NET_TLDS.has(tld)) throw new W3bsError('RESERVED_TLD', 'That namespace label is reserved.', 409);
       const result = await network.requestTld({ tld, ownerId: user.id, policy: { open: Boolean(req.body?.open) } });
       if (!result.created) throw new W3bsError('TLD_TAKEN', 'That namespace is already registered or pending.', 409);
       res.status(202).json({ tld, status: 'pending_moderation', noSales: true });
@@ -510,12 +510,14 @@ export function createNet({
       const target = publicTarget(req.body?.target);
       if (target === undefined) throw new W3bsError('INVALID_TARGET', 'A destination must be a public HTTPS URL.', 400);
       const [label, tld] = name.split('.');
-      const result = await network.requestName({ tld, label, ownerId: user.id, ownerName: user.username, target });
-      if (result.error === 'namespace_unavailable') throw new W3bsError('NAMESPACE_UNAVAILABLE', 'The W3BS namespace is not active.', 409);
-      if (result.error === 'namespace_owner_required') throw new W3bsError('NAMESPACE_OWNER_REQUIRED', 'The namespace owner does not allow open registration.', 403);
+      const result = await network.requestName({ tld, label, ownerId: user.id, ownerName: user.username, target, requestNamespace: req.body?.requestNamespace === true });
+      if (result.error === 'reserved_namespace') throw new W3bsError('RESERVED_TLD', `The .${tld} namespace is reserved.`, 409);
+      if (result.error === 'namespace_missing') throw new W3bsError('NAMESPACE_MISSING', `The .${tld} namespace is not registered. Select “Request the namespace too” to submit both for review.`, 409);
+      if (result.error === 'namespace_unavailable') throw new W3bsError('NAMESPACE_UNAVAILABLE', `The .${tld} namespace is ${result.namespaceStatus}. Its owner must obtain approval before you can request a name.`, 409);
+      if (result.error === 'namespace_owner_required') throw new W3bsError('NAMESPACE_OWNER_REQUIRED', `The .${tld} namespace is closed to registration. Only its owner can request names.`, 403);
       if (result.error === 'seed_owner_required') throw new W3bsError('SEEDED_NAME_OWNER_REQUIRED', 'Only the matching W3BS account can claim this operator-seeded name.', 403);
       if (!result.created) throw new W3bsError('NAME_TAKEN', 'That name is already registered or pending.', 409);
-      res.status(202).json({ name, status: 'pending_moderation' });
+      res.status(202).json({ name, status: 'pending_moderation', namespaceRequested: result.namespaceRequested, namespacePending: result.namespacePending });
     });
 
     app.get('/api/net/v1/operator/overview', async (req, res) => {
@@ -540,6 +542,7 @@ export function createNet({
         actor: user.id,
         note: String(req.body?.note ?? ''),
       });
+      if (result.error === 'namespace_not_active') throw new W3bsError('NAMESPACE_NOT_ACTIVE', 'Approve the parent namespace before activating this name.', 409);
       if (result.error) throw new W3bsError('MODERATION_FAILED', result.error, result.error === 'not_found' ? 404 : 400);
       res.json(result);
     });
@@ -582,7 +585,7 @@ export function createNet({
         'Register on W3BS Net',
         'Request a W3BS namespace or name. Registrations are free and moderated.',
         '/net',
-        `<section class="page-head compact"><div class="eyebrow">W3BS NET · REGISTRATION</div><h1>Claim a name.<br><em>Join the federation.</em></h1><p>Signed in as <strong>@${e(user.username)}</strong>. Namespace and name requests are free. Each request waits for moderation before becoming active or reaching peers.</p></section><div class="net-console"><section class="net-block"><h2>Request a namespace</h2><p class="net-help">A namespace lets you register names beneath it after approval. It has no price and cannot be pre-bought.</p><form id="net-register-tld"><label for="register-tld">Namespace label</label><input id="register-tld" name="tld" maxlength="63" required placeholder="example"><label><input name="open" type="checkbox" value="1"> Let any signed-in W3BS account request names under it</label><button class="button primary" type="submit">Request namespace</button><p class="net-status" data-status></p></form></section><section class="net-block"><h2>Request a name</h2><p class="net-help">Names can be requested under an active open namespace, or under a namespace you own.</p><form id="net-register-name"><label for="register-name">Name</label><input id="register-name" name="name" maxlength="127" required placeholder="riotcoder.agent"><label for="register-target">Optional HTTPS destination</label><input id="register-target" name="target" type="url" placeholder="https://example.org"><button class="button primary" type="submit">Request name</button><p class="net-status" data-status></p></form></section></div><script type="module" src="/assets/net-register.js"></script>`,
+        `<section class="page-head compact"><div class="eyebrow">W3BS NET · REGISTRATION</div><h1>Claim a name.<br><em>Join the federation.</em></h1><p>Signed in as <strong>@${e(user.username)}</strong>. Namespace and name requests are free. Each request waits for moderation before becoming active or reaching peers.</p></section><div class="net-console"><section class="net-block"><h2>Request a namespace</h2><p class="net-help">A namespace lets you register names beneath it after approval. It has no price and cannot be pre-bought.</p><form id="net-register-tld"><label for="register-tld">Namespace label</label><input id="register-tld" name="tld" maxlength="63" required placeholder="example"><label><input name="open" type="checkbox" value="1"> Let any signed-in W3BS account request names under it</label><button class="button primary" type="submit">Request namespace</button><p class="net-status" data-status></p></form></section><section class="net-block"><h2>Request a name</h2><p class="net-help">Request a name under an active open namespace or one you own. For a new namespace, submit both together for moderation.</p><form id="net-register-name"><label for="register-name">Name</label><input id="register-name" name="name" maxlength="127" required placeholder="riotcoder.agent"><label for="register-target">Optional HTTPS destination</label><input id="register-target" name="target" type="url" placeholder="https://example.org"><label><input name="requestNamespace" type="checkbox" value="1"> Request the namespace too if it is not registered</label><p class="net-help">For name.example, the namespace is .example. New namespaces belong to you and are closed to other registrations by default. Neither request becomes active until approved.</p><button class="button primary" type="submit">Request name</button><p class="net-status" data-status role="status" aria-live="polite"></p></form></section></div><script type="module" src="/assets/net-register.js"></script>`,
         'noindex',
       ));
     });

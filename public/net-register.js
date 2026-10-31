@@ -21,12 +21,14 @@ for (const [id, path] of [
     const fields = new FormData(form);
     const body = id === 'net-register-tld'
       ? { tld: fields.get('tld'), open: fields.get('open') === '1' }
-      : { name: fields.get('name'), target: fields.get('target') || null };
+      : { name: fields.get('name'), target: fields.get('target') || null, requestNamespace: fields.get('requestNamespace') === '1' };
     button.disabled = true;
     status.classList.remove('net-error');
     try {
       const result = await send(path, body);
-      status.textContent = `${result.name || `.${result.tld}`} is in the moderation queue.`;
+      status.textContent = result.namespacePending
+        ? `${result.namespaceRequested ? `.${result.name.split('.')[1]} and ` : ''}${result.name} ${result.namespaceRequested ? 'are' : 'is'} in the moderation queue. The namespace must be approved before the name can become active.`
+        : `${result.name || `.${result.tld}`} is in the moderation queue.`;
       form.reset();
     } catch (error) {
       status.textContent = error.message;
