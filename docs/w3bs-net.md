@@ -38,3 +38,18 @@ W3BS is an independent Moshpit instance: W3BS names, owner ids and DNS writes st
 A configured Moshpit resolver maps the W3BS realm `label.namespace.w3bs.org` to this instance, querying its resolve and records APIs. It does not treat bare `label.namespace` on the primary network as the same ownership. Active instance records are authoritative within that explicitly configured realm, including over public parking answers; inactive local names cannot be revived through primary-network fallback. A name with no custom address records goes to the W3BS gateway so its existing HTTPS destination can redirect there. Custom AAAA or CNAME records override the gateway address; TXT/MX coexist with its default address. DNS changes publish immediately in the instance; cached resolver/browser answers still follow TTL.
 
 DNS answers and HTTPS certificates are separate rollout gates. Standard browser access to every new `*.namespace.w3bs.org` requires public DNS and a publicly trusted certificate for that suffix. A generic `*.w3bs.org` certificate does not cover two labels. The primary Moshpit CA intentionally refuses public TLDs and must not be changed to mint arbitrary `.org` certificates to work around missing registrar credentials. Resolver routing is not evidence that public DNS or HTTPS is ready. Preserve that distinction when reporting a new name live.
+
+### URL redirects
+
+At `/net/records`, each active name you own has a URL redirect form. Enter a complete HTTPS URL (including a path), choose **301 permanent** or **302 temporary**, then save. Existing registration destinations appear here as 302 redirects. Saving/removing gives inline feedback without refreshing the page. A 301 can be remembered by browsers; use 302 while testing.
+
+Authenticated owner API:
+
+```http
+PUT /api/net/v1/names/blue.example/redirect
+Content-Type: application/json
+
+{"target":"https://example.com/page","status":301}
+```
+
+`DELETE` at that same endpoint removes the destination. Only the local owner of an active name in an active namespace can change it. Redirect changes update the resolver record and publish a federation activation event. Redirects and AAAA/CNAME records are mutually exclusive, since those records route visitors away from the gateway. TXT/MX records can coexist. Redirects require working gateway DNS and HTTPS; setting a URL does not provision a public certificate or change registrar DNS.

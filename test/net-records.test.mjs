@@ -19,6 +19,24 @@ for(const databaseUrl of [null,...(process.env.W3BS_TEST_DATABASE_URL?[process.e
    await assert.rejects(()=>store.network.dns.put(name,user.id,{type:'TXT',value:'pending'}),/must be active/);
    await store.network.moderate({kind:'namespace',subject:tld,action:'approve',actor:user.id});
    await store.network.moderate({kind:'name',subject:name,action:'approve',actor:user.id});
+   const redirectPath=`/api/net/v1/names/${name}/redirect`;
+   const destination='https://example.com/a-page?campaign=w3bs';
+   assert.equal((await request(redirectPath,'PUT',{target:destination,status:301},false)).status,401);
+   await assert.rejects(()=>store.network.dns.setRedirect(name,'someone-else',destination,301),/Only the W3BS owner/);
+   for(const target of ['javascript:alert(1)','http://example.com','https://user:pass@example.com',`https://${name}.w3bs.org/path`])
+    assert.equal((await request(redirectPath,'PUT',{target,status:301})).status,400);
+   assert.equal((await request(redirectPath,'PUT',{target:destination,status:307})).status,400);
+   assert.equal((await request(redirectPath,'PUT',{target:destination,status:301})).status,200);
+   const gateway=()=>fetch(base+'/anything?ignored=yes',{headers:{host:`${name}.w3bs.org`},redirect:'manual'});
+   let moved=await gateway();assert.equal(moved.status,301);assert.equal(moved.headers.get('location'),destination);
+   assert.equal((await store.network.resolveName(name)).redirectStatus,301);
+   assert.equal((await(await request('/api/net/v1/dns/mine')).json()).names.find(n=>n.name===name).redirect_status,301);
+   assert.equal((await request(`/api/net/v1/names/${name}/records`,'POST',{type:'CNAME',value:'box.example.com'})).status,409);
+   await request(redirectPath,'PUT',{target:destination,status:302});
+   moved=await gateway();assert.equal(moved.status,302);assert.equal(moved.headers.get('location'),destination);
+   await request(redirectPath,'DELETE');assert.equal((await gateway()).status,200);
+   const events=await store.network.events({limit:100});
+   assert.ok(events.some(e=>e.type==='name.activated'&&e.data.redirectStatus===301&&e.data.target===destination));
    const path=`/api/net/v1/names/${name}/records`;
    assert.equal((await request(path,'POST',{type:'TXT',value:'secret'},false)).status,401);
    await assert.rejects(()=>store.network.dns.put(name,'someone-else',{type:'TXT',value:'hijack'}),/Only the W3BS owner/);
@@ -37,12 +55,14 @@ for(const databaseUrl of [null,...(process.env.W3BS_TEST_DATABASE_URL?[process.e
    await request(`${path}/${cname.id}`,'DELETE');
    assert.equal((await request(path,'POST',{type:'MX',value:'mx.example.com',priority:10,ttl:60})).status,200);
    assert.equal((await request(path,'POST',{type:'AAAA',value:'2606:4700:4700::1111'})).status,200);
+   assert.equal((await request(redirectPath,'PUT',{target:destination,status:301})).status,409);
    const mine=await(await request('/api/net/v1/dns/mine')).json();
    assert.equal(mine.names.find(n=>n.name===name).records.length,2);
    assert.equal((await request('/net/records')).status,200);
    assert.match(await(await request('/net/records','GET',undefined,false)).text(),/Sign in to publish/);
    await store.network.moderate({kind:'namespace',subject:tld,action:'suspend',actor:user.id});
    assert.deepEqual(await store.network.dns.list(name),[]);
+   assert.equal((await request(redirectPath,'PUT',{target:destination,status:301})).status,409);
    assert.equal((await request(path,'POST',{type:'TXT',value:'suspended'})).status,409);
   }finally{await app.close();}
  });
