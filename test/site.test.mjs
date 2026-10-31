@@ -139,7 +139,12 @@ test('CrawlProof: only for https://w3bs.org, never on pages that can carry accou
       '/device?code=BCDF-GHJK',
       '/login?next=%2Fdevice%3Fcode%3DBCDFGHJK',
     ])
-      assert.ok(!(await (await fetch(`${t.base}${path}`)).text()).includes('crawlproof'), path);
+      // A footer link to CrawlProof is not the analytics script. Check executable tags.
+      assert.doesNotMatch(
+        await (await fetch(`${t.base}${path}`)).text(),
+        /<script\b[^>]*\bsrc\s*=\s*["'][^"']*crawlproof\.com\b/i,
+        path,
+      );
   } finally {
     await t.close();
     if (saved === undefined) delete process.env.W3BS_CRAWLPROOF_SITE;
