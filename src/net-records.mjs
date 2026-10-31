@@ -32,7 +32,7 @@ export function normalizeNetRecord(input, name) {
   return { type, value, ttl, priority };
 }
 
-export function createNetRecords(db) {
+export function createNetRecords(db, announceRedirect = async () => {}) {
   let writes = Promise.resolve();
   const transaction = (fn) => {
     const next = writes.then(() => db.transaction(fn));
@@ -54,7 +54,29 @@ export function createNetRecords(db) {
   }
   return {
     async owned(ownerId) {
-      return db.all('SELECT n.label,n.tld,n.status,n.target,t.status AS namespace_status FROM net_names n JOIN net_tlds t ON t.tld=n.tld WHERE n.owner_id=? ORDER BY n.tld,n.label',[ownerId]);
+      return db.all('SELECT n.label,n.tld,n.status,n.target,t.status AS namespace_status,COALESCE(r.status,302) AS redirect_status FROM net_names n JOIN net_tlds t ON t.tld=n.tld LEFT JOIN net_url_redirects r ON r.tld=n.tld AND r.label=n.label WHERE n.owner_id=? ORDER BY n.tld,n.label',[ownerId]);
+    },
+    async setRedirect(name, ownerId, target, status = 301) {
+      if (target !== null) {
+        let url;
+        try { url = new URL(target); } catch {}
+        if (typeof target !== 'string' || target.length > 2048 || !url || url.protocol !== 'https:' || url.username || url.password)
+          throw new W3bsError('INVALID_TARGET','Enter a complete HTTPS destination URL.',400);
+        if ([name, `${name}.w3bs.org`].includes(url.hostname.toLowerCase()))
+          throw new W3bsError('REDIRECT_LOOP','A name cannot redirect to itself.',400);
+        target = url.href;
+        if (![301,302].includes(status)) throw new W3bsError('INVALID_REDIRECT_STATUS','Choose 301 permanent or 302 temporary.',400);
+      }
+      return transaction(async tx => {
+        const [tld,label] = await authorize(tx,name,ownerId);
+        if (target && (await rows(tx,tld,label)).some(r=>['AAAA','CNAME'].includes(r.type)))
+          throw new W3bsError('REDIRECT_DNS_CONFLICT','Remove AAAA or CNAME records first so this name uses the W3BS redirect gateway.',409);
+        await tx.run('UPDATE net_names SET target=? WHERE tld=? AND label=?',[target,tld,label]);
+        if (target) await tx.run('INSERT INTO net_url_redirects(tld,label,status) VALUES(?,?,?) ON CONFLICT(tld,label) DO UPDATE SET status=excluded.status',[tld,label,status]);
+        else await tx.run('DELETE FROM net_url_redirects WHERE tld=? AND label=?',[tld,label]);
+        await announceRedirect(tx,name,target,target ? status : 302,ownerId);
+        return { target, redirectStatus: target ? status : 302 };
+      });
     },
     async list(name) {
       const [tld,label] = parts(name);
@@ -65,6 +87,8 @@ export function createNetRecords(db) {
       const record = normalizeNetRecord(input,name);
       return transaction(async tx => {
         const [tld,label] = await authorize(tx,name,ownerId);
+        if (['AAAA','CNAME'].includes(record.type) && (await tx.get('SELECT target FROM net_names WHERE tld=? AND label=?',[tld,label]))?.target)
+          throw new W3bsError('REDIRECT_DNS_CONFLICT','Remove the URL redirect first before pointing this name at another server.',409);
         const existing = await rows(tx,tld,label);
         if (existing.some(r=>r.type==='CNAME' && (record.type!=='CNAME' || r.value!==record.value)) || (record.type==='CNAME' && existing.some(r=>r.type!=='CNAME')))
           throw new W3bsError('CNAME_CONFLICT','CNAME must be the only record on a name. Remove the existing records first.',409);

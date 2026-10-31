@@ -417,7 +417,10 @@ export function createNet({
         `<section class="page-head compact"><div class="eyebrow">W3BS NET · ${e(record.status)}</div><h1>${e(name)}</h1><p>This local W3BS record is not active, so the federation backfill is not used for it.</p><a class="button" href="https://w3bs.org/net">W3BS Net</a></section>`,
       ));
     }
-    if (record.target) return res.redirect(302, record.target);
+    if (record.target) {
+      res.set('Cache-Control', 'no-store');
+      return res.redirect(record.redirectStatus === 301 ? 301 : 302, record.target);
+    }
     res.set('X-W3BS-Net-Source', record.source === 'w3bs' ? 'w3bs-primary' : 'w3bs-federation');
     return res.type('html').send(shell(
       name,
@@ -477,19 +480,37 @@ export function createNet({
       if (!name) throw new W3bsError('INVALID_NAME','Use label.namespace.',400);
       res.json({ name, records:await network.dns.remove(name,user.id,req.params.id) });
     });
+    app.put('/api/net/v1/names/:name/redirect', async (req,res) => {
+      const user = await requireAccount(req);
+      const name = safeName(req.params.name);
+      if (!name) throw new W3bsError('INVALID_NAME','Use label.namespace.',400);
+      res.set('Cache-Control','no-store');
+      res.json({ name, ...await network.dns.setRedirect(name,user.id,req.body?.target,req.body?.status ?? 301) });
+    });
+    app.delete('/api/net/v1/names/:name/redirect', async (req,res) => {
+      const user = await requireAccount(req);
+      const name = safeName(req.params.name);
+      if (!name) throw new W3bsError('INVALID_NAME','Use label.namespace.',400);
+      res.json({ name, ...await network.dns.setRedirect(name,user.id,null) });
+    });
     app.get('/net/records', async (req,res) => {
       const { user } = await authorized(req);
       res.set('Cache-Control','no-store');
       res.type('html').send(shell('DNS Records · W3BS Net','Publish DNS records on names you own in this Moshpit instance.','/net',`
-        <section class="page-head compact"><div class="eyebrow">W3BS NET · MOSHPIT INSTANCE</div><h1>DNS <em>records.</em></h1>
-        <p>Real records on the names you hold: AAAA for IPv6, CNAME to another hostname, MX for mail and TXT for verification. Changes publish to this W3BS instance immediately; existing resolver caches follow the record’s TTL.</p>
+        <section class="page-head compact"><div class="eyebrow">W3BS NET · MOSHPIT INSTANCE</div><h1>DNS &amp; <em>redirects.</em></h1>
+        <p>Send a name to any HTTPS URL with a 301 permanent or 302 temporary URL redirect. Or publish DNS records on the names you hold: AAAA for IPv6, CNAME to another hostname, MX for mail and TXT for verification. Changes publish to this W3BS instance immediately; existing resolver caches follow the record’s TTL.</p>
         <p class="net-help">W3BS is a separate Moshpit instance. Your names and records belong here; imported primary-network records remain read-only backfill. The public gateway name is <code>name.namespace.w3bs.org</code>.</p>
         <nav class="net-tabs" aria-label="Network"><a href="/net">Network</a><a href="/net/register">Register</a><a href="/net/records" aria-current="page">DNS Records</a></nav></section>
         ${user ? `<section class="net-block"><form id="net-dns-filter" role="search"><label for="dns-filter">Filter your names</label><input id="dns-filter" name="q" placeholder="dumb.fuck, fuck, dumb.*" autocomplete="off"><button class="button" type="submit">Filter</button></form><p id="dns-status" class="net-status" role="status" aria-live="polite">Loading your names…</p><div id="dns-names"></div></section><script type="module" src="/assets/net-records.js"></script>` : `<section class="net-block"><p>Sign in to publish records on names you own in W3BS.</p><a class="button primary" href="/login?next=%2Fnet%2Frecords">Sign in →</a></section>`}
         <section class="net-block"><h2>Publish from a script</h2><p>Use the existing W3BS OAuth bearer from <code>w3bs login</code>. Primary-network API keys do not grant W3BS ownership.</p><pre>POST /api/net/v1/names/blue.example/records
 { "type": "AAAA", "value": "2606:4700:4700::1111", "ttl": 300 }
 
-GET /api/net/v1/dns/records?name=blue.example</pre></section>`, 'noindex'));
+GET /api/net/v1/dns/records?name=blue.example
+
+PUT /api/net/v1/names/blue.example/redirect
+{ "target": "https://example.com/path", "status": 301 }
+
+DELETE /api/net/v1/names/blue.example/redirect</pre></section>`, 'noindex'));
     });
     app.get('/api/net/v1/resolve/:name', async (req, res) => {
       res.set('Access-Control-Allow-Origin', '*');

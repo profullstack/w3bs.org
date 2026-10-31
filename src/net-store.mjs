@@ -44,6 +44,10 @@ const TABLES = (sequence) => `
     UNIQUE(tld,label,type,value,priority)
   );
   CREATE INDEX IF NOT EXISTS net_dns_name ON net_dns_records(tld,label);
+  CREATE TABLE IF NOT EXISTS net_url_redirects (
+    tld TEXT NOT NULL, label TEXT NOT NULL, status INTEGER NOT NULL,
+    PRIMARY KEY(tld,label)
+  );
   CREATE TABLE IF NOT EXISTS net_events (
     seq ${sequence},
     event_id TEXT NOT NULL UNIQUE,
@@ -230,8 +234,9 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
     const safeLimit = Math.max(1, Math.min(200, Number(limit) || 100));
     const local = await db.all(
       `SELECT n.tld, n.label, n.target, n.status, n.source, n.created_at,
-              t.policy, n.owner_id
+              t.policy, n.owner_id, COALESCE(r.status,302) AS redirect_status
          FROM net_names n JOIN net_tlds t ON t.tld = n.tld
+         LEFT JOIN net_url_redirects r ON r.tld=n.tld AND r.label=n.label
         WHERE n.status = 'active' AND t.status = 'active'
           AND (? = '' OR lower(n.label || '.' || n.tld) LIKE ?)
         ORDER BY n.tld, n.label LIMIT ?`,
@@ -281,6 +286,7 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
       .map(([name, value]) => ({
         name,
         target: publicTarget(value.event.data?.target),
+        redirectStatus: value.event.data?.redirectStatus === 301 ? 301 : 302,
         source: value.source,
         importedAt: value.importedAt,
         status: 'federated',
@@ -317,6 +323,7 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
           tld: row.tld,
           label: row.label,
           target: row.target,
+          redirectStatus: row.redirect_status,
           status: row.status,
           source: 'w3bs',
           claimed: Boolean(row.owner_id),
@@ -330,8 +337,9 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
   async function resolveName(name) {
     const [label, tld] = String(name ?? '').toLowerCase().split('.');
     const local = await db.get(
-      `SELECT n.tld, n.label, n.target, n.status, n.owner_id, n.created_at, t.policy
+      `SELECT n.tld, n.label, n.target, n.status, n.owner_id, n.created_at, t.policy, COALESCE(r.status,302) AS redirect_status
          FROM net_names n JOIN net_tlds t ON t.tld = n.tld
+         LEFT JOIN net_url_redirects r ON r.tld=n.tld AND r.label=n.label
         WHERE n.tld = ? AND n.label = ? AND n.status = 'active' AND t.status = 'active'`,
       [tld, label],
     );
@@ -341,6 +349,7 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
         source: 'w3bs',
         status: 'active',
         target: local.target,
+        redirectStatus: local.redirect_status,
         claimed: Boolean(local.owner_id),
         createdAt: local.created_at,
       };
@@ -374,6 +383,7 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
         source: remote.source,
         status: 'federated',
         target: publicTarget(remote.event.data?.target),
+        redirectStatus: remote.event.data?.redirectStatus === 301 ? 301 : 302,
         claimed: Boolean(remote.event.data?.claimed),
         importedAt: remote.importedAt,
       };
@@ -524,7 +534,7 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
     }
     if (kind !== 'name') return { error: 'invalid_kind' };
     const [label, tld] = String(subject).toLowerCase().split('.');
-    const row = await db.get('SELECT * FROM net_names WHERE tld = ? AND label = ?', [tld, label]);
+    const row = await db.get('SELECT n.*, COALESCE(r.status,302) AS redirect_status FROM net_names n LEFT JOIN net_url_redirects r ON r.tld=n.tld AND r.label=n.label WHERE n.tld = ? AND n.label = ?', [tld, label]);
     if (!row) return { error: 'not_found' };
     if (status === 'active') {
       const namespace = await db.get('SELECT status FROM net_tlds WHERE tld = ?', [tld]);
@@ -542,6 +552,7 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
           data: {
             name: `${label}.${tld}`,
             target: row.target,
+            redirectStatus: row.redirect_status,
             status,
             claimed: Boolean(row.owner_id),
           },
@@ -820,7 +831,10 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
   }
 
   return {
-    dns: createNetRecords(db),
+    dns: createNetRecords(db, (tx, name, target, redirectStatus, actor) => announce(tx, {
+      type: 'name.activated', subject: name, actor,
+      data: { name, target, redirectStatus, status: 'active', claimed: true },
+    })),
     ensureDefaults,
     registry,
     resolveName,

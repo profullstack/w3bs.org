@@ -50,7 +50,35 @@ function render(){
     const button=el('button','Publish record',{type:'submit',className:'button primary'});form.append(button);
     type.addEventListener('change',()=>{value.placeholder=help[type.value];priorityLabel.hidden=type.value!=='MX';});
     form.addEventListener('submit',async event=>{event.preventDefault();await perform(button,()=>api(path,{method:'POST',body:JSON.stringify({type:type.value,value:value.value,ttl:Number(ttl.value),priority:Number(priority.value)})}));});
-    card.append(form,feedback);root.append(card);
+    card.append(form,feedback);
+    const redirectForm=el('form',null,{className:'net-dns-form'});
+    const target=el('input',null,{name:'target',type:'url',required:true,maxLength:2048,value:item.target||'',placeholder:'https://example.com/your-page'});
+    target.setAttribute('aria-label','Destination URL');
+    const targetLabel=el('label','Destination URL');targetLabel.append(target);
+    const code=el('select',null,{name:'status'});code.setAttribute('aria-label','Redirect type');
+    code.append(el('option','301 — Permanent',{value:'301'}),el('option','302 — Temporary',{value:'302'}));code.value=String(item.redirect_status||301);
+    if(!item.target)code.value='301';
+    const codeLabel=el('label','Redirect type');codeLabel.append(code);
+    const save=el('button','Save redirect',{type:'submit',className:'button primary'});
+    const remove=el('button','Remove redirect',{type:'button',className:'button'});remove.hidden=!item.target;
+    const message=el('p','',{className:'net-status'});message.setAttribute('role','status');message.setAttribute('aria-live','polite');
+    const summary=el('p',item.target?`${item.redirect_status} → ${item.target}`:'No URL redirect set.',{className:'net-help'});
+    const redirectPath=`/api/net/v1/names/${encodeURIComponent(item.name)}/redirect`;
+    const changeRedirect=async(clear)=>{
+      save.disabled=true;remove.disabled=true;message.textContent='Saving…';message.classList.remove('net-error');
+      try{
+        const data=await api(redirectPath,clear?{method:'DELETE'}:{method:'PUT',body:JSON.stringify({target:target.value,status:Number(code.value)})});
+        item.target=data.target;item.redirect_status=data.redirectStatus;remove.hidden=!data.target;
+        target.value=data.target||'';summary.textContent=data.target?`${data.redirectStatus} → ${data.target}`:'No URL redirect set.';
+        message.textContent=data.target?'URL redirect saved.':'URL redirect removed.';
+      }catch(error){message.textContent=error.message;message.classList.add('net-error');}
+      finally{save.disabled=false;remove.disabled=false;}
+    };
+    redirectForm.append(targetLabel,codeLabel,save,remove);
+    redirectForm.addEventListener('submit',event=>{event.preventDefault();changeRedirect(false);});
+    remove.addEventListener('click',()=>changeRedirect(true));
+    card.append(el('h3','URL redirect'),el('p','Send visitors to a complete HTTPS URL, including its path. Choose 301 for a permanent move or 302 for a temporary destination. Browsers may remember permanent redirects. AAAA/CNAME records must be removed to use the redirect gateway. The hostname must resolve to the gateway and have a valid HTTPS certificate.',{className:'net-help'}),summary,redirectForm,message);
+    root.append(card);
   }
 }
 document.querySelector('#net-dns-filter').addEventListener('submit',event=>{event.preventDefault();render();});
