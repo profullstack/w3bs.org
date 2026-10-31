@@ -74,7 +74,7 @@ function registryMarkup(names, { query = '', moshpitError = '' } = {}) {
           })
           .join('')}</div>`
       : '<p class="muted">No names match this search.</p>';
-  return `<section class="page-head net-intro"><div class="eyebrow">W3BS NET · OPEN DOMAIN FEDERATION</div><h1>Your namespaces.<br><em>Your network.</em></h1><p>W3BS Net is an independent registry and event relay. Names registered here are primary on W3BS; opted-in peers receive announcements. Public Moshpit records are imported as backfill and stay attributed to their source.</p><form class="search-bar" action="/search" method="get" role="search"><label class="sr-only" for="net-q">Search W3BS Net</label><input id="net-q" name="q" type="search" value="${e(query)}" placeholder="Search names and namespaces…" maxlength="200"><button class="button primary" type="submit">Search →</button></form><div class="actions"><a class="button primary" href="/net/register">Register a namespace or name</a><a class="button" href="/net/operator">Operator console</a><a class="text-link" href="/api/net/v1/registry">Registry API ↗</a><a class="text-link" href="/api/net/v1/events">Event relay ↗</a></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">LOCAL · PRIMARY</div><h2>W3BS registrations</h2></div><p>Requests are held for moderation. Active namespaces and names are free, never sold, and never reserved for pre-buy.</p></div>${rows(local)}</section><section class="section"><div class="section-heading"><div><div class="eyebrow">FEDERATION · BACKFILL</div><h2>Imported names</h2></div><p>Moshpit records fill gaps in discovery. W3BS registrations always take precedence when a name exists in both registries.</p></div>${moshpitError ? `<p class="net-meta">${e(moshpitError)}</p>` : ''}${rows(imported, true)}</section><aside class="callout net-no-sales"><strong>No pre-buys, sales or paid reservations.</strong><p>Register a namespace or name through your W3BS account. Operators review registrations before announcing them to federation peers.</p><a class="inline-link" href="/net/operator">Open the operator console →</a></aside>`;
+  return `<section class="page-head net-intro"><div class="eyebrow">W3BS NET · OPEN DOMAIN FEDERATION</div><h1>Your namespaces.<br><em>Your network.</em></h1><p>W3BS Net is a separate Moshpit instance with its own registry and event relay. Names registered here are primary on W3BS; opted-in peers receive announcements. Public Moshpit records are imported as backfill and stay attributed to their source.</p><form class="search-bar" action="/search" method="get" role="search"><label class="sr-only" for="net-q">Search W3BS Net</label><input id="net-q" name="q" type="search" value="${e(query)}" placeholder="Search names and namespaces…" maxlength="200"><button class="button primary" type="submit">Search →</button></form><div class="actions"><a class="button primary" href="/net/register">Register a namespace or name</a><a class="button" href="/net/records">DNS Records</a><a class="button" href="/net/operator">Operator console</a><a class="text-link" href="/api/net/v1/registry">Registry API ↗</a><a class="text-link" href="/api/net/v1/events">Event relay ↗</a></div></section><section class="section"><div class="section-heading"><div><div class="eyebrow">LOCAL · PRIMARY</div><h2>W3BS registrations</h2></div><p>Requests are held for moderation. Active namespaces and names are free, never sold, and never reserved for pre-buy.</p></div>${rows(local)}</section><section class="section"><div class="section-heading"><div><div class="eyebrow">FEDERATION · BACKFILL</div><h2>Imported names</h2></div><p>Moshpit records fill gaps in discovery. W3BS registrations always take precedence when a name exists in both registries.</p></div>${moshpitError ? `<p class="net-meta">${e(moshpitError)}</p>` : ''}${rows(imported, true)}</section><aside class="callout net-no-sales"><strong>No pre-buys, sales or paid reservations.</strong><p>Register a namespace or name through your W3BS account. Operators review registrations before announcing them to federation peers.</p><a class="inline-link" href="/net/operator">Open the operator console →</a></aside>`;
 }
 
 function searchMarkup(query, local, backfill, webResults, error) {
@@ -432,6 +432,10 @@ export function createNet({
     app.get('/.well-known/w3bs-net.json', (_req, res) => res.json({
       specVersion: 'W3BS-NET-1-draft-1',
       instance: root,
+      instanceType: 'moshpit',
+      realm: 'w3bs.org',
+      dnsRecords: `${root}/api/net/v1/dns/records?name={name}`,
+      recordTypes: ['AAAA','CNAME','MX','TXT'],
       primaryRegistry: `${root}/api/net/v1/registry`,
       resolution: `${root}/api/net/v1/resolve/{name}`,
       events: `${root}/api/net/v1/events`,
@@ -447,6 +451,45 @@ export function createNet({
       res.set('Access-Control-Allow-Origin', '*');
       const registry = await network.registry({ query: req.query.q ?? '', limit: req.query.limit });
       res.json(registry);
+    });
+    app.get('/api/net/v1/dns/records', async (req,res) => {
+      res.set('Access-Control-Allow-Origin','*');
+      res.set('Cache-Control','no-store');
+      const name = safeName(req.query.name);
+      if (!name) throw new W3bsError('INVALID_NAME','Use label.namespace.',400);
+      res.json({ instance:root, name, records:await network.dns.list(name) });
+    });
+    app.get('/api/net/v1/dns/mine', async (req,res) => {
+      const user = await requireAccount(req);
+      res.set('Cache-Control','no-store');
+      const names = await network.dns.owned(user.id);
+      res.json({ instance:root, names:await Promise.all(names.map(async n=>({ ...n, name:`${n.label}.${n.tld}`, records:await network.dns.list(`${n.label}.${n.tld}`) }))) });
+    });
+    app.post('/api/net/v1/names/:name/records', async (req,res) => {
+      const user = await requireAccount(req);
+      const name = safeName(req.params.name);
+      if (!name) throw new W3bsError('INVALID_NAME','Use label.namespace.',400);
+      res.json({ name, records:await network.dns.put(name,user.id,req.body) });
+    });
+    app.delete('/api/net/v1/names/:name/records/:id', async (req,res) => {
+      const user = await requireAccount(req);
+      const name = safeName(req.params.name);
+      if (!name) throw new W3bsError('INVALID_NAME','Use label.namespace.',400);
+      res.json({ name, records:await network.dns.remove(name,user.id,req.params.id) });
+    });
+    app.get('/net/records', async (req,res) => {
+      const { user } = await authorized(req);
+      res.set('Cache-Control','no-store');
+      res.type('html').send(shell('DNS Records · W3BS Net','Publish DNS records on names you own in this Moshpit instance.','/net',`
+        <section class="page-head compact"><div class="eyebrow">W3BS NET · MOSHPIT INSTANCE</div><h1>DNS <em>records.</em></h1>
+        <p>Real records on the names you hold: AAAA for IPv6, CNAME to another hostname, MX for mail and TXT for verification. Changes publish to this W3BS instance immediately; existing resolver caches follow the record’s TTL.</p>
+        <p class="net-help">W3BS is a separate Moshpit instance. Your names and records belong here; imported primary-network records remain read-only backfill. The public gateway name is <code>name.namespace.w3bs.org</code>.</p>
+        <nav class="net-tabs" aria-label="Network"><a href="/net">Network</a><a href="/net/register">Register</a><a href="/net/records" aria-current="page">DNS Records</a></nav></section>
+        ${user ? `<section class="net-block"><form id="net-dns-filter" role="search"><label for="dns-filter">Filter your names</label><input id="dns-filter" name="q" placeholder="dumb.fuck, fuck, dumb.*" autocomplete="off"><button class="button" type="submit">Filter</button></form><p id="dns-status" class="net-status" role="status" aria-live="polite">Loading your names…</p><div id="dns-names"></div></section><script type="module" src="/assets/net-records.js"></script>` : `<section class="net-block"><p>Sign in to publish records on names you own in W3BS.</p><a class="button primary" href="/login?next=%2Fnet%2Frecords">Sign in →</a></section>`}
+        <section class="net-block"><h2>Publish from a script</h2><p>Use the existing W3BS OAuth bearer from <code>w3bs login</code>. Primary-network API keys do not grant W3BS ownership.</p><pre>POST /api/net/v1/names/blue.example/records
+{ "type": "AAAA", "value": "2606:4700:4700::1111", "ttl": 300 }
+
+GET /api/net/v1/dns/records?name=blue.example</pre></section>`, 'noindex'));
     });
     app.get('/api/net/v1/resolve/:name', async (req, res) => {
       res.set('Access-Control-Allow-Origin', '*');
