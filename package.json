@@ -31,7 +31,7 @@
     "@profullstack/coinpay-onboard": "0.3.0",
     "@profullstack/fleet": "0.1.1",
     "@profullstack/fleetbar": "0.2.0",
-    "@profullstack/footer": "0.4.0",
+    "@profullstack/footer": "latest",
     "@profullstack/hqtui": "0.10.3",
     "@profullstack/stack": "0.4.0",
     "@profullstack/threatcrush": "0.13.30",
