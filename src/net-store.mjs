@@ -1,3 +1,4 @@
+import { createNetRecords } from './net-records.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 
 export const RESERVED_NET_TLDS = new Set(['w3bs', 'www', 'api', 'net', 'search', 'admin', 'root']);
@@ -37,6 +38,12 @@ const TABLES = (sequence) => `
     PRIMARY KEY (tld, label)
   );
   CREATE INDEX IF NOT EXISTS net_names_status ON net_names(status, tld, label);
+  CREATE TABLE IF NOT EXISTS net_dns_records (
+    id TEXT PRIMARY KEY, tld TEXT NOT NULL, label TEXT NOT NULL, type TEXT NOT NULL,
+    value TEXT NOT NULL, ttl INTEGER NOT NULL, priority INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
+    UNIQUE(tld,label,type,value,priority)
+  );
+  CREATE INDEX IF NOT EXISTS net_dns_name ON net_dns_records(tld,label);
   CREATE TABLE IF NOT EXISTS net_events (
     seq ${sequence},
     event_id TEXT NOT NULL UNIQUE,
@@ -813,6 +820,7 @@ export function createNetworkStore(db, { instance = 'https://w3bs.org' } = {}) {
   }
 
   return {
+    dns: createNetRecords(db),
     ensureDefaults,
     registry,
     resolveName,
