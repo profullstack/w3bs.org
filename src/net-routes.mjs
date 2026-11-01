@@ -395,7 +395,7 @@ export function createNet({
     return name;
   }
 
-  async function gateway(req, res, name) {
+  async function gateway(req, res, name, next) {
     const record = await network.resolveName(name);
     if (!record) {
       return res.status(404).type('html').send(shell(
@@ -421,13 +421,22 @@ export function createNet({
       res.set('Cache-Control', 'no-store');
       return res.redirect(record.redirectStatus === 301 ? 301 : 302, record.target);
     }
+    // Name hosts use the primary site's shared shell. Let that shell's public files
+    // reach the static handlers below instead of rendering the name page as an asset.
+    if (
+      next &&
+      ['GET', 'HEAD'].includes(req.method) &&
+      (req.path.startsWith('/assets/') || req.path === '/manifest.webmanifest' || req.path === '/sw.js')
+    )
+      return next();
     res.set('X-W3BS-Net-Source', record.source === 'w3bs' ? 'w3bs-primary' : 'w3bs-federation');
-    return res.type('html').send(shell(
+    const landing = shell(
       name,
       `${name} is an active W3BS Net name.`,
       '/net',
       `<section class="page-head compact"><div class="eyebrow">W3BS NET · ${record.source === 'w3bs' ? 'PRIMARY' : 'FEDERATED'} NAME</div><h1>${e(name)}</h1><p>${record.source === 'w3bs' ? 'This name is registered in the W3BS primary registry.' : `This name was announced by the opted-in federation peer ${e(record.source)}.`} Its owner has not published a Web destination yet.</p><p class="net-meta">${record.claimed ? 'Claimed by an account' : 'Operator-seeded'} · Active after moderation</p><div class="actions"><a class="button" href="https://w3bs.org/net">W3BS Net</a><a class="text-link" href="https://w3bs.org/api/net/v1/resolve/${encodeURIComponent(name)}">Registry record ↗</a></div></section>`,
-    ));
+    ).replace(/(<a\b[^>]*\bhref=")\/(?!\/)/g, (_match, prefix) => `${prefix}${root}/`);
+    return res.type('html').send(landing);
   }
 
   function mount(app, options = {}) {

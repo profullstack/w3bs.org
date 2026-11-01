@@ -74,7 +74,7 @@ export function createApp({
     const railwayHealth =
       req.method === 'GET' && req.path === '/healthz' && req.hostname === 'healthcheck.railway.app';
     const netName = net.nameFromHost(req.hostname);
-    if (netName) return net.gateway(req, res, netName).catch(next);
+    if (netName) return net.gateway(req, res, netName, next).catch(next);
     if (!hosts.has(req.hostname.toLowerCase()) && !railwayHealth)
       return next(new W3bsError('INVALID_HOST', 'Unrecognized service host.', 403));
     // OAuth token/revoke/metadata, and /api/me with a bearer token, are called by apps on
