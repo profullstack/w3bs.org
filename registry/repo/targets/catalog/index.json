@@ -69,7 +69,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.52.0"
+      "latest_version": "0.52.1"
     },
     {
       "id": "sh1pt.com/sh1pt",
@@ -251,7 +251,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.13.64"
+      "latest_version": "0.13.66"
     },
     {
       "id": "coinpayportal.com/coinpay",
@@ -343,7 +343,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "3.19.4"
+      "latest_version": "3.19.5"
     },
     {
       "id": "logicsrc.com/opencontext",
@@ -944,7 +944,7 @@
       "vendor": "Alibaba Qwen",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "0.26.4"
+      "latest_version": "0.26.5"
     },
     {
       "id": "kiro.dev/kiro-cli",
