@@ -49,6 +49,7 @@ test('an active W3BS name page serves its shell assets and links navigation to t
     assert.match(page.body, /<h1>mint\.agent<\/h1>/);
     assert.match(page.body, /href="http:\/\/localhost:3000\/net"/);
     assert.doesNotMatch(page.body, /<a\b[^>]*href="\/(?!\/)/);
+    assert.match(page.headers['content-security-policy'], /img-src[^;]*https:\/\/profullstack\.com/);
 
     for (const [path, contentType] of [
       ['/assets/style.css', 'text/css'],
