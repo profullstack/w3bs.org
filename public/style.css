@@ -1845,6 +1845,17 @@ textarea {
   border-radius: 14px;
   background: #000;
 }
+.desktop-hero-video .pux-player {
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+}
+.desktop-hero-video .pux-player video {
+  border: 0;
+  border-radius: 0;
+}
 .desktop-hero-video figcaption {
   margin-top: 8px;
   font-size: 13px;
