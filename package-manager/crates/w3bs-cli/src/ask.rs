@@ -210,16 +210,55 @@ pub fn strip_echo(answer: &str, system: &str) -> String {
 }
 
 /// The chat messages: the agent's system prompt, then the question with numbered background.
-pub fn messages(agent: &Agent, question: &str, sources: &[Source]) -> Value {
-    let user = if sources.is_empty() {
-        question.to_owned()
+///
+/// Layout 0 puts the question first in the user turn (with the background first, a 0.5B model
+/// tends to repeat its system prompt). Layout 1, the retry after such an echo, moves the
+/// background into the system message and leaves the user turn as just the question.
+pub fn messages(agent: &Agent, question: &str, sources: &[Source], layout: u8) -> Value {
+    if sources.is_empty() {
+        return json!([{ "role": "system", "content": agent.system }, { "role": "user", "content": question }]);
+    }
+    let ctx = sources.iter().enumerate().map(|(i, s)| format!("[{}] {} ({})\n{}", i + 1, s.title, s.url, s.text)).collect::<Vec<_>>().join("\n\n");
+    if layout == 0 {
+        let user = format!("Question: {question}\n\nNotes from the web:\n{ctx}\n\nAnswer the question in a few practical steps.");
+        json!([{ "role": "system", "content": agent.system }, { "role": "user", "content": user }])
     } else {
-        let ctx = sources.iter().enumerate().map(|(i, s)| format!("[{}] {} ({})\n{}", i + 1, s.title, s.url, s.text)).collect::<Vec<_>>().join("\n\n");
-        // Question first: with the background first, a 0.5B model tends to repeat its system
-        // prompt instead of answering.
-        format!("Question: {question}\n\nNotes from the web:\n{ctx}\n\nAnswer the question in a few practical steps.")
-    };
-    json!([{ "role": "system", "content": agent.system }, { "role": "user", "content": user }])
+        let system = format!("{}\n\nNotes from the web you may use:\n{ctx}", agent.system);
+        json!([{ "role": "system", "content": system }, { "role": "user", "content": question }])
+    }
+}
+
+/// Holds streamed tokens back while they could still be a copy of the system prompt, so an
+/// echo never reaches the screen; everything after the echo (or a real answer) flows through.
+#[derive(Debug, Default)]
+pub struct EchoGuard {
+    held: String,
+    released: bool,
+}
+
+impl EchoGuard {
+    /// Text to show now, if any.
+    pub fn push(&mut self, t: &str, system: &str) -> Option<String> {
+        if self.released {
+            return Some(t.to_owned());
+        }
+        self.held.push_str(t);
+        let h = self.held.trim_start();
+        let sys = system.trim();
+        if sys.starts_with(h) {
+            return None;
+        }
+        if let Some(rest) = h.strip_prefix(sys) {
+            let rest = rest.trim_start();
+            if rest.is_empty() {
+                return None;
+            }
+            self.released = true;
+            return Some(rest.to_owned());
+        }
+        self.released = true;
+        Some(std::mem::take(&mut self.held))
+    }
 }
 
 // ------------------------------------------------------------------ Infernet SSE
@@ -289,115 +328,127 @@ pub async fn ask(req: Request<'_>, on_token: &mut dyn FnMut(&str), on_status: &m
     let origin_raw = req.infernet.map(str::to_owned).or_else(|| std::env::var("W3BS_INFERNET_API").ok().filter(|s| !s.is_empty())).unwrap_or_else(|| INFERNET.into());
     let origin = checked_url(&origin_raw, "the Infernet API")?.origin().ascii_serialization();
     let key = std::env::var("INFERNET_API_KEY").ok().filter(|s| !s.trim().is_empty());
-    let body = json!({
-        "modelName": agent.model,
-        "messages": messages(agent, question, &sources),
-        "maxTokens": req.max_tokens.unwrap_or(agent.max_tokens),
-        "temperature": agent.temperature,
-        // Only a live peer node may answer: never Infernet's hosted (paid) fallback.
-        "p2p_only": true,
-    });
-    on_status(&format!("asking {} on the c0mpute network", agent.name));
-    let client = http(Some(Duration::from_secs(30)));
-    let mut post = client.post(format!("{origin}/api/chat")).json(&body);
-    if let Some(k) = &key {
-        post = post.bearer_auth(k.trim());
-    }
-    let resp = post.send().await.map_err(|e| Error::package("ASK_UNAVAILABLE", format!("{origin}/api/chat: {e}")).retryable())?;
-    let status = resp.status().as_u16();
-    let v: Value = serde_json::from_str(&resp.text().await.unwrap_or_default()).unwrap_or(Value::Null);
-    let msg = v["error"].as_str().map(str::to_owned).unwrap_or_else(|| format!("the Infernet API answered {status}"));
-    match status {
-        200..=299 => {}
-        429 => {
-            let at = v["detail"]["resetAt"].as_str().map(|t| format!(" (resets {t})")).unwrap_or_default();
-            let hint = if key.is_some() { "your INFERNET_API_KEY budget is spent".to_owned() } else { "the public limit is 20 questions an hour per IP; set INFERNET_API_KEY to a trusted client key for more".to_owned() };
-            return Err(Error::package("ASK_RATE_LIMITED", format!("Infernet rate limit reached{at}: {hint}")).retryable());
+    let (mut node, mut job, mut final_text) = (Value::Null, String::new(), String::new());
+    let mut first_token = None::<u128>;
+    for attempt in 0..2u8 {
+        let body = json!({
+            "modelName": agent.model,
+            "messages": messages(agent, question, &sources, attempt),
+            "maxTokens": req.max_tokens.unwrap_or(agent.max_tokens),
+            "temperature": agent.temperature,
+            // Only a live peer node may answer: never Infernet's hosted (paid) fallback.
+            "p2p_only": true,
+        });
+        on_status(&format!("asking {} on the c0mpute network", agent.name));
+        let client = http(Some(Duration::from_secs(30)));
+        let mut post = client.post(format!("{origin}/api/chat")).json(&body);
+        if let Some(k) = &key {
+            post = post.bearer_auth(k.trim());
         }
-        503 => {
-            let live = v["detail"]["availableModels"].as_array().map(|a| a.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_default();
-            return Err(Error::package("ASK_NO_NODE", format!("no c0mpute node is serving {} right now; try again in a few minutes{}", agent.model, if live.is_empty() { String::new() } else { format!(" (live models: {live})") })).retryable());
+        let resp = post.send().await.map_err(|e| Error::package("ASK_UNAVAILABLE", format!("{origin}/api/chat: {e}")).retryable())?;
+        let status = resp.status().as_u16();
+        let v: Value = serde_json::from_str(&resp.text().await.unwrap_or_default()).unwrap_or(Value::Null);
+        let msg = v["error"].as_str().map(str::to_owned).unwrap_or_else(|| format!("the Infernet API answered {status}"));
+        match status {
+            200..=299 => {}
+            429 => {
+                let at = v["detail"]["resetAt"].as_str().map(|t| format!(" (resets {t})")).unwrap_or_default();
+                let hint = if key.is_some() { "your INFERNET_API_KEY budget is spent".to_owned() } else { "the public limit is 20 questions an hour per IP; set INFERNET_API_KEY to a trusted client key for more".to_owned() };
+                return Err(Error::package("ASK_RATE_LIMITED", format!("Infernet rate limit reached{at}: {hint}")).retryable());
+            }
+            503 => {
+                let live = v["detail"]["availableModels"].as_array().map(|a| a.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_default();
+                return Err(Error::package("ASK_NO_NODE", format!("no c0mpute node is serving {} right now; try again in a few minutes{}", agent.model, if live.is_empty() { String::new() } else { format!(" (live models: {live})") })).retryable());
+            }
+            401 | 403 => return Err(Error::package("ASK_REFUSED", format!("Infernet refused the question: {msg}"))),
+            _ => return Err(Error::package("ASK_FAILED", format!("Infernet: {msg}")).retryable()),
         }
-        401 | 403 => return Err(Error::package("ASK_REFUSED", format!("Infernet refused the question: {msg}"))),
-        _ => return Err(Error::package("ASK_FAILED", format!("Infernet: {msg}")).retryable()),
-    }
-    if v["source"].as_str() != Some("p2p") {
-        return Err(Error::package("ASK_NOT_P2P", format!("Infernet offered a {:?} route, not a c0mpute node; refused", v["source"].as_str().unwrap_or("unknown"))));
-    }
-    let job = v["jobId"].as_str().unwrap_or_default().to_owned();
-    let stream_path = v["streamUrl"].as_str().unwrap_or_default();
-    if job.is_empty() || !stream_path.starts_with("/api/chat/stream/") || stream_path.contains("..") {
-        return Err(Error::package("ASK_FAILED", "Infernet's answer had no job stream"));
-    }
-    let mut node = json!({ "id": v["provider"]["nodeId"], "name": v["provider"]["name"], "provider_id": v["provider"]["id"], "gpu": v["provider"]["gpuModel"] });
-    on_status(&format!("{} is answering", s(&node["name"])));
+        if v["source"].as_str() != Some("p2p") {
+            return Err(Error::package("ASK_NOT_P2P", format!("Infernet offered a {:?} route, not a c0mpute node; refused", v["source"].as_str().unwrap_or("unknown"))));
+        }
+        job = v["jobId"].as_str().unwrap_or_default().to_owned();
+        let stream_path = v["streamUrl"].as_str().unwrap_or_default();
+        if job.is_empty() || !stream_path.starts_with("/api/chat/stream/") || stream_path.contains("..") {
+            return Err(Error::package("ASK_FAILED", "Infernet's answer had no job stream"));
+        }
+        node = json!({ "id": v["provider"]["nodeId"], "name": v["provider"]["name"], "provider_id": v["provider"]["id"], "gpu": v["provider"]["gpuModel"] });
+        on_status(&format!("{} is answering", s(&node["name"])));
 
-    let mut get = http(None).get(format!("{origin}{stream_path}")).header("accept", "text/event-stream");
-    if let Some(k) = &key {
-        get = get.bearer_auth(k.trim());
-    }
-    let deadline = started + req.timeout;
-    let resp = tokio::time::timeout_at(tokio::time::Instant::from_std(deadline), get.send())
-        .await
-        .map_err(|_| Error::package("ASK_TIMEOUT", "the node did not start answering in time").retryable())?
-        .map_err(|e| Error::package("ASK_UNAVAILABLE", format!("{origin}{stream_path}: {e}")).retryable())?;
-    if !resp.status().is_success() {
-        return Err(Error::package("ASK_FAILED", format!("the answer stream returned HTTP {}", resp.status().as_u16())).retryable());
-    }
-    let mut stream = resp.bytes_stream();
-    let mut sse = Sse::default();
-    let (mut answer, mut finished, mut first_token) = (String::new(), None::<String>, None::<u128>);
-    'read: loop {
-        let chunk = match tokio::time::timeout_at(tokio::time::Instant::from_std(deadline), stream.next()).await {
-            Err(_) => return Err(Error::package("ASK_TIMEOUT", format!("no complete answer after {} s (job {job})", req.timeout.as_secs())).retryable()),
-            Ok(None) => break,
-            Ok(Some(Err(e))) => return Err(Error::package("ASK_UNAVAILABLE", format!("the answer stream broke: {e}")).retryable()),
-            Ok(Some(Ok(b))) => b,
-        };
-        for (event, data) in sse.push(&String::from_utf8_lossy(&chunk)) {
-            match event.as_str() {
-                "meta" => {
-                    for (k, from) in [("id", "provider_node_id"), ("name", "provider_name"), ("engine", "engine")] {
-                        if let Some(x) = data[from].as_str() {
-                            node[k] = json!(x);
+        let mut get = http(None).get(format!("{origin}{stream_path}")).header("accept", "text/event-stream");
+        if let Some(k) = &key {
+            get = get.bearer_auth(k.trim());
+        }
+        let deadline = started + req.timeout;
+        let resp = tokio::time::timeout_at(tokio::time::Instant::from_std(deadline), get.send())
+            .await
+            .map_err(|_| Error::package("ASK_TIMEOUT", "the node did not start answering in time").retryable())?
+            .map_err(|e| Error::package("ASK_UNAVAILABLE", format!("{origin}{stream_path}: {e}")).retryable())?;
+        if !resp.status().is_success() {
+            return Err(Error::package("ASK_FAILED", format!("the answer stream returned HTTP {}", resp.status().as_u16())).retryable());
+        }
+        let mut stream = resp.bytes_stream();
+        let mut sse = Sse::default();
+        let (mut answer, mut finished, mut guard) = (String::new(), None::<String>, EchoGuard::default());
+        'read: loop {
+            let chunk = match tokio::time::timeout_at(tokio::time::Instant::from_std(deadline), stream.next()).await {
+                Err(_) => return Err(Error::package("ASK_TIMEOUT", format!("no complete answer after {} s (job {job})", req.timeout.as_secs())).retryable()),
+                Ok(None) => break,
+                Ok(Some(Err(e))) => return Err(Error::package("ASK_UNAVAILABLE", format!("the answer stream broke: {e}")).retryable()),
+                Ok(Some(Ok(b))) => b,
+            };
+            for (event, data) in sse.push(&String::from_utf8_lossy(&chunk)) {
+                match event.as_str() {
+                    "meta" => {
+                        for (k, from) in [("id", "provider_node_id"), ("name", "provider_name"), ("engine", "engine")] {
+                            if let Some(x) = data[from].as_str() {
+                                node[k] = json!(x);
+                            }
                         }
                     }
-                }
-                "token" => {
-                    if let Some(t) = data["text"].as_str() {
-                        first_token.get_or_insert(started.elapsed().as_millis());
-                        answer.push_str(t);
-                        on_token(t);
+                    "token" => {
+                        if let Some(t) = data["text"].as_str() {
+                            answer.push_str(t);
+                            if let Some(show) = guard.push(t, &agent.system) {
+                                first_token.get_or_insert(started.elapsed().as_millis());
+                                on_token(&show);
+                            }
+                        }
                     }
+                    "done" => {
+                        finished = Some(data["text"].as_str().map(str::to_owned).unwrap_or_else(|| answer.clone()));
+                        break 'read;
+                    }
+                    "error" => {
+                        let m = data["message"].as_str().or(data["error"].as_str()).or(data.as_str()).unwrap_or("the node failed").to_owned();
+                        return Err(Error::package("ASK_FAILED", format!("{} could not answer: {m}", s(&node["name"]))).retryable());
+                    }
+                    _ => {}
                 }
-                "done" => {
-                    finished = Some(data["text"].as_str().map(str::to_owned).unwrap_or_else(|| answer.clone()));
-                    break 'read;
-                }
-                "error" => {
-                    let m = data["message"].as_str().or(data["error"].as_str()).or(data.as_str()).unwrap_or("the node failed").to_owned();
-                    return Err(Error::package("ASK_FAILED", format!("{} could not answer: {m}", s(&node["name"]))).retryable());
-                }
-                _ => {}
             }
         }
-    }
-    let Some(text) = finished else {
-        return Err(Error::package("ASK_FAILED", format!("the answer stream ended before the node finished (job {job})")).retryable());
-    };
-    let text = strip_echo(&text, &agent.system);
-    if text.is_empty() {
-        return Err(Error::package("ASK_NO_ANSWER", format!("{} repeated its instructions instead of answering (job {job}); ask again, perhaps in other words", agent.name)).retryable());
-    }
-    if answer.is_empty() {
-        on_token(&text);
+        let Some(text) = finished else {
+            return Err(Error::package("ASK_FAILED", format!("the answer stream ended before the node finished (job {job})")).retryable());
+        };
+        let text = strip_echo(&text, &agent.system);
+        if text.is_empty() {
+            if attempt == 0 {
+                on_status(&format!("{} repeated its instructions; asking again", s(&node["name"])));
+                continue;
+            }
+            return Err(Error::package("ASK_NO_ANSWER", format!("{} repeated its instructions instead of answering, twice (job {job}); ask again, perhaps in other words", agent.name)).retryable());
+        }
+        if !guard.released {
+            on_token(&text);
+        }
+        final_text = text;
+        break;
     }
     Ok(json!({
         "agent": agent.name,
         "title": agent.title,
         "model": agent.model,
         "question": question,
-        "answer": text,
+        "answer": final_text,
         "sources": sources.iter().enumerate().map(|(i, s)| json!({ "n": i + 1, "title": s.title, "url": s.url })).collect::<Vec<_>>(),
         "node": node,
         "transport": "infernet",
@@ -635,12 +686,28 @@ mod tests {
         let a = agents();
         let b = find(&a, "business").unwrap();
         let src = vec![Source { title: "T".into(), url: "https://t.example/".into(), text: "body".into() }];
-        let m = messages(b, "Q?", &src);
+        let m = messages(b, "Q?", &src, 0);
         assert_eq!(m[0]["role"], "system");
         assert_eq!(m[1]["content"], "Question: Q?\n\nNotes from the web:\n[1] T (https://t.example/)\nbody\n\nAnswer the question in a few practical steps.");
         assert_eq!(strip_echo(&format!("{} Do X.", b.system), &b.system), "Do X.");
         assert_eq!(strip_echo(&b.system, &b.system), "");
-        assert_eq!(messages(b, "Q?", &[])[1]["content"], "Q?");
+        assert_eq!(messages(b, "Q?", &[], 0)[1]["content"], "Q?");
+        let m1 = messages(b, "Q?", &src, 1);
+        assert_eq!(m1[1]["content"], "Q?");
+        assert!(m1[0]["content"].as_str().unwrap().ends_with("Notes from the web you may use:\n[1] T (https://t.example/)\nbody"));
+    }
+
+    #[test]
+    fn echo_guard_hides_a_repeated_system_prompt() {
+        let sys = "You are x. Be brief.";
+        let mut g = EchoGuard::default();
+        assert_eq!(g.push("You are", sys), None);
+        assert_eq!(g.push(" x. Be brief.", sys), None);
+        assert_eq!(g.push(" Do A.", sys).as_deref(), Some("Do A."));
+        assert_eq!(g.push(" Then B.", sys).as_deref(), Some(" Then B."));
+        let mut g = EchoGuard::default();
+        assert_eq!(g.push("You ", sys), None);
+        assert_eq!(g.push("can sell.", sys).as_deref(), Some("You can sell."));
     }
 
     #[test]

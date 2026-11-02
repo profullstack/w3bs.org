@@ -46,6 +46,7 @@ test('the registry, aliases, query, sources, prompt and SSE framing', () => {
 // A fake pit.world search + Infernet chat API on one port.
 async function fakeNetwork() {
   const seen = [];
+  let posts = 0;
   const server = createServer(async (req, res) => {
     let body = '';
     for await (const c of req) body += c;
@@ -56,9 +57,17 @@ async function fakeNetwork() {
     }
     if (req.method === 'POST' && req.url === '/api/chat') {
       res.setHeader('content-type', 'application/json');
-      return res.end(JSON.stringify({ jobId: 'j1', source: 'p2p', provider: { id: 'p1', name: 'node-one', nodeId: 'provider-1' }, streamUrl: '/api/chat/stream/j1' }));
+      posts += 1;
+      return res.end(JSON.stringify({ jobId: `j${posts}`, source: 'p2p', provider: { id: 'p1', name: 'node-one', nodeId: 'provider-1' }, streamUrl: `/api/chat/stream/j${posts}` }));
     }
-    if (req.url === '/api/chat/stream/j1') {
+    // Odd jobs only repeat the system prompt: the server must ask again.
+    const job = /^\/api\/chat\/stream\/j(\d+)$/.exec(req.url);
+    if (job && Number(job[1]) % 2 === 1) {
+      res.setHeader('content-type', 'text/event-stream');
+      const sys = 'You are saas-business-strategist-agent. You give concise, practical business strategy grounded in what independent writers on these subjects are publishing.';
+      return res.end(`event: done\ndata: ${JSON.stringify({ text: sys })}\n\n`);
+    }
+    if (job) {
       res.setHeader('content-type', 'text/event-stream');
       res.write('event: meta\ndata: {"provider_name":"node-one","provider_node_id":"provider-1","engine":"ollama"}\n\n');
       res.write('event: token\ndata: {"text":"Find "}\n\n');
@@ -96,7 +105,12 @@ test('POST /api/v1/ask and the w3bs_ask MCP tool route p2p_only, ground and thro
     assert.deepEqual(d.sources, [{ n: 1, title: 'One', url: 'https://one.example/' }]);
     assert.equal(d.node.name, 'node-one');
     assert.equal(d.node.engine, 'ollama');
-    const chat = net.seen.find((x) => x.url === '/api/chat');
+    const chats = net.seen.filter((x) => x.url === '/api/chat');
+    assert.equal(chats.length, 2, 'the echo was retried once');
+    assert.equal(chats[1].body.messages[1].content, 'How do I make money??');
+    assert.match(chats[1].body.messages[0].content, /Notes from the web you may use:/);
+    assert.equal(d.job_id, 'j2');
+    const chat = chats[0];
     assert.equal(chat.body.p2p_only, true);
     assert.equal(chat.body.modelName, 'hf.co/profullstack/saas-business-strategist-agent-GGUF:latest');
     assert.equal(chat.auth, 'Bearer ifc_test');

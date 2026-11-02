@@ -5,7 +5,9 @@
 import { readFileSync } from 'node:fs';
 import { W3bsError } from './core.mjs';
 
-const REGISTRY = JSON.parse(readFileSync(new URL('../fixtures/agents.json', import.meta.url), 'utf8'));
+const REGISTRY = JSON.parse(
+  readFileSync(new URL('../fixtures/agents.json', import.meta.url), 'utf8'),
+);
 const SNIPPET = 700;
 
 export function agents(registry = REGISTRY) {
@@ -40,36 +42,59 @@ export const publicAgent = (a) => ({
 });
 
 export function findAgent(name, list = agents()) {
-  const n = String(name ?? '').trim().replace(/^@/, '').toLowerCase();
+  const n = String(name ?? '')
+    .trim()
+    .replace(/^@/, '')
+    .toLowerCase();
   return list.find((a) => a.name === n) ?? list.find((a) => a.aliases.includes(n)) ?? null;
 }
 
 export function searchQuery(question, suffix = '') {
-  const q = question.replace(/([?!.])\1+/g, '$1').split(/\s+/).filter(Boolean).join(' ');
+  const q = question
+    .replace(/([?!.])\1+/g, '$1')
+    .split(/\s+/)
+    .filter(Boolean)
+    .join(' ');
   return suffix ? `${q} ${suffix}` : q;
 }
 
 export function pickSources(body, k) {
   const all = (Array.isArray(body?.results) ? body.results : [])
-    .filter((r) => typeof r?.title === 'string' && r.title.trim() && /^https?:\/\//.test(r?.url ?? ''))
+    .filter(
+      (r) => typeof r?.title === 'string' && r.title.trim() && /^https?:\/\//.test(r?.url ?? ''),
+    )
     .map((r) => ({
       title: r.title.trim(),
       url: r.url.trim(),
-      text: String(r.description ?? '').split(/\s+/).filter(Boolean).join(' ').slice(0, SNIPPET),
+      text: String(r.description ?? '')
+        .split(/\s+/)
+        .filter(Boolean)
+        .join(' ')
+        .slice(0, SNIPPET),
     }));
   return [...all.filter((s) => s.text), ...all.filter((s) => !s.text)].slice(0, k);
 }
 
 // Question first: with the background first, the 0.5B strategist repeats its system prompt.
-export function messages(agent, question, sources) {
-  const user = sources.length
-    ? `Question: ${question}\n\nNotes from the web:\n${sources
-        .map((s, i) => `[${i + 1}] ${s.title} (${s.url})\n${s.text}`)
-        .join('\n\n')}\n\nAnswer the question in a few practical steps.`
-    : question;
+// Layout 1 is the retry after an echo: the background moves into the system message.
+export function messages(agent, question, sources, layout = 0) {
+  if (!sources.length)
+    return [
+      { role: 'system', content: agent.system },
+      { role: 'user', content: question },
+    ];
+  const ctx = sources.map((s, i) => `[${i + 1}] ${s.title} (${s.url})\n${s.text}`).join('\n\n');
+  if (layout === 1)
+    return [
+      { role: 'system', content: `${agent.system}\n\nNotes from the web you may use:\n${ctx}` },
+      { role: 'user', content: question },
+    ];
   return [
     { role: 'system', content: agent.system },
-    { role: 'user', content: user },
+    {
+      role: 'user',
+      content: `Question: ${question}\n\nNotes from the web:\n${ctx}\n\nAnswer the question in a few practical steps.`,
+    },
   ];
 }
 
@@ -145,76 +170,105 @@ export async function ask(
       warnings.push(`pit.world search failed (${e.message}); answering without sources`);
     }
   }
-  const auth = key ? { authorization: `Bearer ${key}` } : {};
-  const origin = new URL(infernet).origin;
-  const posted = await fetchImpl(`${origin}/api/chat`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...auth },
-    body: JSON.stringify({
-      modelName: agent.model,
-      messages: messages(agent, q, sources),
-      maxTokens: agent.maxTokens,
-      temperature: agent.temperature,
-      p2p_only: true,
-    }),
-    signal: AbortSignal.timeout(30_000),
-  }).catch((e) => {
-    throw fail('ASK_UNAVAILABLE', `Infernet is unreachable: ${e.message}`);
-  });
-  const job = await posted.json().catch(() => ({}));
-  if (posted.status === 429)
-    throw fail('ASK_RATE_LIMITED', 'The c0mpute network is rate limiting questions right now; try again later.', 429);
-  if (posted.status === 503)
-    throw fail('ASK_NO_NODE', `No c0mpute node is serving ${agent.model} right now; try again in a few minutes.`, 503);
-  if (!posted.ok) throw fail('ASK_FAILED', `Infernet: ${job.error ?? `HTTP ${posted.status}`}`);
-  if (job.source !== 'p2p')
-    throw fail('ASK_NOT_P2P', `Infernet offered a ${job.source ?? 'unknown'} route, not a c0mpute node; refused.`);
-  if (!job.jobId || !/^\/api\/chat\/stream\/[\w-]+$/.test(job.streamUrl ?? ''))
-    throw fail('ASK_FAILED', "Infernet's answer had no job stream.");
-  const node = {
-    id: job.provider?.nodeId ?? null,
-    name: job.provider?.name ?? null,
-    provider_id: job.provider?.id ?? null,
-    engine: null,
-  };
-  const stream = await fetchImpl(`${origin}${job.streamUrl}`, {
-    headers: { accept: 'text/event-stream', ...auth },
-    signal: AbortSignal.timeout(timeoutMs),
-  }).catch((e) => {
-    throw fail('ASK_UNAVAILABLE', `The answer stream failed: ${e.message}`);
-  });
-  if (!stream.ok || !stream.body) throw fail('ASK_FAILED', `The answer stream returned HTTP ${stream.status}.`);
-  const parse = sseParser();
-  const decoder = new TextDecoder();
-  let streamed = '',
-    done = null,
-    firstToken = null;
-  try {
-    outer: for await (const chunk of stream.body) {
-      for (const [event, data] of parse(decoder.decode(chunk, { stream: true }))) {
-        if (event === 'meta') {
-          node.id = data.provider_node_id ?? node.id;
-          node.name = data.provider_name ?? node.name;
-          node.engine = data.engine ?? null;
-        } else if (event === 'token' && typeof data.text === 'string') {
-          firstToken ??= Date.now() - started;
-          streamed += data.text;
-        } else if (event === 'done') {
-          done = typeof data.text === 'string' ? data.text : streamed;
-          break outer;
-        } else if (event === 'error') {
-          throw fail('ASK_FAILED', `${node.name ?? 'The node'} could not answer: ${data.message ?? data.error ?? 'error'}`);
+  let result;
+  for (let attempt = 0; attempt < 2 && !result; attempt++) {
+    const auth = key ? { authorization: `Bearer ${key}` } : {};
+    const origin = new URL(infernet).origin;
+    const posted = await fetchImpl(`${origin}/api/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...auth },
+      body: JSON.stringify({
+        modelName: agent.model,
+        messages: messages(agent, q, sources, attempt),
+        maxTokens: agent.maxTokens,
+        temperature: agent.temperature,
+        p2p_only: true,
+      }),
+      signal: AbortSignal.timeout(30_000),
+    }).catch((e) => {
+      throw fail('ASK_UNAVAILABLE', `Infernet is unreachable: ${e.message}`);
+    });
+    const job = await posted.json().catch(() => ({}));
+    if (posted.status === 429)
+      throw fail(
+        'ASK_RATE_LIMITED',
+        'The c0mpute network is rate limiting questions right now; try again later.',
+        429,
+      );
+    if (posted.status === 503)
+      throw fail(
+        'ASK_NO_NODE',
+        `No c0mpute node is serving ${agent.model} right now; try again in a few minutes.`,
+        503,
+      );
+    if (!posted.ok) throw fail('ASK_FAILED', `Infernet: ${job.error ?? `HTTP ${posted.status}`}`);
+    if (job.source !== 'p2p')
+      throw fail(
+        'ASK_NOT_P2P',
+        `Infernet offered a ${job.source ?? 'unknown'} route, not a c0mpute node; refused.`,
+      );
+    if (!job.jobId || !/^\/api\/chat\/stream\/[\w-]+$/.test(job.streamUrl ?? ''))
+      throw fail('ASK_FAILED', "Infernet's answer had no job stream.");
+    const node = {
+      id: job.provider?.nodeId ?? null,
+      name: job.provider?.name ?? null,
+      provider_id: job.provider?.id ?? null,
+      engine: null,
+    };
+    const stream = await fetchImpl(`${origin}${job.streamUrl}`, {
+      headers: { accept: 'text/event-stream', ...auth },
+      signal: AbortSignal.timeout(timeoutMs),
+    }).catch((e) => {
+      throw fail('ASK_UNAVAILABLE', `The answer stream failed: ${e.message}`);
+    });
+    if (!stream.ok || !stream.body)
+      throw fail('ASK_FAILED', `The answer stream returned HTTP ${stream.status}.`);
+    const parse = sseParser();
+    const decoder = new TextDecoder();
+    let streamed = '',
+      done = null,
+      firstToken = null;
+    try {
+      outer: for await (const chunk of stream.body) {
+        for (const [event, data] of parse(decoder.decode(chunk, { stream: true }))) {
+          if (event === 'meta') {
+            node.id = data.provider_node_id ?? node.id;
+            node.name = data.provider_name ?? node.name;
+            node.engine = data.engine ?? null;
+          } else if (event === 'token' && typeof data.text === 'string') {
+            firstToken ??= Date.now() - started;
+            streamed += data.text;
+          } else if (event === 'done') {
+            done = typeof data.text === 'string' ? data.text : streamed;
+            break outer;
+          } else if (event === 'error') {
+            throw fail(
+              'ASK_FAILED',
+              `${node.name ?? 'The node'} could not answer: ${data.message ?? data.error ?? 'error'}`,
+            );
+          }
         }
       }
+    } catch (e) {
+      if (e instanceof W3bsError) throw e;
+      throw fail('ASK_TIMEOUT', `No complete answer (job ${job.jobId}): ${e.message}`, 504);
     }
-  } catch (e) {
-    if (e instanceof W3bsError) throw e;
-    throw fail('ASK_TIMEOUT', `No complete answer (job ${job.jobId}): ${e.message}`, 504);
+    if (done === null)
+      throw fail(
+        'ASK_FAILED',
+        `The answer stream ended before the node finished (job ${job.jobId}).`,
+      );
+    const answer = stripEcho(done, agent.system);
+    if (!answer) {
+      if (attempt === 0) continue;
+      throw fail(
+        'ASK_NO_ANSWER',
+        `${agent.name} repeated its instructions instead of answering, twice (job ${job.jobId}); ask again, perhaps in other words.`,
+      );
+    }
+    result = { answer, node, job, firstToken };
   }
-  if (done === null) throw fail('ASK_FAILED', `The answer stream ended before the node finished (job ${job.jobId}).`);
-  const answer = stripEcho(done, agent.system);
-  if (!answer)
-    throw fail('ASK_NO_ANSWER', `${agent.name} repeated its instructions instead of answering (job ${job.jobId}); ask again, perhaps in other words.`);
+  const { answer, node, job, firstToken } = result;
   return {
     agent: agent.name,
     title: agent.title,
@@ -239,6 +293,10 @@ export function limiter({ max, windowMs }) {
     let h = hits.get(key);
     if (!h || h.reset <= now) hits.set(key, (h = { count: 0, reset: now + windowMs }));
     h.count += 1;
-    return { ok: h.count <= max, remaining: Math.max(0, max - h.count), resetAt: new Date(h.reset).toISOString() };
+    return {
+      ok: h.count <= max,
+      remaining: Math.max(0, max - h.count),
+      resetAt: new Date(h.reset).toISOString(),
+    };
   };
 }
