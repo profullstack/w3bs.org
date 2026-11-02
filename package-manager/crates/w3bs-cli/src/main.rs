@@ -2,6 +2,7 @@
 //! manager is the first app, W3BS resources (the w3bs:// registry) the second.
 
 mod ab;
+mod ask;
 mod auth;
 mod desktop;
 mod distupgrade;
@@ -56,6 +57,9 @@ Apps:
   ab         w3bs ab ls               your A/B tests on w3bs.org/ab-testing (OpenABTest)
              w3bs ab new <id> --variant a --variant b   then start, show, pause, close
              w3bs ab --help           assign, resume, export, rm
+  ask        w3bs ask business \"I can't make money, help\"   ask a published agent; it answers
+                                      on the c0mpute network, citing pit.world sources
+             w3bs ask --list          the agents;  w3bs ask   chat with /ask <agent> <question>
   publish    w3bs publish key add <domain>   register your SSH key for a publisher namespace
              w3bs publish release --package <ns/name> --version <v> --install \"curl … | sh\"
                                       sign a release with that key (W3BS-SIGN-1)";
@@ -421,6 +425,29 @@ enum ResCmd {
         #[arg(long, value_name = "FILE")]
         out: PathBuf,
     },
+}
+
+#[derive(Args, Clone)]
+struct AskArgs {
+    /// The agent (name or alias; `w3bs ask --list` shows them)
+    agent: Option<String>,
+    /// The question (quote it, or give it as several words; after `--` if it starts with `-`)
+    question: Vec<String>,
+    /// List the agents
+    #[arg(long, conflicts_with = "question")]
+    list: bool,
+    /// Skip the pit.world search (answer from the model alone, no sources)
+    #[arg(long)]
+    no_search: bool,
+    /// Longest answer, in tokens (default: the agent's)
+    #[arg(long, value_name = "N")]
+    max_tokens: Option<u64>,
+    /// Give up after this many seconds
+    #[arg(long, value_name = "SECONDS", default_value_t = 300)]
+    timeout: u64,
+    /// Infernet API origin (default: $W3BS_INFERNET_API or https://infernetprotocol.com)
+    #[arg(long, value_name = "ORIGIN")]
+    infernet: Option<String>,
 }
 
 #[derive(Subcommand, Clone)]
@@ -979,6 +1006,9 @@ enum Cmd {
     /// Your A/B tests on w3bs.org/ab-testing: create, start, read results, export OpenABTest
     #[command(subcommand)]
     Ab(AbCmd),
+    /// Ask a published agent a question: it answers on the c0mpute network, grounded in
+    /// pit.world search, with sources. `w3bs ask --list` shows the agents; `w3bs ask` alone chats
+    Ask(AskArgs),
     /// Sign package releases with your SSH key (W3BS-SIGN-1): register keys, publish releases
     #[command(subcommand)]
     Publish(PublishCmd),
@@ -1180,6 +1210,7 @@ async fn run(cli: Cli) -> (&'static str, w3bs_core::Result<OperationResult>) {
         Err(Cmd::Fleet(f)) => run_fleet(f).await,
         Err(Cmd::Ab(c)) => run_ab(c).await,
         Err(Cmd::Publish(c)) => run_publish(c).await,
+        Err(Cmd::Ask(a)) => run_ask(a, out).await,
         Err(Cmd::Os(c)) => run_os(c, out).await,
         Err(Cmd::Open { url, no_terminal }) => run_open(&url, no_terminal, out).await,
         Err(Cmd::Handler(h)) => {
@@ -1325,6 +1356,73 @@ async fn run_publish(cmd: PublishCmd) -> (&'static str, w3bs_core::Result<Operat
             };
             ("publish.release", account("publish.release", &f.a, |o| async move { publish::release(&o, args).await }).await)
         }
+    }
+}
+
+async fn run_ask(a: AskArgs, out: Output) -> (&'static str, w3bs_core::Result<OperationResult>) {
+    use std::io::IsTerminal;
+    let loaded = ask::load().await;
+    let mut res = OperationResult::new("ask");
+    // Said up front on a terminal: the answer streams before the result is rendered.
+    if let Some(w) = &loaded.warning {
+        if out.json || a.list {
+            res.warnings.push(w.clone());
+        } else if !out.quiet {
+            eprintln!("warning: {w}");
+        }
+    }
+    let agents = loaded.agents;
+    if a.list {
+        res.operation = "ask.list".into();
+        res.data = json!({ "registry": loaded.source, "agents": agents.iter().map(ask::Agent::summary).collect::<Vec<_>>() });
+        return ("ask.list", Ok(res));
+    }
+    let timeout = std::time::Duration::from_secs(a.timeout.max(10));
+    let agent = match &a.agent {
+        Some(name) => match ask::find(&agents, name) {
+            Some(x) => x.clone(),
+            None => return ("ask", Err(ask::unknown(&agents, name))),
+        },
+        None => agents[0].clone(),
+    };
+    let question = a.question.join(" ");
+    if question.trim().is_empty() {
+        // No question: chat on a terminal, a usage error anywhere else.
+        if !out.json && !out.non_interactive && std::io::stdin().is_terminal() {
+            let n = ask::chat(&agents, agent, !a.no_search, a.max_tokens, a.infernet.as_deref(), timeout).await;
+            res.operation = "ask.chat".into();
+            res.warnings.clear();
+            res.data = json!({ "answered": n });
+            return ("ask.chat", Ok(res));
+        }
+        return ("ask", Err(w3bs_core::Error::usage("ASK_NO_QUESTION", format!("ask a question: w3bs ask {} \"How should I price my first plan?\" (w3bs ask --list shows the agents)", agent.name))));
+    }
+    let human = !out.json;
+    let mut tok = |t: &str| {
+        if human {
+            print!("{t}");
+            let _ = std::io::stdout().flush();
+        }
+    };
+    let mut status = |m: &str| {
+        if human && !out.quiet {
+            eprintln!("w3bs: {m}");
+        }
+    };
+    let req = ask::Request { agent: &agent, question: &question, search: !a.no_search, max_tokens: a.max_tokens, infernet: a.infernet.as_deref(), timeout };
+    match ask::ask(req, &mut tok, &mut status).await {
+        Ok(mut d) => {
+            if human {
+                println!();
+            }
+            if let Some(w) = d.as_object_mut().and_then(|o| o.remove("warnings")) {
+                res.warnings.extend(w.as_array().into_iter().flatten().filter_map(|x| x.as_str().map(str::to_owned)));
+            }
+            d["registry"] = json!(loaded.source);
+            res.data = d;
+            ("ask", Ok(res))
+        }
+        Err(e) => ("ask", Err(e)),
     }
 }
 

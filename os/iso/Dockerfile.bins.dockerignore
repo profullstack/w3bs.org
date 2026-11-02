@@ -9,5 +9,6 @@
 !desktop/gnome-extension/**
 !desktop/packaging/kubuntu/**
 !fixtures/trust.json
+!fixtures/agents.json
 !fixtures/resources/**
 **/target

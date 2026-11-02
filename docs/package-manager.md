@@ -1,6 +1,6 @@
 # Packages in the w3bs CLI
 
-`w3bs` is the W3BS command line: one binary for every W3BS surface. Packages are its first app (install from any participating website or with `w3bs install`, manage every package, update all with one command). Resources are the second: `w3bs resolve`, `w3bs verify` and `w3bs resource …` work with signed `w3bs://` resources in a W3BS registry.
+`w3bs` is the W3BS command line: one binary for every W3BS surface. Packages are its first app (install from any participating website or with `w3bs install`, manage every package, update all with one command). Resources are the second: `w3bs resolve`, `w3bs verify` and `w3bs resource …` work with signed `w3bs://` resources in a W3BS registry. `w3bs ask business "How do I price my first plan?"` asks a published agent, answered on the c0mpute network with pit.world sources ([w3bs ask](/docs/ask.md)).
 
 ```sh
 curl -fsSL https://w3bs.org/install.sh | sh

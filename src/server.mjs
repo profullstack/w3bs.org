@@ -354,6 +354,15 @@ export function createApp({
     '/assets',
     express.static(resolve(ROOT, 'public'), { maxAge: '1h', index: false, fallthrough: false }),
   );
+  // The `w3bs ask` agent registry (docs/ask.md). The CLI embeds a copy and prefers this one,
+  // so a new agent needs no CLI release.
+  app.get('/agents.json', (_req, res) =>
+    res
+      .set('Access-Control-Allow-Origin', '*')
+      .set('Cache-Control', 'public, max-age=300')
+      .type('application/json')
+      .send(readFileSync(resolve(ROOT, 'fixtures/agents.json'))),
+  );
   app.get('/manifest.webmanifest', (_req, res) =>
     res
       .type('application/manifest+json')
