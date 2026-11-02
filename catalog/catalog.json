@@ -2223,6 +2223,14 @@
       {
         "run": "ollama launch claude",
         "does": "Launch Claude Code wired to a local Ollama model"
+      },
+      {
+        "run": "ollama run hf.co/profullstack/saas-business-strategist-agent-GGUF",
+        "does": "Try a model: Profullstack's CPU-friendly SaaS business strategist from Hugging Face (hf.co/ models need Ollama 0.3.13 or later)"
+      },
+      {
+        "run": "curl -fsSL https://ollama.com/install.sh | sh",
+        "does": "Update: rerun the installer (w3bs update does this for you). On Linux it uses sudo to install a systemd service; on macOS it installs Ollama.app"
       }
     ],
     "description": "Runs open-weight language models locally behind a CLI and a local HTTP API.",
