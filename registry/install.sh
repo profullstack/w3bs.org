@@ -34,8 +34,8 @@ w3bs_main() {
   MANAGER_REPO_URL='https://w3bs.org/repo/'
   MANAGER_FINGERPRINT='sha256:48d521f7610117c95cc782982e5c05b641b18bdfa8e48b36a634186133bc766f'
   MANAGER_DOWNLOAD_BASE='https://github.com/profullstack/w3bs.org/releases/download'
-  MANAGER_VERSION='0.1.20'
-  MANAGER_SHA256S='x86_64-unknown-linux-gnu=ac5f2230025d6308278434cd1b5d38082f4a808aecd0498ede928b4bf01b1110 aarch64-unknown-linux-gnu=9149b28f7fd35d10189c939b70d7b33c8c1389f17343a160d9292f7ae151340d x86_64-unknown-linux-musl=3e317ae2430a19cfe1de70619dbe678c40873fa7014ffefcdb97674fcab00dd2 aarch64-unknown-linux-musl=761c006aada19eb9f461314fc3ad38be4d0f7b09084221c1a976c4c7c19fd8b1 x86_64-apple-darwin=fdf6d731d5f7fd8b600a1e8661f56c9a790785af129f2bb0b0adee2d6c63d02a aarch64-apple-darwin=0359d2fc572e0ebf9cb4bda905d867f69e99182b4ff54ebc754347128d6b4eed'
+  MANAGER_VERSION='0.1.21'
+  MANAGER_SHA256S='x86_64-unknown-linux-gnu=9488f423e6ae3915f113d0c1bc511ad261c26c919a9f5abe2e8f49d02b043cbd aarch64-unknown-linux-gnu=f71d98a265a5b823ef2bb7e5d2fe85685cbbe0554f891183a9d16d62ab347167 x86_64-unknown-linux-musl=a282d78d590e3927723ab623e63067b1c0acbf84ced1091e215b9cb38830a78f aarch64-unknown-linux-musl=9a2612d76640a8fbce4b595590b1c234d2d56d8ba97df72db4b23dc28fc7f277 x86_64-apple-darwin=cfb504ee30b537b2c31eb98714524681af0e8a69058697146fc10073860d3442 aarch64-apple-darwin=d8eb77f124e955289c052de6597f2d7b80de8dd0b7e8996129d5f32b96ea7ebb'
 
   say() { printf '%s\n' "$*" >&2; }
   die() { say "w3bs installer: $*"; exit "${2:-4}"; }
