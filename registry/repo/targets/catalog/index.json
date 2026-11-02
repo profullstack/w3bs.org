@@ -18,7 +18,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.120.0"
+      "latest_version": "0.120.1"
     },
     {
       "id": "profullstack.com/cli-tools",
@@ -161,7 +161,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.4.2"
+      "latest_version": "0.4.4"
     },
     {
       "id": "c0mpute.com/c0mpute",
@@ -179,7 +179,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.2.36"
+      "latest_version": "0.2.48"
     },
     {
       "id": "infernetprotocol.com/infernet",
@@ -215,7 +215,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.16.4"
+      "latest_version": "0.16.6"
     },
     {
       "id": "nixamp.com/nixamp",
@@ -397,7 +397,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.21.1"
+      "latest_version": "0.22.0"
     },
     {
       "id": "wx93.me/wx93-mcp",
@@ -1207,7 +1207,7 @@
       "vendor": "Daniel Miessler",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "1.4.557"
+      "latest_version": "1.4.562"
     },
     {
       "id": "w3bs.org/agentic-desktop-layer",
@@ -1401,7 +1401,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.56.0"
+      "latest_version": "0.57.0"
     },
     {
       "id": "nightcell7.com/nightcell7",
@@ -1561,7 +1561,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.5.0"
+      "latest_version": "0.5.2"
     },
     {
       "id": "typeheard.com/typeheard",
