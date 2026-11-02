@@ -18,6 +18,7 @@ fn fake(chat_status: u16) -> Fake {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let origin = format!("http://{}", listener.local_addr().unwrap());
     let seen: Seen = Arc::new(Mutex::new(vec![]));
+    let posts = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let log = seen.clone();
     std::thread::spawn(move || {
         for stream in listener.incoming() {
@@ -60,9 +61,19 @@ fn fake(chat_status: u16) -> Fake {
                     { "title": "Three", "url": "https://three.example/", "description": "third" }
                 ]}).to_string()),
                 ("POST", "/api/chat") if chat_status == 429 => (429, "application/json", json!({ "error": "Rate limit exceeded", "detail": { "resetAt": "2026-11-02T13:00:00.000Z" } }).to_string()),
-                ("POST", "/api/chat") => (200, "application/json", json!({ "jobId": "j1", "status": "assigned", "source": "p2p", "model": "hf.co/x/y-GGUF:latest",
-                    "provider": { "id": "p1", "name": "node-one", "nodeId": "provider-1" }, "streamUrl": "/api/chat/stream/j1" }).to_string()),
-                ("GET", "/api/chat/stream/j1") => (200, "text/event-stream", [
+                ("POST", "/api/chat") => {
+                    let n = posts.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+                    (200, "application/json", json!({ "jobId": format!("j{n}"), "status": "assigned", "source": "p2p", "model": "hf.co/x/y-GGUF:latest",
+                        "provider": { "id": "p1", "name": "node-one", "nodeId": "provider-1" }, "streamUrl": format!("/api/chat/stream/j{n}") }).to_string())
+                }
+                // Every odd job only repeats the business agent's system prompt; the CLI must
+                // hide it and ask again.
+                ("GET", r) if r.starts_with("/api/chat/stream/j") && r[18..].parse::<usize>().unwrap_or(0) % 2 == 1 => (200, "text/event-stream", [
+                    "event: token\ndata: {\"text\":\"You are \"}\n\n",
+                    "event: token\ndata: {\"text\":\"y.\"}\n\n",
+                    "event: done\ndata: {\"text\":\"You are y.\",\"reason\":\"stop\"}\n\n",
+                ].concat()),
+                ("GET", r) if r.starts_with("/api/chat/stream/j") => (200, "text/event-stream", [
                     "event: job\ndata: {\"id\":\"j1\"}\n\n",
                     "event: meta\ndata: {\"provider_node_id\":\"provider-1\",\"provider_name\":\"node-one\",\"engine\":\"ollama\"}\n\n",
                     "event: token\ndata: {\"text\":\"Find \"}\n\n",
@@ -111,7 +122,12 @@ fn ask_grounds_routes_p2p_and_streams() {
     let seen = f.seen.lock().unwrap().clone();
     let search = seen.iter().find(|(_, p, _, _)| p.starts_with("/search")).unwrap();
     assert_eq!(search.1, "/search?q=How+do+I+make+money%3F+startup");
-    let (_, _, chat, auth) = seen.iter().find(|(m, p, _, _)| m == "POST" && p == "/api/chat").unwrap();
+    let posts: Vec<_> = seen.iter().filter(|(m, p, _, _)| m == "POST" && p == "/api/chat").collect();
+    assert_eq!(posts.len(), 2, "the echo was retried once");
+    assert_eq!(posts[1].2["messages"][1]["content"], "How do I make money??", "the retry moves the background into the system message");
+    assert!(posts[1].2["messages"][0]["content"].as_str().unwrap().contains("Notes from the web you may use:"));
+    assert_eq!(d["job_id"], "j2");
+    let (_, _, chat, auth) = posts[0];
     assert_eq!(chat["p2p_only"], true);
     assert_eq!(chat["modelName"], "hf.co/x/y-GGUF:latest");
     assert_eq!((chat["maxTokens"].as_u64(), chat["temperature"].as_f64()), (Some(99), Some(0.1)));
@@ -123,7 +139,7 @@ fn ask_grounds_routes_p2p_and_streams() {
     // Human output: the streamed answer, then the sources; who served it goes to stderr.
     let (code, out, err) = w3bs(&f, &["ask", "business", "Help?"], &[("INFERNET_API_KEY", "ifc_test")]);
     assert_eq!(code, 0, "{out} {err}");
-    assert!(out.starts_with("Find customers.\n"), "{out}");
+    assert!(out.starts_with("Find customers.\n"), "the echo never reaches the screen: {out}");
     assert!(out.contains("Sources:\n  [1] One\n      https://one.example/"), "{out}");
     assert!(err.contains("on c0mpute node node-one (provider-1)"), "{err}");
     let last = f.seen.lock().unwrap().iter().rev().find(|(m, p, _, _)| m == "POST" && p == "/api/chat").unwrap().3.clone();
