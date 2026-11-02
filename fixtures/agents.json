@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "about": "Agents `w3bs ask <agent> \"question\"` can ask. Each runs on the c0mpute network: Infernet nodes serve `model` (a house model every node pulls, see infernetprotocol.com/house-models.json). Small models supply the voice, not the facts, so `grounding.search` puts the top pit.world results in the prompt and the CLI prints them as sources. Adding an agent is one object here (PR to profullstack/w3bs.org public/agents.json). Docs: https://w3bs.org/docs/ask.md",
+  "about": "Agents `w3bs ask <agent> \"question\"` can ask. Each runs on the c0mpute network: Infernet nodes serve `model` (a house model every node pulls, see infernetprotocol.com/house-models.json). Small models supply the voice, not the facts, so `grounding.search` puts the top pit.world results in the prompt and the CLI prints them as sources. Adding an agent is one object here (PR to profullstack/w3bs.org fixtures/agents.json). Docs: https://w3bs.org/docs/ask.md",
   "agents": [
     {
       "name": "business",

@@ -75,7 +75,7 @@ The list lives at [w3bs.org/agents.json](/agents.json) and the CLI reads it on e
 }
 ```
 
-`model` is the name Infernet nodes serve it under. An agent is only useful when nodes serve its model: Infernet [house models](https://infernetprotocol.com/house-models.json) are pulled by every node that fits them, so publish the GGUF there first, then add the agent with a pull request to `public/agents.json` in [profullstack/w3bs.org](https://github.com/profullstack/w3bs.org).
+`model` is the name Infernet nodes serve it under. An agent is only useful when nodes serve its model: Infernet [house models](https://infernetprotocol.com/house-models.json) are pulled by every node that fits them, so publish the GGUF there first, then add the agent with a pull request to `fixtures/agents.json` in [profullstack/w3bs.org](https://github.com/profullstack/w3bs.org).
 
 ## Grounding
 

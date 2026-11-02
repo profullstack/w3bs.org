@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 use w3bs_core::{Error, Result};
 
 /// The registry this binary was built with; used when w3bs.org cannot be reached.
-pub const BUILTIN: &str = include_str!("../../../../public/agents.json");
+pub const BUILTIN: &str = include_str!("../../../../fixtures/agents.json");
 const REGISTRY: &str = "https://w3bs.org/agents.json";
 const INFERNET: &str = "https://infernetprotocol.com";
 const SEARCH: &str = "https://pit.world/api/search";

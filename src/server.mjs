@@ -361,7 +361,7 @@ export function createApp({
       .set('Access-Control-Allow-Origin', '*')
       .set('Cache-Control', 'public, max-age=300')
       .type('application/json')
-      .send(readFileSync(resolve(ROOT, 'public/agents.json'))),
+      .send(readFileSync(resolve(ROOT, 'fixtures/agents.json'))),
   );
   app.get('/manifest.webmanifest', (_req, res) =>
     res

@@ -26,7 +26,7 @@ W3BS_API=http://localhost:3000 node native/client.mjs w3bs://prompt/w3bs/researc
 
 ```sh
 w3bs ask business "What do I do, I can't make money???? HELP!"   # streamed answer + pit.world sources
-w3bs ask --list                                                  # the agents (public/agents.json)
+w3bs ask --list                                                  # the agents (fixtures/agents.json)
 w3bs ask                                                         # chat: /ask <agent> <question>
 ```
 
