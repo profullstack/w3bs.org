@@ -33,6 +33,8 @@ pub struct Agent {
     pub huggingface: String,
     pub gguf: String,
     pub system: String,
+    /// Shown under every answer (legal and tax agents: "not a lawyer, not advice").
+    pub disclaimer: String,
     pub search: bool,
     pub query_suffix: String,
     pub results: usize,
@@ -58,6 +60,7 @@ impl Agent {
             by: st("by"),
             huggingface: st("huggingface"),
             gguf: st("gguf"),
+            disclaimer: st("disclaimer"),
             search: g["search"].as_str().is_some_and(|s| !s.is_empty()),
             query_suffix: g["query_suffix"].as_str().unwrap_or_default().trim().to_owned(),
             results: g["results"].as_u64().unwrap_or(3).clamp(1, 8) as usize,
@@ -70,8 +73,12 @@ impl Agent {
     }
 
     pub fn summary(&self) -> Value {
-        json!({ "name": self.name, "aliases": self.aliases, "title": self.title, "by": self.by, "model": self.model,
-                "huggingface": self.huggingface, "gguf": self.gguf, "grounding": if self.search { "pit.world" } else { "none" } })
+        let mut v = json!({ "name": self.name, "aliases": self.aliases, "title": self.title, "by": self.by, "model": self.model,
+                "huggingface": self.huggingface, "gguf": self.gguf, "grounding": if self.search { "pit.world" } else { "none" } });
+        if !self.disclaimer.is_empty() {
+            v["disclaimer"] = json!(self.disclaimer);
+        }
+        v
     }
 }
 
@@ -443,7 +450,7 @@ pub async fn ask(req: Request<'_>, on_token: &mut dyn FnMut(&str), on_status: &m
         final_text = text;
         break;
     }
-    Ok(json!({
+    let mut out = json!({
         "agent": agent.name,
         "title": agent.title,
         "model": agent.model,
@@ -458,7 +465,11 @@ pub async fn ask(req: Request<'_>, on_token: &mut dyn FnMut(&str), on_status: &m
         "latency_ms": started.elapsed().as_millis() as u64,
         "first_token_ms": first_token.map(|t| t as u64),
         "warnings": warnings,
-    }))
+    });
+    if !agent.disclaimer.is_empty() {
+        out["disclaimer"] = json!(agent.disclaimer);
+    }
+    Ok(out)
 }
 
 fn s(v: &Value) -> String {
@@ -473,6 +484,9 @@ pub fn print_footer(d: &Value) {
         for x in &sources {
             println!("  [{}] {}\n      {}", x["n"], x["title"].as_str().unwrap_or_default(), x["url"].as_str().unwrap_or_default());
         }
+    }
+    if let Some(note) = d["disclaimer"].as_str().filter(|n| !n.is_empty()) {
+        println!("\n{note}");
     }
     let secs = |k: &str| d[k].as_u64().map(|ms| format!("{:.1} s", ms as f64 / 1000.0));
     let first = secs("first_token_ms").map(|t| format!(", first token {t}")).unwrap_or_default();
@@ -646,6 +660,19 @@ mod tests {
             assert_eq!(find(&a, alias).unwrap().name, "business", "{alias}");
         }
         assert!(find(&a, "nobody").is_none());
+        assert!(b.disclaimer.is_empty() && b.summary().get("disclaimer").is_none());
+    }
+
+    #[test]
+    fn builtin_registry_has_the_legal_agent_with_a_disclaimer() {
+        let a = agents();
+        for (alias, name, repo, note) in [("lawyer", "legal", "not-a-lawyer-agent", "Not a lawyer."), ("@Not-A-Lawyer", "legal", "not-a-lawyer-agent", "Not a lawyer.")] {
+            let ag = find(&a, alias).unwrap();
+            assert_eq!(ag.name, name);
+            assert_eq!(ag.model, format!("hf.co/profullstack/{repo}-GGUF:latest"));
+            assert!(ag.disclaimer.starts_with(note), "{}", ag.disclaimer);
+            assert_eq!(ag.summary()["disclaimer"], ag.disclaimer.as_str());
+        }
     }
 
     #[test]

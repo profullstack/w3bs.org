@@ -22,6 +22,7 @@ export function agents(registry = REGISTRY) {
       huggingface: a.huggingface ?? '',
       gguf: a.gguf ?? '',
       system: a.system,
+      disclaimer: a.disclaimer ?? '',
       search: Boolean(a.grounding?.search),
       querySuffix: a.grounding?.query_suffix ?? '',
       results: Math.min(Math.max(Number(a.grounding?.results) || 3, 1), 8),
@@ -38,6 +39,7 @@ export const publicAgent = (a) => ({
   model: a.model,
   huggingface: a.huggingface,
   gguf: a.gguf,
+  ...(a.disclaimer ? { disclaimer: a.disclaimer } : {}),
   grounding: a.search ? 'pit.world' : 'none',
 });
 
@@ -275,6 +277,7 @@ export async function ask(
     model: agent.model,
     question: q,
     answer,
+    ...(agent.disclaimer ? { disclaimer: agent.disclaimer } : {}),
     sources: sources.map((s, i) => ({ n: i + 1, title: s.title, url: s.url })),
     node,
     transport: 'infernet',

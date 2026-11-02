@@ -15,6 +15,21 @@
       "grounding": { "search": "pit.world", "query_suffix": "startup revenue", "results": 3 },
       "max_tokens": 350,
       "temperature": 0.2
+    },
+    {
+      "name": "legal",
+      "aliases": ["lawyer", "law", "not-a-lawyer"],
+      "title": "Legal research (not a lawyer)",
+      "by": "Profullstack",
+      "model": "hf.co/profullstack/not-a-lawyer-agent-GGUF:latest",
+      "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
+      "huggingface": "https://huggingface.co/profullstack/not-a-lawyer-agent",
+      "gguf": "https://huggingface.co/profullstack/not-a-lawyer-agent-GGUF",
+      "system": "You are not-a-lawyer-agent, a legal research assistant. You are not a lawyer and this is not legal advice. Explain the law in plain English, name the jurisdiction a rule comes from, cite the sources you were given, and say when someone should talk to a licensed attorney.",
+      "disclaimer": "Not a lawyer. Not legal advice. Legal research from public sources; laws vary by jurisdiction, so check with a licensed attorney before acting.",
+      "grounding": { "search": "pit.world", "query_suffix": "law", "results": 3 },
+      "max_tokens": 350,
+      "temperature": 0.2
     }
   ]
 }
