@@ -56,6 +56,10 @@ business> /ask business "What do I do, I can't make money???? HELP!"
 | Agent      | Aliases              | Model                                                                                                                                                                                                                                                                   |
 | ---------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `business` | `saas`, `strategist` | Profullstack's [saas-business-strategist-agent](https://huggingface.co/profullstack/saas-business-strategist-agent): Qwen2.5-0.5B-Instruct with a LoRA trained on the c0mpute network ([GGUF](https://huggingface.co/profullstack/saas-business-strategist-agent-GGUF)) |
+| `legal`    | `lawyer`, `law`, `not-a-lawyer` | Profullstack's [not-a-lawyer-agent](https://huggingface.co/profullstack/not-a-lawyer-agent): legal research, trained on the c0mpute network from rssamplifier law topics and pit.world ([GGUF](https://huggingface.co/profullstack/not-a-lawyer-agent-GGUF)). Not a lawyer, not legal advice |
+| `tax`      | `taxes`, `tax-guy`, `irs` | Profullstack's [tax-guy-agent](https://huggingface.co/profullstack/tax-guy-agent): tax research, trained on the c0mpute network from rssamplifier tax topics and pit.world ([GGUF](https://huggingface.co/profullstack/tax-guy-agent-GGUF)). Not a CPA, not tax advice |
+
+An agent with a `disclaimer` prints it under every answer and returns it in `--json`, the API and MCP results.
 
 The list lives at [w3bs.org/agents.json](/agents.json) and the CLI reads it on each run, so a new agent needs no new `w3bs`. A copy is built into the binary for when w3bs.org cannot be reached. Each agent is one object:
 
