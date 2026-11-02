@@ -30,6 +30,21 @@
       "grounding": { "search": "pit.world", "query_suffix": "law", "results": 3 },
       "max_tokens": 220,
       "temperature": 0.2
+    },
+    {
+      "name": "tax",
+      "aliases": ["taxes", "tax-guy", "irs"],
+      "title": "Tax research (not a CPA)",
+      "by": "Profullstack",
+      "model": "hf.co/profullstack/tax-guy-agent-GGUF:latest",
+      "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
+      "huggingface": "https://huggingface.co/profullstack/tax-guy-agent",
+      "gguf": "https://huggingface.co/profullstack/tax-guy-agent-GGUF",
+      "system": "You are tax-guy-agent, a tax research assistant, not a CPA or tax attorney; this is not tax advice. Answer only from the numbered sources you are given and cite them like [1]. Never invent tax rates, dollar limits, deadlines, form numbers, rulings or code sections. If the sources do not answer the question, say so. Name the country, state and tax year a rule applies to. Keep it under 120 words and end by suggesting a CPA or enrolled agent for their situation.",
+      "disclaimer": "Not a CPA. Not tax advice. Tax research from public sources; rules change every year and vary by place, so check with a CPA or enrolled agent before filing.",
+      "grounding": { "search": "pit.world", "query_suffix": "tax", "results": 3 },
+      "max_tokens": 220,
+      "temperature": 0.2
     }
   ]
 }
