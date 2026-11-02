@@ -447,6 +447,21 @@ export function createApp({
     const query = req.originalUrl.indexOf('?');
     res.redirect(301, `/desktop${query === -1 ? '' : req.originalUrl.slice(query)}`);
   });
+  // Short package links: w3bs.org/packages/ollama -> /packages/ollama.com/ollama when exactly one
+  // catalog entry has that short name (the part after the slash, or its display name), the same
+  // rule `w3bs install <short-name>` uses. Ambiguous or unknown names fall through to a 404.
+  app.get('/packages/:name', async (req, res, next) => {
+    const short = String(req.params.name).toLowerCase();
+    const hits = (await store.packages('')).filter(
+      (item) => item.id.split('/')[1] === short || String(item.name).toLowerCase() === short,
+    );
+    if (hits.length !== 1) return next();
+    const query = req.originalUrl.indexOf('?');
+    res.redirect(
+      301,
+      `/packages/${hits[0].id}${query === -1 ? '' : req.originalUrl.slice(query)}`,
+    );
+  });
   app.get(/.*/, async (req, res, next) => {
     try {
       res.type('html').send(

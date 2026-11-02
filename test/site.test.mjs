@@ -203,3 +203,21 @@ test('/os offers only what exists: Docker now, the ISO from the newest os-v* rel
     await t.close();
   }
 });
+
+test('/packages/<short-name> redirects to the full package id; the Ollama page shows the model tip', async () => {
+  const t = await boot();
+  try {
+    const res = await fetch(`${t.base}/packages/ollama`, { redirect: 'manual' });
+    assert.equal(res.status, 301);
+    assert.equal(res.headers.get('location'), '/packages/ollama.com/ollama');
+    const html = await (await fetch(`${t.base}/packages/ollama.com/ollama`)).text();
+    assert.ok(html.includes('curl -fsSL https://ollama.com/install.sh | sh'));
+    assert.ok(html.includes('ollama run hf.co/profullstack/saas-business-strategist-agent-GGUF'));
+    assert.match(html, /0\.3\.13/);
+    // Unknown short names and the publish page are untouched.
+    assert.equal((await fetch(`${t.base}/packages/no-such-tool`, { redirect: 'manual' })).status, 404);
+    assert.equal((await fetch(`${t.base}/packages/publish`, { redirect: 'manual' })).status, 200);
+  } finally {
+    await t.close();
+  }
+});
