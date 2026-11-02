@@ -237,6 +237,8 @@ test('Agentic Desktop Layer page, typo redirect, raw PRD and navigation', async 
       'Enable agent access',
       'Disable agent access',
       '/assets/desktop.js',
+      '/assets/pf-player-init.js',
+      'data-pf-player',
     ])
       assert.ok(html.includes(text), `missing ${text}`);
     assert.match(html, /<a href="\/desktop" aria-current="page">Desktop<\/a>/);
@@ -287,6 +289,15 @@ test('Agentic Desktop Layer page, typo redirect, raw PRD and navigation', async 
     assert.match(front, /<meta name="twitter:card" content="summary">/);
     const script = await (await fetch(`${origin}/assets/desktop.js`)).text();
     assert.ok(!/localhost|127\.0\.0\.1|requestPermission|getUserMedia/.test(script));
+    // The demo video plays in @profullstack/player, bundled and served from this origin.
+    const player = await fetch(`${origin}/assets/pf-player.js`);
+    assert.equal(player.status, 200);
+    assert.match(player.headers.get('content-type'), /javascript/);
+    const playerJs = await player.text();
+    assert.ok(playerJs.includes('pux-player') && /export\s*\{[^}]*createPlayer/.test(playerJs));
+    const playerCss = await fetch(`${origin}/assets/pf-player.css`);
+    assert.equal(playerCss.status, 200);
+    assert.ok((await playerCss.text()).includes('.pux-player'));
   } finally {
     await instance.close();
   }

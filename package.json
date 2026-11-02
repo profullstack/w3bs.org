@@ -33,6 +33,7 @@
     "@profullstack/fleetbar": "0.2.0",
     "@profullstack/footer": "latest",
     "@profullstack/hqtui": "0.10.3",
+    "@profullstack/player": "0.17.0",
     "@profullstack/stack": "0.4.0",
     "@profullstack/threatcrush": "0.13.30",
     "@simplewebauthn/server": "13.3.3",

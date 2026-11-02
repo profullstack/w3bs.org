@@ -27,6 +27,7 @@ import { mountInstallLinks } from './install-links.mjs';
 import { mountRegistryFront } from './registry-front.mjs';
 import { createBrowser } from './browse.mjs';
 import { createNet } from './net-routes.mjs';
+import { playerCss, playerJs } from './player-bundle.mjs';
 
 export function createApp({
   store,
@@ -374,6 +375,19 @@ export function createApp({
     origin,
     publishTask: (userId, payload) => publishedTasks.publish(userId, payload),
   });
+  // @profullstack/player, bundled once on first use (src/player-bundle.mjs); pf-player-init.js loads
+  // it only on a page with something to play. Same origin, so script-src 'self' covers it.
+  app.get('/assets/pf-player.js', async (_req, res) => {
+    try {
+      res.set('Cache-Control', 'public, max-age=3600').type('text/javascript').send(await playerJs());
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      res.status(503).type('text/plain').send('player unavailable');
+    }
+  });
+  app.get('/assets/pf-player.css', (_req, res) =>
+    res.set('Cache-Control', 'public, max-age=3600').type('text/css').send(playerCss()),
+  );
   app.use(
     '/assets',
     express.static(resolve(ROOT, 'public'), { maxAge: '1h', index: false, fallthrough: false }),
