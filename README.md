@@ -20,6 +20,18 @@ W3BS_API=http://localhost:3000 w3bs resolve w3bs://prompt/w3bs/research@1
 W3BS_API=http://localhost:3000 node native/client.mjs w3bs://prompt/w3bs/research@1 --json
 ```
 
+## The w3bs CLI
+
+`curl -fsSL https://w3bs.org/install.sh | sh` installs `w3bs`, one command for every W3BS surface: packages (`docs/package-manager.md`), resources, fleet, A/B tests, and `w3bs ask`, which asks a published agent a question on the c0mpute network:
+
+```sh
+w3bs ask business "What do I do, I can't make money???? HELP!"   # streamed answer + pit.world sources
+w3bs ask --list                                                  # the agents (public/agents.json)
+w3bs ask                                                         # chat: /ask <agent> <question>
+```
+
+See `docs/ask.md`.
+
 ## Included
 
 - Three implemented protocol drafts and five initial proposals, governance and contribution process.

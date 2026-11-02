@@ -337,6 +337,16 @@ pub fn human(r: &OperationResult) {
             }
             return;
         }
+        "ask" => {
+            // The answer already streamed to stdout while it arrived.
+            crate::ask::print_footer(&r.data);
+            return;
+        }
+        "ask.list" => {
+            crate::ask::print_list(&r.data);
+            return;
+        }
+        "ask.chat" => return,
         "ab.ls" => {
             let list = r.data["experiments"].as_array().cloned().unwrap_or_default();
             if list.is_empty() {

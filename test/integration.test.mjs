@@ -130,8 +130,12 @@ test('HTTP rejects hostile origins, arbitrary hosts, invalid bodies and unauthen
       '/docs/founding-prd.md',
       '/manifest.webmanifest',
       '/sw.js',
+      '/agents.json',
     ])
       assert.equal((await fetch(origin + route)).status, 200, route);
+    const agents = await (await fetch(`${origin}/agents.json`)).json();
+    const business = agents.agents.find((a) => a.name === 'business');
+    assert.ok(business.aliases.includes('saas') && business.model && business.system);
   } finally {
     await instance.close();
   }

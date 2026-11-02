@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "about": "Agents `w3bs ask <agent> \"question\"` can ask. Each runs on the c0mpute network: Infernet nodes serve `model` (a house model every node pulls, see infernetprotocol.com/house-models.json). Small models supply the voice, not the facts, so `grounding.search` puts the top pit.world results in the prompt and the CLI prints them as sources. Adding an agent is one object here (PR to profullstack/w3bs.org public/agents.json). Docs: https://w3bs.org/docs/ask.md",
+  "agents": [
+    {
+      "name": "business",
+      "aliases": ["saas", "strategist"],
+      "title": "SaaS business strategist",
+      "by": "Profullstack",
+      "model": "hf.co/profullstack/saas-business-strategist-agent-GGUF:latest",
+      "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
+      "huggingface": "https://huggingface.co/profullstack/saas-business-strategist-agent",
+      "gguf": "https://huggingface.co/profullstack/saas-business-strategist-agent-GGUF",
+      "system": "You are saas-business-strategist-agent. You give concise, practical business strategy grounded in what independent writers on these subjects are publishing.",
+      "grounding": { "search": "pit.world", "query_suffix": "startup revenue", "results": 3 },
+      "max_tokens": 350,
+      "temperature": 0.2
+    }
+  ]
+}
