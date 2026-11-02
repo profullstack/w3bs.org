@@ -77,6 +77,27 @@ The list lives at [w3bs.org/agents.json](/agents.json) and the CLI reads it on e
 
 `model` is the name Infernet nodes serve it under. An agent is only useful when nodes serve its model: Infernet [house models](https://infernetprotocol.com/house-models.json) are pulled by every node that fits them, so publish the GGUF there first, then add the agent with a pull request to `fixtures/agents.json` in [profullstack/w3bs.org](https://github.com/profullstack/w3bs.org).
 
+## HTTP API
+
+```sh
+curl -s https://w3bs.org/api/v1/ask -H 'content-type: application/json' \
+  -d '{"agent":"business","question":"What do I do, I can'"'"'t make money???? HELP!"}'
+```
+
+`POST /api/v1/ask` takes `{agent, question, search?}` (`agent` defaults to the first one; `search: false` skips pit.world) and returns the same object as `w3bs ask --json`'s `data`: `answer`, `sources` (`n`, `title`, `url`), `node` (`id`, `name`, `engine`), `model`, `job_id`, `latency_ms`, `first_token_ms`. `GET /api/v1/ask/agents` lists the agents. No key: 20 questions an hour per client IP (`429 ASK_RATE_LIMITED` after that). w3bs.org asks Infernet with `p2p_only` like the CLI, so a node answers or the call fails (`503 ASK_NO_NODE`); there is no hosted fallback.
+
+## MCP
+
+The hosted MCP server at `https://w3bs.org/mcp` (Streamable HTTP) and the stdio one (`bun src/mcp-stdio.mjs`) have a `w3bs_ask` tool: `{agent, question, search?}` in, the API's object out (answer, sources, node). Same limit as the API.
+
+```sh
+claude mcp add --transport http w3bs https://w3bs.org/mcp
+```
+
+## The TUI
+
+`w3bs ask` with no question is the interactive surface: a chat on the terminal with the `/ask`, `/agent`, `/list`, `/help` and `/quit` slash commands (above).
+
 ## Grounding
 
 Small models supply the voice, not the facts. Before asking, `w3bs ask` runs the question (plus the agent's `query_suffix`) through [pit.world](https://pit.world) search and puts the top results, numbered, in the prompt. Results with a description come first. They are printed as the sources. If the search fails, the agent answers without them and `w3bs` says so.

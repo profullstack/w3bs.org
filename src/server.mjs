@@ -9,6 +9,7 @@ import { openStore, ROOT } from './store.mjs';
 import { W3bsError, manifestJsonSchema } from './core.mjs';
 import { dispatch, operations } from './operations.mjs';
 import { createMcp } from './mcp.mjs';
+import { ask as askAgent, agents as askAgents, publicAgent, limiter } from './ask.mjs';
 import { renderPage, scanBadgeSvg, refreshHouseFooter, FOOTER_SCRIPT_SRC } from './site.mjs';
 import { descriptor } from '@profullstack/footer';
 import { createScanner } from './scan.mjs';
@@ -144,6 +145,7 @@ export function createApp({
       manifest: `${origin}/api/manifest`,
       search: `${origin}/api/search`,
       browse: `${origin}/api/browse`,
+      ask: `${origin}/api/v1/ask`,
       mcp: `${origin}/mcp`,
       schemas: [`${origin}/schemas/manifest.json`],
       trust: `${origin}/api/trust`,
@@ -208,6 +210,25 @@ export function createApp({
   app.get('/api/browse', async (req, res) => res.json(await browse(String(req.query.q ?? ''))));
   // POST { q } is what the stdio MCP server (src/mcp-stdio.mjs) calls, as for the operations.
   app.post('/api/browse', async (req, res) => res.json(await browse(String(req.body?.q ?? ''))));
+  // Ask a published agent (docs/ask.md): answered by a c0mpute/Infernet node, never a hosted
+  // model. Anonymous; 20 questions an hour per client IP, the same as Infernet's public limit.
+  const askLimit = limiter({ max: Number(process.env.W3BS_ASK_PER_HOUR) || 20, windowMs: 60 * 60 * 1000 });
+  const askFor = (req, args) => {
+    const ip = String(req.headers['x-real-ip'] || req.socket.remoteAddress || '');
+    const r = askLimit(ip);
+    if (!r.ok)
+      throw new W3bsError(
+        'ASK_RATE_LIMITED',
+        `20 questions an hour per IP address; try again after ${r.resetAt}.`,
+        429,
+      );
+    return askAgent({ agent: args?.agent, question: args?.question, search: args?.search !== false });
+  };
+  app.get('/api/v1/ask/agents', (_req, res) =>
+    res.json({ agents: askAgents().map(publicAgent), docs: `${origin}/docs/ask.md` }),
+  );
+  for (const route of ['/api/v1/ask', '/api/ask'])
+    app.post(route, async (req, res) => res.set('Cache-Control', 'no-store').json(await askFor(req, req.body)));
   // w3bs://chovy.hacker or w3bs://example.com/path is an address, so /browse opens the site the way
   // typing it would: a claimed Moshpit name at its pit.world gateway (which every browser reaches),
   // anything else at https. Resource URIs (w3bs://prompt/...) and names that do not resolve fall
@@ -298,7 +319,10 @@ export function createApp({
     }
   }
   app.post('/mcp', async (req, res, next) => {
-    const server = createMcp((name, args) => invoke(req, name, args), { browse });
+    const server = createMcp((name, args) => invoke(req, name, args), {
+      browse,
+      ask: (args) => askFor(req, args),
+    });
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
