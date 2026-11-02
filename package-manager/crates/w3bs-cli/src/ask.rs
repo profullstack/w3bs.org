@@ -666,7 +666,7 @@ mod tests {
     #[test]
     fn builtin_registry_has_the_legal_agent_with_a_disclaimer() {
         let a = agents();
-        for (alias, name, repo, note) in [("lawyer", "legal", "not-a-lawyer-agent", "Not a lawyer."), ("@Not-A-Lawyer", "legal", "not-a-lawyer-agent", "Not a lawyer.")] {
+        for (alias, name, repo, note) in [("lawyer", "legal", "not-a-lawyer-agent", "Not a lawyer."), ("@Not-A-Lawyer", "legal", "not-a-lawyer-agent", "Not a lawyer."), ("@IRS", "tax", "tax-guy-agent", "Not a CPA.")] {
             let ag = find(&a, alias).unwrap();
             assert_eq!(ag.name, name);
             assert_eq!(ag.model, format!("hf.co/profullstack/{repo}-GGUF:latest"));

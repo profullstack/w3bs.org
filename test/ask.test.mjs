@@ -17,6 +17,8 @@ test('the registry, aliases, query, sources, prompt and SSE framing', () => {
   assert.equal(b.disclaimer, '');
   assert.equal(findAgent('lawyer', list).model, 'hf.co/profullstack/not-a-lawyer-agent-GGUF:latest');
   assert.match(findAgent('legal', list).disclaimer, /^Not a lawyer\. Not legal advice\./);
+  assert.equal(findAgent('tax-guy', list).model, 'hf.co/profullstack/tax-guy-agent-GGUF:latest');
+  assert.match(findAgent('@IRS', list).disclaimer, /^Not a CPA\. Not tax advice\./);
   assert.equal(searchQuery("I can't make money???? HELP!", 'startup revenue'), "I can't make money? HELP! startup revenue");
   const s = pickSources(
     {
