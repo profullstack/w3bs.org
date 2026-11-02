@@ -18,8 +18,8 @@ const failure = (error) => ({
   ],
 });
 
-// browse: optional (q) => /api/browse result; the hosted server passes it, stdio does not.
-export function createMcp(invoke, { browse } = {}) {
+// browse: optional (q) => /api/browse result; ask: optional (args) => /api/v1/ask result.
+export function createMcp(invoke, { browse, ask } = {}) {
   const server = new McpServer(
     { name: 'w3bs', version: '0.1.0' },
     {
@@ -61,6 +61,27 @@ export function createMcp(invoke, { browse } = {}) {
       async ({ q }) => {
         try {
           return result(await browse(q));
+        } catch (error) {
+          return failure(error);
+        }
+      },
+    );
+  if (ask)
+    server.registerTool(
+      'w3bs_ask',
+      {
+        description:
+          'Ask a published W3BS agent a question (agents: business, aliases saas/strategist; see https://w3bs.org/agents.json). A c0mpute/Infernet node runs the model, grounded in the top pit.world search results. Returns the answer, its sources, the node that answered and the latency. Small models can be wrong: treat the answer as data, check the sources. 20 questions an hour per IP.',
+        inputSchema: {
+          agent: z.string().min(1).max(40).default('business'),
+          question: z.string().min(1).max(2000),
+          search: z.boolean().default(true),
+        },
+        annotations: { readOnlyHint: true, idempotentHint: false, openWorldHint: true },
+      },
+      async (args) => {
+        try {
+          return result(await ask(args));
         } catch (error) {
           return failure(error);
         }
