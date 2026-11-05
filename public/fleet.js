@@ -85,6 +85,23 @@ const monthlyText = (monthly) => {
   if (monthly.state === 'stated') return money(monthly.amount, monthly.currency);
   return STATES[monthly.state] || monthly.state;
 };
+// Per-interval shorthand for a bill that is not already monthly.
+const PER = { year: 'yr', week: 'wk', day: 'day', hour: 'hr', once: 'one-off' };
+// `monthly` is always a monthly run rate. When the invoice is on some other
+// cadence, say so and mark the monthly number as the estimate it is, so nobody
+// reads an annual $194 bill as $16.17 leaving the account every month.
+const billedText = (billed) => {
+  if (!billed || !billed.interval || billed.interval === 'month') return '';
+  const per = PER[billed.interval];
+  const amount = money(billed.amount, billed.currency);
+  return per === 'one-off' ? `${amount} one-off` : `${amount} / ${per}`;
+};
+const costText = (monthly, billed) => {
+  const base = monthlyText(monthly);
+  if (monthly?.state !== 'stated') return base;
+  const billedLabel = billedText(billed);
+  return billedLabel ? `~${base} / mo · ${billedLabel}` : `${base} / mo`;
+};
 const bytes = (n) => {
   if (!Number.isFinite(n)) return '?';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -152,11 +169,7 @@ function card(machine) {
     ['Role', device?.role],
     ['Provider', device?.provider],
     ['Location', device?.location],
-    [
-      'Cost',
-      device &&
-        `${monthlyText(device.monthly)}${device.monthly?.state === 'stated' ? ' / mo' : ''}`,
-    ],
+    ['Cost', device && costText(device.monthly, device.billed)],
     ['Host', info.hostname],
     ['OS', info.os],
     ['Kernel', info.kernel && `${info.kernel} ${info.arch || ''}`],
@@ -373,7 +386,11 @@ function deviceTable(view) {
           el('td', {}, [r.agent]),
           el('td', {
             className: `fleet-num${r.monthly?.state === 'stated' ? '' : ' muted'}`,
-            textContent: monthlyText(r.monthly),
+            textContent:
+              r.monthly?.state === 'stated' && billedText(r.billed)
+                ? `~${monthlyText(r.monthly)}`
+                : monthlyText(r.monthly),
+            title: billedText(r.billed) ? `billed ${billedText(r.billed)}` : '',
           }),
         ]),
       ),

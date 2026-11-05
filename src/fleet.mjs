@@ -561,6 +561,16 @@ export function createFleet(db, { events } = {}) {
       [device.location?.region, device.location?.country].filter(Boolean).join(', ') || null,
     hostnames: device.hostnames,
     monthly,
+    // What the invoice actually says, so the page can show a yearly bill as
+    // yearly instead of passing its /12 off as a monthly charge. `monthly`
+    // from @profullstack/fleet is always normalised and drops the interval.
+    billed: device.cost?.amount == null
+      ? null
+      : {
+          amount: device.cost.amount,
+          interval: device.cost.interval,
+          currency: device.cost.currency ?? null,
+        },
   });
   // The whole fleet: enrolled machines (each with its inventory device, if one
   // matches by name, hostname or id), the inventory devices without an agent, and
