@@ -797,7 +797,7 @@
       "vendor": "Anthropic",
       "license": "proprietary",
       "agentic": true,
-      "latest_version": "2.1.318"
+      "latest_version": "2.1.319"
     },
     {
       "id": "openai.com/codex",
@@ -835,7 +835,7 @@
       "vendor": "GitHub",
       "license": "proprietary",
       "agentic": true,
-      "latest_version": "1.0.106"
+      "latest_version": "1.0.107"
     },
     {
       "id": "aider.chat/aider",
@@ -873,7 +873,7 @@
       "vendor": "Anomaly (formerly SST)",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "2.2.5"
+      "latest_version": "2.2.6"
     },
     {
       "id": "block.xyz/goose",
@@ -944,7 +944,7 @@
       "vendor": "Alibaba Qwen",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "0.26.8"
+      "latest_version": "0.26.9"
     },
     {
       "id": "kiro.dev/kiro-cli",
@@ -2100,7 +2100,7 @@
       "vendor": "Hanzo AI",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "8.5.890"
+      "latest_version": "8.5.912"
     },
     {
       "id": "github.com/tuxcleaner",
