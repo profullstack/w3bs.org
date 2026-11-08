@@ -18,7 +18,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.120.1"
+      "latest_version": "0.121.1"
     },
     {
       "id": "profullstack.com/cli-tools",
@@ -944,7 +944,7 @@
       "vendor": "Alibaba Qwen",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "0.26.9"
+      "latest_version": "0.27.0"
     },
     {
       "id": "kiro.dev/kiro-cli",
@@ -2100,7 +2100,7 @@
       "vendor": "Hanzo AI",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "8.5.912"
+      "latest_version": "8.5.915"
     },
     {
       "id": "github.com/tuxcleaner",
