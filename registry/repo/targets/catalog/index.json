@@ -134,10 +134,10 @@
         "agenticjobs-mcp"
       ],
       "install": {
-        "url": "https://agenticjobs.work/install.sh",
+        "url": "https://agenticjobs.pwa.pit.world/install.sh",
         "shell": "sh"
       },
-      "homepage": "https://agenticjobs.work",
+      "homepage": "https://agenticjobs.pwa.pit.world",
       "repository": "https://github.com/profullstack/agenticjobs",
       "vendor": "Profullstack",
       "license": "MIT",
@@ -1271,10 +1271,10 @@
         "submitfleet"
       ],
       "install": {
-        "url": "https://submitfleet.com/install.sh",
+        "url": "https://submitfleet.pwa.pit.world/install.sh",
         "shell": "sh"
       },
-      "homepage": "https://submitfleet.com",
+      "homepage": "https://submitfleet.pwa.pit.world",
       "repository": "https://github.com/profullstack/submitfleet",
       "vendor": "Profullstack",
       "license": "MIT",
@@ -1324,10 +1324,10 @@
         "c0upons"
       ],
       "install": {
-        "url": "https://c0upons.com/install.sh",
+        "url": "https://c0upons.pwa.pit.world/install.sh",
         "shell": "sh"
       },
-      "homepage": "https://c0upons.com",
+      "homepage": "https://c0upons.pwa.pit.world",
       "repository": "https://github.com/profullstack/c0upons",
       "vendor": "Profullstack",
       "license": "MIT",
@@ -1518,10 +1518,10 @@
         "ringhuman"
       ],
       "install": {
-        "url": "https://ringhuman.com/install.sh",
+        "url": "https://ringhuman.pwa.pit.world/install.sh",
         "shell": "sh"
       },
-      "homepage": "https://ringhuman.com",
+      "homepage": "https://ringhuman.pwa.pit.world",
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
@@ -1535,10 +1535,10 @@
         "saasrow"
       ],
       "install": {
-        "url": "https://saasrow.com/install.sh",
+        "url": "https://saasrow.pwa.pit.world/install.sh",
         "shell": "sh"
       },
-      "homepage": "https://saasrow.com",
+      "homepage": "https://saasrow.pwa.pit.world",
       "repository": "https://github.com/profullstack/saasrow-web",
       "vendor": "Profullstack",
       "license": "MIT",
@@ -1553,10 +1553,10 @@
         "tleehealth"
       ],
       "install": {
-        "url": "https://tleehealth.com/install.sh",
+        "url": "https://tleehealth.pwa.pit.world/install.sh",
         "shell": "sh"
       },
-      "homepage": "https://tleehealth.com",
+      "homepage": "https://tleehealth.pwa.pit.world",
       "repository": "https://github.com/profullstack/tleehealth.com",
       "vendor": "Profullstack",
       "license": "MIT",
@@ -1571,10 +1571,10 @@
         "typeheard"
       ],
       "install": {
-        "url": "https://typeheard.com/install.sh",
+        "url": "https://typeheard.pwa.pit.world/install.sh",
         "shell": "sh"
       },
-      "homepage": "https://typeheard.com",
+      "homepage": "https://typeheard.pwa.pit.world",
       "repository": "https://github.com/profullstack/typeheard.com",
       "vendor": "Profullstack",
       "license": "MIT",

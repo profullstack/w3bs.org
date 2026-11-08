@@ -248,18 +248,18 @@
         "does": "Prepare an application as a draft without sending it"
       },
       {
-        "run": "claude mcp add jobs -- agenticjobs-mcp --server https://agenticjobs.work",
+        "run": "claude mcp add jobs -- agenticjobs-mcp --server https://agenticjobs.pwa.pit.world",
         "does": "Add the job board as an MCP server in Claude Code"
       }
     ],
     "description": "Self-hosted job board for agents and people, with a CLI and an MCP server.",
-    "homepage": "https://agenticjobs.work",
+    "homepage": "https://agenticjobs.pwa.pit.world",
     "repository": "https://github.com/profullstack/agenticjobs",
     "license": "MIT",
     "agentic": true,
     "latest_version": "0.23.0",
     "vendor": "Profullstack",
-    "install": "curl -fsSL https://agenticjobs.work/install.sh | sh",
+    "install": "curl -fsSL https://agenticjobs.pwa.pit.world/install.sh | sh",
     "evidence": "npm view @profullstack/agenticjobs; installer 200; examples: /home/anthony/src/profullstack/agenticjobs/README.md; MCP line from src/views/docs.tsx + src/mcp/stdio.ts",
     "publisher": "profullstack"
   },
@@ -2417,13 +2417,13 @@
       }
     ],
     "description": "CLI and MCP server for SubmitFleet: launch a product on 339 launch sites and directories from one approved profile, and track every submission until it is live.",
-    "homepage": "https://submitfleet.com",
+    "homepage": "https://submitfleet.pwa.pit.world",
     "repository": "https://github.com/profullstack/submitfleet",
     "license": "MIT",
     "agentic": true,
     "latest_version": "0.3.0",
     "vendor": "Profullstack",
-    "install": "curl -fsSL https://submitfleet.com/install.sh | sh",
+    "install": "curl -fsSL https://submitfleet.pwa.pit.world/install.sh | sh",
     "evidence": "npm view @profullstack/submitfleet version = 0.3.0; submitfleet.com/install.sh 200 (text/x-shellscript, w3bs npm-cli template); examples: submitfleet help (src/cli.ts) and submitfleet.com/docs",
     "publisher": "profullstack"
   },
@@ -2534,14 +2534,14 @@
       }
     ],
     "description": "Community coupon CLI for c0upons.com: search and reveal coupon codes, submit your own and post bounties for codes you need.",
-    "homepage": "https://c0upons.com",
+    "homepage": "https://c0upons.pwa.pit.world",
     "repository": "https://github.com/profullstack/c0upons",
     "license": "MIT",
     "agentic": false,
     "latest_version": "1.9.0",
     "vendor": "Profullstack",
-    "install": "curl -fsSL https://c0upons.com/install.sh | sh",
-    "evidence": "c0upons.com/install.sh 200 downloads https://c0upons.com/cli/c0upons (200, bash script, VERSION=1.9.0) to ~/.local/bin or /usr/local/bin; examples: c0upons help text in that script; license from package.json",
+    "install": "curl -fsSL https://c0upons.pwa.pit.world/install.sh | sh",
+    "evidence": "c0upons.com/install.sh 200 downloads https://c0upons.pwa.pit.world/cli/c0upons (200, bash script, VERSION=1.9.0) to ~/.local/bin or /usr/local/bin; examples: c0upons help text in that script; license from package.json",
     "publisher": "profullstack"
   },
   {
@@ -2955,13 +2955,13 @@
       }
     ],
     "description": "RingHuman command line: RingHuman calls customer support for you, waits through the phone tree and the hold music, and rings your phone when a real human answers.",
-    "homepage": "https://ringhuman.com",
+    "homepage": "https://ringhuman.pwa.pit.world",
     "repository": null,
     "license": "MIT",
     "agentic": false,
     "latest_version": "0.1.0",
     "vendor": "Profullstack",
-    "install": "curl -fsSL https://ringhuman.com/install.sh | sh",
+    "install": "curl -fsSL https://ringhuman.pwa.pit.world/install.sh | sh",
     "evidence": "npm view @profullstack/ringhuman version = 0.1.0; ringhuman.com/install.sh 200 (installs @profullstack/ringhuman with bun or npm); examples: @profullstack/ringhuman README and cac commands in dist/ringhuman.js; source repo is private, so only the installer is scanned",
     "publisher": "profullstack"
   },
@@ -2994,13 +2994,13 @@
       }
     ],
     "description": "Command-line client for the saasrow.com software directory: search it without an account, and manage your free listings and API keys.",
-    "homepage": "https://saasrow.com",
+    "homepage": "https://saasrow.pwa.pit.world",
     "repository": "https://github.com/profullstack/saasrow-web",
     "license": "MIT",
     "agentic": false,
     "latest_version": "1.2.0",
     "vendor": "Profullstack",
-    "install": "curl -fsSL https://saasrow.com/install.sh | sh",
+    "install": "curl -fsSL https://saasrow.pwa.pit.world/install.sh | sh",
     "evidence": "npm view @profullstack/saasrow version = 0.1.0; saasrow.com/install.sh 200 (installs @profullstack/saasrow with bun or npm); examples: @profullstack/saasrow README and src/cli.mjs",
     "publisher": "profullstack"
   },
@@ -3033,13 +3033,13 @@
       }
     ],
     "description": "The tleehealth CLI and dashboard TUI: schedule and caseload from the terminal, plus your own health records from MyChart and other SMART on FHIR portals.",
-    "homepage": "https://tleehealth.com",
+    "homepage": "https://tleehealth.pwa.pit.world",
     "repository": "https://github.com/profullstack/tleehealth.com",
     "license": "MIT",
     "agentic": false,
     "latest_version": "0.5.2",
     "vendor": "Profullstack",
-    "install": "curl -fsSL https://tleehealth.com/install.sh | sh",
+    "install": "curl -fsSL https://tleehealth.pwa.pit.world/install.sh | sh",
     "evidence": "npm view @profullstack/tleehealth version = 0.4.1; tleehealth.com/install.sh 200 (installs the latest @profullstack/tleehealth with bun or npm); examples: @profullstack/tleehealth README and bin/",
     "publisher": "profullstack"
   },
@@ -3068,13 +3068,13 @@
       }
     ],
     "description": "Transcribe audio and video from the terminal with typeheard.com. Also a TUI; the first few minutes of any file are free without a key.",
-    "homepage": "https://typeheard.com",
+    "homepage": "https://typeheard.pwa.pit.world",
     "repository": "https://github.com/profullstack/typeheard.com",
     "license": "MIT",
     "agentic": false,
     "latest_version": "0.1.0",
     "vendor": "Profullstack",
-    "install": "curl -fsSL https://typeheard.com/install.sh | sh",
+    "install": "curl -fsSL https://typeheard.pwa.pit.world/install.sh | sh",
     "evidence": "npm view @profullstack/typeheard version = 0.1.0; typeheard.com/install.sh 200 (installs @profullstack/typeheard with bun or npm); examples: @profullstack/typeheard README and src/cli.js usage",
     "publisher": "profullstack"
   },
