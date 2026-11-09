@@ -18,7 +18,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.121.1"
+      "latest_version": "0.122.0"
     },
     {
       "id": "profullstack.com/cli-tools",
@@ -251,7 +251,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.13.73"
+      "latest_version": "0.13.74"
     },
     {
       "id": "coinpayportal.com/coinpay",
@@ -1207,7 +1207,7 @@
       "vendor": "Daniel Miessler",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "1.4.564"
+      "latest_version": "1.4.567"
     },
     {
       "id": "w3bs.org/agentic-desktop-layer",
@@ -1561,7 +1561,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.5.2"
+      "latest_version": "0.5.4"
     },
     {
       "id": "typeheard.com/typeheard",
@@ -2100,7 +2100,7 @@
       "vendor": "Hanzo AI",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "8.5.915"
+      "latest_version": "8.5.917"
     },
     {
       "id": "github.com/tuxcleaner",
