@@ -70,7 +70,7 @@ export function createApp({
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'strict-origin-when-cross-origin',
       'Cache-Control': 'no-store',
-      'Content-Security-Policy': `default-src 'self'; script-src 'self' https://crawlproof.com ${FOOTER_SCRIPT_SRC}; style-src 'self'; img-src 'self' data: https://built.indie.pit.world https://pwamart.com https://profullstack.com; connect-src 'self' https://crawlproof.com https://pit.world; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self' https://pit.world`,
+      'Content-Security-Policy': `default-src 'self'; script-src 'self' https://crawlproof.com https://cdn.jsdelivr.net ${FOOTER_SCRIPT_SRC}; style-src 'self'; img-src 'self' data: https://built.indie.pit.world https://pwamart.com https://profullstack.com; connect-src 'self' https://crawlproof.com https://pit.world; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self' https://pit.world`,
       'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
     });
     const railwayHealth =
