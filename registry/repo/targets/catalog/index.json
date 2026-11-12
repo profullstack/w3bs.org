@@ -69,7 +69,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.55.0"
+      "latest_version": "0.55.1"
     },
     {
       "id": "sh1pt.com/sh1pt",
@@ -123,7 +123,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.4.1"
+      "latest_version": "0.4.2"
     },
     {
       "id": "agenticjobs.work/agenticjobs",
@@ -179,7 +179,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.3.36"
+      "latest_version": "0.3.58"
     },
     {
       "id": "infernetprotocol.com/infernet",
@@ -215,7 +215,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.16.6"
+      "latest_version": "0.17.1"
     },
     {
       "id": "nixamp.com/nixamp",
@@ -233,7 +233,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "0.80.2"
+      "latest_version": "0.80.3"
     },
     {
       "id": "threatcrush.com/threatcrush",
@@ -287,7 +287,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "1.5.1"
+      "latest_version": "1.6.0"
     },
     {
       "id": "rssamplifier.com/rssamplifier",
@@ -343,7 +343,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": false,
-      "latest_version": "3.19.6"
+      "latest_version": "3.20.0"
     },
     {
       "id": "logicsrc.com/opencontext",
@@ -1401,7 +1401,7 @@
       "vendor": "Profullstack",
       "license": "MIT",
       "agentic": true,
-      "latest_version": "0.61.1"
+      "latest_version": "0.64.0"
     },
     {
       "id": "nightcell7.com/nightcell7",
@@ -1454,7 +1454,7 @@
       "repository": "https://github.com/profullstack/p0dcasters",
       "vendor": "Profullstack",
       "agentic": false,
-      "latest_version": "0.4.2"
+      "latest_version": "0.7.1"
     },
     {
       "id": "pwamart.com/pwamart",
@@ -2100,7 +2100,7 @@
       "vendor": "Hanzo AI",
       "license": "Apache-2.0",
       "agentic": true,
-      "latest_version": "8.5.923"
+      "latest_version": "8.5.927"
     },
     {
       "id": "github.com/tuxcleaner",
