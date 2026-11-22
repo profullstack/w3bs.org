@@ -3,6 +3,7 @@
 // /api/account, /api/me), the OAuth 2.1 endpoints and the @profullstack/bridges host.
 import express from 'express';
 import { randomBytes } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { createBridgeHost } from '@profullstack/bridges';
 import { createFormGuard } from '@profullstack/stack/email';
 import {
@@ -23,6 +24,22 @@ import {
   formatUserCode,
 } from './accounts.mjs';
 import { escapeHtml as e, FOOTER_SCRIPT_SRC, pageShell } from './site.mjs';
+
+// The User-Agent CoinPay sees on sign-in (token + userinfo). Every fleet site runs on
+// one box behind one IP, so the runtime default (`Bun/x.y.z`) made them one caller.
+const W3BS_VERSION = (() => {
+  try {
+    return createRequire(import.meta.url)('../package.json').version;
+  } catch {
+    return '';
+  }
+})();
+export const COINPAY_UA = `w3bs.org${W3BS_VERSION ? `/${W3BS_VERSION}` : ''} (+https://w3bs.org)`;
+export const coinpayFetch = (input, init = {}) => {
+  const headers = new Headers(init.headers);
+  if (!headers.has('user-agent')) headers.set('user-agent', COINPAY_UA);
+  return fetch(input, { ...init, headers });
+};
 
 // Paths a third party may call cross-origin: no cookies are read on them.
 export const OPEN_CORS = [
@@ -324,7 +341,7 @@ export function mountAccounts(
         clientSecret: coinpay.clientSecret,
         redirectUri: coinpayRedirectUri,
         ...(coinpay.base ? { base: coinpay.base } : {}),
-        ...(coinpay.fetch ? { fetch: coinpay.fetch } : {}),
+        fetch: coinpay.fetch ?? coinpayFetch,
       });
     } catch (error) {
       process.stderr.write(`W3BS: CoinPay sign-in failed: ${error.message}\n`);
