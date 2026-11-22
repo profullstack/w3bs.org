@@ -409,8 +409,16 @@ export function createApp({
   app.get('/sw.js', (_req, res) =>
     res.type('text/javascript').send(readFileSync(resolve(ROOT, 'public/sw.js'))),
   );
-  app.get('/robots.txt', (_req, res) =>
-    res.type('text/plain').send(`User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`),
+  // browse., prompt. and specs. are section hosts: their / is that section's page
+  // (renderPage). Each one names its own sitemap rather than the apex's.
+  const sectionHost = (req) =>
+    /^(browse|prompt|specs)\./.test(req.hostname) && hosts.has(req.hostname.toLowerCase())
+      ? `https://${req.hostname.toLowerCase()}`
+      : null;
+  app.get('/robots.txt', (req, res) =>
+    res
+      .type('text/plain')
+      .send(`User-agent: *\nAllow: /\nSitemap: ${sectionHost(req) ?? origin}/sitemap.xml\n`),
   );
   // For agents: what W3BS is and every way in, as plain text (llmstxt.org).
   app.get('/llms.txt', (_req, res) =>
@@ -451,13 +459,20 @@ export function createApp({
         ].join('\n'),
       ),
   );
-  app.get('/sitemap.xml', (_req, res) =>
-    res
+  app.get('/sitemap.xml', (req, res) => {
+    const section = sectionHost(req);
+    if (section)
+      return res
+        .type('application/xml')
+        .send(
+          `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${section}/</loc></url></urlset>`,
+        );
+    return res
       .type('application/xml')
       .send(
         `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/', '/pricing', '/packages', '/packages/publish', '/specs', '/browse', '/net', '/search', '/prompts', '/devices', '/desktop', '/de', '/training', '/training/liquid-agent', '/tasks', '/workflows', '/os', '/os/mobile', '/ab-testing', '/social', '/governance', '/developers', '/signup', '/terms', '/privacy'].map((path) => `<url><loc>${origin}${path}</loc></url>`).join('')}</urlset>`,
-      ),
-  );
+      );
+  });
   app.get('/docs/:file', (req, res) => {
     if (!/^[a-zA-Z0-9-]+\.md$/.test(req.params.file))
       throw new W3bsError('NOT_FOUND', 'Document not found.', 404);
