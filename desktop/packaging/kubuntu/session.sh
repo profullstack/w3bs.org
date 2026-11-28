@@ -1,7 +1,8 @@
 #!/bin/sh
 # The headless Kubuntu session inside the w3bs desktop container (see Dockerfile).
 # Runs as the host user (docker run --user), with $HOME on a host volume.
-#   W3BS_DRM       the KMS device KWin drives (default: the vkms card passed in)
+#   W3BS_DRM       the KMS device KWin drives (default: the vkms card passed in; none means
+#                  KWin's virtual backend, for kernels built without vkms such as Debian's)
 #   W3BS_GEOMETRY  1920x1080 by default
 #   W3BS_MCP       127.0.0.1:7801 by default (the desktop layer's MCP endpoint)
 set -eu
@@ -33,7 +34,11 @@ if [ -z "$DRM" ]; then
     [ "$(basename "$(readlink -f "/sys/class/drm/$(basename "$card")/device")")" = vkms ] && DRM=$card && break
   done
 fi
-[ -n "$DRM" ] || { say "no vkms display passed in; on the host run: sudo modprobe vkms"; exit 2; }
+# No vkms (Debian and some cloud kernels are built without CONFIG_DRM_VKMS): KWin's virtual
+# backend draws the same desktop with no KMS device. It renders OpenGL through vgem's nodes,
+# which the host loads and passes in; without them KWin falls back to QPainter and its
+# screencast (the VNC server's and the desktop layer's only view) refuses to stream.
+[ -n "$DRM" ] || say "no vkms display; using KWin's virtual backend"
 
 dbus-daemon --session --address="$DBUS_SESSION_BUS_ADDRESS" --nofork --nopidfile >"$LOGS/dbus.log" 2>&1 &
 wait_for "$XDG_RUNTIME_DIR/bus"
@@ -52,15 +57,21 @@ export KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1
 kbuildsycoca6 >"$LOGS/kbuildsycoca.log" 2>&1 || true
 
 # KWin on the virtual display; with no GPU, Mesa renders OpenGL on the CPU.
-KWIN_DRM_DEVICES=$DRM kwin_wayland --drm --socket wayland-0 >"$LOGS/kwin.log" 2>&1 &
+if [ -n "$DRM" ]; then
+  KWIN_DRM_DEVICES=$DRM kwin_wayland --drm --socket wayland-0 >"$LOGS/kwin.log" 2>&1 &
+else
+  kwin_wayland --virtual --width "${GEOMETRY%x*}" --height "${GEOMETRY#*x}" --socket wayland-0 >"$LOGS/kwin.log" 2>&1 &
+fi
 KWIN=$!
 wait_for "$XDG_RUNTIME_DIR/wayland-0"
 export WAYLAND_DISPLAY=wayland-0 QT_QPA_PLATFORM=wayland
-# vkms starts at 1024x768.
-for _ in $(seq 1 20); do kscreen-doctor -o >/dev/null 2>&1 && break; sleep 0.5; done
-OUTPUT=$(kscreen-doctor -j 2>/dev/null | sed -n 's/.*"name": *"\([^"]*\)".*/\1/p' | head -1)
-[ -n "$OUTPUT" ] && kscreen-doctor "output.$OUTPUT.mode.$GEOMETRY@60" >"$LOGS/kscreen.log" 2>&1 \
-  || say "could not set $GEOMETRY on ${OUTPUT:-the display}; see $LOGS/kscreen.log"
+if [ -n "$DRM" ]; then
+  # vkms starts at 1024x768.
+  for _ in $(seq 1 20); do kscreen-doctor -o >/dev/null 2>&1 && break; sleep 0.5; done
+  OUTPUT=$(kscreen-doctor -j 2>/dev/null | sed -n 's/.*"name": *"\([^"]*\)".*/\1/p' | head -1)
+  [ -n "$OUTPUT" ] && kscreen-doctor "output.$OUTPUT.mode.$GEOMETRY@60" >"$LOGS/kscreen.log" 2>&1 \
+    || say "could not set $GEOMETRY on ${OUTPUT:-the display}; see $LOGS/kscreen.log"
+fi
 
 /usr/lib/*/libexec/xdg-desktop-portal-kde >"$LOGS/xdg-desktop-portal-kde.log" 2>&1 &
 sleep 1
@@ -90,7 +101,7 @@ W0=$!
 # The Agentic Desktop Layer, Enabled from the start: this desktop exists for agents.
 w3bs-desktop daemon --adapter auto --enabled-by-default --mcp-http "${W3BS_MCP:-127.0.0.1:7801}" \
   >"$LOGS/w3bs-desktop.log" 2>&1 &
-say "up: KWin on $DRM, VNC on /vnc/vnc.sock, desktop layer MCP on http://${W3BS_MCP:-127.0.0.1:7801}/mcp"
+say "up: KWin on ${DRM:-the virtual backend}, VNC on /vnc/vnc.sock, desktop layer MCP on http://${W3BS_MCP:-127.0.0.1:7801}/mcp"
 
 # Stay up while the compositor and the VNC server live (docker restarts the container
 # otherwise); tini reaps everything else, including w0vncserver's per-viewer children.

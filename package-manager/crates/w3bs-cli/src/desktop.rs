@@ -4,7 +4,8 @@
 //! `start` builds the image from the Dockerfile embedded here (desktop/packaging/kubuntu), runs
 //! it as this user with `--restart unless-stopped`, and turns screen sharing on for this
 //! machine's fleet agent through the container's VNC Unix socket. Inside: KWin on the kernel's
-//! vkms virtual display (OpenGL on the CPU, no GPU needed), Plasma, Konsole, TigerVNC's
+//! vkms virtual display (OpenGL on the CPU, no GPU needed), or on KWin's own virtual backend
+//! when the kernel has no vkms (Debian's is built without it), Plasma, Konsole, TigerVNC's
 //! w0vncserver and the Agentic Desktop Layer (MCP on 127.0.0.1:7802). See
 //! w3bs.org/docs/fleet-screen.md.
 
@@ -79,12 +80,35 @@ fn require_docker() -> Result<()> {
     }
 }
 
-/// The vkms card (`/dev/dri/cardN`): its sysfs device is named vkms (on the faux bus in recent
-/// kernels, a platform device in older ones).
+/// The DRM nodes (`/dev/dri/cardN`, `/dev/dri/renderDN`) whose sysfs device is named `driver`
+/// (on the faux bus in recent kernels, a platform device in older ones), cards first.
+fn find_nodes(sys: &Path, driver: &str) -> Vec<PathBuf> {
+    let Ok(dir) = std::fs::read_dir(sys) else { return Vec::new() };
+    let node = |n: &str| ["card", "renderD"].iter().any(|p| n.strip_prefix(p).is_some_and(|d| !d.is_empty() && d.chars().all(|c| c.is_ascii_digit())));
+    let mut names: Vec<_> = dir
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| node(n))
+        .filter(|n| std::fs::canonicalize(sys.join(n).join("device")).ok().and_then(|p| p.file_name().map(|f| f == driver)).unwrap_or(false))
+        .collect();
+    names.sort();
+    names.into_iter().map(|n| PathBuf::from("/dev/dri").join(n)).collect()
+}
+
+/// The vkms card (`/dev/dri/cardN`).
 pub fn find_vkms(sys: &Path) -> Option<PathBuf> {
-    let mut cards: Vec<_> = std::fs::read_dir(sys).ok()?.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).filter(|n| n.starts_with("card") && n[4..].chars().all(|c| c.is_ascii_digit()) && n.len() > 4).collect();
-    cards.sort();
-    cards.into_iter().find(|n| std::fs::canonicalize(sys.join(n).join("device")).ok().and_then(|p| p.file_name().map(|f| f == "vkms")).unwrap_or(false)).map(|n| PathBuf::from("/dev/dri").join(n))
+    find_nodes(sys, "vkms").into_iter().find(|p| p.file_name().is_some_and(|f| f.to_string_lossy().starts_with("card")))
+}
+
+/// What KWin draws on inside the container.
+#[derive(Debug, PartialEq)]
+enum Display {
+    /// The kernel's vkms virtual display, driven through KMS.
+    Vkms(PathBuf),
+    /// KWin's virtual backend, rendering through vgem's nodes. For kernels built without vkms
+    /// (Debian's): without a render node KWin falls back to QPainter, and its screencast, which
+    /// both the VNC server and the desktop layer read, refuses that ("Unsupported compositing type").
+    Virtual(Vec<PathBuf>),
 }
 
 #[cfg(unix)]
@@ -97,12 +121,24 @@ fn ids() -> (u32, u32) {
     (0, 0)
 }
 
-/// Load vkms (and keep it across reboots), asking sudo for it when needed.
-fn ensure_vkms(notes: &mut Vec<String>) -> Result<PathBuf> {
-    let sys = Path::new("/sys/class/drm");
-    if let Some(card) = find_vkms(sys) {
-        return Ok(card);
-    }
+/// Whether this kernel ships module `name` (a loadable module, or built in).
+fn module_available(release: &str, modules: &Path, name: &str) -> bool {
+    let dir = modules.join(release);
+    let file = format!("{name}.ko");
+    let listed = |f: &str| {
+        std::fs::read_to_string(dir.join(f))
+            .map(|t| t.lines().any(|l| l.split(':').next().unwrap_or("").rsplit('/').next().unwrap_or("").starts_with(&file)))
+            .unwrap_or(false)
+    };
+    listed("modules.dep") || listed("modules.builtin")
+}
+
+fn kernel_release() -> String {
+    std::fs::read_to_string("/proc/sys/kernel/osrelease").map(|s| s.trim().to_owned()).unwrap_or_default()
+}
+
+/// Load kernel module `name` and keep it across reboots, asking sudo when not root.
+fn load_module(name: &str, why: &str, notes: &mut Vec<String>) -> bool {
     let root = ids().0 == 0;
     let run = |args: &[&str]| -> bool {
         let mut cmd = if root { Command::new(args[0]) } else { Command::new("sudo") };
@@ -113,22 +149,51 @@ fn ensure_vkms(notes: &mut Vec<String>) -> Result<PathBuf> {
         }
         cmd.status().map(|s| s.success()).unwrap_or(false)
     };
-    eprintln!("w3bs: loading the vkms virtual display (a kernel module; sudo may ask for your password)");
-    let loaded = run(&["modprobe", "vkms"]);
-    let persisted = loaded && run(&["sh", "-c", "echo vkms > /etc/modules-load.d/w3bs-vkms.conf"]);
-    if persisted {
-        notes.push("loaded the vkms kernel module and kept it in /etc/modules-load.d/w3bs-vkms.conf".into());
+    eprintln!("w3bs: loading {why} (the {name} kernel module; sudo may ask for your password)");
+    let conf = format!("/etc/modules-load.d/w3bs-{name}.conf");
+    let loaded = run(&["modprobe", name]);
+    if loaded && run(&["sh", "-c", &format!("echo {name} > {conf}")]) {
+        notes.push(format!("loaded the {name} kernel module and kept it in {conf}"));
     }
+    loaded
+}
+
+fn wait_for_nodes(sys: &Path, driver: &str) -> Vec<PathBuf> {
     for _ in 0..20 {
-        if let Some(card) = find_vkms(sys) {
-            return Ok(card);
+        let nodes = find_nodes(sys, driver);
+        if !nodes.is_empty() {
+            return nodes;
         }
         std::thread::sleep(Duration::from_millis(250));
     }
-    Err(fail(
-        "NO_VKMS",
-        "the desktop needs the kernel's vkms virtual display; run: sudo modprobe vkms && echo vkms | sudo tee /etc/modules-load.d/w3bs-vkms.conf",
-    ))
+    Vec::new()
+}
+
+/// The display for KWin: vkms when the kernel has it, else KWin's virtual backend on vgem.
+fn ensure_display(notes: &mut Vec<String>) -> Result<Display> {
+    let sys = Path::new("/sys/class/drm");
+    if let Some(card) = find_vkms(sys) {
+        return Ok(Display::Vkms(card));
+    }
+    let release = kernel_release();
+    let modules = Path::new("/lib/modules");
+    if module_available(&release, modules, "vkms") && load_module("vkms", "the vkms virtual display", notes) {
+        if let Some(card) = wait_for_nodes(sys, "vkms").into_iter().find(|p| p.to_string_lossy().contains("/card")) {
+            return Ok(Display::Vkms(card));
+        }
+    }
+    let mut vgem = find_nodes(sys, "vgem");
+    if vgem.is_empty() && module_available(&release, modules, "vgem") && load_module("vgem", "a render node for the desktop", notes) {
+        vgem = wait_for_nodes(sys, "vgem");
+    }
+    if vgem.is_empty() {
+        return Err(fail(
+            "NO_DISPLAY",
+            format!("the desktop needs the kernel's vkms or vgem module, and kernel {release} has neither loadable; run: sudo modprobe vkms (or vgem)"),
+        ));
+    }
+    notes.push(format!("kernel {release} has no vkms, so KWin runs its virtual backend on vgem (the same desktop, no display device)"));
+    Ok(Display::Virtual(vgem))
 }
 
 #[cfg(unix)]
@@ -181,7 +246,7 @@ pub fn start(control: bool, geometry: Option<&str>, rebuild: bool) -> Result<Val
     }
     require_docker()?;
     let mut notes = Vec::new();
-    let card = ensure_vkms(&mut notes)?;
+    let display = ensure_display(&mut notes)?;
     let tag = image_tag();
     if rebuild || docker(&["image", "inspect", &tag]).is_err() {
         build_image(&tag)?;
@@ -201,16 +266,23 @@ pub fn start(control: bool, geometry: Option<&str>, rebuild: bool) -> Result<Val
     let user = format!("{uid}:{gid}");
     // /dev/dri bound whole with a DRM cgroup rule, not `--device /dev/dri/cardN`: card numbers
     // change across reboots, and Docker will not restart a container whose device has gone, so
-    // the desktop stayed down after one. session.sh finds the vkms card itself.
-    let device = card.display().to_string();
-    let card_gid = gid_of(&card).map(|g| g.to_string());
+    // the desktop stayed down after one. session.sh finds the vkms card itself, and runs KWin's
+    // virtual backend when there is none (KWin then picks vgem's nodes).
+    let (device, nodes) = match &display {
+        Display::Vkms(card) => (card.display().to_string(), vec![card.clone()]),
+        Display::Virtual(nodes) => ("virtual (vgem)".to_owned(), nodes.clone()),
+    };
+    // Every node's group (card is `video`, renderD is `render`), so KWin can open them.
+    let mut node_gids: Vec<String> = nodes.iter().filter_map(|n| gid_of(n)).map(|g| g.to_string()).collect();
+    node_gids.sort();
+    node_gids.dedup();
     let home = format!("{}:/home/desktop", dir.join("home").display());
     let vnc = format!("{}:/vnc", dir.join("vnc").display());
     let geometry_env = format!("W3BS_GEOMETRY={}", geometry.unwrap_or("1920x1080"));
     let mcp_env = format!("W3BS_MCP={MCP}");
     let mut args = vec!["run", "-d", "--name", CONTAINER, "--restart", "unless-stopped", "--network", "host", "--user", &user, "--shm-size", "512m", "--device-cgroup-rule", DRM_RULE, "-v", "/dev/dri:/dev/dri"];
-    if let Some(g) = card_gid.as_deref() {
-        args.extend(["--group-add", g]);
+    for g in &node_gids {
+        args.extend(["--group-add", g.as_str()]);
     }
     args.extend(["-e", &geometry_env, "-e", &mcp_env, "-v", &home, "-v", &vnc, &tag]);
     docker(&args).map_err(|e| fail("DESKTOP_START", format!("docker run failed: {e}")))?;
@@ -262,7 +334,7 @@ pub fn status() -> Result<Value> {
         "state": parts.next().filter(|s| !s.is_empty()).unwrap_or("absent"),
         "started_at": parts.next(), "restarts": parts.next(), "image": parts.next(),
         "current_image": image_tag(), "vnc": format!("unix:{}", sock.display()), "vnc_ready": sock.exists(),
-        "mcp": format!("http://{MCP}/mcp"), "vkms": find_vkms(Path::new("/sys/class/drm")),
+        "mcp": format!("http://{MCP}/mcp"), "vkms": find_vkms(Path::new("/sys/class/drm")), "vgem": find_nodes(Path::new("/sys/class/drm"), "vgem"),
         "screen": agent_screen, "logs": data_dir()?.join("home/.local/state/w3bs-desktop/logs"),
     }))
 }
@@ -377,6 +449,40 @@ mod tests {
         #[cfg(unix)]
         assert_eq!(find_vkms(&sys), Some(PathBuf::from("/dev/dri/card2")));
         assert_eq!(find_vkms(&dir.path().join("nothing")), None);
+    }
+
+    #[test]
+    fn knows_when_the_kernel_has_vkms() {
+        let dir = tempfile::tempdir().unwrap();
+        let k = dir.path().join("6.12.1");
+        std::fs::create_dir_all(&k).unwrap();
+        // Debian's kernel: vgem, no vkms.
+        std::fs::write(k.join("modules.dep"), "kernel/drivers/gpu/drm/vgem/vgem.ko.xz: kernel/drivers/gpu/drm/drm.ko.xz\n").unwrap();
+        assert!(!module_available("6.12.1", dir.path(), "vkms"));
+        assert!(module_available("6.12.1", dir.path(), "vgem"));
+        std::fs::write(k.join("modules.builtin"), "kernel/drivers/gpu/drm/vkms/vkms.ko\n").unwrap();
+        assert!(module_available("6.12.1", dir.path(), "vkms"));
+        std::fs::remove_file(k.join("modules.builtin")).unwrap();
+        std::fs::write(k.join("modules.dep"), "kernel/drivers/gpu/drm/vkms/vkms.ko.zst: kernel/drivers/gpu/drm/drm.ko.zst\n").unwrap();
+        assert!(module_available("6.12.1", dir.path(), "vkms"));
+        assert!(!module_available("nope", dir.path(), "vkms"));
+        // Without vkms, session.sh starts KWin's virtual backend instead of giving up.
+        assert!(SESSION.contains("kwin_wayland --virtual"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn finds_vgem_card_and_render_node() {
+        let dir = tempfile::tempdir().unwrap();
+        let sys = dir.path().join("class/drm");
+        let devs = dir.path().join("devices");
+        for (node, dev) in [("card0", "pci0000:00/0000:00:02.0"), ("card1", "faux/vgem"), ("renderD128", "faux/vgem"), ("renderD129", "pci0000:00/0000:00:02.0")] {
+            std::fs::create_dir_all(devs.join(dev)).unwrap();
+            std::fs::create_dir_all(sys.join(node)).unwrap();
+            std::os::unix::fs::symlink(devs.join(dev), sys.join(node).join("device")).unwrap();
+        }
+        assert_eq!(find_nodes(&sys, "vgem"), vec![PathBuf::from("/dev/dri/card1"), PathBuf::from("/dev/dri/renderD128")]);
+        assert_eq!(find_vkms(&sys), None);
     }
 
     #[test]
