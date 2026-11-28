@@ -52,7 +52,10 @@ What is in the container:
 
 - **KDE Plasma** (KWin, Plasma shell, Konsole) from Ubuntu 26.04's packages.
 - **No GPU needed.** KWin drives the kernel's `vkms` virtual display and Mesa renders OpenGL on
-  the CPU. `start` loads `vkms` (asking `sudo` once) and keeps it loaded across reboots.
+  the CPU. `start` loads `vkms` (asking `sudo` once) and keeps it loaded across reboots. Kernels
+  built without `vkms` (Debian's, some cloud images) are fine too: `start` loads `vgem` instead
+  (a render node with no display, also kept across reboots) and KWin runs its virtual backend on
+  it, the same desktop with no display device.
 - **The [Agentic Desktop Layer](/desktop)**, enabled from the start, with its MCP endpoint on
   `http://127.0.0.1:7802/mcp` (not 7801, so it never clashes with a desktop layer on the host).
 - **TigerVNC's `w0vncserver`**, built from source in the image (Ubuntu's TigerVNC is too old to
